@@ -43,6 +43,7 @@
 
   @media (min-width: 66rem) {
     div {
+      content: "";
       color: transparent;
     }
   }

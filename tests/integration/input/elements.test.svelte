@@ -43,6 +43,7 @@
 
   @media (up: lg) {
     div {
+      content: "";
       color: transparent;
     }
   }

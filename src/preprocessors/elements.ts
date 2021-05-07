@@ -96,73 +96,48 @@ export function elements(
                   )?.value;
                 }
 
-                const Value = child.value.children
-                  .map((childValue) => {
-                    if (childValue.type === "String") {
-                      const token = childValue.value.replace(/(\"|\')/g, "");
+                child.value.children.forEach((childValue) => {
+                  if (childValue.type === "String") {
+                    const token = childValue.value.replace(/(\"|\')/g, "");
 
-                      if (
-                        token !== undefined &&
-                        token in carbonElements.elements.tokens
-                      ) {
-                        const tokenValue =
-                          carbonElements.elements.tokens[token as Token];
-                        if (child.property in TOKEN_TYPE) {
-                          if (
-                            (tokenValue as TokenTypeStyles).breakpoints.length >
-                            0
-                          ) {
-                            // TODO: generate responsive styles
-                          }
-
-                          replaceContent(
-                            node,
-                            (tokenValue as TokenTypeStyles).css,
-                            getContent(child)
-                          );
-
-                          return (tokenValue as TokenTypeStyles).css;
+                    if (
+                      token !== undefined &&
+                      token in carbonElements.elements.tokens
+                    ) {
+                      const tokenValue =
+                        carbonElements.elements.tokens[token as Token];
+                      if (child.property in TOKEN_TYPE) {
+                        if (
+                          (tokenValue as TokenTypeStyles).breakpoints.length > 0
+                        ) {
+                          // TODO: generate responsive styles
                         }
 
-                        if (token in carbonElements.elements.tokens_ui) {
-                          let Value: TokenUI | string;
-
-                          if (theme === "all" || cssVars)
-                            Value = `var(--cds-${token})`;
-                          else
-                            Value =
-                              carbonElements.elements.tokens_ui[
-                                token as TokenUI
-                              ][theme];
-
-                          const oldValue = getContent(child.value);
-                          const newValue = oldValue.replace(
-                            childValue.value,
-                            Value
-                          );
-
-                          replaceContent(
-                            node,
-                            `${child.property}: ${newValue}`,
-                            getContent(child)
-                          );
-
-                          if (theme === "all") return `var(--cds-${token})`;
-                          return carbonElements.elements.tokens_ui[
-                            token as TokenUI
-                          ][theme];
-                        }
-
-                        const oldValue = getContent(child.value);
-
-                        let newValue = oldValue.replace(
-                          childValue.value,
-                          tokenValue as string
+                        replaceContent(
+                          node,
+                          (tokenValue as TokenTypeStyles).css,
+                          getContent(child)
                         );
 
-                        if (hasOperator && operatorValue !== undefined) {
-                          newValue = `calc(${tokenValue} ${operator} ${operatorValue})`;
-                        }
+                        return (tokenValue as TokenTypeStyles).css;
+                      }
+
+                      if (token in carbonElements.elements.tokens_ui) {
+                        let Value: TokenUI | string;
+
+                        if (theme === "all" || cssVars)
+                          Value = `var(--cds-${token})`;
+                        else
+                          Value =
+                            carbonElements.elements.tokens_ui[token as TokenUI][
+                              theme
+                            ];
+
+                        const oldValue = getContent(child.value);
+                        const newValue = oldValue.replace(
+                          childValue.value,
+                          Value
+                        );
 
                         replaceContent(
                           node,
@@ -170,21 +145,35 @@ export function elements(
                           getContent(child)
                         );
 
-                        return tokenValue;
-                      } else {
-                        console.warn(
-                          `[carbon:elements] Invalid token "${token}"`
-                        );
+                        if (theme === "all") return `var(--cds-${token})`;
+                        return carbonElements.elements.tokens_ui[
+                          token as TokenUI
+                        ][theme];
                       }
+
+                      const oldValue = getContent(child.value);
+
+                      let newValue = oldValue.replace(
+                        childValue.value,
+                        tokenValue as string
+                      );
+
+                      if (hasOperator && operatorValue !== undefined) {
+                        newValue = `calc(${tokenValue} ${operator} ${operatorValue})`;
+                      }
+
+                      replaceContent(
+                        node,
+                        `${child.property}: ${newValue}`,
+                        getContent(child)
+                      );
+
+                      return tokenValue;
                     }
+                  }
 
-                    return getContent(childValue);
-                  })
-                  .join(" ");
-
-                if (child.property in PROPERTY_ALIAS) return Value;
-
-                return `${child.property}: ${Value};`;
+                  return getContent(childValue);
+                });
               });
             }
 
