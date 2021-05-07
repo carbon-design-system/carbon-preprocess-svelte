@@ -135,9 +135,15 @@ export function elements(
                                 token as TokenUI
                               ][theme];
 
+                          const oldValue = getContent(child.value);
+                          const newValue = oldValue.replace(
+                            childValue.value,
+                            Value
+                          );
+
                           replaceContent(
                             node,
-                            `${child.property}: ${Value}`,
+                            `${child.property}: ${newValue}`,
                             getContent(child)
                           );
 
