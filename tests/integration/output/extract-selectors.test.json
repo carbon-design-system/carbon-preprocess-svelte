@@ -1,0 +1,98 @@
+[
+  [
+    "a",
+    {
+      "type": "Element"
+    }
+  ],
+  [
+    "span",
+    {
+      "type": "Element"
+    }
+  ],
+  [
+    ".bx--assistive-text",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--btn__icon",
+    {
+      "type": "Attribute"
+    }
+  ],
+  [
+    "button",
+    {
+      "type": "Element"
+    }
+  ],
+  [
+    ".bx--btn",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--btn--field",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--btn--sm",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--btn--",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--btn--disabled",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--btn--icon-only",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--tooltip__trigger",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--tooltip--a11y",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--tooltip--",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--tooltip--align-",
+    {
+      "type": "Class"
+    }
+  ],
+  [
+    ".bx--btn--selected",
+    {
+      "type": "Class"
+    }
+  ]
+]
