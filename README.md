@@ -79,6 +79,18 @@ export default {
 };
 ```
 
+#### API
+
+```ts
+interface OptimizeCssOptions {
+  safelist: {
+    standard?: Array<RegExp | string>;
+    deep?: RegExp[];
+    greedy?: RegExp[];
+  };
+}
+```
+
 ### `elements`
 
 `elements` is a Svelte style preprocessor that rewrites Carbon Design System tokens to their computed values.

@@ -20,14 +20,17 @@
     "build:api:icons": "ts-node src/build/build-icons",
     "build:api:pictograms": "ts-node src/build/build-pictograms",
     "build:lib": "run-p build:lib:*",
-    "build:lib:cjs": "esbuild src/index.ts --bundle --platform=node --target=node10.4 --outfile=dist/index.js",
-    "build:lib:esm": "esbuild src/index.ts --bundle --platform=node --target=es6 --format=esm --outfile=dist/index.mjs",
+    "build:lib:cjs": "esbuild src/index.ts --bundle --platform=node --target=node10.4 --external:purgecss --outfile=dist/index.js",
+    "build:lib:esm": "esbuild src/index.ts --bundle --platform=node --target=es6 --format=esm --external:purgecss --outfile=dist/index.mjs",
     "build:lib:types": "tsc",
     "prepack": "run-s build:api build:lib",
     "test": "run-p test:*",
     "test:unit": "ts-node tests/unit",
     "test:integration": "ts-node tests/integration",
     "format": "prettier --write '.'"
+  },
+  "dependencies": {
+    "purgecss": "^4.0.3"
   },
   "devDependencies": {
     "@carbon/elements": "10.31.0",
@@ -42,7 +45,6 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^2.2.1",
     "prettier-plugin-svelte": "^2.2.0",
-    "purgecss": "^4.0.3",
     "rollup": "^2.47.0",
     "svelte": "^3.38.2",
     "totalist": "^2.0.0",
