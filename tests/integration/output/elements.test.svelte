@@ -43,6 +43,7 @@
 
   @media (min-width: 66rem) {
     div {
+      content: "";
       color: transparent;
     }
   }
@@ -54,4 +55,23 @@
   }
   
   @media (min-width: 82rem) {}
+
+  @media (max-width: 42rem) {
+    :global(.info-card:not(:nth-child(2))) {
+      border-top: 1px solid #e0e0e0;
+      padding-top: 3rem;
+    }
+  }
+
+  @media (min-width: 42rem) {
+    :global(.info-card:not(:nth-child(odd))) {
+      border-left: 1px solid #e0e0e0;
+    }
+  }
+
+  @media (min-width: 321px) and (max-width: 42rem) {
+    p {
+      max-width: 75%;
+    }
+  }
 </style>

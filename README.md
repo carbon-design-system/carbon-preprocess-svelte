@@ -61,14 +61,14 @@ module.exports = {
 `optimizeCss` should be added to the list of `vite.plugins`. Take care to only run the plugin when building for production.
 
 ```js
-// svelte.config.cjs
-const static = require("@sveltejs/adapter-static");
-const { optimizeCss } = require("carbon-preprocess-svelte");
+// svelte.config.js
+import adapter from "@sveltejs/adapter-static";
+import { optimizeCss } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   kit: {
     target: "#svelte",
-    adapter: static(),
+    adapter: adapter(),
     vite: {
       optimizeDeps: {
         include: ["carbon-components-svelte", "clipboard-copy"],
@@ -135,10 +135,10 @@ module.exports = {
 #### Usage
 
 ```js
-// svelte.config.cjs
-const { elements } = require("carbon-preprocess-svelte");
+// svelte.config.js
+import { elements } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   preprocess: [elements()],
 };
 ```
@@ -182,10 +182,10 @@ The only required attribute is `name`, which represents the module name of the i
 #### Usage
 
 ```js
-// svelte.config.cjs
-const { icons } = require("carbon-preprocess-svelte");
+// svelte.config.js
+import { icons } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   preprocess: [icons()],
 };
 ```
@@ -207,10 +207,10 @@ The only required attribute is `name`, which represents the module name of the p
 #### Usage
 
 ```js
-// svelte.config.cjs
-const { pictograms } = require("carbon-preprocess-svelte");
+// svelte.config.js
+import { pictograms } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   preprocess: [pictograms()],
 };
 ```
@@ -246,10 +246,10 @@ const headings = [
 #### Usage
 
 ```js
-// svelte.config.cjs
-const { collectHeadings } = require("carbon-preprocess-svelte");
+// svelte.config.js
+import { collectHeadings } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   preprocess: [
     collectHeadings({
       afterCollect: (headings, content) => {
@@ -294,10 +294,10 @@ interface CollectHeadingsOptions {
 ## Presets
 
 ```js
-// svelte.config.cjs
-const { presetCarbon } = require("carbon-preprocess-svelte");
+// svelte.config.js
+import { presetCarbon } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   preprocess: presetCarbon(),
 
   // if using other preprocessors

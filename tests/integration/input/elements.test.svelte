@@ -43,6 +43,7 @@
 
   @media (up: lg) {
     div {
+      content: "";
       color: transparent;
     }
   }
@@ -54,4 +55,23 @@
   }
   
   @media (bp: xlg) {}
+
+  @media (down: md) {
+    :global(.info-card:not(:nth-child(2))) {
+      border-top: 1px solid "ui-03";
+      padding-top: "spacing-09";
+    }
+  }
+
+  @media (bp: md) {
+    :global(.info-card:not(:nth-child(odd))) {
+      border-left: 1px solid "ui-03";
+    }
+  }
+
+  @media (between: 321px) and (md) {
+    p {
+      max-width: 75%;
+    }
+  }
 </style>

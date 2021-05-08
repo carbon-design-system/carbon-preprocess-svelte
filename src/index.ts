@@ -1,4 +1,6 @@
 export * from "./preprocessors";
 export * from "./extractors";
-export * from "./plugins";
+
+// TODO: restore
+// export * from "./plugins";
 export * from "./presets";
