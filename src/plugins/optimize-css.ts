@@ -1,8 +1,11 @@
 import Rollup from "rollup";
 import { extractSelectors, ExtractedSelectors } from "../extractors";
-import { PurgeCSS } from "purgecss";
+import purgecss from "purgecss";
 import { readFile } from "../utils";
 import { EXT_SVELTE, EXT_CSS } from "../constants";
+
+// @ts-ignore
+const { PurgeCSS } = purgecss;
 
 interface OptimizeCssOptions {
   safelist: {
