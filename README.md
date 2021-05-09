@@ -44,10 +44,10 @@ This library contains the following preprocessors and plugins:
 #### Usage
 
 ```js
-// svelte.config.cjs
-const { optimizeImports } = require("carbon-preprocess-svelte");
+// svelte.config.js
+import { optimizeImports } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   preprocess: [optimizeImports()],
 };
 ```
