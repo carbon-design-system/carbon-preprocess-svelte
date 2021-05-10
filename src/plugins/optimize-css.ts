@@ -1,8 +1,13 @@
 import Rollup from "rollup";
+import sveltePreprocess from "svelte-preprocess";
+import { preprocess } from "svelte/compiler";
 import { extractSelectors, ExtractedSelectors } from "../extractors";
 import purgecss from "purgecss";
 import { readFile } from "../utils";
 import { EXT_SVELTE, EXT_CSS } from "../constants";
+
+// @ts-ignore
+const { typescript } = sveltePreprocess;
 
 // @ts-ignore
 const { PurgeCSS } = purgecss;
@@ -35,7 +40,10 @@ export function optimizeCss(
     async transform(code, id) {
       if (EXT_SVELTE.test(id)) {
         const source = await readFile(id, "utf-8");
-        selectors.push(...extractSelectors(source, id));
+        const result = await preprocess(source, [typescript()], {
+          filename: id,
+        });
+        selectors.push(...extractSelectors(result.code, id));
         return { code, map: null };
       }
     },

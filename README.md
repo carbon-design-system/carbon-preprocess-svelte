@@ -164,7 +164,7 @@ interface ElementsOptions {
    * Setting to "all" will also enable `cssVars`
    * @default "white"
    */
-  theme: v10_theme | "all";
+  theme: "white" | "g10" | "g90" | "g100" | "all";
 
   /**
    * Set to `true` for tokens to be re-written as CSS variables
