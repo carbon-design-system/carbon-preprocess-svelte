@@ -5,7 +5,7 @@
 ![npm downloads to date](https://img.shields.io/npm/dt/carbon-preprocess-svelte?color=262626&style=for-the-badge)
 [![Build][build]][build-badge]
 
-> Collection of Svelte preprocessors for the Carbon Design System
+> Collection of [Svelte preprocessors](https://svelte.dev/docs#svelte_preprocess) for the Carbon Design System
 
 ## Installation
 
@@ -28,7 +28,13 @@ This library contains the following preprocessors and plugins:
 
 ### `optimizeImports`
 
-`optimizeImports` is a Svelte script preprocessor that rewrites base imports from Carbon components/icons/pictograms packages to their source Svelte code paths. This can greatly speed up compile times during development while preserving typeahead and autocomplete hinting offered by integrated development environments (IDE) like VSCode.
+`optimizeImports` is a Svelte script preprocessor that rewrites base imports from Carbon components/icons/pictograms packages to their source Svelte code paths. This can greatly speed up compile times during development while preserving typeahead and autocompletion hinting offered by integrated development environments (IDE) like VSCode.
+
+The preprocessor optimizes imports from the following packages:
+
+- [carbon-components-svelte](https://github.com/IBM/carbon-components-svelte)
+- [carbon-icons-svelte](https://github.com/IBM/carbon-icons-svelte)
+- [carbon-pictograms-svelte](https://github.com/IBM/carbon-pictograms-svelte)
 
 **Example**
 
@@ -54,7 +60,7 @@ export default {
 
 ### `optimizeCss`
 
-`optimizeCss` is a Rollup plugin that removes unused Carbon CSS. It extracts selectors based on a Svelte component's markup and style content and uses PurgeCSS to prune any unused styles.
+`optimizeCss` is a Rollup plugin that removes unused Carbon CSS. It extracts selectors based on a Svelte component's markup and style content and uses [PurgeCSS](https://github.com/FullHuman/purgecss) to prune any unused styles.
 
 #### Usage
 
@@ -93,7 +99,7 @@ interface OptimizeCssOptions {
 
 ### `elements`
 
-`elements` is a Svelte style preprocessor that rewrites Carbon Design System tokens to their computed values.
+`elements` is a Svelte style preprocessor that rewrites [Carbon Design System tokens](https://www.carbondesignsystem.com/guidelines/themes/overview#tokens) to their computed values. The purpose is to use design system token names (e.g., `"interactive-01"`) instead of hardcoded values (e.g., `"#0f62fe"`).
 
 **Before**
 
@@ -314,6 +320,27 @@ export default {
 
   // if using other preprocessors
   // preprocess: [...presetCarbon()],
+};
+```
+
+## Sample SvelteKit set-up
+
+```js
+// svelte.config.js
+import adapter from "@sveltejs/adapter-static";
+import * as carbon from "carbon-preprocess-svelte";
+
+/** @type {import('@sveltejs/kit').Config} */
+export default {
+  preprocess: carbon.presetCarbon(),
+  kit: {
+    target: "#svelte",
+    adapter: adapter(),
+    vite: {
+      optimizeDeps: { include: ["clipboard-copy"] },
+      plugins: [process.env.NODE_ENV === "production" && carbon.optimizeCss()],
+    },
+  },
 };
 ```
 
