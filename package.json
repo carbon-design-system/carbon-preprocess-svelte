@@ -20,7 +20,7 @@
     "build:api:icons": "ts-node src/build/build-icons",
     "build:api:pictograms": "ts-node src/build/build-pictograms",
     "build:lib": "run-p build:lib:*",
-    "build:lib:cjs": "esbuild src/index.ts --bundle --platform=node --target=node10.4 --external:purgecss --external:svelte-preprocess --external:typescript --outfile=dist/index.js",
+    "build:lib:cjs": "esbuild src/index.cjs.ts --bundle --platform=node --target=node10.4 --external:purgecss --external:svelte-preprocess --external:typescript --outfile=dist/index.js",
     "build:lib:esm": "esbuild src/index.ts --bundle --platform=node --target=es6 --format=esm --external:purgecss --external:svelte-preprocess --external:typescript --outfile=dist/index.mjs",
     "build:lib:types": "tsc",
     "prepack": "run-s build:api build:lib",
