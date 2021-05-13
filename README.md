@@ -20,11 +20,11 @@ npm i -D carbon-preprocess-svelte
 This library contains the following preprocessors and plugins:
 
 - **optimizeImports**: rewrites Carbon Svelte imports to their source path in the `script` block
-- **optimizeCss**: Rollup plugin that removes unused CSS using PurgeCSS
-- **elements**: computes Carbon theme tokens in the `style` block
-- **icons**: inlines Carbon icons in the `markup` block
-- **pictograms**: inlines Carbon pictograms in the `markup` block
-- **collectHeadings**: extract heading elements (e.g., `<h1>`, `<h2>`) from the `markup`
+- **optimizeCss**: Rollup plugin that removes unused CSS using [PurgeCSS](https://github.com/FullHuman/purgecss)
+- **elements**: computes [Carbontokens](https://www.carbondesignsystem.com/guidelines/themes/overview#tokens) in the `style` block
+- **icons**: inlines [Carbon icons](https://www.carbondesignsystem.com/guidelines/icons/library/) in the `markup` block
+- **pictograms**: inlines [Carbon pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/) in the `markup` block
+- **collectHeadings**: extracts heading elements (e.g., `<h1>`, `<h2>`) from the `markup`
 
 ### `optimizeImports`
 
@@ -76,9 +76,7 @@ export default {
     target: "#svelte",
     adapter: adapter(),
     vite: {
-      optimizeDeps: {
-        include: ["carbon-components-svelte", "clipboard-copy"],
-      },
+      optimizeDeps: { include: ["clipboard-copy"] },
       plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
     },
   },
