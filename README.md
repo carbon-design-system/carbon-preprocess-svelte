@@ -326,17 +326,17 @@ export default {
 ```js
 // svelte.config.js
 import adapter from "@sveltejs/adapter-static";
-import * as carbon from "carbon-preprocess-svelte";
+import { optimizeImports, optimizeCss } from "carbon-preprocess-svelte";
 
 /** @type {import('@sveltejs/kit').Config} */
 export default {
-  preprocess: carbon.presetCarbon(),
+  preprocess: [optimizeImports()],
   kit: {
     target: "#svelte",
     adapter: adapter(),
     vite: {
       optimizeDeps: { include: ["clipboard-copy"] },
-      plugins: [process.env.NODE_ENV === "production" && carbon.optimizeCss()],
+      plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
     },
   },
 };
