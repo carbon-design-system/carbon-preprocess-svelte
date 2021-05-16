@@ -210,7 +210,7 @@ export default {
 
 `pictograms` is Svelte markup preprocessor that inlines [Carbon SVG pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/).
 
-The only required attribute is `name`, which represents the module name of the pictogram. Refer to [carbon-pictograms-svelte/ICON_INDEX.md](https://github.com/IBM/carbon-pictograms-svelte/blob/master/PICTOGRAM_INDEX.md) for a list of supported pictograms.
+The only required attribute is `name`, which represents the module name of the pictogram. Refer to [carbon-pictograms-svelte/PICTOGRAM_INDEX.md](https://github.com/IBM/carbon-pictograms-svelte/blob/master/PICTOGRAM_INDEX.md) for a list of supported pictograms.
 
 **Example**
 
@@ -261,6 +261,8 @@ const headings = [
 
 #### Usage
 
+In the following example, we create a table of contents from the `<h2>` elements in a Svelte file. In the `afterCollect` callback, we replace `<!-- toc -->` with the table of contents.
+
 ```js
 // svelte.config.js
 import { collectHeadings } from "carbon-preprocess-svelte";
@@ -269,7 +271,6 @@ export default {
   preprocess: [
     collectHeadings({
       afterCollect: (headings, content) => {
-        // generate a table of contents from <h2> elements
         const toc = headings
           .filter((heading) => heading.level === 2)
           .map((item) => `<li><a href="#${item.id}">${item.text}</a></li>`)
