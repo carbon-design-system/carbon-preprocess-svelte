@@ -63,11 +63,14 @@ export function include(
       ) {
         script.forEach((entry) => {
           const behavior = entry.behavior ?? "prepend";
+          const test = entry.test ?? EXT_SVELTE;
 
-          if (behavior === "prepend") {
-            content = entry.content + content;
-          } else if (behavior === "append") {
-            content += entry.content;
+          if (test.test(filename)) {
+            if (behavior === "prepend") {
+              content = entry.content + content;
+            } else if (behavior === "append") {
+              content += entry.content;
+            }
           }
         });
 
@@ -89,11 +92,14 @@ export function include(
       ) {
         markup.forEach((entry) => {
           const behavior = entry.behavior ?? "prepend";
+          const test = entry.test ?? EXT_SVELTE;
 
-          if (behavior === "prepend") {
-            content = entry.content + content;
-          } else if (behavior === "append") {
-            content += entry.content;
+          if (test.test(filename)) {
+            if (behavior === "prepend") {
+              content = entry.content + content;
+            } else if (behavior === "append") {
+              content += entry.content;
+            }
           }
         });
 
