@@ -3,6 +3,13 @@ import { EXT_SVELTE } from "../constants";
 import { parse } from "path";
 
 interface PreprocessIncludeOptions {
+  /**
+   * Specify the filename pattern to process
+   * Defaults to files ending with ".svelte"
+   * @default /\.(svelte)$/
+   */
+  test?: RegExp;
+
   script: Array<{
     /**
      * Specify the content the prepend or append
@@ -24,6 +31,7 @@ interface PreprocessIncludeOptions {
      */
     behavior?: "prepend" | "append";
   }>;
+
   markup: Array<{
     /**
      * Specify the content the prepend or append
@@ -52,6 +60,7 @@ export function include(
 ): Pick<PreprocessorGroup, "markup" | "script"> {
   const script = options?.script ?? [];
   const markup = options?.markup ?? [];
+  const test = options?.test ?? EXT_SVELTE;
 
   return {
     script({ filename, content }) {
@@ -59,7 +68,7 @@ export function include(
         script.length > 0 &&
         filename !== undefined &&
         !/node_modules/.test(filename) &&
-        EXT_SVELTE.test(filename)
+        test.test(filename)
       ) {
         script.forEach((entry) => {
           const behavior = entry.behavior ?? "prepend";
@@ -88,7 +97,7 @@ export function include(
         // ignore SvelteKit layout/error files to prevent duplicate markup
         !/.svelte-kit/.test(filename) &&
         !/^(__layout)/.test(name) &&
-        EXT_SVELTE.test(filename)
+        test.test(filename)
       ) {
         markup.forEach((entry) => {
           const behavior = entry.behavior ?? "prepend";

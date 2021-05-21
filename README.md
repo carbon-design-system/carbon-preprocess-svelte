@@ -361,6 +361,13 @@ By default, the `include` preprocessor will _prepend_ content to the content blo
 
 ```js
 interface PreprocessIncludeOptions {
+  /**
+   * Specify the filename pattern to process
+   * Defaults to files ending with ".svelte"
+   * @default /\.(svelte)$/
+   */
+  test?: RegExp;
+
   script: Array<{
     /**
      * Specify the content the prepend or append
@@ -382,6 +389,7 @@ interface PreprocessIncludeOptions {
      */
     behavior?: "prepend" | "append",
   }>;
+
   markup: Array<{
     /**
      * Specify the content the prepend or append
