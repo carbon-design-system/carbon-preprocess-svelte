@@ -72,9 +72,9 @@ export function include(
       ) {
         script.forEach((entry) => {
           const behavior = entry.behavior ?? "prepend";
-          const test = entry.test ?? EXT_SVELTE;
+          const testEntry = entry.test ?? test;
 
-          if (test.test(filename)) {
+          if (testEntry.test(filename)) {
             if (behavior === "prepend") {
               content = entry.content + content;
             } else if (behavior === "append") {
@@ -101,9 +101,9 @@ export function include(
       ) {
         markup.forEach((entry) => {
           const behavior = entry.behavior ?? "prepend";
-          const test = entry.test ?? EXT_SVELTE;
+          const testEntry = entry.test ?? test;
 
-          if (test.test(filename)) {
+          if (testEntry.test(filename)) {
             if (behavior === "prepend") {
               content = entry.content + content;
             } else if (behavior === "append") {
