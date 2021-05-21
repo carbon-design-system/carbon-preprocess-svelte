@@ -20,11 +20,11 @@ npm i -D carbon-preprocess-svelte
 This library contains the following preprocessors and plugins:
 
 - **optimizeImports**: rewrites Carbon Svelte imports to their source path in the `script` block
-- **optimizeCss**: Rollup plugin that removes unused CSS using PurgeCSS
-- **elements**: computes Carbon theme tokens in the `style` block
-- **icons**: inlines Carbon icons in the `markup` block
-- **pictograms**: inlines Carbon pictograms in the `markup` block
-- **collectHeadings**: extract heading elements (e.g., `<h1>`, `<h2>`) from the `markup`
+- **optimizeCss**: Rollup plugin that removes unused CSS using [PurgeCSS](https://github.com/FullHuman/purgecss)
+- **elements**: computes [Carbontokens](https://www.carbondesignsystem.com/guidelines/themes/overview#tokens) in the `style` block
+- **icons**: inlines [Carbon icons](https://www.carbondesignsystem.com/guidelines/icons/library/) in the `markup` block
+- **pictograms**: inlines [Carbon pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/) in the `markup` block
+- **collectHeadings**: extracts heading elements (e.g., `<h1>`, `<h2>`) from the `markup`
 
 ### `optimizeImports`
 
@@ -76,9 +76,7 @@ export default {
     target: "#svelte",
     adapter: adapter(),
     vite: {
-      optimizeDeps: {
-        include: ["carbon-components-svelte", "clipboard-copy"],
-      },
+      optimizeDeps: { include: ["clipboard-copy"] },
       plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
     },
   },
@@ -212,7 +210,7 @@ export default {
 
 `pictograms` is Svelte markup preprocessor that inlines [Carbon SVG pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/).
 
-The only required attribute is `name`, which represents the module name of the pictogram. Refer to [carbon-pictograms-svelte/ICON_INDEX.md](https://github.com/IBM/carbon-pictograms-svelte/blob/master/PICTOGRAM_INDEX.md) for a list of supported pictograms.
+The only required attribute is `name`, which represents the module name of the pictogram. Refer to [carbon-pictograms-svelte/PICTOGRAM_INDEX.md](https://github.com/IBM/carbon-pictograms-svelte/blob/master/PICTOGRAM_INDEX.md) for a list of supported pictograms.
 
 **Example**
 
@@ -263,6 +261,8 @@ const headings = [
 
 #### Usage
 
+In the following example, we create a table of contents from the `<h2>` elements in a Svelte file. In the `afterCollect` callback, we replace `<!-- toc -->` with the table of contents.
+
 ```js
 // svelte.config.js
 import { collectHeadings } from "carbon-preprocess-svelte";
@@ -271,7 +271,6 @@ export default {
   preprocess: [
     collectHeadings({
       afterCollect: (headings, content) => {
-        // generate a table of contents from <h2> elements
         const toc = headings
           .filter((heading) => heading.level === 2)
           .map((item) => `<li><a href="#${item.id}">${item.text}</a></li>`)
@@ -328,17 +327,17 @@ export default {
 ```js
 // svelte.config.js
 import adapter from "@sveltejs/adapter-static";
-import * as carbon from "carbon-preprocess-svelte";
+import { optimizeImports, optimizeCss } from "carbon-preprocess-svelte";
 
 /** @type {import('@sveltejs/kit').Config} */
 export default {
-  preprocess: carbon.presetCarbon(),
+  preprocess: [optimizeImports()],
   kit: {
     target: "#svelte",
     adapter: adapter(),
     vite: {
       optimizeDeps: { include: ["clipboard-copy"] },
-      plugins: [process.env.NODE_ENV === "production" && carbon.optimizeCss()],
+      plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
     },
   },
 };
