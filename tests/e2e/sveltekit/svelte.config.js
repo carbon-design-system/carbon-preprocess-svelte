@@ -1,8 +1,8 @@
-const static = require("@sveltejs/adapter-static");
-const carbon = require("carbon-preprocess-svelte");
+import adapter from "@sveltejs/adapter-static";
+import * as carbon from "carbon-preprocess-svelte";
 
 /** @type {import('@sveltejs/kit').Config} */
-module.exports = {
+export default {
   preprocess: [
     ...carbon.presetCarbon(),
     carbon.pictograms(),
@@ -17,12 +17,28 @@ module.exports = {
         return content.replace("<!-- toc -->", h2);
       },
     }),
+    carbon.include({
+      script: [
+        {
+          content: `const data = {};`,
+        },
+      ],
+      markup: [
+        {
+          content: "<!-- toc -->",
+        },
+        {
+          content: "<p>Summary</p>",
+          behavior: "append",
+        },
+      ],
+    }),
   ],
   kit: {
     target: "#svelte",
-    adapter: static(),
+    adapter: adapter(),
     vite: {
-      optimizeDeps: { include: ["carbon-components-svelte", "clipboard-copy"] },
+      optimizeDeps: { include: ["clipboard-copy"] },
       plugins: [process.env.NODE_ENV === "production" && carbon.optimizeCss()],
     },
   },

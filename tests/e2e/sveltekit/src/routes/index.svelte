@@ -19,6 +19,8 @@
 <icon name="Add16" />
 <pictogram name="Airplane" class="pictogram" />
 
+{JSON.stringify(data, null, 2)}
+
 <style>
   p {
     background: "ui-03";
