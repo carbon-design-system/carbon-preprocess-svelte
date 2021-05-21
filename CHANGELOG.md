@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.3.0) - 2021-05-21
+
+**Features**
+
+- add `test` option to `include` preprocessor to filter filenames
+
+**Fixes**
+
+- support custom `test` regex per script/markup object in `include` preprocessor
+
 ## [0.2.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.2.0) - 2021-05-21
 
 **Features**

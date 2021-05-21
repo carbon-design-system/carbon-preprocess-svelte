@@ -1,6 +1,6 @@
 {
   "name": "carbon-preprocess-svelte",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "Apache-2.0",
   "description": "Collection of Svelte preprocessors for the Carbon Design System",
   "author": "IBM",
