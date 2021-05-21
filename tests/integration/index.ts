@@ -4,3 +4,4 @@ import "./optimize-imports.test";
 import "./collect-headings.test";
 import "./pictograms.test";
 import "./extract-selectors.test";
+import "./include.test";

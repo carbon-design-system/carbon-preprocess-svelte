@@ -308,6 +308,104 @@ interface CollectHeadingsOptions {
 }
 ```
 
+### `include`
+
+`include` prepends or appends arbitrary content to the script and markup blocks.
+
+**Example**
+
+```diff
+<script>
++ import { CodeSnippet } from "carbon-components-svelte";
+  import { onMount } from "svelte";
+</script>
+
++ <!-- toc -->
+
+<h1>Title</h1>
+
++ <p>Summary</p>
+```
+
+#### Usage
+
+In the above example, we prepend script content that imports the `CodeSnippet` component from `carbon-components-svelte`. In the markup, we prepend `<!-- toc -->` and append `<p>Summary</p>`.
+
+```js
+// svelte.config.js
+import { include } from "carbon-preprocess-svelte";
+
+export default {
+  preprocess: [
+    include({
+      script: [
+        {
+          content: 'import { CodeSnippet } from "carbon-components-svelte";',
+        },
+      ],
+      markup: [
+        { content: "<!-- toc -->" },
+        {
+          content: "<p>Summary</p>",
+          behavior: "append",
+        },
+      ],
+    }),
+  ],
+};
+```
+
+#### API
+
+By default, the `include` preprocessor will _prepend_ content to the content block. Set `behavior` to `"append"` to append the content.
+
+```js
+interface PreprocessIncludeOptions {
+  script: Array<{
+    /**
+     * Specify the content the prepend or append
+     * @example
+     * import { CodeSnippet } from "carbon-components-svelte";
+     */
+    content: string,
+
+    /**
+     * Specify the filename pattern to process
+     * Defaults to files ending with ".svelte"
+     * @default /\.(svelte)$/
+     */
+    test?: RegExp,
+
+    /**
+     * Specify whether the content should be prepended or appended
+     * @default "prepend"
+     */
+    behavior?: "prepend" | "append",
+  }>;
+  markup: Array<{
+    /**
+     * Specify the content the prepend or append
+     * @example
+     * <ul>Table of Contents</ul>
+     */
+    content: string,
+
+    /**
+     * Specify the filename pattern to process
+     * Defaults to files ending with ".svelte"
+     * @default /\.(svelte)$/
+     */
+    test?: RegExp,
+
+    /**
+     * Specify whether the content should be prepended or appended
+     * @default "prepend"
+     */
+    behavior?: "prepend" | "append",
+  }>;
+}
+```
+
 ## Presets
 
 ```js
