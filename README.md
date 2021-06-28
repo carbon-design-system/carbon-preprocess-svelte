@@ -21,7 +21,7 @@ This library contains the following preprocessors and plugins:
 
 - **optimizeImports**: rewrites Carbon Svelte imports to their source path in the `script` block
 - **optimizeCss**: Rollup plugin that removes unused CSS using [PurgeCSS](https://github.com/FullHuman/purgecss)
-- **elements**: computes [Carbontokens](https://www.carbondesignsystem.com/guidelines/themes/overview#tokens) in the `style` block
+- **elements**: computes [Carbon tokens](https://www.carbondesignsystem.com/guidelines/themes/overview#tokens) in the `style` block
 - **icons**: inlines [Carbon icons](https://www.carbondesignsystem.com/guidelines/icons/library/) in the `markup` block
 - **pictograms**: inlines [Carbon pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/) in the `markup` block
 - **collectHeadings**: extracts heading elements (e.g., `<h1>`, `<h2>`) from the `markup`
