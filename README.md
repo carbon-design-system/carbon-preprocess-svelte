@@ -184,7 +184,7 @@ interface ElementsOptions {
 
 ### `icons`
 
-`icons` is Svelte markup preprocessor that inlines [Carbon SVG icons](https://www.carbondesignsystem.com/guidelines/icons/library/).
+`icons` is a Svelte markup preprocessor that inlines [Carbon SVG icons](https://www.carbondesignsystem.com/guidelines/icons/library/).
 
 The only required attribute is `name`, which represents the module name of the icon. Refer to [carbon-icons-svelte/ICON_INDEX.md](https://github.com/IBM/carbon-icons-svelte/blob/master/ICON_INDEX.md) for a list of supported icons.
 
@@ -208,7 +208,7 @@ export default {
 
 ### `pictograms`
 
-`pictograms` is Svelte markup preprocessor that inlines [Carbon SVG pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/).
+`pictograms` is a Svelte markup preprocessor that inlines [Carbon SVG pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/).
 
 The only required attribute is `name`, which represents the module name of the pictogram. Refer to [carbon-pictograms-svelte/PICTOGRAM_INDEX.md](https://github.com/IBM/carbon-pictograms-svelte/blob/master/PICTOGRAM_INDEX.md) for a list of supported pictograms.
 
