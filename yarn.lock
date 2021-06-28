@@ -147,10 +147,10 @@ call-bind@^1.0.0, call-bind@^1.0.2:
     function-bind "^1.1.1"
     get-intrinsic "^1.0.2"
 
-carbon-components-svelte@^0.33.0:
-  version "0.33.0"
-  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.33.0.tgz#eb09cdfbb36daffb217f7c0dea92e36daa7c37f7"
-  integrity sha512-bVobGZsHc8/EqpzyJ8y/iL+SaLb1JkRsHSPaLiKfDtmF5m2Ft6d5iP5QfNmSCEiJNb7ZmvP54odsitZo0lWoGQ==
+carbon-components-svelte@^0.38.0:
+  version "0.38.0"
+  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.38.0.tgz#d87c68d2ba7ffb163bbb40172f1e0e7fd00313e1"
+  integrity sha512-BlCFnyTEHG/fVd0TWOMidorbTzM+8m2zZ0FaKLA3uTdECVqoVGxVjvTbunc8z/36PriG8f1tRk6Dp4mlHgOcDA==
   dependencies:
     carbon-icons-svelte "^10.27.0"
     clipboard-copy "3.2.0"
