@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Fixes**
 
-- default `include` preprocessor entry test regest to high-level test option
+- default `include` preprocessor entry test regex to high-level test option
 
 ## [0.3.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.3.0) - 2021-05-21
 
