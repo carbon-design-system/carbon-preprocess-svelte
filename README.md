@@ -76,7 +76,6 @@ export default {
     target: "#svelte",
     adapter: adapter(),
     vite: {
-      optimizeDeps: { include: ["clipboard-copy"] },
       plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
     },
   },
@@ -442,7 +441,6 @@ export default {
     target: "#svelte",
     adapter: adapter(),
     vite: {
-      optimizeDeps: { include: ["clipboard-copy"] },
       plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
     },
   },
