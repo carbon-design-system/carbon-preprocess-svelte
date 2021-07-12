@@ -42,7 +42,7 @@
     "@types/carbon__elements": "10.31.0",
     "@types/carbon__icon-helpers": "^10.7.1",
     "@types/node": "^15.0.2",
-    "carbon-components-svelte": "^0.39.0",
+    "carbon-components-svelte": "^0.40.0",
     "esbuild": "^0.11.19",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.2.1",
@@ -54,10 +54,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ibm/carbon-preprocess-svelte.git"
+    "url": "https://github.com/IBM/carbon-preprocess-svelte.git"
   },
-  "homepage": "https://github.com/ibm/carbon-preprocess-svelte",
-  "bugs": "https://github.com/ibm/carbon-preprocess-svelte/issues",
+  "homepage": "https://github.com/IBM/carbon-preprocess-svelte",
+  "bugs": "https://github.com/IBM/carbon-preprocess-svelte/issues",
   "keywords": [
     "carbon",
     "carbon design system",
