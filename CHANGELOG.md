@@ -5,17 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.6.0) - 2021-07-11
+
+- upgrade `carbon-components-svelte` to v0.40.0 to include `Breakpoint`, `Theme` components for `optimizeImports`
+
 ## [0.5.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.5.0) - 2021-07-05
 
-**Features**
-
-- upgrade `carbon-components-svelte` to v0.39 to include `RecursiveList`, `TreeView` components for `optimizeImports`
+- upgrade `carbon-components-svelte` to v0.39.0 to include `RecursiveList`, `TreeView` components for `optimizeImports`
 
 ## [0.4.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.4.0) - 2021-06-28
 
 **Features**
 
-- upgrade `carbon-components-svelte` to v0.38 to include `ProgressBar` component for `optimizeImports`
+- upgrade `carbon-components-svelte` to v0.38.0 to include `ProgressBar` component for `optimizeImports`
 
 **Fixes**
 
