@@ -67,5 +67,8 @@
   ],
   "files": [
     "dist"
+  ],
+  "contributors": [
+    "Eric Liu (https://github.com/metonym)"
   ]
 }
