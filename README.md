@@ -9,9 +9,15 @@
 
 ## Installation
 
-```bash
+**Yarn**
+
+```sh
 yarn add -D carbon-preprocess-svelte
-# OR
+```
+
+**NPM**
+
+```sh
 npm i -D carbon-preprocess-svelte
 ```
 
