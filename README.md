@@ -3,7 +3,6 @@
 [![NPM][npm]][npm-url]
 ![GitHub](https://img.shields.io/github/license/ibm/carbon-preprocess-svelte?color=262626&style=for-the-badge)
 ![npm downloads to date](https://img.shields.io/npm/dt/carbon-preprocess-svelte?color=262626&style=for-the-badge)
-[![Build][build]][build-badge]
 
 > Collection of [Svelte preprocessors](https://svelte.dev/docs#svelte_preprocess) for the Carbon Design System
 
@@ -463,5 +462,3 @@ Refer to the [contributing guidelines](CONTRIBUTING.md).
 
 [npm]: https://img.shields.io/npm/v/carbon-preprocess-svelte.svg?color=262626&style=for-the-badge
 [npm-url]: https://npmjs.com/package/carbon-preprocess-svelte
-[build]: https://img.shields.io/travis/com/ibm/carbon-preprocess-svelte?color=24a148&style=for-the-badge
-[build-badge]: https://travis-ci.com/ibm/carbon-preprocess-svelte
