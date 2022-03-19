@@ -20,6 +20,12 @@ yarn add -D carbon-preprocess-svelte
 npm i -D carbon-preprocess-svelte
 ```
 
+**pnpm**
+
+```sh
+pnpm i -D carbon-preprocess-svelte
+```
+
 ## Usage
 
 This library contains the following preprocessors and plugins:
@@ -78,7 +84,6 @@ import { optimizeCss } from "carbon-preprocess-svelte";
 
 export default {
   kit: {
-    target: "#svelte",
     adapter: adapter(),
     vite: {
       plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
@@ -443,7 +448,6 @@ import { optimizeImports, optimizeCss } from "carbon-preprocess-svelte";
 export default {
   preprocess: [optimizeImports()],
   kit: {
-    target: "#svelte",
     adapter: adapter(),
     vite: {
       plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
