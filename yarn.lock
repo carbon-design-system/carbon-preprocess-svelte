@@ -147,18 +147,12 @@ call-bind@^1.0.0, call-bind@^1.0.2:
     function-bind "^1.1.1"
     get-intrinsic "^1.0.2"
 
-carbon-components-svelte@^0.40.0:
-  version "0.40.0"
-  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.40.0.tgz#69240ff24745cf2aeec48085c6c4ef7af2035401"
-  integrity sha512-BqzRrftWpXp+92d4LKhe9+imZ2nxEeTiEEWUoT1+eIgP67cIv6s1R2rTNJRlv768lCuRrOmFmWGggvGwV4qYUg==
+carbon-components-svelte@^0.62.0:
+  version "0.62.0"
+  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.62.0.tgz#51589473e5dcf25ef8fcf6ea970587e897ed68c4"
+  integrity sha512-NwcVOyXI1R/JEkncrYWSgbkTHmrIwpsJR3GPDHgBnBbGjlpr8I1szBqEjhj1Q5NOHDTm10S5az8FyGyIGkKkXA==
   dependencies:
-    carbon-icons-svelte "^10.27.0"
     flatpickr "4.6.9"
-
-carbon-icons-svelte@^10.27.0:
-  version "10.28.0"
-  resolved "https://registry.yarnpkg.com/carbon-icons-svelte/-/carbon-icons-svelte-10.28.0.tgz#812a6eae858d0c9e043067c714910fcfb6249cd2"
-  integrity sha512-C3K+U2PRy63WHFZme1HQNju89rhVIQmUkfgBrZzcezdutkhXbSPOY+o/MI0B2mDcQ7G9gfhEpqsXET8gBTWfJQ==
 
 chalk@^2.4.1:
   version "2.4.2"
