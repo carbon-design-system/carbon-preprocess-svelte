@@ -1,9 +1,8 @@
 {
   "name": "carbon-preprocess-svelte",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "license": "Apache-2.0",
   "description": "Collection of Svelte preprocessors for the Carbon Design System",
-  "author": "IBM",
   "module": "./dist/index.mjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
