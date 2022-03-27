@@ -98,6 +98,7 @@ const v10_THEMES: v10_theme[] = ["white", "g10", "g90", "g100"];
     metadata: {
       package: pkg.name!,
       version: pkg.version!,
+      exports: 0,
     },
 
     tokens: {},

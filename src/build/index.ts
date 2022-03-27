@@ -13,5 +13,10 @@ export interface BuildApi {
      * @example "0.32.0"
      */
     version: string;
+
+    /**
+     * Number of exports
+     */
+    exports: number;
   };
 }

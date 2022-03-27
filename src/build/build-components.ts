@@ -1,11 +1,19 @@
-import { parse } from "path";
+import path from "path";
+import fs from "fs";
 import { totalist } from "totalist";
+import { parse, walk } from "svelte/compiler";
 import { getPackageJson, writeFile } from "../utils";
 import { CARBON_SVELTE, API_COMPONENTS } from "../constants";
-import { BuildApi } from "../build";
+import type { BuildApi } from "../build";
+import type { Node } from "../walk-and-replace";
 
+type ExportName = string;
+
+interface BuildComponentsApi {
+  path: string;
+}
 export interface BuildComponents extends BuildApi {
-  components: Record<string, { path: string }>;
+  components: Record<ExportName, BuildComponentsApi>;
 }
 
 (async () => {
@@ -14,16 +22,41 @@ export interface BuildComponents extends BuildApi {
     metadata: {
       package: pkg.name!,
       version: pkg.version!,
+      exports: 0,
     },
     components: {},
   };
 
+  const indexJs = fs.readFileSync(
+    `node_modules/${CARBON_SVELTE.components}/src/index.js`,
+    "utf-8"
+  );
+  const ast = parse(`<script>${indexJs}</script>`);
+  const exports = new Set();
+
+  walk(ast, {
+    enter(node: Node) {
+      if (node.type === "ExportSpecifier") {
+        exports.add(node.local.name);
+      }
+    },
+  });
+
+  components.metadata.exports = exports.size;
+
+  const moduleNames = new Map<ExportName, BuildComponentsApi>();
+
   await totalist(`node_modules/${CARBON_SVELTE.components}/src`, (file) => {
-    if (/\.svelte$/.test(file)) {
-      const moduleName = parse(file).name;
+    const moduleName = path.parse(file).name;
+
+    if (exports.has(moduleName)) {
       const path = `${CARBON_SVELTE.components}/src/${file}`;
-      components.components[moduleName] = { path };
+      moduleNames.set(moduleName, { path });
     }
+  });
+
+  [...moduleNames.entries()].sort().forEach(([moduleName, value]) => {
+    components.components[moduleName] = value;
   });
 
   await writeFile(

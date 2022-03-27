@@ -34,6 +34,7 @@ interface CarbonIconsMetadata {
     metadata: {
       package: pkg.name!,
       version: pkg.version!,
+      exports: 0,
     },
     icons: {},
   };
@@ -43,6 +44,8 @@ interface CarbonIconsMetadata {
     "utf-8"
   );
   const metadata: CarbonIconsMetadata = JSON.parse(metadataJson);
+
+  icons.metadata.exports = metadata.icons.length;
 
   metadata.icons.map(({ output }) => {
     output.forEach((output) => {

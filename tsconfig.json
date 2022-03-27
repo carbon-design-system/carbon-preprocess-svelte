@@ -4,6 +4,7 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "esModuleInterop": true,
+    "downlevelIteration": true,
     "lib": ["ESNext", "DOM.Iterable"],
     "moduleResolution": "Node",
     "outDir": "dist",

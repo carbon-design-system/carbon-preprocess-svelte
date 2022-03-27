@@ -62,6 +62,7 @@ export interface CarbonPictogramsMetadata {
     metadata: {
       package: pkg.name!,
       version: pkg.version!,
+      exports: 0,
     },
     pictograms: {},
   };
@@ -71,6 +72,8 @@ export interface CarbonPictogramsMetadata {
     "utf-8"
   );
   const metadata: CarbonPictogramsMetadata = JSON.parse(metadataJson);
+
+  pictograms.metadata.exports = metadata.icons.length;
 
   metadata.icons.map(({ output }) => {
     output.forEach((output) => {
