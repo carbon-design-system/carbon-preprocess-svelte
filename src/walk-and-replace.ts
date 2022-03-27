@@ -77,6 +77,11 @@ interface NodeImportDeclaration extends NodeMeta {
   }>;
 }
 
+interface NodeExportSpecifier extends NodeMeta {
+  type: "ExportSpecifier";
+  local: { name: string };
+}
+
 interface NodeDeclaration extends NodeMeta {
   type: "Declaration";
   property: string;
@@ -151,14 +156,14 @@ export interface NodeChildString extends NodeMeta {
   value: string;
 }
 
-type Node =
+export type Node =
   | NodeElement
   | NodeImportDeclaration
+  | NodeExportSpecifier
   | NodeDeclaration
   | NodeRule
   | NodeAtRule
   | NodeFunction;
-
 export function walkAndReplace(
   options: WalkAndReplaceOptions,
   replaceWith: (
