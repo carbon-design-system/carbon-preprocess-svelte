@@ -39,10 +39,10 @@
   resolved "https://registry.yarnpkg.com/@carbon/icons/-/icons-10.29.0.tgz#98d33c721b7621614bbfdcf5862fb389f9dfc999"
   integrity sha512-HMlQTUfCI50UDBUHKnk5DvTCypEQS3fzJQDi5anbzf7zcvljnkrdZy7jT42qAYAn6oV04TCWEH5CSshm4Nej9A==
 
-"@carbon/icons@^10.31.0":
-  version "10.31.0"
-  resolved "https://registry.yarnpkg.com/@carbon/icons/-/icons-10.31.0.tgz#9af43e9d7874c9cac26ed1bfd562d5eff363fde7"
-  integrity sha512-w3yH/tV+/EMq7MOVPniFrQx24I9vZi5HORvDP7UKFf3G7Hqrp2FlM9yowre/fpcGoE7d134Z32gws5+dsuu78Q==
+"@carbon/icons@^10.48.0":
+  version "10.48.0"
+  resolved "https://registry.yarnpkg.com/@carbon/icons/-/icons-10.48.0.tgz#a517812f42fc816ef9735409383111d8f23e7bff"
+  integrity sha512-wLvTfQy4k/vF8oVH2T/esISogdyjWJ34KdlfD//A0bKa6YViJStnvyoJA8Pmi7XolVyKm5Cw1ho7CjV1TFBJSg==
 
 "@carbon/import-once@^10.6.0":
   version "10.6.0"
@@ -59,10 +59,10 @@
   resolved "https://registry.yarnpkg.com/@carbon/motion/-/motion-10.15.0.tgz#ddf38a5d4bf594abf0adb9302bb1101c5ae93346"
   integrity sha512-hyGUNm+5TB9NlXgtbAmXlVN7ivjdBxoV8h/f+461eQ5BLiu/MibcLtTM3zeIypUYxd3PUNAx9DcMN12t/J3EpA==
 
-"@carbon/pictograms@^11.9.0":
-  version "11.9.0"
-  resolved "https://registry.yarnpkg.com/@carbon/pictograms/-/pictograms-11.9.0.tgz#e5145d44afc5670e8fff08c419ef11c584cd7bdd"
-  integrity sha512-F9lnUJP8aIhlPr9KbskDjpGZdJ4l9kpEF6H2UGbNfujgB13arQWoXdP66SOSefAq/5NLnuv/S4IVrJaSejzLRg==
+"@carbon/pictograms@^11.24.0":
+  version "11.24.0"
+  resolved "https://registry.yarnpkg.com/@carbon/pictograms/-/pictograms-11.24.0.tgz#55d490b82ae39b5eac20a1687858e8465f8b9a66"
+  integrity sha512-dzlp7DIOYcuViFpQXHQKCH7cdfPmY3txc+SyzBXYyhWtwSjnjUOA/pv/wkvubR2gUQdxk9nCZK9CDl1HzahpiQ==
 
 "@carbon/themes@^10.31.0":
   version "10.31.0"
@@ -147,10 +147,10 @@ call-bind@^1.0.0, call-bind@^1.0.2:
     function-bind "^1.1.1"
     get-intrinsic "^1.0.2"
 
-carbon-components-svelte@^0.62.0:
-  version "0.62.0"
-  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.62.0.tgz#51589473e5dcf25ef8fcf6ea970587e897ed68c4"
-  integrity sha512-NwcVOyXI1R/JEkncrYWSgbkTHmrIwpsJR3GPDHgBnBbGjlpr8I1szBqEjhj1Q5NOHDTm10S5az8FyGyIGkKkXA==
+carbon-components-svelte@^0.62.3:
+  version "0.62.3"
+  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.62.3.tgz#d2dbafb2c8d4bd6ba4a5a5183110b16ba256886e"
+  integrity sha512-/MWO0vEKEKZ3t12tCKrMW6JY97b9g/csbDFg7kppOrvEvpOhvK3Fu3JGQr6+ob3ngNLDmCSOmXqgs05uybtR5A==
   dependencies:
     flatpickr "4.6.9"
 
