@@ -53,16 +53,17 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/IBM/carbon-preprocess-svelte.git"
+    "url": "https://github.com/carbon-design-system/carbon-preprocess-svelte.git"
   },
-  "homepage": "https://github.com/IBM/carbon-preprocess-svelte",
-  "bugs": "https://github.com/IBM/carbon-preprocess-svelte/issues",
+  "homepage": "https://github.com/carbon-design-system/carbon-preprocess-svelte",
+  "bugs": "https://github.com/carbon-design-system/carbon-preprocess-svelte/issues",
   "keywords": [
     "carbon",
     "carbon design system",
     "carbon preprocess",
     "svelte",
-    "preprocessor"
+    "preprocessor",
+    "optimize imports"
   ],
   "files": [
     "dist"
