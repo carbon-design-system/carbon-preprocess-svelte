@@ -36,8 +36,8 @@ export interface BuildComponents extends BuildApi {
 
   walk(ast, {
     enter(node: Node) {
-      if (node.type === "ExportSpecifier") {
-        exports.add(node.local.name);
+      if (node.type === "Identifier") {
+        exports.add(node.name);
       }
     },
   });
