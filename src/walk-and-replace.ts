@@ -77,9 +77,9 @@ interface NodeImportDeclaration extends NodeMeta {
   }>;
 }
 
-interface NodeExportSpecifier extends NodeMeta {
-  type: "ExportSpecifier";
-  local: { name: string };
+interface NodeIdentifier extends NodeMeta {
+  type: "Identifier";
+  name: string;
 }
 
 interface NodeDeclaration extends NodeMeta {
@@ -159,7 +159,7 @@ export interface NodeChildString extends NodeMeta {
 export type Node =
   | NodeElement
   | NodeImportDeclaration
-  | NodeExportSpecifier
+  | NodeIdentifier
   | NodeDeclaration
   | NodeRule
   | NodeAtRule

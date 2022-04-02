@@ -2,6 +2,8 @@
   import Accordion2 from "carbon-components-svelte/src/Accordion/Accordion.svelte";
   import Button from "carbon-components-svelte/src/Button/Button.svelte";
 
+  import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
+  import truncate2 from "carbon-components-svelte/src/Truncate/truncate.js";
   import RecursiveList from "carbon-components-svelte/src/RecursiveList/RecursiveList.svelte";
 import TreeView from "carbon-components-svelte/src/TreeView/TreeView.svelte";
 import ProgressBar from "carbon-components-svelte/src/ProgressBar/ProgressBar.svelte";
