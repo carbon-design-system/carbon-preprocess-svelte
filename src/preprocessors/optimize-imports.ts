@@ -46,6 +46,10 @@ export function optimizeImports(): Pick<PreprocessorGroup, "script"> {
                     node,
                     node.specifiers
                       .map(({ local, imported }) => {
+                        if (CARBON_VERSIONS[CARBON_SVELTE.icons] === "11") {
+                          return `import ${local.name} from "${CARBON_SVELTE.icons}/lib/${imported.name}.svelte";`;
+                        }
+
                         return `import ${local.name} from "${CARBON_SVELTE.icons}/lib/${imported.name}/${imported.name}.svelte";`;
                       })
                       .join("\n")
