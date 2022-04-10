@@ -32,7 +32,7 @@ const clampContent = (type: ContentType, content: string) => {
   }
 };
 
-type GetAst = (type: ContentType, ast: Ast) => TemplateNode | Style | Script;
+type GetAst = (type: ContentType, ast: Ast) => TemplateNode | Style | Script | undefined;
 
 const getAst: GetAst = (type, ast) => {
   switch (type) {
@@ -42,6 +42,8 @@ const getAst: GetAst = (type, ast) => {
       return ast.css;
     case "markup":
       return ast.html;
+    default:
+      return undefined
   }
 };
 

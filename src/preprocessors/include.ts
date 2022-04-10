@@ -89,14 +89,14 @@ export function include(
       return { code: content };
     },
     markup({ filename, content }) {
-      const { name } = parse(filename);
 
       if (
         markup.length > 0 &&
+        filename &&
         !/node_modules/.test(filename) &&
         // ignore SvelteKit layout/error files to prevent duplicate markup
         !/.svelte-kit/.test(filename) &&
-        !/^(__layout)/.test(name) &&
+        !/^(__layout)/.test(parse(filename).name) &&
         test.test(filename)
       ) {
         markup.forEach((entry) => {

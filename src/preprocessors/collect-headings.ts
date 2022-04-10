@@ -35,7 +35,7 @@ export function collectHeadings(
 
   return {
     markup({ filename, content }) {
-      if (!/node_modules/.test(filename) && test.test(filename)) {
+      if (filename && !/node_modules/.test(filename) && test.test(filename)) {
         const headings: Headings = [];
 
         walkAndReplace({ type: "markup", content, filename }, ({ node }) => {

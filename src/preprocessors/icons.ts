@@ -17,7 +17,7 @@ const defaultIconAttributes = {
 export function icons(): Pick<PreprocessorGroup, "markup"> {
   return {
     markup({ filename, content }) {
-      if (!/node_modules/.test(filename) && EXT_SVELTE.test(filename)) {
+      if (filename && !/node_modules/.test(filename) && EXT_SVELTE.test(filename)) {
         const code = walkAndReplace(
           { type: "markup", content, filename },
           ({ node }, replaceContent, getContent) => {
