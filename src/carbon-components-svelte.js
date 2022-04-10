@@ -2,7 +2,7 @@ export const components = {
   "metadata": {
     "package": "carbon-components-svelte",
     "version": "0.62.3",
-    "exports": 169
+    "exports": 171
   },
   "components": {
     "Accordion": {
@@ -147,40 +147,49 @@ export const components = {
       "path": "carbon-components-svelte/src/Grid/Grid.svelte"
     },
     "Header": {
-      "path": "carbon-components-svelte/src/UIShell/Header.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/Header.svelte"
     },
     "HeaderAction": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderAction.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderAction.svelte"
     },
     "HeaderActionLink": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderActionLink.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderActionLink.svelte"
+    },
+    "HeaderActionSearch": {
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderActionSearch.svelte"
     },
     "HeaderGlobalAction": {
       "path": "carbon-components-svelte/src/UIShell/HeaderGlobalAction.svelte"
     },
     "HeaderNav": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderNav.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderNav.svelte"
     },
     "HeaderNavItem": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderNavItem.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderNavItem.svelte"
     },
     "HeaderNavMenu": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderNavMenu.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderNavMenu.svelte"
     },
     "HeaderPanelDivider": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderPanelDivider.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderPanelDivider.svelte"
     },
     "HeaderPanelLink": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderPanelLink.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderPanelLink.svelte"
     },
     "HeaderPanelLinks": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderPanelLinks.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderPanelLinks.svelte"
     },
     "HeaderSearch": {
       "path": "carbon-components-svelte/src/UIShell/HeaderSearch.svelte"
     },
     "HeaderUtilities": {
-      "path": "carbon-components-svelte/src/UIShell/HeaderUtilities.svelte"
+      "path": "carbon-components-svelte/src/UIShell/GlobalHeader/HeaderUtilities.svelte"
+    },
+    "Icon": {
+      "path": "carbon-components-svelte/src/Icon/Icon.svelte"
+    },
+    "IconSkeleton": {
+      "path": "carbon-components-svelte/src/Icon/IconSkeleton.svelte"
     },
     "ImageLoader": {
       "path": "carbon-components-svelte/src/ImageLoader/ImageLoader.svelte"
@@ -244,6 +253,9 @@ export const components = {
     },
     "NotificationIcon": {
       "path": "carbon-components-svelte/src/Notification/NotificationIcon.svelte"
+    },
+    "NotificationTextDetails": {
+      "path": "carbon-components-svelte/src/Notification/NotificationTextDetails.svelte"
     },
     "NumberInput": {
       "path": "carbon-components-svelte/src/NumberInput/NumberInput.svelte"
@@ -330,22 +342,22 @@ export const components = {
       "path": "carbon-components-svelte/src/Tile/SelectableTile.svelte"
     },
     "SideNav": {
-      "path": "carbon-components-svelte/src/UIShell/SideNav.svelte"
+      "path": "carbon-components-svelte/src/UIShell/SideNav/SideNav.svelte"
     },
     "SideNavDivider": {
       "path": "carbon-components-svelte/src/UIShell/SideNavDivider.svelte"
     },
     "SideNavItems": {
-      "path": "carbon-components-svelte/src/UIShell/SideNavItems.svelte"
+      "path": "carbon-components-svelte/src/UIShell/SideNav/SideNavItems.svelte"
     },
     "SideNavLink": {
-      "path": "carbon-components-svelte/src/UIShell/SideNavLink.svelte"
+      "path": "carbon-components-svelte/src/UIShell/SideNav/SideNavLink.svelte"
     },
     "SideNavMenu": {
-      "path": "carbon-components-svelte/src/UIShell/SideNavMenu.svelte"
+      "path": "carbon-components-svelte/src/UIShell/SideNav/SideNavMenu.svelte"
     },
     "SideNavMenuItem": {
-      "path": "carbon-components-svelte/src/UIShell/SideNavMenuItem.svelte"
+      "path": "carbon-components-svelte/src/UIShell/SideNav/SideNavMenuItem.svelte"
     },
     "SkeletonPlaceholder": {
       "path": "carbon-components-svelte/src/SkeletonPlaceholder/SkeletonPlaceholder.svelte"
@@ -461,6 +473,12 @@ export const components = {
     "ToggleSkeleton": {
       "path": "carbon-components-svelte/src/Toggle/ToggleSkeleton.svelte"
     },
+    "ToggleSmall": {
+      "path": "carbon-components-svelte/src/ToggleSmall/ToggleSmall.svelte"
+    },
+    "ToggleSmallSkeleton": {
+      "path": "carbon-components-svelte/src/ToggleSmall/ToggleSmallSkeleton.svelte"
+    },
     "Toolbar": {
       "path": "carbon-components-svelte/src/DataTable/Toolbar.svelte"
     },
@@ -499,15 +517,6 @@ export const components = {
     },
     "UnorderedList": {
       "path": "carbon-components-svelte/src/UnorderedList/UnorderedList.svelte"
-    },
-    "breakpointObserver": {
-      "path": "carbon-components-svelte/src/Breakpoint/breakpointObserver.js"
-    },
-    "breakpoints": {
-      "path": "carbon-components-svelte/src/Breakpoint/breakpoints.js"
-    },
-    "truncate": {
-      "path": "carbon-components-svelte/src/Truncate/truncate.js"
     }
   }
 }
