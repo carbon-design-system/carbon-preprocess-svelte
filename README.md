@@ -43,9 +43,9 @@ This library contains the following preprocessors and plugins:
 
 The preprocessor optimizes imports from the following packages:
 
-- [carbon-components-svelte](https://github.com/IBM/carbon-components-svelte)
-- [carbon-icons-svelte](https://github.com/IBM/carbon-icons-svelte)
-- [carbon-pictograms-svelte](https://github.com/IBM/carbon-pictograms-svelte)
+- [carbon-components-svelte](https://github.com/carbon-design-system/carbon-components-svelte)
+- [carbon-icons-svelte](https://github.com/carbon-design-system/carbon-icons-svelte)
+- [carbon-pictograms-svelte](https://github.com/carbon-design-system/carbon-pictograms-svelte)
 
 **Example**
 
@@ -195,7 +195,7 @@ interface ElementsOptions {
 
 `icons` is a Svelte markup preprocessor that inlines [Carbon SVG icons](https://www.carbondesignsystem.com/guidelines/icons/library/).
 
-The only required attribute is `name`, which represents the module name of the icon. Refer to [carbon-icons-svelte/ICON_INDEX.md](https://github.com/IBM/carbon-icons-svelte/blob/master/ICON_INDEX.md) for a list of supported icons.
+The only required attribute is `name`, which represents the module name of the icon. Refer to [carbon-icons-svelte/ICON_INDEX.md](https://github.com/carbon-design-system/carbon-icons-svelte/blob/master/ICON_INDEX.md) for a list of supported icons.
 
 **Example**
 
@@ -219,7 +219,7 @@ export default {
 
 `pictograms` is a Svelte markup preprocessor that inlines [Carbon SVG pictograms](https://www.carbondesignsystem.com/guidelines/pictograms/library/).
 
-The only required attribute is `name`, which represents the module name of the pictogram. Refer to [carbon-pictograms-svelte/PICTOGRAM_INDEX.md](https://github.com/IBM/carbon-pictograms-svelte/blob/master/PICTOGRAM_INDEX.md) for a list of supported pictograms.
+The only required attribute is `name`, which represents the module name of the pictogram. Refer to [carbon-pictograms-svelte/PICTOGRAM_INDEX.md](https://github.com/carbon-design-system/carbon-pictograms-svelte/blob/master/PICTOGRAM_INDEX.md) for a list of supported pictograms.
 
 **Example**
 

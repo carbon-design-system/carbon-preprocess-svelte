@@ -5,19 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.7.0) - 2022-03-19
+## [0.8.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.8.0) - 2022-04-10
+
+- upgrade `@carbon/icons` to v11.0.1
+- update `optimizeImports` to support `carbon-icons-svelte@11` component imports
+
+## [0.7.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.7.0) - 2022-03-19
 
 - upgrade `carbon-components-svelte` to v0.62.0 to account for the removed `Copy` component and inlined icon components
 
-## [0.6.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.6.0) - 2021-07-11
+## [0.6.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.6.0) - 2021-07-11
 
 - upgrade `carbon-components-svelte` to v0.40.0 to include `Breakpoint`, `Theme` components for `optimizeImports`
 
-## [0.5.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.5.0) - 2021-07-05
+## [0.5.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.5.0) - 2021-07-05
 
 - upgrade `carbon-components-svelte` to v0.39.0 to include `RecursiveList`, `TreeView` components for `optimizeImports`
 
-## [0.4.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.4.0) - 2021-06-28
+## [0.4.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.4.0) - 2021-06-28
 
 **Features**
 
@@ -27,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - default `include` preprocessor entry test regex to high-level test option
 
-## [0.3.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.3.0) - 2021-05-21
+## [0.3.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.3.0) - 2021-05-21
 
 **Features**
 
@@ -37,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - support custom `test` regex per script/markup object in `include` preprocessor
 
-## [0.2.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.2.0) - 2021-05-21
+## [0.2.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.2.0) - 2021-05-21
 
 **Features**
 
@@ -48,25 +53,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - enrich preprocessor descriptions
 - simplify sample SvelteKit set-up
 
-## [0.1.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.1.0) - 2021-05-11
+## [0.1.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.1.0) - 2021-05-11
 
 **Documentation**
 
 - improve preprocessor descriptions, add sample SvelteKit set-up
 
-## [0.1.0-rc.5](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.5) - 2021-05-11
+## [0.1.0-rc.5](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.5) - 2021-05-11
 
 **Fixes**
 
 - add separate entry point for CJS bundle
 
-## [0.1.0-rc.4](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.4) - 2021-05-10
+## [0.1.0-rc.4](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.4) - 2021-05-10
 
 **Fixes**
 
 - add TypeScript as a direct dependency
 
-## [0.1.0-rc.3](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.3) - 2021-05-10
+## [0.1.0-rc.3](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.3) - 2021-05-10
 
 **Features**
 
@@ -76,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - list available theme options for the `elements` preprocessor
 
-## [0.1.0-rc.2](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.2) - 2021-05-08
+## [0.1.0-rc.2](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.2) - 2021-05-08
 
 **Fixes**
 
@@ -86,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - add `optimizeCss` API to README
 
-## [0.1.0-rc.1](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.1) - 2021-05-08
+## [0.1.0-rc.1](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.1) - 2021-05-08
 
 **Fixes**
 
@@ -99,6 +104,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - use ESM instead of CJS syntax in `svelte.config.js` usage examples
 
-## [0.1.0-rc.0](https://github.com/IBM/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.0) - 2021-05-07
+## [0.1.0-rc.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.1.0-rc.0) - 2021-05-07
 
 - initial release
