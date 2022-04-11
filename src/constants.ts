@@ -6,7 +6,7 @@ export const CARBON_SVELTE = {
 
 export const LATEST_MAJOR_VERSION = {
   [CARBON_SVELTE.components]: "0",
-  [CARBON_SVELTE.icons]: "10",
+  [CARBON_SVELTE.icons]: "11",
   [CARBON_SVELTE.pictograms]: "11",
 };
 
