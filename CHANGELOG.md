@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.8.2) - 2022-04-10
+
+- set latest major version of `carbon-icons-svelte` to `11`
+
 ## [0.8.1](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.8.1) - 2022-04-10
 
 - hot fix to re-build components imports map using a non-linked version of `carbon-components-svelte`
