@@ -189,7 +189,7 @@
     "function-bind" "^1.1.1"
     "get-intrinsic" "^1.0.2"
 
-"carbon-components-svelte@../carbon-components-svelte":
+"carbon-components-svelte@^0.62.3":
   "resolved" "file:../carbon-components-svelte"
   "version" "0.62.4"
   dependencies:
