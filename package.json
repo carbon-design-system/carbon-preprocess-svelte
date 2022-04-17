@@ -37,7 +37,7 @@
     "@carbon/elements": "10.31.0",
     "@carbon/icon-helpers": "^10.16.0",
     "@carbon/icons": "^11.0.1",
-    "@carbon/pictograms": "^11.24.0",
+    "@carbon/pictograms": "^12.0.2",
     "@types/carbon__elements": "10.31.0",
     "@types/carbon__icon-helpers": "^10.7.1",
     "@types/node": "^15.0.2",
