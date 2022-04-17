@@ -59,10 +59,10 @@
   resolved "https://registry.yarnpkg.com/@carbon/motion/-/motion-10.15.0.tgz#ddf38a5d4bf594abf0adb9302bb1101c5ae93346"
   integrity sha512-hyGUNm+5TB9NlXgtbAmXlVN7ivjdBxoV8h/f+461eQ5BLiu/MibcLtTM3zeIypUYxd3PUNAx9DcMN12t/J3EpA==
 
-"@carbon/pictograms@^11.24.0":
-  version "11.24.0"
-  resolved "https://registry.yarnpkg.com/@carbon/pictograms/-/pictograms-11.24.0.tgz#55d490b82ae39b5eac20a1687858e8465f8b9a66"
-  integrity sha512-dzlp7DIOYcuViFpQXHQKCH7cdfPmY3txc+SyzBXYyhWtwSjnjUOA/pv/wkvubR2gUQdxk9nCZK9CDl1HzahpiQ==
+"@carbon/pictograms@^12.0.2":
+  version "12.0.2"
+  resolved "https://registry.yarnpkg.com/@carbon/pictograms/-/pictograms-12.0.2.tgz#5f561f72de870e952b0755e6fcae3f5214e39efa"
+  integrity sha512-vxiNC9kZkNAFMJIMKZtlNVYFuVIx6+27kqY+SJcoH9DhkGem8B6TRUAbQKp5YTjlDRnY/WgJ38tNq79nVxMIZw==
 
 "@carbon/themes@^10.31.0":
   version "10.31.0"
