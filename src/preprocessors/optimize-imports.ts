@@ -62,7 +62,8 @@ export function optimizeImports(): Pick<PreprocessorGroup, "script"> {
                     node.specifiers
                       .map(({ local, imported }) => {
                         if (
-                          CARBON_VERSIONS[CARBON_SVELTE.pictograms] === "11"
+                          CARBON_VERSIONS[CARBON_SVELTE.pictograms] === "11" ||
+                          CARBON_VERSIONS[CARBON_SVELTE.pictograms] === "12"
                         ) {
                           return `import ${local.name} from "${CARBON_SVELTE.pictograms}/lib/${imported.name}.svelte";`;
                         }
