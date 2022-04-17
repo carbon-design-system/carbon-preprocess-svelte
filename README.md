@@ -53,10 +53,16 @@ The preprocessor optimizes imports from the following packages:
 - import { Button } from "carbon-components-svelte";
 - import { Add16 } from "carbon-icons-svelte";
 - import { Airplane } from "carbon-pictograms-svelte";
-+ import Button from "carbon-components-svelte/Button/Button.svelte";
-+ import Add16 from "carbon-icons-svelte/lib/Add16/Add16.svelte";
-+ import Airplane from "carbon-pictograms-svelte/lib/Airplane/Airplane.svelte";
++ import Button from "carbon-components-svelte/Button.svelte";
++ import Add16 from "carbon-icons-svelte/lib/Add16.svelte";
++ import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
 ```
+
+**Note**
+
+A minimum version of `carbon-preprocess-svelte@0.9.0` is required for `carbon-component-svelte@0.63.0`.
+
+A minimum version of `carbon-preprocess-svelte@0.8.0` is required for `carbon-icons-svelte@11`.
 
 #### Usage
 
