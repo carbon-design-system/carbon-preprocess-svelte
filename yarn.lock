@@ -189,10 +189,10 @@ call-bind@^1.0.0, call-bind@^1.0.2:
     function-bind "^1.1.1"
     get-intrinsic "^1.0.2"
 
-carbon-components-svelte@^0.62.3:
-  version "0.62.3"
-  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.62.3.tgz#d2dbafb2c8d4bd6ba4a5a5183110b16ba256886e"
-  integrity sha512-/MWO0vEKEKZ3t12tCKrMW6JY97b9g/csbDFg7kppOrvEvpOhvK3Fu3JGQr6+ob3ngNLDmCSOmXqgs05uybtR5A==
+carbon-components-svelte@^0.63.0:
+  version "0.63.0"
+  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.63.0.tgz#ab46b431b66a4e458ff3647c51d6789214c13fad"
+  integrity sha512-oG5pW1/Tzuc/2MW5ekRLp6oGmIZjvIoY8y/Dg7M8Bj35hB6ofgs5BQPLa/UjsnVOEC3YqNVu18vXnvFqkjAA8A==
   dependencies:
     flatpickr "4.6.9"
 
