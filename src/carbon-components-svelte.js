@@ -1,7 +1,7 @@
 export const components = {
   "metadata": {
     "package": "carbon-components-svelte",
-    "version": "0.62.4",
+    "version": "0.63.0",
     "exports": 171
   },
   "components": {

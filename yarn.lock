@@ -59,10 +59,10 @@
   "resolved" "https://registry.npmjs.org/@carbon/motion/-/motion-10.29.0.tgz"
   "version" "10.29.0"
 
-"@carbon/pictograms@^11.24.0":
-  "integrity" "sha512-dzlp7DIOYcuViFpQXHQKCH7cdfPmY3txc+SyzBXYyhWtwSjnjUOA/pv/wkvubR2gUQdxk9nCZK9CDl1HzahpiQ=="
-  "resolved" "https://registry.npmjs.org/@carbon/pictograms/-/pictograms-11.24.0.tgz"
-  "version" "11.24.0"
+"@carbon/pictograms@^12.0.2":
+  version "12.0.2"
+  resolved "https://registry.yarnpkg.com/@carbon/pictograms/-/pictograms-12.0.2.tgz#5f561f72de870e952b0755e6fcae3f5214e39efa"
+  integrity sha512-vxiNC9kZkNAFMJIMKZtlNVYFuVIx6+27kqY+SJcoH9DhkGem8B6TRUAbQKp5YTjlDRnY/WgJ38tNq79nVxMIZw==
 
 "@carbon/themes@^10.31.0":
   "integrity" "sha512-Q//XENDqFcgJbide0QbaAvAOKg/u3HIR3na0DsmoWtX4ZWrSz8zpUdvN8Yy9ybJBg1dT+IOfNCdjjhjbCVikKA=="
@@ -189,9 +189,10 @@
     "function-bind" "^1.1.1"
     "get-intrinsic" "^1.0.2"
 
-"carbon-components-svelte@^0.62.3":
-  "resolved" "file:../carbon-components-svelte"
-  "version" "0.62.4"
+carbon-components-svelte@^0.63.0:
+  version "0.63.0"
+  resolved "https://registry.yarnpkg.com/carbon-components-svelte/-/carbon-components-svelte-0.63.0.tgz#ab46b431b66a4e458ff3647c51d6789214c13fad"
+  integrity sha512-oG5pW1/Tzuc/2MW5ekRLp6oGmIZjvIoY8y/Dg7M8Bj35hB6ofgs5BQPLa/UjsnVOEC3YqNVu18vXnvFqkjAA8A==
   dependencies:
     "carbon-preprocess-svelte" "^0.8.2"
     "flatpickr" "4.6.9"
