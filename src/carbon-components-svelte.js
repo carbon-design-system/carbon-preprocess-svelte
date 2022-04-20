@@ -2,7 +2,7 @@ export const components = {
   "metadata": {
     "package": "carbon-components-svelte",
     "version": "0.63.0",
-    "exports": 169
+    "exports": 171
   },
   "components": {
     "Accordion": {
@@ -16,6 +16,12 @@ export const components = {
     },
     "AspectRatio": {
       "path": "carbon-components-svelte/src/AspectRatio/AspectRatio.svelte"
+    },
+    "AutoComplete": {
+      "path": "carbon-components-svelte/src/AutoComplete/AutoComplete.svelte"
+    },
+    "AutoCompleteSkeleton": {
+      "path": "carbon-components-svelte/src/AutoComplete/AutoCompleteSkeleton.svelte"
     },
     "Breadcrumb": {
       "path": "carbon-components-svelte/src/Breadcrumb/Breadcrumb.svelte"
