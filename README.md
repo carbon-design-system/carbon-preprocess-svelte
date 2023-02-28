@@ -84,18 +84,15 @@ export default {
 `optimizeCss` should be added to the list of `vite.plugins`. Take care to only run the plugin when building for production.
 
 ```js
-// svelte.config.js
-import adapter from "@sveltejs/adapter-static";
-import { optimizeCss } from "carbon-preprocess-svelte";
+// vite.config.js
+import { sveltekit } from '@sveltejs/kit/vite';
+import { optimizeCss } from 'carbon-preprocess-svelte';
 
-export default {
-  kit: {
-    adapter: adapter(),
-    vite: {
-      plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
-    },
-  },
+const config = {
+	plugins: [sveltekit(), optimizeCss({})],
 };
+
+export default config;
 ```
 
 #### API
@@ -455,11 +452,19 @@ export default {
   preprocess: [optimizeImports()],
   kit: {
     adapter: adapter(),
-    vite: {
-      plugins: [process.env.NODE_ENV === "production" && optimizeCss()],
-    },
   },
 };
+```
+```js
+// vite.config.js
+import { sveltekit } from '@sveltejs/kit/vite';
+import { optimizeCss } from 'carbon-preprocess-svelte';
+
+const config = {
+	plugins: [sveltekit(), optimizeCss({})],
+};
+
+export default config;
 ```
 
 ## Contributing
