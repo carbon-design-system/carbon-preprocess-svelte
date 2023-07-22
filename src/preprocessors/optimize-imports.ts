@@ -1,9 +1,9 @@
 import { PreprocessorGroup } from "svelte/types/compiler/preprocess";
-import { walkAndReplace } from "../walk-and-replace";
 import { BuildComponents } from "../build/build-components";
-import { getCarbonVersions } from "../utils";
-import { CARBON_SVELTE } from "../constants";
 import { components } from "../carbon-components-svelte.js";
+import { CARBON_SVELTE } from "../constants";
+import { getCarbonVersions } from "../utils";
+import { walkAndReplace } from "../walk-and-replace";
 
 const Components: Pick<BuildComponents, "components"> = components;
 const CARBON_VERSIONS: Record<string, string> = getCarbonVersions();
@@ -46,7 +46,10 @@ export function optimizeImports(): Pick<PreprocessorGroup, "script"> {
                     node,
                     node.specifiers
                       .map(({ local, imported }) => {
-                        if (CARBON_VERSIONS[CARBON_SVELTE.icons] === "11") {
+                        if (
+                          CARBON_VERSIONS[CARBON_SVELTE.icons] === "11" ||
+                          CARBON_VERSIONS[CARBON_SVELTE.icons] === "12"
+                        ) {
                           return `import ${local.name} from "${CARBON_SVELTE.icons}/lib/${imported.name}.svelte";`;
                         }
 
