@@ -1,52 +1,22 @@
-import fs from "fs";
-import path from "path";
-import { promisify } from "util";
-import { CARBON_SVELTE, LATEST_MAJOR_VERSION } from "./constants";
+import { BITS_DENOM } from "./constants";
 
-export const writeFile = promisify(fs.writeFile);
-export const readFile = promisify(fs.readFile);
+const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
-export function getPackageJson(
-  subpath: string = ""
-): {
-  name?: string;
-  version?: string;
-  devDependencies?: Record<string, string>;
-  dependencies?: Record<string, string>;
-} {
-  const pkgPath = path.join(process.cwd(), subpath, "package.json");
+export const log = console.log;
 
-  if (fs.existsSync(pkgPath)) {
-    return JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-  } else {
-    return {};
+export function toHumanReadableSize(size_in_kb: number) {
+  if (size_in_kb >= BITS_DENOM) {
+    return formatter.format(size_in_kb / BITS_DENOM) + " MB";
   }
+
+  return formatter.format(size_in_kb) + " kB";
 }
 
-export function getCarbonVersions() {
-  const { devDependencies, dependencies } = getPackageJson();
-  const devDeps = devDependencies ?? {};
-  const deps = dependencies ?? {};
+export function stringSizeInKB(str: string) {
+  const blob = new Blob([str], { type: "text/plain" });
+  return blob.size / BITS_DENOM;
+}
 
-  return [
-    CARBON_SVELTE.components,
-    CARBON_SVELTE.icons,
-    CARBON_SVELTE.pictograms,
-  ].reduce((pkgs, pkg) => {
-    let version = devDeps[pkg] || deps[pkg];
-
-    if (version !== undefined) {
-      const [major, minor, patch] = version.replace(/^(\^|\~)/, "").split(".");
-
-      // check if major version is a number
-      if (!isNaN(Number(major))) {
-        version = major;
-      }
-    } else {
-      // default to the latest package versions
-      version = LATEST_MAJOR_VERSION[pkg];
-    }
-
-    return { ...pkgs, [pkg]: version };
-  }, {});
+export function percentageDiff(a: number, b: number) {
+  return formatter.format(((a - b) / a) * 100) + "%";
 }

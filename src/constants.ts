@@ -1,19 +1,12 @@
-export const CARBON_SVELTE = {
-  components: "carbon-components-svelte",
-  icons: "carbon-icons-svelte",
-  pictograms: "carbon-pictograms-svelte",
-};
+export const enum CarbonSvelte {
+  Components = "carbon-components-svelte",
+  Icons = "carbon-icons-svelte",
+  Pictograms = "carbon-pictograms-svelte",
+}
 
-export const LATEST_MAJOR_VERSION = {
-  [CARBON_SVELTE.components]: "0",
-  [CARBON_SVELTE.icons]: "11",
-  [CARBON_SVELTE.pictograms]: "12",
-};
+export const RE_EXT_SVELTE = /\.svelte$/;
 
-export const API_COMPONENTS = `src/${CARBON_SVELTE.components}.js`;
-export const API_ELEMENTS = "src/carbon-elements.js";
-export const API_ICONS = "src/carbon-icons.js";
-export const API_PICTOGRAMS = "src/carbon-pictograms.js";
+export const RE_EXT_CSS = /\.css$/;
 
-export const EXT_SVELTE = /\.(svelte)$/;
-export const EXT_CSS = /\.(css)$/;
+// Vite uses the decimal system for file sizes.
+export const BITS_DENOM = 1_000;

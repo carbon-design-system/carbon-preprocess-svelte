@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "carbon-components-svelte": "^0.84.1",
+    "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "@sveltejs/vite-plugin-svelte": "latest",
+    "svelte": "latest",
+    "vite": "latest"
+  }
+}

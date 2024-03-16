@@ -1,4 +1,2 @@
-export * from "./preprocessors";
-export * from "./extractors";
-export * from "./plugins";
-export * from "./presets";
+export { optimizeCss } from "./optimize-css";
+export { optimizeImports } from "./optimize-imports";

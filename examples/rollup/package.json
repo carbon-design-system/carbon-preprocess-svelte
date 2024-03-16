@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rollup -cw",
+    "build": "rollup -c"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "latest",
+    "@rollup/plugin-node-resolve": "latest",
+    "carbon-components-svelte": "^0.84.1",
+    "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "rollup": "latest",
+    "rollup-plugin-css-only": "latest",
+    "rollup-plugin-svelte": "latest",
+    "rollup-plugin-terser": "latest",
+    "svelte": "latest"
+  }
+}

@@ -1,5 +1,0 @@
-/dist
-/src/*.js
-/tests/**/build
-/tests/**/*.test.svelte
-/tests/**/.svelte

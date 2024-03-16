@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-For MacOS, prerequisites include [Node.js](https://nodejs.org/en/download/package-manager/#macos)(version 14 or greater) and [Yarn](https://yarnpkg.com/en/docs/install#mac-stable).
+For MacOS, prerequisites include Node.js and Bun.
 
 ## Set-up
 
@@ -16,7 +16,7 @@ cd carbon-preprocess-svelte
 Set the original repository as the upstream:
 
 ```sh
-git remote add upstream git@github.com:IBM/carbon-preprocess-svelte.git
+git remote add upstream git@github.com:carbon-design-system/carbon-preprocess-svelte.git
 # verify that the upstream is added
 git remote -v
 ```
@@ -24,35 +24,28 @@ git remote -v
 Finally, install the project dependencies:
 
 ```sh
-yarn install
+bun install
 ```
 
 ## Workflow
 
-Each preprocessor or plugin should have an integration test. Before running tests, be sure to build the library at least once.
+Imports for `carbon-components-svelte` must be regenerated if the `carbon-components-svelte` package is updated.
+
+To update the imports, run the following command:
 
 ```sh
-yarn prepack
+bun run index:components
 ```
+
+This will update `src/component-index.ts`, which should be checked into source control.
 
 ### Unit tests
 
-Run `yarn test:unit` to execute the unit tests (located in `/tests/unit`).
+Run `bun test` to execute the unit tests (located in `/tests`).
 
-### Integration tests
+For watch mode, run `bun test --watch`.
 
-Run `yarn test:integration` to execute the integration tests (located in `/tests/integration`).
-
-### Continuous Integration
-
-The `yarn prepack` command is executed in Travis CI.
-
-It does the following:
-
-1. Build the library
-2. Run unit/integration tests in parallel
-
-The CI should pass if no unexpected errors occur.
+To update snapshots, run `bun test --update-snapshots`.
 
 ## Submitting a Pull Request
 
@@ -62,10 +55,10 @@ Before submitting a pull request, make sure your fork is up to date with the lat
 
 ```sh
 git fetch upstream
-git checkout master
-git merge upstream/master
+git checkout main
+git merge upstream/main
 ```
 
 ### Submit a PR
 
-After you've pushed your changes to remote, submit your PR. Make sure you are comparing `<YOUR_USER_ID>/feature` to `origin/master`.
+After you've pushed your changes to remote, submit your PR. Make sure you are comparing `<YOUR_USER_ID>/feature` to `origin/main`.

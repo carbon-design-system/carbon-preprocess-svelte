@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "webpack serve",
+    "build": "NODE_ENV=production webpack"
+  },
+  "devDependencies": {
+    "carbon-components-svelte": "^0.84.1",
+    "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "css-loader": "latest",
+    "html-webpack-plugin": "latest",
+    "mini-css-extract-plugin": "latest",
+    "svelte": "latest",
+    "svelte-loader": "latest",
+    "webpack": "latest",
+    "webpack-cli": "latest",
+    "webpack-dev-server": "latest"
+  }
+}
