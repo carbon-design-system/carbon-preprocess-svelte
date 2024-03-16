@@ -1,0 +1,42 @@
+{
+  "name": "carbon-preprocess-svelte",
+  "version": "0.10.0",
+  "license": "Apache-2.0",
+  "description": "Collection of Svelte preprocessors for the Carbon Design System",
+  "author": "Eric Liu (https://github.com/metonym)",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "index:components": "bun scripts/index-components.ts",
+    "prepack": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "magic-string": "^0.30.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "carbon-components-svelte": "^0.84.1",
+    "svelte": "latest",
+    "typescript": "latest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carbon-design-system/carbon-preprocess-svelte.git"
+  },
+  "homepage": "https://github.com/carbon-design-system/carbon-preprocess-svelte",
+  "bugs": "https://github.com/carbon-design-system/carbon-preprocess-svelte/issues",
+  "keywords": [
+    "carbon",
+    "carbon design system",
+    "carbon preprocess",
+    "svelte",
+    "preprocessor",
+    "optimize imports"
+  ],
+  "files": [
+    "dist"
+  ],
+  "maintainers": [
+    "Eric Liu (https://github.com/metonym)"
+  ]
+}
