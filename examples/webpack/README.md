@@ -28,7 +28,7 @@ Run the app in development mode. This should only apply the `optimizeImports` pr
 bun run dev
 ```
 
-Build the app for production.
+Build the app for production. This should run both the `optimizeImports` and `optimizeCss` preprocessors.
 
 ```sh
 bun run build

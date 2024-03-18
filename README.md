@@ -220,8 +220,21 @@ export default {
 
 #### Webpack
 
-> [!WARNING]
-> Currently, the `optimizeCss` plugin does not support Webpack.
+This code is abridged, see [examples/webpack](examples/webpack) for a full set-up.
+
+```js
+// webpack.config.js
+const { OptimizeCssPlugin } = require("carbon-preprocess-svelte");
+
+const PROD = process.env.NODE_ENV === "production";
+
+module.exports = {
+  plugins: [
+    // Conditionally apply the plugin when building for production.
+    PROD && new OptimizeCssPlugin(),
+  ],
+};
+```
 
 #### `optimizeCss` API
 

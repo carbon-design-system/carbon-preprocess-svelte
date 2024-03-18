@@ -24,7 +24,7 @@ export function extractSelectors(props: ExtractSelectorsProps) {
               .split(/\s+/)
               .filter(Boolean)
               .forEach((selector) =>
-                selectors.set(selector, { type: node.type })
+                selectors.set(selector, { type: node.type }),
               );
           }
         });

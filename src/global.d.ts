@@ -55,6 +55,6 @@ declare module "svelte/compiler" {
     ast: Ast,
     options: {
       enter: (node: ANode, parentNode: ANode) => void;
-    }
+    },
   ): void;
 }

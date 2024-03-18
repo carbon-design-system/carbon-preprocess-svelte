@@ -52,8 +52,8 @@ const components = Object.fromEntries(
   new Map(
     [...exports_map.entries()]
       .sort((a, b) => a.toLocaleString().localeCompare(b.toLocaleString()))
-      .filter(([_, value]) => value !== null)
-  )
+      .filter(([_, value]) => value !== null),
+  ),
 );
 
 await Bun.write(
@@ -66,6 +66,6 @@ await Bun.write(
 export const components: Record<string, { path: string; classes: string[]; }> = Object.freeze(${JSON.stringify(
     components,
     null,
-    2
-  )});\n`
+    2,
+  )});\n`,
 );

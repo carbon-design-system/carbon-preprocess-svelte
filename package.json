@@ -8,7 +8,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
-    "prepack": "tsc -p tsconfig.build.json"
+    "prepack": "tsc -p tsconfig.build.json",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "magic-string": "^0.30.5",
@@ -18,9 +19,11 @@
   "devDependencies": {
     "@types/bun": "latest",
     "carbon-components-svelte": "0.84.1",
+    "prettier": "latest",
     "svelte": "latest",
     "typescript": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "webpack": "latest"
   },
   "repository": {
     "type": "git",

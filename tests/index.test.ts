@@ -28,6 +28,6 @@ test("optimizeImports", () => {
         import { Airplane } from "carbon-pictograms-svelte";
         import { Airplane as Airplane2 } from "carbon-pictograms-svelte";
         import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";
-    `)
+    `),
   ).toMatchSnapshot();
 });

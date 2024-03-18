@@ -1,5 +1,6 @@
 import MagicString from "magic-string";
-import { parse, walk, type ImportDeclaration } from "svelte/compiler";
+import type { ImportDeclaration } from "svelte/compiler";
+import { parse, walk } from "svelte/compiler";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { components } from "./component-index";
 import { CarbonSvelte } from "./constants";
@@ -7,7 +8,7 @@ import { CarbonSvelte } from "./constants";
 function rewriteImport(
   s: MagicString,
   node: ImportDeclaration,
-  map: (specifier: ImportDeclaration["specifiers"][0]) => string
+  map: (specifier: ImportDeclaration["specifiers"][0]) => string,
 ) {
   let content = "";
 
@@ -23,7 +24,7 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
   return {
     name: "carbon:optimize-imports",
     script({ filename, content: raw }) {
-      // Skip Svelte files in node_modules to minimize unnecessary preprocessing
+      // Skip files in node_modules to minimize unnecessary preprocessing
       if (!filename) return;
       if (/node_modules/.test(filename)) return;
 
