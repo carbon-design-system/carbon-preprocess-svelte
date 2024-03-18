@@ -68,7 +68,11 @@ export function extractSelectors(props: ExtractSelectorsProps) {
       if (value.startsWith("bx--") && !value.startsWith(".")) {
         classes.push("." + value);
       } else {
-        classes.push(value);
+        if (value.startsWith(".")) {
+          classes.push(value);
+        } else {
+          classes.push("." + value);
+        }
       }
     }
   });

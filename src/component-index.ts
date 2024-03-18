@@ -240,7 +240,7 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
     "path": "carbon-components-svelte/src/ComposedModal/ComposedModal.svelte",
     "classes": [
       ".bx--modal",
-      "is-visible",
+      ".is-visible",
       ".bx--modal--danger",
       ".bx--modal-container",
       ".bx--modal-container--xs",
@@ -586,7 +586,7 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
     "classes": [
       ".bx--header__action",
       ".bx--header__action--active",
-      "action-text",
+      ".action-text",
       ".bx--header-panel",
       ".bx--header-panel--expanded"
     ]
@@ -652,11 +652,11 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
   "HeaderSearch": {
     "path": "carbon-components-svelte/src/UIShell/HeaderSearch.svelte",
     "classes": [
-      "active",
+      ".active",
       ".bx--header__action",
-      "disabled",
-      "hidden",
-      "selected"
+      ".disabled",
+      ".hidden",
+      ".selected"
     ]
   },
   "HeaderUtilities": {
@@ -792,7 +792,7 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
     "classes": [
       ".bx--modal",
       ".bx--modal-tall",
-      "is-visible",
+      ".is-visible",
       ".bx--modal--danger",
       ".bx--modal-container",
       ".bx--modal-container--xs",
@@ -914,9 +914,9 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
       ".bx--number__invalid--warning",
       ".bx--number__controls",
       ".bx--number__control-btn",
-      "down-icon",
+      ".down-icon",
       ".bx--number__rule-divider",
-      "up-icon",
+      ".up-icon",
       ".bx--form__helper-text",
       ".bx--form__helper-text--disabled",
       ".bx--form-requirement"
@@ -1865,9 +1865,9 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
       ".bx--tree",
       ".bx--tree--default",
       ".bx--tree--compact",
-      "li.bx--tree-node:not(.bx--tree-node--disabled)",
+      ".li.bx--tree-node:not(.bx--tree-node--disabled)",
       ".bx--tree-node--disabled",
-      "li.bx--tree-node"
+      ".li.bx--tree-node"
     ]
   },
   "truncate": {
