@@ -59,11 +59,17 @@ See [examples/sveltekit](examples/sveltekit).
 ```js
 // svelte.config.js
 import adapter from "@sveltejs/adapter-static";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { optimizeImports } from "carbon-preprocess-svelte";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-  preprocess: [optimizeImports()],
+  preprocess: [
+    // Preprocessors are run in sequence.
+    // If using TypeScript, the code must be transpiled first.
+    vitePreprocess(),
+    optimizeImports(),
+  ],
   kit: {
     adapter: adapter(),
   },
@@ -79,13 +85,19 @@ See [examples/vite](examples/vite).
 ```js
 // vite.config.js
 import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { optimizeImports } from "carbon-preprocess-svelte";
 
 /** @type {import('vite').UserConfig} */
 export default {
   plugins: [
     svelte({
-      preprocess: [optimizeImports()],
+      preprocess: [
+        // Preprocessors are run in sequence.
+        // If using TypeScript, the code must be transpiled first.
+        vitePreprocess(),
+        optimizeImports(),
+      ],
     }),
   ],
 };
@@ -155,7 +167,7 @@ dist/assets/index-Ceijs3eO.js   53.65 kB │ gzip: 15.88 kB
 ```
 
 > [!NOTE]
-> This is a plugin and not a Svelte preprocessor. It should be added to the list of `vite.plugins`. For Vite set-ups, this plugin is only run when building the app. For Rollup, you should conditionally apply the plugin.
+> This is a plugin and not a Svelte preprocessor. It should be added to the list of `vite.plugins`. For Vite set-ups, this plugin is only run when building the app. For Rollup and Webpack, you should conditionally apply the plugin to only execute when building for production.
 
 #### SvelteKit
 
