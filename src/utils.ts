@@ -19,6 +19,10 @@ export function stringSizeInKB(str: string) {
   return blob.size / BITS_DENOM;
 }
 
+function padIfNeeded(a: string, b: string) {
+  return a.length > b.length ? a : a.padStart(b.length, " ");
+}
+
 export function logComparison(props: {
   original_size: number;
   optimized_size: number;
@@ -27,14 +31,12 @@ export function logComparison(props: {
   const { original_size, optimized_size, id } = props;
   const original = toHumanReadableSize(original_size);
   const optimized = toHumanReadableSize(optimized_size);
+  const original_display = padIfNeeded(original, optimized);
+  const optimized_display = padIfNeeded(optimized, original);
   const diff = percentageDiff(original_size, optimized_size);
 
   console.log("\n");
   console.log("Optimized", id);
-  console.log("Before:", original);
-  console.log(
-    "After: ",
-    optimized.padStart(original.length, " "),
-    `(-${diff})\n`,
-  );
+  console.log("Before:", original_display);
+  console.log("After: ", optimized_display, `(-${diff})\n`);
 }
