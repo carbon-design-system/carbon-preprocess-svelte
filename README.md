@@ -103,7 +103,7 @@ export default {
 
 #### Rollup
 
-This code is abridged, see [examples/rollup](examples/rollup) for a full set-up.
+This code is abridged; see [examples/rollup](examples/rollup) for a full set-up.
 
 ```js
 // rollup.config.js
@@ -121,7 +121,7 @@ export default {
 
 #### Webpack
 
-This code is abridged, see [examples/webpack](examples/webpack) for a full set-up.
+This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
 
 ```js
 // webpack.config.js
@@ -197,7 +197,7 @@ export default {
 
 #### Rollup
 
-This code is abridged, see [examples/rollup](examples/rollup) for a full set-up.
+This code is abridged; see [examples/rollup](examples/rollup) for a full set-up.
 
 ```js
 // rollup.config.js
@@ -220,7 +220,7 @@ export default {
 
 #### Webpack
 
-This code is abridged, see [examples/webpack](examples/webpack) for a full set-up.
+This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
 
 ```js
 // webpack.config.js
@@ -241,32 +241,26 @@ module.exports = {
 ```ts
 type OptimizeCssOptions = {
   /**
-   * Set to `false` to disable verbose logging.
    * By default, the plugin will log the size diff
    * between the original and optimized CSS.
+   *
+   * Set to `false` to disable verbose logging.
    * @default true
    */
   verbose?: boolean;
 
   /**
-   * By default, the pre-compiled Carbon StyleSheet will
-   * ship @font-face rules for all available IBM Plex fonts,
-   * many of which are not used in the Carbon Svelte components.
-   * As such, the default behavior is to only preserve IBM Plex fonts
-   * with 400/600-weight and normal-style @font-face rules.
+   * By default, pre-compiled Carbon StyleSheets ship `@font-face`
+   * rules for all available IBM Plex fonts, many of which are
+   * not actually used in Carbon Svelte components.
+   *
+   * The recommended optimization is to only preserve IBM Plex
+   * fonts with 400/600-weight and normal-font-style rules.
    *
    * Set to `true` to disable this behavior.
    * @default false
    */
   preserveAllIBMFonts?: boolean;
-
-  /**
-   * Optionally provide a custom PostCSS plugin.
-   * This plugin will be applied after Carbon Svelte CSS is optimized.
-   * This is exposed for convenience and maximum flexibility.
-   * @see https://postcss.org/docs/postcss-plugins
-   */
-  postcssPlugin?: postcss.Plugin;
 };
 ```
 

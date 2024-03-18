@@ -6,13 +6,12 @@ import { components } from "./component-index";
 import { CarbonSvelte, RE_EXT_CSS, RE_EXT_SVELTE } from "./constants";
 import type { OptimizeCssOptions } from "./optimize-css";
 import { postcssOptimizeCarbon } from "./postcss-plugin";
-import { logComparison, noop, stringSizeInKB } from "./utils";
+import { logComparison, stringSizeInKB } from "./utils";
 
 class OptimizeCssPlugin {
   private options: OptimizeCssOptions = {
     verbose: true,
     preserveAllIBMFonts: false,
-    postcssPlugin: undefined,
   };
 
   public constructor(options?: OptimizeCssOptions) {
@@ -23,13 +22,9 @@ class OptimizeCssPlugin {
     if (options?.preserveAllIBMFonts === true) {
       this.options.preserveAllIBMFonts = true;
     }
-
-    if (options?.postcssPlugin) {
-      this.options.postcssPlugin = options.postcssPlugin;
-    }
   }
 
-  private apply(compiler: Compiler) {
+  public apply(compiler: Compiler) {
     const { webpack } = compiler;
     const { Compilation, NormalModule } = compiler.webpack;
     const { RawSource } = webpack.sources;
@@ -69,7 +64,6 @@ class OptimizeCssPlugin {
                 const optimized_css = postcss([
                   postcssOptimizeCarbon({ ...this.options, css_allowlist }),
                   discardEmpty(),
-                  this.options.postcssPlugin ?? noop,
                 ]).process(source).css;
 
                 const original_size = stringSizeInKB(source.toString());

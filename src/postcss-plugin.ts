@@ -19,14 +19,10 @@ export function postcssOptimizeCarbon(
       const selector = node.selector;
 
       /**
-       * This could be improved.
-       * For now, first ensure that the selector contains a class.
+       * Ensure that the selector contains a class.
        */
       if (selector.includes(".")) {
-        /**
-         * Selectors may contain multiple classes, separated by a comma.
-         * For now, only extract classes.
-         */
+        // Selectors may contain multiple classes, separated by a comma.
         const classes = selector
           .split(",")
           .filter((c) => c.trim().startsWith("."));
@@ -35,10 +31,8 @@ export function postcssOptimizeCarbon(
 
         for (const name of classes) {
           for (const selector of css_allowlist) {
-            /**
-             * If at least one class is in the allowlist, keep the rule.
-             * This is a simplistic approach and can be further optimized.
-             */
+            // If at least one class is in the allowlist, keep the rule.
+            // This is a simplistic approach and can be further optimized.
             if (name.includes(selector)) {
               remove_rule = false;
               break;
@@ -53,13 +47,13 @@ export function postcssOptimizeCarbon(
     },
     AtRule(node) {
       if (!preserveAllIBMFonts && node.name === "font-face") {
-        // IBM Plex Sans and IBM Plex Mono are the only fonts used in the Carbon Svelte components.
+        // IBM Plex Sans, IBM Plex Mono are the only fonts used in components.
         let is_IBM_Plex = false;
 
-        // 400/600 are the only weights used in the Carbon Svelte components.
+        // 400/600 are the only weights used in components.
         let is_product_weight = false;
 
-        // Only normal-style fonts are used in the Carbon Svelte components.
+        // Only normal-style fonts are used in components.
         let is_product_style = false;
 
         node.walkDecls((decl) => {

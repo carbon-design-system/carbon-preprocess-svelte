@@ -4,3 +4,4 @@ dist
 build
 public/build/
 .svelte-kit
+*.tgz
