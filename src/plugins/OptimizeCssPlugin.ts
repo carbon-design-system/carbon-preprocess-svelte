@@ -1,27 +1,25 @@
-import path from "node:path";
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import type { Compiler } from "webpack";
-import { components } from "./component-index";
-import { CarbonSvelte, RE_EXT_CSS, RE_EXT_SVELTE } from "./constants";
-import type { OptimizeCssOptions } from "./optimize-css";
-import { postcssOptimizeCarbon } from "./postcss-plugin";
-import { logComparison, stringSizeInKB } from "./utils";
+import { RE_EXT_CSS } from "../constants";
+import type { OptimizeCssOptions } from "./utils";
+import {
+  getComponentClasses,
+  getCssAllowlist,
+  isCarbonSvelteComponent,
+  logComparison,
+  postcssOptimizeCarbon,
+  stringSizeInKB,
+} from "./utils";
 
 class OptimizeCssPlugin {
-  private options: OptimizeCssOptions = {
-    verbose: true,
-    preserveAllIBMFonts: false,
-  };
+  private options: OptimizeCssOptions;
 
   public constructor(options?: OptimizeCssOptions) {
-    if (options?.verbose === false) {
-      this.options.verbose = false;
-    }
-
-    if (options?.preserveAllIBMFonts === true) {
-      this.options.preserveAllIBMFonts = true;
-    }
+    this.options = {
+      verbose: options?.verbose !== false,
+      preserveAllIBMFonts: options?.preserveAllIBMFonts === true,
+    };
   }
 
   public apply(compiler: Compiler) {
@@ -32,21 +30,14 @@ class OptimizeCssPlugin {
     compiler.hooks.thisCompilation.tap(
       OptimizeCssPlugin.name,
       (compilation) => {
-        const css_allowlist: string[] = [".bx--body"];
         const hooks = NormalModule.getCompilationHooks(compilation);
+        const css_allowlist = getCssAllowlist();
 
         hooks.beforeSnapshot.tap(OptimizeCssPlugin.name, (module) => {
           if (module.buildInfo?.fileDependencies) {
             for (const id of module.buildInfo.fileDependencies) {
-              if (
-                RE_EXT_SVELTE.test(id) &&
-                id.includes(CarbonSvelte.Components)
-              ) {
-                const { name } = path.parse(id);
-
-                if (name in components) {
-                  css_allowlist.push(...components[name].classes);
-                }
+              if (isCarbonSvelteComponent(id)) {
+                css_allowlist.push(...getComponentClasses(id));
               }
             }
           }

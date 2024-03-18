@@ -1,3 +1,3 @@
-export { default as OptimizeCssPlugin } from "./OptimizeCssPlugin";
-export { optimizeCss } from "./optimize-css";
-export { optimizeImports } from "./optimize-imports";
+export { default as OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin";
+export { optimizeCss } from "./plugins/optimize-css";
+export { optimizeImports } from "./preprocessors/optimize-imports";
