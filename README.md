@@ -28,7 +28,7 @@ pnpm i -D carbon-preprocess-svelte
 
 ### `optimizeImports`
 
-`optimizeImports` is a Svelte script preprocessor that rewrites base imports from Carbon components/icons/pictograms packages to their source Svelte code paths. This can greatly speed up compile times during development while preserving typeahead and autocompletion offered by integrated development environments (IDE) like VS Code.
+`optimizeImports` is a Svelte preprocessor that rewrites barrel imports from Carbon components/icons/pictograms packages to their source Svelte code paths. This can significantly speed up development and production build compile times while preserving typeahead and autocompletion offered by integrated development environments (IDE) like VS Code.
 
 The preprocessor optimizes imports from the following packages:
 
@@ -88,16 +88,6 @@ export default {
       preprocess: [optimizeImports()],
     }),
   ],
-
-  // Optional, but recommended for even faster cold starts.
-  // Instruct Vite to exclude packages that `optimizeImports` will resolve.
-  optimizeDeps: {
-    exclude: [
-      "carbon-components-svelte",
-      "carbon-icons-svelte",
-      "carbon-pictograms-svelte",
-    ],
-  },
 };
 ```
 
@@ -148,7 +138,9 @@ module.exports = {
 
 ### `optimizeCss`
 
-`optimizeCss` is a Vite plugin (Rollup-compatible) that removes unused Carbon styles. This is designed to optimize pre-compiled CSS StyleSheets from `carbon-components-svelte`. At build time, it will remove unused Carbon class selectors from the CSS bundle.
+`optimizeCss` is a Vite plugin that removes unused Carbon styles. This is designed to optimize pre-compiled CSS StyleSheets from `carbon-components-svelte`. At build time, it will remove unused Carbon class selectors (e.g., `.bx--btn`) from the CSS bundle.
+
+The plugin is compatible with Rollup ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
 
 ```sh
 $ vite build
@@ -212,7 +204,7 @@ export default {
       preprocess: [optimizeImports()],
     }),
 
-    // For Rollup, conditionally apply the plugin when building for production.
+    // Only apply the plugin when building for production.
     production && optimizeCss(),
   ],
 };
@@ -230,7 +222,7 @@ const PROD = process.env.NODE_ENV === "production";
 
 module.exports = {
   plugins: [
-    // Conditionally apply the plugin when building for production.
+    // Only apply the plugin when building for production.
     PROD && new OptimizeCssPlugin(),
   ],
 };
@@ -266,7 +258,7 @@ type OptimizeCssOptions = {
 
 ## Examples
 
-Refer to the [examples](examples) folder for usage with common set-ups.
+Refer to [examples](examples) for common set-ups.
 
 ## Contributing
 
