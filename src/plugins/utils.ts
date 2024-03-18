@@ -105,9 +105,13 @@ export function postcssOptimizeCarbon(
       // Ensure that the selector contains a class.
       if (selector.includes(".")) {
         // Selectors may contain multiple classes, separated by a comma.
-        const classes = selector
-          .split(",")
-          .filter((c) => c.trim().startsWith("."));
+        const classes = selector.split(",").filter((c) => {
+          const v = c.trim() ?? "";
+          // Some Carbon classes may be prefixed with a tag for higher specificity.
+          // E.g., a.bx--header
+          const [, rest] = v.split(".");
+          return Boolean(rest);
+        });
 
         let remove_rule = true;
 
