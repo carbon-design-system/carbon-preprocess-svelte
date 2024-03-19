@@ -1,21 +1,32 @@
-import { expect, test } from "bun:test";
-import type { Processed } from "svelte/types/compiler/preprocess";
+import { describe, expect, test } from "bun:test";
+import type { Preprocessor, Processed } from "svelte/types/compiler/preprocess";
 import { optimizeImports } from "../src";
 
-const preprocess = (content: string) => {
+const preprocess = (options?: Partial<Parameters<Preprocessor>[0]>) => {
   return (
     optimizeImports().script({
-      filename: "test.svelte",
-      content,
       attributes: {},
+      filename: "test.svelte",
+      content: "",
       markup: "",
+      ...options,
     }) as Processed
-  ).code;
+  )?.code;
 };
 
-test("optimizeImports", () => {
-  expect(
-    preprocess(`
+describe("optimizeImports", () => {
+  test("preprocessor is skipped", () => {
+    expect(preprocess({ filename: undefined })).toBeUndefined();
+    expect(preprocess({ filename: "node_modules" })).toBeUndefined();
+    expect(
+      preprocess({ filename: "node_modules/carbon-components-svelte" })
+    ).toBeUndefined();
+  });
+
+  test("barrel imports", () => {
+    expect(
+      preprocess({
+        content: `
         import { Accordion, AccordionItem } from "carbon-components-svelte";
         import { Accordion as Accordion2 } from "carbon-components-svelte";
         import { breakpoints } from "carbon-components-svelte";
@@ -28,6 +39,8 @@ test("optimizeImports", () => {
         import { Airplane } from "carbon-pictograms-svelte";
         import { Airplane as Airplane2 } from "carbon-pictograms-svelte";
         import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";
-    `),
-  ).toMatchSnapshot();
+    `,
+      })
+    ).toMatchSnapshot();
+  });
 });

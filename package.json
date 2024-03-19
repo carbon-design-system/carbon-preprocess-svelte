@@ -12,8 +12,8 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "magic-string": "^0.30.5",
-    "postcss": "^8.4.35",
+    "magic-string": "^0.30.8",
+    "postcss": "^8.4.36",
     "postcss-discard-empty": "^6.0.3"
   },
   "devDependencies": {
