@@ -6,7 +6,6 @@ import { createOptimizedCss } from "./create-optimized-css";
 
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const verbose = options?.verbose !== false;
-  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const ids: string[] = [];
 
   return {
@@ -27,10 +26,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
-          const optimized_css = createOptimizedCss(original_css, {
-            preserveAllIBMFonts,
-            ids,
-          });
+          const optimized_css = createOptimizedCss(original_css, ids, options);
 
           file.source = optimized_css;
 

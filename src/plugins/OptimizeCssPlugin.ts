@@ -29,9 +29,9 @@ class OptimizeCssPlugin {
         const hooks = NormalModule.getCompilationHooks(compilation);
         const ids: string[] = [];
 
-        hooks.beforeSnapshot.tap(OptimizeCssPlugin.name, (module) => {
-          if (module.buildInfo?.fileDependencies) {
-            for (const id of module.buildInfo.fileDependencies) {
+        hooks.beforeSnapshot.tap(OptimizeCssPlugin.name, ({ buildInfo }) => {
+          if (buildInfo?.fileDependencies) {
+            for (const id of buildInfo.fileDependencies) {
               if (isCarbonSvelteImport(id)) {
                 ids.push(id);
               }
@@ -51,10 +51,11 @@ class OptimizeCssPlugin {
             for (const [id] of Object.entries(assets)) {
               if (isCssFile(id)) {
                 const original_css = assets[id].source();
-                const optimized_css = createOptimizedCss(original_css, {
-                  ...this.options,
+                const optimized_css = createOptimizedCss(
+                  original_css,
                   ids,
-                });
+                  this.options,
+                );
 
                 compilation.updateAsset(id, new RawSource(optimized_css));
 

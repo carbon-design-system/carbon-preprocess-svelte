@@ -29,9 +29,10 @@ export type OptimizeCssOptions = {
 
 export function createOptimizedCss(
   original_css: Uint8Array | string,
-  options: OptimizeCssOptions & { ids: string[] },
+  ids: string[],
+  options?: OptimizeCssOptions,
 ) {
-  const { preserveAllIBMFonts, ids } = options;
+  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
 
   // List of Carbon classes that must be preserved in the CSS
   // but that are not referenced in Carbon Svelte components.
