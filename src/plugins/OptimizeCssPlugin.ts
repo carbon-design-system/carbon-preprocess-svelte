@@ -1,8 +1,8 @@
 import type { Compiler } from "webpack";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import { compareDiff } from "./compare-diff";
-import type { OptimizeCssOptions } from "./utils";
-import { createOptimizedCss } from "./utils";
+import type { OptimizeCssOptions } from "./create-optimized-css";
+import { createOptimizedCss } from "./create-optimized-css";
 
 class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
@@ -15,9 +15,13 @@ class OptimizeCssPlugin {
   }
 
   public apply(compiler: Compiler) {
-    const { webpack } = compiler;
-    const { Compilation, NormalModule } = compiler.webpack;
-    const { RawSource } = webpack.sources;
+    const {
+      webpack: {
+        Compilation,
+        NormalModule,
+        sources: { RawSource },
+      },
+    } = compiler;
 
     compiler.hooks.thisCompilation.tap(
       OptimizeCssPlugin.name,
@@ -41,6 +45,7 @@ class OptimizeCssPlugin {
             stage: Compilation.PROCESS_ASSETS_STAGE_DERIVED,
           },
           (assets) => {
+            // Skip processing if no Carbon Svelte imports are found.
             if (ids.length === 0) return;
 
             for (const [id] of Object.entries(assets)) {

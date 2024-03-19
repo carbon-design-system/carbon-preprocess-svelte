@@ -1,8 +1,8 @@
 import type { Plugin } from "vite";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import { compareDiff } from "./compare-diff";
-import type { OptimizeCssOptions } from "./utils";
-import { createOptimizedCss } from "./utils";
+import type { OptimizeCssOptions } from "./create-optimized-css";
+import { createOptimizedCss } from "./create-optimized-css";
 
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const verbose = options?.verbose !== false;
@@ -19,6 +19,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       }
     },
     async generateBundle(_, bundle) {
+      // Skip processing if no Carbon Svelte imports are found.
       if (ids.length === 0) return;
 
       for (const id in bundle) {
