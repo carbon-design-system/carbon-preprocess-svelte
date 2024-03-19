@@ -1,12 +1,8 @@
 import path from "node:path";
 import type { Plugin } from "postcss";
+import postcss from "postcss";
+import discardEmpty from "postcss-discard-empty";
 import { components } from "../component-index";
-import { CarbonSvelte } from "../constants";
-import { isSvelteFile } from "../utils";
-
-export function isCarbonSvelteComponent(id: string) {
-  return isSvelteFile(id) && id.includes(CarbonSvelte.Components);
-}
 
 export type OptimizeCssOptions = {
   /**
@@ -36,9 +32,7 @@ type PostcssOptimizeCarbonOptions = OptimizeCssOptions & {
   ids: string[];
 };
 
-export function postcssOptimizeCarbon(
-  options: PostcssOptimizeCarbonOptions,
-): Plugin {
+function postcssOptimizeCarbon(options: PostcssOptimizeCarbonOptions): Plugin {
   const { preserveAllIBMFonts, ids } = options;
 
   // `.bx--body` needs to be explicitly included,
@@ -63,7 +57,7 @@ export function postcssOptimizeCarbon(
         // Selectors may contain multiple classes, separated by a comma.
         const classes = selector.split(",").filter((selectee) => {
           const value = selectee.trim() ?? "";
-          // Some Carbon classes may be prefixed with a tag for higher specificity.
+          // Some Carbon classes are prefixed with a tag for higher specificity.
           // E.g., a.bx--header
           const [, rest] = value.split(".");
           return Boolean(rest);
@@ -118,4 +112,13 @@ export function postcssOptimizeCarbon(
       }
     },
   };
+}
+
+export function createOptimizedCss(
+  original_css: Uint8Array | string,
+  options: PostcssOptimizeCarbonOptions,
+) {
+  return postcss([postcssOptimizeCarbon(options), discardEmpty()]).process(
+    original_css,
+  ).css;
 }

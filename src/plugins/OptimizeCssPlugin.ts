@@ -1,10 +1,8 @@
-import postcss from "postcss";
-import discardEmpty from "postcss-discard-empty";
 import type { Compiler } from "webpack";
-import { isCssFile } from "../utils";
+import { isCarbonSvelteImport, isCssFile } from "../utils";
 import { compareDiff } from "./compare-diff";
 import type { OptimizeCssOptions } from "./utils";
-import { isCarbonSvelteComponent, postcssOptimizeCarbon } from "./utils";
+import { createOptimizedCss } from "./utils";
 
 class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
@@ -30,7 +28,7 @@ class OptimizeCssPlugin {
         hooks.beforeSnapshot.tap(OptimizeCssPlugin.name, (module) => {
           if (module.buildInfo?.fileDependencies) {
             for (const id of module.buildInfo.fileDependencies) {
-              if (isCarbonSvelteComponent(id)) {
+              if (isCarbonSvelteImport(id)) {
                 ids.push(id);
               }
             }
@@ -48,10 +46,10 @@ class OptimizeCssPlugin {
             for (const [id] of Object.entries(assets)) {
               if (isCssFile(id)) {
                 const original_css = assets[id].source();
-                const optimized_css = postcss([
-                  postcssOptimizeCarbon({ ...this.options, ids }),
-                  discardEmpty(),
-                ]).process(original_css).css;
+                const optimized_css = createOptimizedCss(original_css, {
+                  ...this.options,
+                  ids,
+                });
 
                 compilation.updateAsset(id, new RawSource(optimized_css));
 

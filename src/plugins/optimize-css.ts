@@ -1,10 +1,8 @@
-import postcss from "postcss";
-import discardEmpty from "postcss-discard-empty";
 import type { Plugin } from "vite";
-import { isCssFile } from "../utils";
+import { isCarbonSvelteImport, isCssFile } from "../utils";
 import { compareDiff } from "./compare-diff";
 import type { OptimizeCssOptions } from "./utils";
-import { isCarbonSvelteComponent, postcssOptimizeCarbon } from "./utils";
+import { createOptimizedCss } from "./utils";
 
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const verbose = options?.verbose !== false;
@@ -16,7 +14,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     apply: "build",
     enforce: "post",
     transform(_, id) {
-      if (isCarbonSvelteComponent(id)) {
+      if (isCarbonSvelteImport(id)) {
         ids.push(id);
       }
     },
@@ -28,10 +26,10 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
-          const optimized_css = postcss([
-            postcssOptimizeCarbon({ preserveAllIBMFonts, ids }),
-            discardEmpty(),
-          ]).process(original_css).css;
+          const optimized_css = createOptimizedCss(original_css, {
+            preserveAllIBMFonts,
+            ids,
+          });
 
           file.source = optimized_css;
 
