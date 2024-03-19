@@ -4,8 +4,7 @@
     "declaration": true,
     "outDir": "dist",
     "target": "ES6",
-    "module": "CommonJS",
-    "sourceMap": true
+    "module": "CommonJS"
   },
   "include": ["src/**/*"]
 }
