@@ -3,30 +3,6 @@ import type { Plugin } from "postcss";
 import { components } from "../component-index";
 import { BITS_DENOM, CarbonSvelte, RE_EXT_SVELTE } from "../constants";
 
-export type OptimizeCssOptions = {
-  /**
-   * By default, the plugin will log the size diff
-   * between the original and optimized CSS.
-   *
-   * Set to `false` to disable verbose logging.
-   * @default true
-   */
-  verbose?: boolean;
-
-  /**
-   * By default, pre-compiled Carbon StyleSheets ship `@font-face`
-   * rules for all available IBM Plex fonts, many of which are
-   * not actually used in Carbon Svelte components.
-   *
-   * The recommended optimization is to only preserve IBM Plex
-   * fonts with 400/600-weight and normal-font-style rules.
-   *
-   * Set to `true` to disable this behavior.
-   * @default false
-   */
-  preserveAllIBMFonts?: boolean;
-};
-
 const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 export function toHumanReadableSize(size_in_kb: number) {
@@ -51,11 +27,14 @@ function padIfNeeded(a: string, b: string) {
 }
 
 export function logComparison(props: {
-  original_size: number;
-  optimized_size: number;
+  original_css: Uint8Array | Buffer | string;
+  optimized_css: string;
   id: string;
 }) {
-  const { original_size, optimized_size, id } = props;
+  const { original_css, optimized_css, id } = props;
+
+  const original_size = stringSizeInKB(original_css.toString());
+  const optimized_size = stringSizeInKB(optimized_css);
   const original = toHumanReadableSize(original_size);
   const optimized = toHumanReadableSize(optimized_size);
   const original_display = padIfNeeded(original, optimized);
@@ -82,20 +61,46 @@ export function getComponentClasses(id: string) {
   return [];
 }
 
-export function getCssAllowlist() {
-  // `.bx--body` needs to be explicitly included,
-  // or the class will be inadvertently removed.
-  return [".bx--body"].slice();
-}
+export type OptimizeCssOptions = {
+  /**
+   * By default, the plugin will log the size diff
+   * between the original and optimized CSS.
+   *
+   * Set to `false` to disable verbose logging.
+   * @default true
+   */
+  verbose?: boolean;
+
+  /**
+   * By default, pre-compiled Carbon StyleSheets ship `@font-face`
+   * rules for all available IBM Plex fonts, many of which are
+   * not actually used in Carbon Svelte components.
+   *
+   * The recommended optimization is to only preserve IBM Plex
+   * fonts with 400/600-weight and normal-font-style rules.
+   *
+   * Set to `true` to disable this behavior.
+   * @default false
+   */
+  preserveAllIBMFonts?: boolean;
+};
 
 type PostcssOptimizeCarbonOptions = OptimizeCssOptions & {
-  css_allowlist: ReturnType<typeof getCssAllowlist>;
+  ids: string[];
 };
 
 export function postcssOptimizeCarbon(
   options: PostcssOptimizeCarbonOptions,
 ): Plugin {
-  const { preserveAllIBMFonts, css_allowlist } = options;
+  const { preserveAllIBMFonts, ids } = options;
+
+  // `.bx--body` needs to be explicitly included,
+  // or the class will be inadvertently removed.
+  const css_allowlist = [".bx--body"];
+
+  for (const id of ids) {
+    css_allowlist.push(...getComponentClasses(id));
+  }
 
   return {
     postcssPlugin: "postcss-plugin:carbon:optimize-css",
@@ -105,11 +110,11 @@ export function postcssOptimizeCarbon(
       // Ensure that the selector contains a class.
       if (selector.includes(".")) {
         // Selectors may contain multiple classes, separated by a comma.
-        const classes = selector.split(",").filter((c) => {
-          const v = c.trim() ?? "";
+        const classes = selector.split(",").filter((selectee) => {
+          const value = selectee.trim() ?? "";
           // Some Carbon classes may be prefixed with a tag for higher specificity.
           // E.g., a.bx--header
-          const [, rest] = v.split(".");
+          const [, rest] = value.split(".");
           return Boolean(rest);
         });
 

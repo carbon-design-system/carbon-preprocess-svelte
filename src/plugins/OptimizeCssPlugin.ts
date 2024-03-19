@@ -4,12 +4,9 @@ import type { Compiler } from "webpack";
 import { RE_EXT_CSS } from "../constants";
 import type { OptimizeCssOptions } from "./utils";
 import {
-  getComponentClasses,
-  getCssAllowlist,
   isCarbonSvelteComponent,
   logComparison,
   postcssOptimizeCarbon,
-  stringSizeInKB,
 } from "./utils";
 
 class OptimizeCssPlugin {
@@ -31,13 +28,13 @@ class OptimizeCssPlugin {
       OptimizeCssPlugin.name,
       (compilation) => {
         const hooks = NormalModule.getCompilationHooks(compilation);
-        const css_allowlist = getCssAllowlist();
+        const ids: string[] = [];
 
         hooks.beforeSnapshot.tap(OptimizeCssPlugin.name, (module) => {
           if (module.buildInfo?.fileDependencies) {
             for (const id of module.buildInfo.fileDependencies) {
               if (isCarbonSvelteComponent(id)) {
-                css_allowlist.push(...getComponentClasses(id));
+                ids.push(id);
               }
             }
           }
@@ -49,23 +46,20 @@ class OptimizeCssPlugin {
             stage: Compilation.PROCESS_ASSETS_STAGE_DERIVED,
           },
           (assets) => {
+            if (ids.length === 0) return;
+
             for (const [id] of Object.entries(assets)) {
               if (RE_EXT_CSS.test(id)) {
-                const source = assets[id].source();
+                const original_css = assets[id].source();
                 const optimized_css = postcss([
-                  postcssOptimizeCarbon({ ...this.options, css_allowlist }),
+                  postcssOptimizeCarbon({ ...this.options, ids }),
                   discardEmpty(),
-                ]).process(source).css;
+                ]).process(original_css).css;
 
-                const original_size = stringSizeInKB(source.toString());
-                const optimized_size = stringSizeInKB(optimized_css);
+                compilation.updateAsset(id, new RawSource(optimized_css));
 
-                if (optimized_size < original_size) {
-                  compilation.updateAsset(id, new RawSource(optimized_css));
-
-                  if (this.options.verbose) {
-                    logComparison({ original_size, optimized_size, id });
-                  }
+                if (this.options.verbose) {
+                  logComparison({ original_css, optimized_css, id });
                 }
               }
             }

@@ -4,18 +4,15 @@ import type { Plugin } from "vite";
 import { RE_EXT_CSS } from "../constants";
 import type { OptimizeCssOptions } from "./utils";
 import {
-  getComponentClasses,
-  getCssAllowlist,
   isCarbonSvelteComponent,
   logComparison,
   postcssOptimizeCarbon,
-  stringSizeInKB,
 } from "./utils";
 
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const verbose = options?.verbose !== false;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const css_allowlist = getCssAllowlist();
+  const ids: string[] = [];
 
   return {
     name: "vite:carbon:optimize-css",
@@ -23,28 +20,26 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     enforce: "post",
     transform(_, id) {
       if (isCarbonSvelteComponent(id)) {
-        css_allowlist.push(...getComponentClasses(id));
+        ids.push(id);
       }
     },
     async generateBundle(_, bundle) {
+      if (ids.length === 0) return;
+
       for (const id in bundle) {
         const file = bundle[id];
 
         if (file.type === "asset" && RE_EXT_CSS.test(id)) {
+          const original_css = file.source;
           const optimized_css = postcss([
-            postcssOptimizeCarbon({ preserveAllIBMFonts, css_allowlist }),
+            postcssOptimizeCarbon({ preserveAllIBMFonts, ids }),
             discardEmpty(),
-          ]).process(file.source).css;
+          ]).process(original_css).css;
 
-          const original_size = stringSizeInKB(file.source.toString());
-          const optimized_size = stringSizeInKB(optimized_css);
+          file.source = optimized_css;
 
-          if (optimized_size < original_size) {
-            file.source = optimized_css;
-
-            if (verbose) {
-              logComparison({ original_size, optimized_size, id });
-            }
+          if (verbose) {
+            logComparison({ original_css, optimized_css, id });
           }
         }
       }
