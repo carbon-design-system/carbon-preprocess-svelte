@@ -1,64 +1,11 @@
 import path from "node:path";
 import type { Plugin } from "postcss";
 import { components } from "../component-index";
-import { BITS_DENOM, CarbonSvelte, RE_EXT_SVELTE } from "../constants";
-
-const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
-
-export function toHumanReadableSize(size_in_kb: number) {
-  if (size_in_kb >= BITS_DENOM) {
-    return formatter.format(size_in_kb / BITS_DENOM) + " MB";
-  }
-
-  return formatter.format(size_in_kb) + " kB";
-}
-
-export function percentageDiff(a: number, b: number) {
-  return formatter.format(((a - b) / a) * 100) + "%";
-}
-
-export function stringSizeInKB(str: string) {
-  const blob = new Blob([str], { type: "text/plain" });
-  return blob.size / BITS_DENOM;
-}
-
-function padIfNeeded(a: string, b: string) {
-  return a.length > b.length ? a : a.padStart(b.length, " ");
-}
-
-export function logComparison(props: {
-  original_css: Uint8Array | Buffer | string;
-  optimized_css: string;
-  id: string;
-}) {
-  const { original_css, optimized_css, id } = props;
-
-  const original_size = stringSizeInKB(original_css.toString());
-  const optimized_size = stringSizeInKB(optimized_css);
-  const original = toHumanReadableSize(original_size);
-  const optimized = toHumanReadableSize(optimized_size);
-  const original_display = padIfNeeded(original, optimized);
-  const optimized_display = padIfNeeded(optimized, original);
-  const diff = percentageDiff(original_size, optimized_size);
-
-  console.log("\n");
-  console.log("Optimized", id);
-  console.log("Before:", original_display);
-  console.log("After: ", optimized_display, `(-${diff})\n`);
-}
+import { CarbonSvelte } from "../constants";
+import { isSvelteFile } from "../utils";
 
 export function isCarbonSvelteComponent(id: string) {
-  return RE_EXT_SVELTE.test(id) && id.includes(CarbonSvelte.Components);
-}
-
-export function getComponentClasses(id: string) {
-  const { name } = path.parse(id);
-
-  if (name in components) {
-    return [...components[name].classes];
-  }
-
-  return [];
+  return isSvelteFile(id) && id.includes(CarbonSvelte.Components);
 }
 
 export type OptimizeCssOptions = {
@@ -99,7 +46,11 @@ export function postcssOptimizeCarbon(
   const css_allowlist = [".bx--body"];
 
   for (const id of ids) {
-    css_allowlist.push(...getComponentClasses(id));
+    const { name } = path.parse(id);
+
+    if (name in components) {
+      css_allowlist.push(...components[name].classes);
+    }
   }
 
   return {

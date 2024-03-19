@@ -1,13 +1,10 @@
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import type { Compiler } from "webpack";
-import { RE_EXT_CSS } from "../constants";
+import { isCssFile } from "../utils";
+import { compareDiff } from "./compare-diff";
 import type { OptimizeCssOptions } from "./utils";
-import {
-  isCarbonSvelteComponent,
-  logComparison,
-  postcssOptimizeCarbon,
-} from "./utils";
+import { isCarbonSvelteComponent, postcssOptimizeCarbon } from "./utils";
 
 class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
@@ -49,7 +46,7 @@ class OptimizeCssPlugin {
             if (ids.length === 0) return;
 
             for (const [id] of Object.entries(assets)) {
-              if (RE_EXT_CSS.test(id)) {
+              if (isCssFile(id)) {
                 const original_css = assets[id].source();
                 const optimized_css = postcss([
                   postcssOptimizeCarbon({ ...this.options, ids }),
@@ -59,7 +56,7 @@ class OptimizeCssPlugin {
                 compilation.updateAsset(id, new RawSource(optimized_css));
 
                 if (this.options.verbose) {
-                  logComparison({ original_css, optimized_css, id });
+                  compareDiff({ original_css, optimized_css, id });
                 }
               }
             }

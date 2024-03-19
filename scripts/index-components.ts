@@ -1,7 +1,8 @@
 import { Glob } from "bun";
 import path from "node:path";
 import { parse, walk } from "svelte/compiler";
-import { CarbonSvelte, RE_EXT_SVELTE } from "../src/constants";
+import { CarbonSvelte } from "../src/constants";
+import { isSvelteFile } from "../src/utils";
 import { extractSelectors } from "./extract-selectors";
 
 const carbon_path = path.join("node_modules", CarbonSvelte.Components);
@@ -37,7 +38,7 @@ for await (const file of files) {
       classes: [],
     };
 
-    if (RE_EXT_SVELTE.test(file)) {
+    if (isSvelteFile(file)) {
       const file_path = path.join(carbon_path, "src/", file);
       const file_text = await Bun.file(file_path).text();
       map.classes = extractSelectors({ code: file_text, filename: file });

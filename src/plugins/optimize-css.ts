@@ -1,13 +1,10 @@
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import type { Plugin } from "vite";
-import { RE_EXT_CSS } from "../constants";
+import { isCssFile } from "../utils";
+import { compareDiff } from "./compare-diff";
 import type { OptimizeCssOptions } from "./utils";
-import {
-  isCarbonSvelteComponent,
-  logComparison,
-  postcssOptimizeCarbon,
-} from "./utils";
+import { isCarbonSvelteComponent, postcssOptimizeCarbon } from "./utils";
 
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const verbose = options?.verbose !== false;
@@ -29,7 +26,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       for (const id in bundle) {
         const file = bundle[id];
 
-        if (file.type === "asset" && RE_EXT_CSS.test(id)) {
+        if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
           const optimized_css = postcss([
             postcssOptimizeCarbon({ preserveAllIBMFonts, ids }),
@@ -39,7 +36,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
           file.source = optimized_css;
 
           if (verbose) {
-            logComparison({ original_css, optimized_css, id });
+            compareDiff({ original_css, optimized_css, id });
           }
         }
       }
