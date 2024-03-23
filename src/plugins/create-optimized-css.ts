@@ -18,7 +18,7 @@ export type OptimizeCssOptions = {
    * for all available IBM Plex fonts, many of which are not actually
    * used in Carbon Svelte components.
    *
-   * The recommended optimization is to only preserve:
+   * The default behavior is to preserve the following IBM Plex fonts:
    * - IBM Plex Sans (300/400/600-weight and normal-font-style rules)
    * - IBM Plex Mono (400-weight and normal-font-style rules)
    *
@@ -32,7 +32,7 @@ export type OptimizeCssOptions = {
 export function createOptimizedCss(
   original_css: Uint8Array | string,
   ids: string[],
-  options?: OptimizeCssOptions
+  options?: OptimizeCssOptions,
 ) {
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
 

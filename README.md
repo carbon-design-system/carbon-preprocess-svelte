@@ -150,16 +150,16 @@ module.exports = {
 
 ### `optimizeCss`
 
-`optimizeCss` is a Vite plugin that removes unused Carbon styles. This is designed to optimize pre-compiled CSS StyleSheets from `carbon-components-svelte`. At build time, it will remove unused Carbon class selectors (e.g., `.bx--btn`) from the CSS bundle.
+`optimizeCss` is a Vite plugin that removes unused Carbon styles at build time. The plugin is compatible with Rollup ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
 
-The plugin is compatible with Rollup ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
+`carbon-components-svelte@0.85.0` or greater is required.
 
-```sh
+```diff
 $ vite build
 
 Optimized index-CU4gbKFa.css
-Before: 606.26 kB
-After:   53.22 kB (-91.22%)
+- Before: 606.26 kB
++ After:   53.22 kB (-91.22%)
 
 dist/index.html                  0.34 kB │ gzip:  0.24 kB
 dist/assets/index-CU4gbKFa.css  53.22 kB │ gzip:  6.91 kB
@@ -224,6 +224,8 @@ export default {
 
 #### Webpack
 
+Webpack users should use the `OptimizeCssPlugin`. The plugin API is identical to the Vite plugin.
+
 This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
 
 ```js
@@ -243,7 +245,7 @@ module.exports = {
 #### `optimizeCss` API
 
 ```ts
-type OptimizeCssOptions = {
+optimizeCss({
   /**
    * By default, the plugin will print the size
    * difference between the original and optimized CSS.
@@ -251,14 +253,14 @@ type OptimizeCssOptions = {
    * Set to `false` to disable verbose logging.
    * @default true
    */
-  verbose?: boolean;
+  verbose: false,
 
   /**
    * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
    * for all available IBM Plex fonts, many of which are not actually
    * used in Carbon Svelte components.
    *
-   * The recommended optimization is to only preserve:
+   * The default behavior is to preserve the following IBM Plex fonts:
    * - IBM Plex Sans (300/400/600-weight and normal-font-style rules)
    * - IBM Plex Mono (400-weight and normal-font-style rules)
    *
@@ -266,8 +268,8 @@ type OptimizeCssOptions = {
    * retain *all* IBM Plex `@font-face` rules.
    * @default false
    */
-  preserveAllIBMFonts?: boolean;
-};
+  preserveAllIBMFonts: false,
+});
 ```
 
 ## Examples

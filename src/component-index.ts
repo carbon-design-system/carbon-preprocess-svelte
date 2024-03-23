@@ -586,16 +586,20 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
     "classes": [
       ".bx--header__action",
       ".bx--header__action--active",
-      ".action-text",
+      ".bx--header__action--text",
+      ".bx--header__action-text",
       ".bx--header-panel",
-      ".bx--header-panel--expanded"
+      ".bx--header-panel--expanded",
+      ".bx--header__action--text",
+      ".bx--header__action-text"
     ]
   },
   "HeaderActionLink": {
     "path": "carbon-components-svelte/src/UIShell/HeaderActionLink.svelte",
     "classes": [
       ".bx--header__action",
-      ".bx--header__action--active"
+      ".bx--header__action--active",
+      ".bx--header__action"
     ]
   },
   "HeaderGlobalAction": {
@@ -633,7 +637,9 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
   "HeaderPanelDivider": {
     "path": "carbon-components-svelte/src/UIShell/HeaderPanelDivider.svelte",
     "classes": [
-      ".bx--switcher__item--divider"
+      ".bx--header-panel-divider",
+      ".bx--switcher__item--divider",
+      ".bx--header-panel-divider"
     ]
   },
   "HeaderPanelLink": {
@@ -652,11 +658,35 @@ export const components: Record<string, { path: string; classes: string[]; }> = 
   "HeaderSearch": {
     "path": "carbon-components-svelte/src/UIShell/HeaderSearch.svelte",
     "classes": [
-      ".active",
+      ".bx--header__search",
+      ".bx--header__search--active",
+      ".bx--header__search-label",
+      ".bx--header__search-menu",
+      ".bx--header-search-button",
       ".bx--header__action",
-      ".disabled",
-      ".hidden",
-      ".selected"
+      ".bx--header-search-button--disabled",
+      ".bx--header__search-input",
+      ".bx--header-search-button--hidden",
+      ".bx--header-search-menu",
+      ".bx--header-search-menu-item",
+      ".bx--header-search-menu-item--selected",
+      ".bx--header-search-menu-description",
+      ".bx--header__search-label",
+      ".bx--header__search",
+      ".bx--header__search:not(.bx--header__search--active)",
+      ".bx--header__search.bx--header__search--active",
+      ".bx--header__search-menu",
+      ".bx--header__search-input",
+      ".bx--header__search-input:not(.bx--header__search--active)",
+      ".bx--header-search-button",
+      ".bx--header-search-button--disabled",
+      ".bx--header-search-button:hover",
+      ".bx--header-search-button--hidden",
+      ".bx--header-search-menu",
+      ".bx--header-search-menu-item",
+      ".bx--header-search-menu-item--selected",
+      ".bx--header-search-menu-item:hover",
+      ".bx--header-search-menu-description"
     ]
   },
   "HeaderUtilities": {

@@ -10,7 +10,7 @@ describe("compare-diff", () => {
         original_css: "body { color: red; } .bx--btn {}",
         optimized_css: "body { color: red; }",
         id: "id",
-      })
+      }),
     );
     expect(log.mock.calls).toEqual([
       ["\n"],

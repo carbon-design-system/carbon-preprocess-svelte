@@ -19,7 +19,7 @@ describe("optimizeImports", () => {
     expect(preprocess({ filename: undefined })).toBeUndefined();
     expect(preprocess({ filename: "node_modules" })).toBeUndefined();
     expect(
-      preprocess({ filename: "node_modules/carbon-components-svelte" })
+      preprocess({ filename: "node_modules/carbon-components-svelte" }),
     ).toBeUndefined();
   });
 
@@ -40,7 +40,7 @@ describe("optimizeImports", () => {
         import { Airplane as Airplane2 } from "carbon-pictograms-svelte";
         import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";
     `,
-      })
+      }),
     ).toMatchSnapshot();
   });
 });
