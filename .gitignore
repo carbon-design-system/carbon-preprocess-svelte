@@ -1,5 +1,7 @@
 .DS_Store
-/node_modules
-/dist
-/src/*.js
-!/src/carbon-components-svelte.js
+node_modules
+dist
+build
+public/build/
+.svelte-kit
+*.tgz

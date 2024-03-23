@@ -1,93 +1,70 @@
-import { PreprocessorGroup } from "svelte/types/compiler/preprocess";
-import { BuildComponents } from "../build/build-components";
-import { components } from "../carbon-components-svelte.js";
-import { CARBON_SVELTE } from "../constants";
-import { getCarbonVersions } from "../utils";
-import { walkAndReplace } from "../walk-and-replace";
+import MagicString from "magic-string";
+import type { ImportDeclaration } from "svelte/compiler";
+import { parse, walk } from "svelte/compiler";
+import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
+import { components } from "../component-index";
+import { CarbonSvelte } from "../constants";
 
-const Components: Pick<BuildComponents, "components"> = components;
-const CARBON_VERSIONS: Record<string, string> = getCarbonVersions();
+function rewriteImport(
+  s: MagicString,
+  node: ImportDeclaration,
+  map: (specifier: ImportDeclaration["specifiers"][0]) => string,
+) {
+  let content = "";
 
-export function optimizeImports(): Pick<PreprocessorGroup, "script"> {
-  return {
-    script({ filename, content }) {
-      if (filename && !/node_modules/.test(filename)) {
-        const code = walkAndReplace(
-          {
-            type: "script",
-            content,
-            filename,
-          },
-          ({ node }, replaceContent) => {
-            if (node.type === "ImportDeclaration") {
-              switch (node.source.value) {
-                case CARBON_SVELTE.components:
-                  replaceContent(
-                    node,
-                    node.specifiers
-                      .map(({ local, imported }) => {
-                        if (imported.name in Components.components) {
-                          return `import ${local.name} from "${
-                            Components.components[imported.name].path
-                          }";`;
-                        }
+  for (const specifier of node.specifiers) {
+    const fragment = map(specifier);
+    if (fragment) content += fragment;
+  }
 
-                        console.warn(
-                          `[carbon:optimizeImports] ${imported.name} is not a valid Carbon component`
-                        );
-                        return "";
-                      })
-                      .join("\n")
-                  );
-                  break;
-
-                case CARBON_SVELTE.icons:
-                  replaceContent(
-                    node,
-                    node.specifiers
-                      .map(({ local, imported }) => {
-                        if (
-                          CARBON_VERSIONS[CARBON_SVELTE.icons] === "11" ||
-                          CARBON_VERSIONS[CARBON_SVELTE.icons] === "12"
-                        ) {
-                          return `import ${local.name} from "${CARBON_SVELTE.icons}/lib/${imported.name}.svelte";`;
-                        }
-
-                        return `import ${local.name} from "${CARBON_SVELTE.icons}/lib/${imported.name}/${imported.name}.svelte";`;
-                      })
-                      .join("\n")
-                  );
-                  break;
-
-                case CARBON_SVELTE.pictograms:
-                  replaceContent(
-                    node,
-                    node.specifiers
-                      .map(({ local, imported }) => {
-                        if (
-                          CARBON_VERSIONS[CARBON_SVELTE.pictograms] === "11" ||
-                          CARBON_VERSIONS[CARBON_SVELTE.pictograms] === "12"
-                        ) {
-                          return `import ${local.name} from "${CARBON_SVELTE.pictograms}/lib/${imported.name}.svelte";`;
-                        }
-
-                        return `import ${local.name} from "${CARBON_SVELTE.pictograms}/lib/${imported.name}/${imported.name}.svelte";`;
-                      })
-                      .join("\n")
-                  );
-                  break;
-              }
-            }
-          }
-        );
-
-        return { code };
-      }
-
-      return { code: content };
-    },
-  };
+  if (content) s.overwrite(node.start, node.end, content);
 }
 
-// alias to make it compatible with the old preprocessor
-export { optimizeImports as optimizeCarbonImports };
+export const optimizeImports: SveltePreprocessor<"script"> = () => {
+  return {
+    name: "carbon:optimize-imports",
+    script({ filename, content: raw }) {
+      // Skip files in node_modules to minimize unnecessary preprocessing
+      if (!filename) return;
+      if (/node_modules/.test(filename)) return;
+
+      // Wrap the content in a `<script>` tag to parse it with the Svelte parser.
+      const content = `<script>${raw}</script>`;
+      const s = new MagicString(content);
+
+      walk(parse(content), {
+        enter(node) {
+          if (node.type === "ImportDeclaration") {
+            const import_name = node.source.value;
+
+            switch (import_name) {
+              case CarbonSvelte.Components:
+                rewriteImport(s, node, ({ imported, local }) => {
+                  const import_path = components[imported.name]?.path;
+                  return import_path
+                    ? `import ${local.name} from "${import_path}";`
+                    : "";
+                });
+                break;
+
+              case CarbonSvelte.Icons:
+              case CarbonSvelte.Pictograms:
+                rewriteImport(s, node, ({ imported, local }) => {
+                  return `import ${local.name} from "${import_name}/lib/${imported.name}.svelte";`;
+                });
+                break;
+            }
+          }
+        },
+      });
+
+      s.replace(/^<script>/, "");
+      s.replace(/<\/script>$/, "");
+
+      return {
+        code: s.toString(),
+        map: s.generateMap({ source: filename, hires: true }),
+      };
+    },
+  };
+};

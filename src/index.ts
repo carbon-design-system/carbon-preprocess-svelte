@@ -1,4 +1,3 @@
-export * from "./preprocessors";
-export * from "./extractors";
-export * from "./plugins";
-export * from "./presets";
+export { default as OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin";
+export { optimizeCss } from "./plugins/optimize-css";
+export { optimizeImports } from "./preprocessors/optimize-imports";

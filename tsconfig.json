@@ -1,15 +1,12 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "declaration": true,
-    "emitDeclarationOnly": true,
     "esModuleInterop": true,
-    "downlevelIteration": true,
-    "lib": ["ESNext", "DOM.Iterable"],
-    "moduleResolution": "Node",
-    "outDir": "dist",
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ESNext"],
+    "moduleResolution": "node",
     "skipLibCheck": true,
     "strict": true
   },
-  "include": ["src/**/*"]
+  "include": ["scripts/**/*", "src/**/*", "tests/**/*"]
 }
