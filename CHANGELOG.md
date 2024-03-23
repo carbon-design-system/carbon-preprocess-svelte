@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.0) - 2024-03-23
+
+**Breaking Changes**
+
+- Remove all preprocessors except for `optimizeImports`
+- `optimizeImports`: drop support for `carbon-icons-svelte` version 10, `carbon-pictograms-svelte` version 10
+- Rewrite `optimizeCss` plugin from scratch; it's now offered as a Vite/Rollup/Webpack plugin. `carbon-components-svelte@0.85.0` or greater is required
+
 ## [0.10.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.10.0) - 2023-07-23
 
 **Breaking Changes**
