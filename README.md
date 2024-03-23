@@ -245,8 +245,8 @@ module.exports = {
 ```ts
 type OptimizeCssOptions = {
   /**
-   * By default, the plugin will log the size diff
-   * between the original and optimized CSS.
+   * By default, the plugin will print the size
+   * difference between the original and optimized CSS.
    *
    * Set to `false` to disable verbose logging.
    * @default true
@@ -254,14 +254,16 @@ type OptimizeCssOptions = {
   verbose?: boolean;
 
   /**
-   * By default, pre-compiled Carbon StyleSheets ship `@font-face`
-   * rules for all available IBM Plex fonts, many of which are
-   * not actually used in Carbon Svelte components.
+   * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
+   * for all available IBM Plex fonts, many of which are not actually
+   * used in Carbon Svelte components.
    *
-   * The recommended optimization is to only preserve IBM Plex
-   * fonts with 400/600-weight and normal-font-style rules.
+   * The recommended optimization is to only preserve:
+   * - IBM Plex Sans (300/400/600-weight and normal-font-style rules)
+   * - IBM Plex Mono (400-weight and normal-font-style rules)
    *
-   * Set to `true` to disable this behavior.
+   * Set to `true` to disable this behavior and
+   * retain *all* IBM Plex `@font-face` rules.
    * @default false
    */
   preserveAllIBMFonts?: boolean;

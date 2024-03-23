@@ -4,6 +4,7 @@ import { compareDiff } from "./compare-diff";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createOptimizedCss } from "./create-optimized-css";
 
+// Webpack plugin to optimize CSS for Carbon Svelte components.
 class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
 

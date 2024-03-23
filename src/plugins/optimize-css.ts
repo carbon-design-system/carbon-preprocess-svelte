@@ -4,6 +4,7 @@ import { compareDiff } from "./compare-diff";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createOptimizedCss } from "./create-optimized-css";
 
+// Vite plugin (Rollup-compatible) to optimize CSS for Carbon Svelte components.
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const verbose = options?.verbose !== false;
   const ids: string[] = [];

@@ -5,8 +5,8 @@ import { components } from "../component-index";
 
 export type OptimizeCssOptions = {
   /**
-   * By default, the plugin will log the size diff
-   * between the original and optimized CSS.
+   * By default, the plugin will print the size
+   * difference between the original and optimized CSS.
    *
    * Set to `false` to disable verbose logging.
    * @default true
@@ -14,14 +14,16 @@ export type OptimizeCssOptions = {
   verbose?: boolean;
 
   /**
-   * By default, pre-compiled Carbon StyleSheets ship `@font-face`
-   * rules for all available IBM Plex fonts, many of which are
-   * not actually used in Carbon Svelte components.
+   * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
+   * for all available IBM Plex fonts, many of which are not actually
+   * used in Carbon Svelte components.
    *
-   * The recommended optimization is to only preserve IBM Plex
-   * fonts with 400/600-weight and normal-font-style rules.
+   * The recommended optimization is to only preserve:
+   * - IBM Plex Sans (300/400/600-weight and normal-font-style rules)
+   * - IBM Plex Mono (400-weight and normal-font-style rules)
    *
-   * Set to `true` to disable this behavior.
+   * Set to `true` to disable this behavior and
+   * retain *all* IBM Plex `@font-face` rules.
    * @default false
    */
   preserveAllIBMFonts?: boolean;
@@ -30,7 +32,7 @@ export type OptimizeCssOptions = {
 export function createOptimizedCss(
   original_css: Uint8Array | string,
   ids: string[],
-  options?: OptimizeCssOptions,
+  options?: OptimizeCssOptions
 ) {
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
 
@@ -83,31 +85,37 @@ export function createOptimizedCss(
       },
       AtRule(node) {
         if (!preserveAllIBMFonts && node.name === "font-face") {
-          // IBM Plex Sans, IBM Plex Mono are the only fonts used in components.
-          let is_IBM_Plex = false;
-
-          // 400/600 are the only weights used in components.
-          let is_product_weight = false;
-
-          // Only normal-style fonts are used in components.
-          let is_product_style = false;
+          const attributes = {
+            "font-family": "",
+            "font-style": "",
+            "font-weight": "",
+          };
 
           node.walkDecls((decl) => {
             switch (decl.prop) {
               case "font-family":
-                is_IBM_Plex = /IBM Plex/.test(decl.value);
+                attributes["font-family"] = decl.value;
                 break;
               case "font-style":
-                is_product_style = decl.value === "normal";
+                attributes["font-style"] = decl.value;
                 break;
               case "font-weight":
-                is_product_weight =
-                  decl.value === "400" || decl.value === "600";
+                attributes["font-weight"] = decl.value;
                 break;
             }
           });
 
-          if (!(is_IBM_Plex && is_product_style && is_product_weight)) {
+          const is_mono =
+            attributes["font-style"] === "normal" &&
+            attributes["font-family"] === "IBM Plex Mono" &&
+            attributes["font-weight"] === "400";
+
+          const is_sans =
+            attributes["font-style"] === "normal" &&
+            attributes["font-family"] === "IBM Plex Sans" &&
+            ["300", "400", "600"].includes(attributes["font-weight"]);
+
+          if (!(is_sans || is_mono)) {
             node.remove();
           }
         }
