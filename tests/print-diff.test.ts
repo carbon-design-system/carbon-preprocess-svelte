@@ -22,4 +22,18 @@ describe("print-diff", () => {
       ["After: ", "0.02 kB", "(-37.5%)\n"],
     ]);
   });
+
+  test("no diff", () => {
+    const log = jest.spyOn(console, "log");
+
+    expect(
+      printDiff({
+        original_css: "body { color: red; }",
+        optimized_css: "body { color: red; }",
+        id: "id",
+      }),
+    );
+
+    expect(log.mock.calls).toEqual([]);
+  });
 });
