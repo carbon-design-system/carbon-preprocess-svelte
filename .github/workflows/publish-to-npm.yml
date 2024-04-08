@@ -16,12 +16,10 @@ jobs:
           node-version: "20.x"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Publish package
+      - name: Install dependencies
+        run: npm install --force
+
+      - name: Publish to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
-
-        # Currently, only npm supports publishing packages with provenance
-        # https://docs.npmjs.com/generating-provenance-statements
-        run: |
-          npm install --force
-          npm publish --provenance --access public
+        run: npm publish --provenance --access public
