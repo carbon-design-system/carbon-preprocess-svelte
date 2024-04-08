@@ -8,7 +8,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
-    "prepack": "bunx --bun tsc -p tsconfig.build.json",
+    "prepack": "tsc -p tsconfig.build.json",
     "format": "bunx --bun prettier --write ."
   },
   "dependencies": {
