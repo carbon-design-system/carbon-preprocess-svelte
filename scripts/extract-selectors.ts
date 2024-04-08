@@ -1,6 +1,5 @@
 import { parse, walk } from "svelte/compiler";
-
-const CARBON_PREFIX = /bx--/;
+import { CARBON_PREFIX } from "../src/constants";
 
 type ExtractSelectorsProps = {
   code: string;

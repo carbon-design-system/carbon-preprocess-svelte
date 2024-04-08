@@ -2,6 +2,7 @@ import path from "node:path";
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import { components } from "../component-index";
+import { CARBON_PREFIX } from "../constants";
 
 export type OptimizeCssOptions = {
   /**
@@ -54,8 +55,8 @@ export function createOptimizedCss(
       Rule(node) {
         const selector = node.selector;
 
-        // Ensure that the selector contains a class.
-        if (selector.includes(".")) {
+        // Ensure that the selector contains a Carbon prefix.
+        if (CARBON_PREFIX.test(selector)) {
           // Selectors may contain multiple classes, separated by a comma.
           const classes = selector.split(",").filter((selectee) => {
             const value = selectee.trim() ?? "";
