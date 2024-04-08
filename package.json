@@ -8,8 +8,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
-    "prepack": "tsc -p tsconfig.build.json",
-    "format": "prettier --write ."
+    "prepack": "bunx --bun tsc -p tsconfig.build.json",
+    "format": "bunx --bun prettier --write ."
   },
   "dependencies": {
     "magic-string": "^0.30.8",
