@@ -32,6 +32,11 @@ export function printDiff(props: {
 
   const original_size = stringSizeInKB(original_css.toString());
   const optimized_size = stringSizeInKB(optimized_css);
+
+  if (original_size === optimized_size) {
+    return;
+  }
+
   const original = toHumanReadableSize(original_size);
   const optimized = toHumanReadableSize(optimized_size);
   const original_display = padIfNeeded(original, optimized);
