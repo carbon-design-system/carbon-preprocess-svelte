@@ -4,6 +4,8 @@ export const enum CarbonSvelte {
   Pictograms = "carbon-pictograms-svelte",
 }
 
+export const CARBON_PREFIX = /bx--/;
+
 export const RE_EXT_SVELTE = /\.svelte$/;
 
 export const RE_EXT_CSS = /\.css$/;
