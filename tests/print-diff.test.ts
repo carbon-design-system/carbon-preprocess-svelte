@@ -1,12 +1,12 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { compareDiff } from "../src/plugins/compare-diff";
+import { printDiff } from "../src/plugins/print-diff";
 
-describe("compare-diff", () => {
+describe("print-diff", () => {
   test("output", () => {
     const log = spyOn(console, "log");
 
     expect(
-      compareDiff({
+      printDiff({
         original_css: "body { color: red; } .bx--btn {}",
         optimized_css: "body { color: red; }",
         id: "id",

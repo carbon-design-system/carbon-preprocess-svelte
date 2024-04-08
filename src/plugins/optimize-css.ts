@@ -1,6 +1,6 @@
 import type { Plugin } from "vite";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
-import { compareDiff } from "./compare-diff";
+import { printDiff } from "./print-diff";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createOptimizedCss } from "./create-optimized-css";
 
@@ -32,7 +32,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
           file.source = optimized_css;
 
           if (verbose) {
-            compareDiff({ original_css, optimized_css, id });
+            printDiff({ original_css, optimized_css, id });
           }
         }
       }

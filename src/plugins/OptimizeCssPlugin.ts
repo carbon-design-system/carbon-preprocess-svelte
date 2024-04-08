@@ -1,6 +1,6 @@
 import type { Compiler } from "webpack";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
-import { compareDiff } from "./compare-diff";
+import { printDiff } from "./print-diff";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createOptimizedCss } from "./create-optimized-css";
 
@@ -61,7 +61,7 @@ class OptimizeCssPlugin {
                 compilation.updateAsset(id, new RawSource(optimized_css));
 
                 if (this.options.verbose) {
-                  compareDiff({ original_css, optimized_css, id });
+                  printDiff({ original_css, optimized_css, id });
                 }
               }
             }

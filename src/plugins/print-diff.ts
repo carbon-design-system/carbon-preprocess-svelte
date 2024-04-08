@@ -23,7 +23,7 @@ function padIfNeeded(a: string, b: string) {
   return a.length > b.length ? a : a.padStart(b.length, " ");
 }
 
-export function compareDiff(props: {
+export function printDiff(props: {
   original_css: Uint8Array | Buffer | string;
   optimized_css: string;
   id: string;
