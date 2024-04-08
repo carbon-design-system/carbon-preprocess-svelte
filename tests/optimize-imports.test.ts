@@ -1,4 +1,3 @@
-import { describe, expect, test } from "bun:test";
 import type { Preprocessor, Processed } from "svelte/types/compiler/preprocess";
 import { optimizeImports } from "../src";
 

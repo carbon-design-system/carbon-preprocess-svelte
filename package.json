@@ -18,6 +18,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/jest": "^29.5.12",
     "carbon-components-svelte": "0.85.0",
     "prettier": "latest",
     "svelte": "latest",

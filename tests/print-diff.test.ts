@@ -1,9 +1,12 @@
-import { describe, expect, spyOn, test } from "bun:test";
 import { printDiff } from "../src/plugins/print-diff";
 
 describe("print-diff", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   test("output", () => {
-    const log = spyOn(console, "log");
+    const log = jest.spyOn(console, "log");
 
     expect(
       printDiff({
