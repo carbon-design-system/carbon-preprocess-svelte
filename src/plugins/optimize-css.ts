@@ -1,8 +1,8 @@
 import type { Plugin } from "vite";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
-import { printDiff } from "./print-diff";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createOptimizedCss } from "./create-optimized-css";
+import { printDiff } from "./print-diff";
 
 // Vite plugin (Rollup-compatible) to optimize CSS for Carbon Svelte components.
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
@@ -27,7 +27,11 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
-          const optimized_css = createOptimizedCss(original_css, ids, options);
+          const optimized_css = createOptimizedCss({
+            ...options,
+            source: original_css,
+            ids,
+          });
 
           file.source = optimized_css;
 

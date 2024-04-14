@@ -30,11 +30,13 @@ export type OptimizeCssOptions = {
   preserveAllIBMFonts?: boolean;
 };
 
-export function createOptimizedCss(
-  original_css: Uint8Array | string,
-  ids: string[],
-  options?: OptimizeCssOptions,
-) {
+type CreateOptimizedCssOptions = OptimizeCssOptions & {
+  source: Uint8Array | string;
+  ids: string[];
+};
+
+export function createOptimizedCss(options: CreateOptimizedCssOptions) {
+  const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
 
   // List of Carbon classes that must be preserved in the CSS
@@ -119,5 +121,5 @@ export function createOptimizedCss(
       },
     },
     discardEmpty(),
-  ]).process(original_css).css;
+  ]).process(source).css;
 }

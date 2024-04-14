@@ -1,8 +1,8 @@
 import type { Compiler } from "webpack";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
-import { printDiff } from "./print-diff";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createOptimizedCss } from "./create-optimized-css";
+import { printDiff } from "./print-diff";
 
 // Webpack plugin to optimize CSS for Carbon Svelte components.
 class OptimizeCssPlugin {
@@ -52,11 +52,11 @@ class OptimizeCssPlugin {
             for (const [id] of Object.entries(assets)) {
               if (isCssFile(id)) {
                 const original_css = assets[id].source();
-                const optimized_css = createOptimizedCss(
-                  original_css,
+                const optimized_css = createOptimizedCss({
+                  ...this.options,
+                  source: original_css,
                   ids,
-                  this.options,
-                );
+                });
 
                 compilation.updateAsset(id, new RawSource(optimized_css));
 
