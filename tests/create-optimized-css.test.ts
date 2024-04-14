@@ -2,8 +2,8 @@ import { createOptimizedCss } from "../src/plugins/create-optimized-css";
 
 describe("create-optimized-css", () => {
   test("removes unused selectors", () => {
-    const result = createOptimizedCss(
-      `
+    const result = createOptimizedCss({
+      source: `
         * { box-sizing: border-box }
         a { color: blue }
         button.bx--btn { background-color: red }
@@ -11,8 +11,8 @@ describe("create-optimized-css", () => {
         .bx--accordion { background-color: yellow }
         .bx--accordion--end, .bx--accordion__content {color: black }
       `,
-      ["/Accordion.svelte"],
-    );
+      ids: ["/Accordion.svelte"],
+    });
     expect(result).toMatchSnapshot();
   });
 
@@ -55,12 +55,17 @@ describe("create-optimized-css", () => {
     }`;
 
   test("removes unused @font rules", () => {
-    const result = createOptimizedCss(font_rules, ["/Accordion.svelte"]);
+    const result = createOptimizedCss({
+      source: font_rules,
+      ids: ["/Accordion.svelte"],
+    });
     expect(result).toMatchSnapshot();
   });
 
   test("preserves all IBM fonts", () => {
-    const result = createOptimizedCss(font_rules, ["/Accordion.svelte"], {
+    const result = createOptimizedCss({
+      source: font_rules,
+      ids: ["/Accordion.svelte"],
       preserveAllIBMFonts: true,
     });
     expect(result).toMatchSnapshot();
