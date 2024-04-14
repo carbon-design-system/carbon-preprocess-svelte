@@ -95,13 +95,9 @@ export function createOptimizedCss(
           node.walkDecls((decl) => {
             switch (decl.prop) {
               case "font-family":
-                attributes["font-family"] = decl.value;
-                break;
               case "font-style":
-                attributes["font-style"] = decl.value;
-                break;
               case "font-weight":
-                attributes["font-weight"] = decl.value;
+                attributes[decl.prop] = decl.value;
                 break;
             }
           });
