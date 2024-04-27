@@ -9,7 +9,7 @@
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
     "build": "bun --bun tsc -p tsconfig.build.json",
-    "format": "bun --bun prettier --write ."
+    "format": "bun --bun prettier --write . --cache"
   },
   "dependencies": {
     "magic-string": "^0.30.8",
