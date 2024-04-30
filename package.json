@@ -12,6 +12,7 @@
     "format": "bun --bun prettier --write . --cache"
   },
   "dependencies": {
+    "estree-walker": "^2.0.2",
     "magic-string": "^0.30.8",
     "postcss": "^8.4.36",
     "postcss-discard-empty": "^6.0.3"
