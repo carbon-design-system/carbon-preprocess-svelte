@@ -1,6 +1,7 @@
+import type { ImportDeclaration } from "estree-walker";
+import { walk } from "estree-walker";
 import MagicString from "magic-string";
-import type { ImportDeclaration } from "svelte/compiler";
-import { parse, walk } from "svelte/compiler";
+import { parse } from "svelte/compiler";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { components } from "../component-index";
 import { CarbonSvelte } from "../constants";
