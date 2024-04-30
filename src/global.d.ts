@@ -1,4 +1,4 @@
-declare module "svelte/compiler" {
+declare module "estree-walker" {
   import type { Ast, Element, Text } from "svelte/types/compiler/interfaces";
 
   type CustomElement<T> = Omit<Element, "type"> & T;
