@@ -6,7 +6,8 @@
     "lib": ["ESNext"],
     "moduleResolution": "node",
     "skipLibCheck": true,
-    "strict": true
+    "strict": true,
+    "resolveJsonModule": true
   },
   "include": ["scripts/**/*", "src/**/*", "tests/**/*"]
 }
