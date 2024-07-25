@@ -15,7 +15,7 @@
   "dependencies": {
     "estree-walker": "^2.0.2",
     "magic-string": "^0.30.10",
-    "postcss": "^8.4.39",
+    "postcss": "^8.4.40",
     "postcss-discard-empty": "^6.0.3"
   },
   "devDependencies": {
