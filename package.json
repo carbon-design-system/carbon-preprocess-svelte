@@ -9,6 +9,7 @@
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
     "build": "bun --bun tsc -p tsconfig.build.json",
+    "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
     "format": "bun --bun prettier --write . --cache"
   },
