@@ -11,7 +11,8 @@
     "build": "bun --bun tsc -p tsconfig.build.json",
     "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
-    "format": "bun --bun prettier --write . --cache"
+    "format": "bun --bun prettier --write . --cache",
+    "upgrade-examples": "bun scripts/upgrade-examples.ts"
   },
   "dependencies": {
     "estree-walker": "^2.0.2",
