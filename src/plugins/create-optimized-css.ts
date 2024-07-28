@@ -104,6 +104,11 @@ export function createOptimizedCss(options: CreateOptimizedCssOptions) {
             }
           });
 
+          // Do not proceed if font is not IBM Plex.
+          if (!attributes["font-family"].startsWith("IBM Plex")) {
+            return;
+          }
+
           const is_mono =
             attributes["font-style"] === "normal" &&
             attributes["font-family"] === "IBM Plex Mono" &&
