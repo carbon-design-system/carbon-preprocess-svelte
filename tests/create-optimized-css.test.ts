@@ -18,6 +18,11 @@ describe("create-optimized-css", () => {
 
   const font_rules = `
     @font-face {
+      font-family: 'CustomFont';
+      src: url('path/to/custom-font.ttf');
+    }
+
+    @font-face {
       font-display: auto;
       font-family: IBM Plex Mono;
       font-style: normal;

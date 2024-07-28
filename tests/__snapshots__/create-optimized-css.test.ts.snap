@@ -9,8 +9,13 @@ exports[`create-optimized-css removes unused selectors 1`] = `
       "
 `;
 
-exports[`create-optimized-css removes unused @font rules 1`] = `
+exports[`create-optimized-css removes unused IBM @font rules 1`] = `
 "
+    @font-face {
+      font-family: 'CustomFont';
+      src: url('path/to/custom-font.ttf');
+    }
+
     @font-face {
       font-display: auto;
       font-family: IBM Plex Mono;
@@ -36,6 +41,11 @@ exports[`create-optimized-css removes unused @font rules 1`] = `
 
 exports[`create-optimized-css preserves all IBM fonts 1`] = `
 "
+    @font-face {
+      font-family: 'CustomFont';
+      src: url('path/to/custom-font.ttf');
+    }
+
     @font-face {
       font-display: auto;
       font-family: IBM Plex Mono;
