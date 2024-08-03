@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "removeComments": true,
     "declaration": true,
     "outDir": "dist",
     "target": "ES6",
