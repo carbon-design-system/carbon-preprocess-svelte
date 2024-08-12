@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "latest",
-    "carbon-components-svelte": "^0.85.0",
+    "carbon-components-svelte": "^0.85.1",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
     "svelte": "latest",
     "vite": "latest"
