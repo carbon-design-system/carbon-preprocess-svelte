@@ -11,24 +11,28 @@
 Install `carbon-preprocess-svelte` as a development dependency.
 
 ```sh
-# Yarn
-yarn add -D carbon-preprocess-svelte
-
 # npm
 npm i -D carbon-preprocess-svelte
 
 # pnpm
 pnpm i -D carbon-preprocess-svelte
+
+# Yarn
+yarn add -D carbon-preprocess-svelte
+
+# Bun
+bun add -D carbon-preprocess-svelte
 ```
 
 ## Usage
 
 - [**optimizeImports**](#optimizeimports): Svelte preprocessor that rewrites Carbon Svelte imports to their source path in the `script` block, making development compile times dramatically faster.
 - [**optimizeCss**](#optimizecss): Vite/Rollup plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
+- [**OptimizeCssPlugin**][#optimizecssplugin]: The corresponding `optimizeCss` plugin for Webpack that removes unused Carbon styles.
 
 ### `optimizeImports`
 
-`optimizeImports` is a Svelte preprocessor that rewrites barrel imports from Carbon components/icons/pictograms packages to their source Svelte code paths. This can significantly speed up development and production build compile times while preserving typeahead and autocompletion offered by integrated development environments (IDE) like VS Code.
+`optimizeImports` is a Svelte preprocessor that rewrites barrel imports from Carbon components/icons/pictograms packages to their source Svelte code paths. This can significantly speed up development and build compile times while preserving typeahead and autocompletion offered by integrated development environments (IDE) like VS Code.
 
 The preprocessor optimizes imports from the following packages:
 
@@ -49,8 +53,8 @@ The preprocessor optimizes imports from the following packages:
 
 > [!NOTE]
 > When this preprocessor was first created, there was no workaround to optimize slow cold start times with Vite in development.
-> As of today, [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte) enables [`prebundleSvelteLibraries`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries) by default, which greatly improves development times.
-> However, this preprocessor is still useful for non-Vite bundlers, like Rollup and Webpack.
+> As of today, [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte) enables [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries) by default, which greatly improves development times.
+> However, this preprocessor is still useful for non-Vite bundlers, like Rollup and Webpack. Additionally, this preprocessor can still improve cold start development times, even when `prebundleSvelteLibraries` is enabled.
 
 #### SvelteKit
 
@@ -152,8 +156,6 @@ module.exports = {
 
 `optimizeCss` is a Vite plugin that removes unused Carbon styles at build time. The plugin is compatible with Rollup ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
 
-`carbon-components-svelte@0.85.0` or greater is required.
-
 ```diff
 $ vite build
 
@@ -167,7 +169,7 @@ dist/assets/index-Ceijs3eO.js   53.65 kB │ gzip: 15.88 kB
 ```
 
 > [!NOTE]
-> This is a plugin and not a Svelte preprocessor. It should be added to the list of `vite.plugins`. For Vite set-ups, this plugin is only run when building the app. For Rollup and Webpack, you should conditionally apply the plugin to only execute when building for production.
+> This is a plugin and not a Svelte preprocessor. It should be added to the list of `vite.plugins`. For Vite set-ups, this plugin _is not run_ during development and is only executed when building the app (i.e., `vite build`). For Rollup and Webpack, you should conditionally apply the plugin to only execute when building for production.
 
 #### SvelteKit
 
@@ -222,26 +224,6 @@ export default {
 };
 ```
 
-#### Webpack
-
-Webpack users should use the `OptimizeCssPlugin`. The plugin API is identical to the Vite plugin.
-
-This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
-
-```js
-// webpack.config.js
-const { OptimizeCssPlugin } = require("carbon-preprocess-svelte");
-
-const PROD = process.env.NODE_ENV === "production";
-
-module.exports = {
-  plugins: [
-    // Only apply the plugin when building for production.
-    PROD && new OptimizeCssPlugin(),
-  ],
-};
-```
-
 #### `optimizeCss` API
 
 ```ts
@@ -270,6 +252,26 @@ optimizeCss({
    */
   preserveAllIBMFonts: false,
 });
+```
+
+### `OptimizeCssPlugin`
+
+For Webpack users, `OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`. The plugin API is identical to that of `optimizeCss`.
+
+This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
+
+```js
+// webpack.config.js
+const { OptimizeCssPlugin } = require("carbon-preprocess-svelte");
+
+const PROD = process.env.NODE_ENV === "production";
+
+module.exports = {
+  plugins: [
+    // Only apply the plugin when building for production.
+    PROD && new OptimizeCssPlugin(),
+  ],
+};
 ```
 
 ## Examples
