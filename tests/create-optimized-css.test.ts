@@ -4,6 +4,8 @@ describe("create-optimized-css", () => {
   test("removes unused selectors", () => {
     const result = createOptimizedCss({
       source: `* { box-sizing: border-box }
+.empty-rule {}
+@media (min-width: 40em) {}
 a { color: blue }
 button.bx--btn { background-color: red }
 .bx--btn, .bx--btn--primary { color: white }
