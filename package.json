@@ -19,7 +19,7 @@
     "estree-walker": "^2.0.2",
     "magic-string": "^0.30.11",
     "postcss": "^8.4.41",
-    "postcss-discard-empty": "^6.0.3"
+    "postcss-discard-empty": "^7.0.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
