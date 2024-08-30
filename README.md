@@ -53,8 +53,8 @@ The preprocessor optimizes imports from the following packages:
 
 > [!NOTE]
 > When this preprocessor was first created, there was no workaround to optimize slow cold start times with Vite in development.
-> As of today, [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte) enables [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries) by default, which greatly improves development times.
-> However, this preprocessor is still useful for non-Vite bundlers, like Rollup and Webpack. Additionally, this preprocessor can still improve cold start development times, even when `prebundleSvelteLibraries` is enabled.
+> Today, [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte) enables [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries) by default.
+> However, this preprocessor is still useful for non-Vite bundlers, like Rollup and Webpack. Also, it can further improve cold start development times even with `prebundleSvelteLibraries: true`.
 
 #### SvelteKit
 
