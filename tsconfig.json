@@ -7,7 +7,11 @@
     "moduleResolution": "node",
     "skipLibCheck": true,
     "strict": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@": ["./src/index.ts"],
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["scripts/**/*", "src/**/*", "tests/**/*"]
 }

@@ -1,4 +1,4 @@
-import { createOptimizedCss } from "../src/plugins/create-optimized-css";
+import { createOptimizedCss } from "@/plugins/create-optimized-css";
 
 describe("create-optimized-css", () => {
   test("removes unused selectors", () => {
@@ -16,7 +16,7 @@ button.bx--btn { background-color: red }
     expect(result).toEqual(`* { box-sizing: border-box }
 a { color: blue }
 .bx--accordion { background-color: yellow }
-.bx--accordion--end, .bx--accordion__content {color: black }`)
+.bx--accordion--end, .bx--accordion__content {color: black }`);
   });
 
   const font_rules = `@font-face {
@@ -89,7 +89,7 @@ a { color: blue }
   font-family: IBM Plex Sans;
   font-style: normal;
   font-weight: 300;
-}`)
+}`);
   });
 
   test("preserves all IBM fonts", () => {
@@ -137,6 +137,6 @@ a { color: blue }
   font-family: IBM Plex Sans;
   font-style: normal;
   font-weight: 100;
-}`)
+}`);
   });
 });

@@ -1,4 +1,4 @@
-import { printDiff } from "../src/plugins/print-diff";
+import { printDiff } from "@/plugins/print-diff";
 
 describe("print-diff", () => {
   beforeEach(() => {
