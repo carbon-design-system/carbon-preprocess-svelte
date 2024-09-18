@@ -54,7 +54,9 @@ class OptimizeCssPlugin {
                 const original_css = assets[id].source();
                 const optimized_css = createOptimizedCss({
                   ...this.options,
-                  source: original_css,
+                  source: Buffer.isBuffer(original_css)
+                    ? original_css.toString()
+                    : original_css,
                   ids,
                 });
 
