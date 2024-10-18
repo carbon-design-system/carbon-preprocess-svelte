@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "estree-walker": "^2.0.2",
-    "magic-string": "^0.30.11",
+    "magic-string": "^0.30.12",
     "postcss": "^8.4.47",
     "postcss-discard-empty": "^7.0.0"
   },
