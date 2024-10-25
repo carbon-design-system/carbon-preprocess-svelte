@@ -5,7 +5,7 @@
     "build": "NODE_ENV=production webpack"
   },
   "devDependencies": {
-    "carbon-components-svelte": "^0.85.3",
+    "carbon-components-svelte": "^0.85.2",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
     "css-loader": "latest",
     "html-webpack-plugin": "latest",
