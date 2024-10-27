@@ -1,9 +1,6 @@
-# example
+# webpack
 
 > Used for end-to-end testing and development purposes.
-
-> [!NOTE]
-> Currently, the `optimizeCss` plugin does not support Webpack.
 
 ## Quick Start
 
