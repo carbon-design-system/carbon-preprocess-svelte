@@ -1,27 +1,29 @@
-const HtmlWebpackPlugin = require("html-webpack-plugin");
-const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-const path = require("path");
+// @ts-check
+import HtmlWebpackPlugin from "html-webpack-plugin";
+import MiniCssExtractPlugin from "mini-css-extract-plugin";
+import path from "node:path";
+import carbonPreprocess from "carbon-preprocess-svelte";
+
 const {
   optimizeImports,
   OptimizeCssPlugin,
-} = require("carbon-preprocess-svelte");
+} = carbonPreprocess;
 
-const NODE_ENV = process.env.NODE_ENV || "development";
+/** @type {"development" | "production"} */
+const NODE_ENV =
+  process.env.NODE_ENV === "production" ? "production" : "development";
 const PROD = NODE_ENV === "production";
 
-module.exports = {
+/** @type {import("webpack").Configuration} */
+export default {
   entry: { "build/bundle": ["./src/index.js"] },
   resolve: {
-    alias: {
-      svelte: path.resolve("node_modules", "svelte/src/runtime"),
-    },
     extensions: [".mjs", ".js", ".svelte"],
-    mainFields: ["svelte", "browser", "module", "main"],
     conditionNames: ["svelte", "browser", "import"],
   },
   output: {
     publicPath: "/",
-    path: path.join(__dirname, "/public"),
+    path: path.resolve("./public"),
     filename: PROD ? "[name].[contenthash].js" : "[name].js",
     chunkFilename: "[name].[id].js",
     clean: true,
