@@ -9,7 +9,7 @@
     "@sveltejs/adapter-static": "latest",
     "@sveltejs/kit": "latest",
     "@sveltejs/vite-plugin-svelte": "latest",
-    "carbon-components-svelte": "^0.85.2",
+    "carbon-components-svelte": "^0.85.3",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
     "svelte": "latest",
     "vite": "latest"
