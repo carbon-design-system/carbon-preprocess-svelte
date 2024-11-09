@@ -10,7 +10,7 @@
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "carbon-components-svelte": "^0.85.3",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
-    "svelte": "^5.1.9",
+    "svelte": "^5.1.13",
     "svelte-preprocess-directives": "^0.1.2",
     "vite": "latest"
   }
