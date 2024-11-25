@@ -1,6 +1,7 @@
 import { Glob } from "bun";
 import path from "node:path";
-import { parse, walk } from "svelte/compiler";
+import { parse } from "svelte/compiler";
+import { walk } from "estree-walker";
 import { CarbonSvelte } from "../src/constants";
 import { isSvelteFile } from "../src/utils";
 import { extractSelectors } from "./extract-selectors";

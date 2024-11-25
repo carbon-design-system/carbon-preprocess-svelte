@@ -1,4 +1,5 @@
-import { parse, walk } from "svelte/compiler";
+import { parse } from "svelte/compiler";
+import { type ANode, walk } from "estree-walker";
 import { CARBON_PREFIX } from "../src/constants";
 
 type ExtractSelectorsProps = {
@@ -17,12 +18,12 @@ export function extractSelectors(props: ExtractSelectorsProps) {
         // class="c1"
         // class="c1 c2"
         // class="{c} c1 c2 c3"
-        node.value?.map((value) => {
+        node.value?.map((value: ANode) => {
           if (value.type === "Text") {
             value.data
               .split(/\s+/)
               .filter(Boolean)
-              .forEach((selector) =>
+              .forEach((selector: string) =>
                 selectors.set(selector, { type: node.type }),
               );
           }
@@ -37,7 +38,7 @@ export function extractSelectors(props: ExtractSelectorsProps) {
       if (node.type === "PseudoClassSelector" && node.name === "global") {
         // global selector
         // :global(div) {}
-        node.children[0]?.value.split(",").forEach((selector: string) => {
+        node.children?.[0]?.value.split(",").forEach((selector: string) => {
           selectors.set(selector.trim(), { type: node.type, name: node.name });
         });
       }
