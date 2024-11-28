@@ -79,5 +79,5 @@ export function extractSelectors(props: ExtractSelectorsProps) {
     }
   });
 
-  return classes;
+  return [...new Set(classes)];
 }
