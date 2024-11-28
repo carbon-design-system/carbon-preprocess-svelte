@@ -38,9 +38,11 @@ export function extractSelectors(props: ExtractSelectorsProps) {
       if (node.type === "PseudoClassSelector" && node.name === "global") {
         // global selector
         // :global(div) {}
-        node.children?.[0]?.value.split(",").forEach((selector: string) => {
-          selectors.set(selector.trim(), { type: node.type, name: node.name });
-        });
+        const selector = code.slice(node.start, node.end);
+
+        // Remove :global( from start and ) from end
+        const cleanSelector = selector.replace(/^:global\((.*)\)$/, "$1");
+        selectors.set(cleanSelector, { type: node.type, name: node.name });
       }
 
       if (node.type === "Literal" && CARBON_PREFIX.test(node.value)) {
