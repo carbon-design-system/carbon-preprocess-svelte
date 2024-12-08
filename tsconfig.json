@@ -9,8 +9,8 @@
     "strict": true,
     "resolveJsonModule": true,
     "paths": {
-      "@": ["./src/index.ts"],
-      "@/*": ["./src/*"]
+      "carbon-preprocess-svelte": ["./src/index.ts"],
+      "carbon-preprocess-svelte/*": ["./src/*"]
     }
   },
   "include": ["scripts/**/*", "src/**/*", "tests/**/*"]

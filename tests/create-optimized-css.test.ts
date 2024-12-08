@@ -1,4 +1,4 @@
-import { createOptimizedCss } from "@/plugins/create-optimized-css";
+import { createOptimizedCss } from "carbon-preprocess-svelte/plugins/create-optimized-css";
 
 describe("create-optimized-css", () => {
   test("removes unused selectors", () => {

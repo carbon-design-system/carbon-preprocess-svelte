@@ -1,4 +1,4 @@
-import { printDiff } from "@/plugins/print-diff";
+import { printDiff } from "carbon-preprocess-svelte/plugins/print-diff";
 
 describe("print-diff", () => {
   beforeEach(() => {
