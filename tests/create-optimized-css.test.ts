@@ -11,7 +11,7 @@ button.bx--btn { background-color: red }
 .bx--btn, .bx--btn--primary { color: white }
 .bx--accordion { background-color: yellow }
 .bx--accordion--end, .bx--accordion__content {color: black }`,
-      ids: ["/Accordion.svelte"],
+      ids: ["Accordion"],
     });
     expect(result).toEqual(`* { box-sizing: border-box }
 a { color: blue }
@@ -138,5 +138,42 @@ a { color: blue }
   font-style: normal;
   font-weight: 100;
 }`);
+  });
+
+  test("preserves .bx--body class", () => {
+    const result = createOptimizedCss({
+      source: `.bx--body { margin: 0 } .bx--unused-class { color: red }`,
+      ids: [],
+    });
+    expect(result).toEqual(`.bx--body { margin: 0 }`);
+  });
+
+  test("handles complex selectors with Carbon classes", () => {
+    const result = createOptimizedCss({
+      source: `a.bx--header { color: blue }
+div.bx--unused { background: red }
+button.bx--btn.bx--btn--primary { color: white }`,
+      ids: ["Header", "Button"],
+    });
+    expect(result).toEqual(`a.bx--header { color: blue }
+button.bx--btn.bx--btn--primary { color: white }`);
+  });
+
+  test("avoids false positives", () => {
+    const result = createOptimizedCss({
+      source: `.bx--btn, .bx--btn--primary, .bx--unused { color: white }`,
+      ids: ["Button"],
+    });
+    expect(result).toEqual(
+      `.bx--btn, .bx--btn--primary, .bx--unused { color: white }`,
+    );
+  });
+
+  test("ignores non-Carbon prefixed rules", () => {
+    const result = createOptimizedCss({
+      source: `.custom-class { color: red }`,
+      ids: ["Button"],
+    });
+    expect(result).toEqual(`.custom-class { color: red }`);
   });
 });
