@@ -4,10 +4,7 @@ import MiniCssExtractPlugin from "mini-css-extract-plugin";
 import path from "node:path";
 import carbonPreprocess from "carbon-preprocess-svelte";
 
-const {
-  optimizeImports,
-  OptimizeCssPlugin,
-} = carbonPreprocess;
+const { optimizeImports, OptimizeCssPlugin } = carbonPreprocess;
 
 /** @type {"development" | "production"} */
 const NODE_ENV =
