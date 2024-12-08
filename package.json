@@ -26,7 +26,7 @@
     "@types/jest": "latest",
     "carbon-components-svelte": "0.86.1",
     "prettier": "latest",
-    "svelte": "^5.2.12",
+    "svelte": "^5.9.0",
     "typescript": "latest",
     "vite": "latest",
     "webpack": "latest"
