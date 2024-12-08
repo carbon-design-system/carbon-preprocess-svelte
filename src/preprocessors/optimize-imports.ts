@@ -15,7 +15,9 @@ function rewriteImport(
 
   for (const specifier of node.specifiers) {
     const fragment = map(specifier);
-    if (fragment) content += fragment;
+    if (fragment) {
+      content += fragment + (!fragment.endsWith("\n") ? "\n" : "");
+    }
   }
 
   if (content) s.overwrite(node.start, node.end, content);
