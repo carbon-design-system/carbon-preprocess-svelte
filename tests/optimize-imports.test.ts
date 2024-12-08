@@ -28,7 +28,6 @@ describe("optimizeImports", () => {
         content: `import { Accordion, AccordionItem } from "carbon-components-svelte";
 import { Accordion as Accordion2 } from "carbon-components-svelte";
 import { breakpoints } from "carbon-components-svelte";
-import { invalid } from "carbon-components-svelte";
 
 import { Add } from "carbon-icons-svelte";
 import { Add as Add2 } from "carbon-icons-svelte";
@@ -42,7 +41,6 @@ import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`,
       .toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import Accordion2 from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
-import { invalid } from "carbon-components-svelte";
 
 import Add from "carbon-icons-svelte/lib/Add.svelte";
 import Add2 from "carbon-icons-svelte/lib/Add.svelte";
@@ -51,5 +49,13 @@ import Add3 from "carbon-icons-svelte/lib/Add.svelte";
 import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
 import Airplane2 from "carbon-pictograms-svelte/lib/Airplane.svelte";
 import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`);
+  });
+
+  test("invalid imports should fail open", () => {
+    expect(
+      preprocess({
+        content: "import { NonExistent } from 'carbon-components-svelte'",
+      }),
+    ).toEqual("import { NonExistent } from 'carbon-components-svelte'");
   });
 });
