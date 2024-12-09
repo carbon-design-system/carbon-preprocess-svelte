@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Features**
 
-- **optimizeImports**: re-index `carbon-components-svelte@0.87` components to support `toHierarchy`
+- `optimizeImports`: re-index `carbon-components-svelte@0.87` components to support `toHierarchy`
 
 **Fixes**
 
-- **optimizeImports**: append line break to optimized path
+- `optimizeImports`: append line break to optimized path
 
 ## [0.11.8](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.8) - 2024-11-30
 
