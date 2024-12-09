@@ -20,7 +20,7 @@ function rewriteImport(
     }
   }
 
-  if (content) s.overwrite(node.start, node.end, content);
+  if (content) s.overwrite(node.start, node.end, content.trimEnd());
 }
 
 export const optimizeImports: SveltePreprocessor<"script"> = () => {
