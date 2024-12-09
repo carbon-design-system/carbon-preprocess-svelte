@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/jest": "latest",
-    "carbon-components-svelte": "0.86.1",
+    "carbon-components-svelte": "0.87.0",
     "prettier": "latest",
     "svelte": "^5.10.0",
     "typescript": "latest",

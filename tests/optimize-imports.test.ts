@@ -28,6 +28,7 @@ describe("optimizeImports", () => {
         content: `import { Accordion, AccordionItem } from "carbon-components-svelte";
 import { Accordion as Accordion2 } from "carbon-components-svelte";
 import { breakpoints } from "carbon-components-svelte";
+import { toHierarchy } from "carbon-components-svelte";
 
 import { Add } from "carbon-icons-svelte";
 import { Add as Add2 } from "carbon-icons-svelte";
@@ -42,6 +43,7 @@ import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`,
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import Accordion2 from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
+import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
 
 import Add from "carbon-icons-svelte/lib/Add.svelte";
 import Add2 from "carbon-icons-svelte/lib/Add.svelte";
