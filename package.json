@@ -9,7 +9,7 @@
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
     "build": "bun --bun tsc -p tsconfig.build.json",
-    "build:prune-package": "bun scripts/prune-package.ts",
+    "build:prune-package": "bunx culls",
     "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
     "format": "bun --bun prettier --write . --cache",
@@ -25,6 +25,7 @@
     "@types/bun": "latest",
     "@types/jest": "latest",
     "carbon-components-svelte": "0.87.0",
+    "culls": "latest",
     "prettier": "latest",
     "svelte": "^5.10.0",
     "typescript": "latest",
