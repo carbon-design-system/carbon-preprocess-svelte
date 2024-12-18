@@ -44,9 +44,8 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
               case CarbonSvelte.Components:
                 rewriteImport(s, node, ({ imported, local }) => {
                   const import_path = components[imported.name]?.path;
-                  return import_path
-                    ? `import ${local.name} from "${import_path}";`
-                    : "";
+                  if (!import_path) return "";
+                  return `import ${local.name} from "${import_path}";`;
                 });
                 break;
 
