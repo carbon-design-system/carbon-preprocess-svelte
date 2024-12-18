@@ -14,7 +14,7 @@ jobs:
         run: bun install
 
       - name: Run unit tests
-        run: bun test
+        run: bun --silent test
 
       - name: Run e2e tests
         run: bun test:e2e
