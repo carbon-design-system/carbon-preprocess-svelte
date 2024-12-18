@@ -7,10 +7,10 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^4.0.2",
+    "@sveltejs/vite-plugin-svelte": "^4.0.4",
     "carbon-components-svelte": "^0.85.4",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
-    "svelte": "^5.10.0",
+    "svelte": "^5.14.4",
     "svelte-preprocess-directives": "^0.1.2",
     "vite": "latest"
   }
