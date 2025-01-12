@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "estree-walker": "^2.0.2",
-    "magic-string": "^0.30.14",
+    "magic-string": "^0.30.17",
     "postcss": "^8.4.49",
     "postcss-discard-empty": "^7.0.0"
   },
@@ -27,7 +27,7 @@
     "carbon-components-svelte": "0.87.0",
     "culls": "latest",
     "prettier": "latest",
-    "svelte": "^5.10.0",
+    "svelte": "^5.17.3",
     "typescript": "latest",
     "vite": "latest",
     "webpack": "latest"
