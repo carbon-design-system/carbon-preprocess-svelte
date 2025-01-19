@@ -7,11 +7,14 @@ Identical to the `vite` example, but using Svelte 5.
 ## Quick Start
 
 ```sh
-# Rebuild the library when making changes
-bun prepack -w
+# First, build the library locally
+bun run build
 
 # Create a local link to the library
 bun link
+
+# When developing, rebuild the library when making changes
+bun run build -w
 ```
 
 In this folder, you can run the following commands:
