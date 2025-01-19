@@ -1,5 +1,5 @@
-import { parse } from "svelte/compiler";
 import { type ANode, walk } from "estree-walker";
+import { parse } from "svelte/compiler";
 import { CARBON_PREFIX } from "../src/constants";
 
 type ExtractSelectorsProps = {
@@ -11,9 +11,20 @@ export function extractSelectors(props: ExtractSelectorsProps) {
   const { code, filename } = props;
   const ast = parse(code, { filename });
   const selectors: Map<string, any> = new Map();
+  const components: Set<string> = new Set();
 
   walk(ast, {
     enter(node) {
+      // A component may compose other components.
+      // Record these references for later processing.
+      if (node.type === "InlineComponent") {
+        if (node.name === "svelte:component") {
+          components.add(node.expression.name);
+        } else {
+          components.add(node.name);
+        }
+      }
+
       if (node.type === "Attribute" && node.name === "class") {
         // class="c1"
         // class="c1 c2"
@@ -79,5 +90,11 @@ export function extractSelectors(props: ExtractSelectorsProps) {
     }
   });
 
-  return [...new Set(classes)];
+  return {
+    /** Unique classes in the current component. */
+    classes: [...new Set(classes)],
+
+    /** Unique components that are referenced by the current component. */
+    components: [...new Set(components)],
+  };
 }
