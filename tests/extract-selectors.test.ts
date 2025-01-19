@@ -6,7 +6,7 @@ describe("extractSelectors", () => {
       code: '<div class="test-class"></div>',
       filename: "test.svelte",
     });
-    expect(result).toEqual([".test-class"]);
+    expect(result.classes).toEqual([".test-class"]);
   });
 
   test("extracts multiple classes from class attribute", () => {
@@ -14,7 +14,7 @@ describe("extractSelectors", () => {
       code: '<div class="class1 class2 class3"></div>',
       filename: "test.svelte",
     });
-    expect(result).toEqual([".class1", ".class2", ".class3"]);
+    expect(result.classes).toEqual([".class1", ".class2", ".class3"]);
   });
 
   test("extracts class directives", () => {
@@ -22,7 +22,7 @@ describe("extractSelectors", () => {
       code: "<div class:active={isActive}></div>",
       filename: "test.svelte",
     });
-    expect(result).toEqual([".active"]);
+    expect(result.classes).toEqual([".active"]);
   });
 
   test("extracts global selectors", () => {
@@ -30,7 +30,7 @@ describe("extractSelectors", () => {
       code: "<style>:global(div) { color: red; }</style>",
       filename: "test.svelte",
     });
-    expect(result).toEqual([".div"]);
+    expect(result.classes).toEqual([".div"]);
   });
 
   test("handles Carbon prefix classes", () => {
@@ -38,7 +38,7 @@ describe("extractSelectors", () => {
       code: '<div class="bx--button bx--text"></div>',
       filename: "test.svelte",
     });
-    expect(result).toEqual([".bx--button", ".bx--text"]);
+    expect(result.classes).toEqual([".bx--button", ".bx--text"]);
   });
 
   test("deduplicates repeated classes", () => {
@@ -46,7 +46,7 @@ describe("extractSelectors", () => {
       code: '<div class="test test test"></div>',
       filename: "test.svelte",
     });
-    expect(result).toEqual([".test"]);
+    expect(result.classes).toEqual([".test"]);
   });
 
   test("handles mixed scenarios", () => {
@@ -59,7 +59,11 @@ describe("extractSelectors", () => {
       `,
       filename: "test.svelte",
     });
-    expect(result).toEqual([".regular-class", ".bx--carbon-class", ".active"]);
+    expect(result.classes).toEqual([
+      ".regular-class",
+      ".bx--carbon-class",
+      ".active",
+    ]);
   });
 
   test("handles empty class attributes", () => {
@@ -67,6 +71,14 @@ describe("extractSelectors", () => {
       code: '<div class=""></div>',
       filename: "test.svelte",
     });
-    expect(result).toEqual([]);
+    expect(result.classes).toEqual([]);
+  });
+
+  test("handles inline components", () => {
+    const result = extractSelectors({
+      code: "<div><Test /><Component /></div>",
+      filename: "test.svelte",
+    });
+    expect(result.components).toEqual(["Test", "Component"]);
   });
 });
