@@ -11,6 +11,6 @@
     "carbon-components-svelte": "^0.85.4",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
     "svelte": "^4.2.19",
-    "vite": "latest"
+    "vite": "^5.4.11"
   }
 }
