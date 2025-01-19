@@ -5,6 +5,7 @@
 
 <DataTable
   sortable
+  selectable
   headers={[
     { key: "name", value: "Name" },
     { key: "protocol", value: "Protocol" },
