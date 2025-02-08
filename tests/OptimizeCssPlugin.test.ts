@@ -1,8 +1,14 @@
+import type { Compiler } from "webpack";
 import { CarbonSvelte } from "../src/constants";
 import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
 
 // Mock webpack compiler and related types
-const createMockCompiler = (options: any = {}) => {
+const createMockCompiler = (
+  options: {
+    assets?: Record<string, unknown>;
+    fileDependencies?: string[];
+  } = {},
+) => {
   const { assets = {}, fileDependencies = [] } = options;
 
   const compilation = {
@@ -46,13 +52,18 @@ const createMockCompiler = (options: any = {}) => {
   };
 };
 
+const asCompiler = (mock: ReturnType<typeof createMockCompiler>): Compiler => {
+  return mock as unknown as Compiler;
+};
+
 describe("OptimizeCssPlugin", () => {
   test("constructor sets default options correctly", () => {
     const plugin = new OptimizeCssPlugin();
-    expect((plugin as any).options).toEqual({
+    // @ts-expect-error – options is private
+    expect(plugin.options).toEqual({
       verbose: true,
       preserveAllIBMFonts: false,
-    });
+    } as const);
   });
 
   test("constructor respects provided options", () => {
@@ -60,7 +71,8 @@ describe("OptimizeCssPlugin", () => {
       verbose: false,
       preserveAllIBMFonts: true,
     });
-    expect((plugin as any).options).toEqual({
+    // @ts-expect-error – options is private
+    expect(plugin.options).toEqual({
       verbose: false,
       preserveAllIBMFonts: true,
     });
@@ -73,7 +85,7 @@ describe("OptimizeCssPlugin", () => {
       fileDependencies: ["regular-component.svelte"],
     });
 
-    plugin.apply(mockCompiler as any);
+    plugin.apply(asCompiler(mockCompiler));
 
     expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
   });
@@ -90,7 +102,7 @@ describe("OptimizeCssPlugin", () => {
       fileDependencies: [carbonComponent],
     });
 
-    plugin.apply(mockCompiler as any);
+    plugin.apply(asCompiler(mockCompiler));
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledWith(
       "styles.css",
@@ -110,7 +122,7 @@ describe("OptimizeCssPlugin", () => {
       fileDependencies: [carbonComponent],
     });
 
-    plugin.apply(mockCompiler as any);
+    plugin.apply(asCompiler(mockCompiler));
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledWith(
       "styles.css",
@@ -130,7 +142,7 @@ describe("OptimizeCssPlugin", () => {
       fileDependencies: [carbonComponent],
     });
 
-    plugin.apply(mockCompiler as any);
+    plugin.apply(asCompiler(mockCompiler));
 
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();

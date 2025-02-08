@@ -4,14 +4,14 @@ const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 function toHumanReadableSize(size_in_kb: number) {
   if (size_in_kb >= BITS_DENOM) {
-    return formatter.format(size_in_kb / BITS_DENOM) + " MB";
+    return `${formatter.format(size_in_kb / BITS_DENOM)} MB`;
   }
 
-  return formatter.format(size_in_kb) + " kB";
+  return `${formatter.format(size_in_kb)} kB`;
 }
 
 function percentageDiff(a: number, b: number) {
-  return formatter.format(((a - b) / a) * 100) + "%";
+  return `${formatter.format(((a - b) / a) * 100)}%`;
 }
 
 function stringSizeInKB(str: string) {

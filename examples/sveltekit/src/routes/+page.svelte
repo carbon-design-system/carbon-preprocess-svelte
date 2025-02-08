@@ -1,6 +1,6 @@
 <script>
-  import "carbon-components-svelte/css/g100.css";
-  import { DataTable } from "carbon-components-svelte";
+import "carbon-components-svelte/css/g100.css";
+import { DataTable } from "carbon-components-svelte";
 </script>
 
 <DataTable
