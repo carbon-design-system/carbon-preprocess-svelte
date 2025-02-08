@@ -10,7 +10,7 @@ type ExtractSelectorsProps = {
 export function extractSelectors(props: ExtractSelectorsProps) {
   const { code, filename } = props;
   const ast = parse(code, { filename });
-  const selectors: Map<string, any> = new Map();
+  const selectors: Map<string, { type: string; name?: string }> = new Map();
   const components: Set<string> = new Set();
 
   walk(ast, {
@@ -31,12 +31,9 @@ export function extractSelectors(props: ExtractSelectorsProps) {
         // class="{c} c1 c2 c3"
         node.value?.map((value: ANode) => {
           if (value.type === "Text") {
-            value.data
-              .split(/\s+/)
-              .filter(Boolean)
-              .forEach((selector: string) =>
-                selectors.set(selector, { type: node.type }),
-              );
+            for (const selector of value.data.split(/\s+/).filter(Boolean)) {
+              selectors.set(selector, { type: node.type });
+            }
           }
         });
       }
@@ -72,23 +69,23 @@ export function extractSelectors(props: ExtractSelectorsProps) {
   const classes: string[] = [];
 
   // Iterate through all class attribute identifiers
-  Array.from(selectors).forEach((selector) => {
-    const [v = ""] = selector;
+  for (const [v = "", { type, name }] of selectors) {
+    const value = v.trim();
 
     if (typeof v === "string") {
       const value = v.trim();
 
       if (value.startsWith("bx--") && !value.startsWith(".")) {
-        classes.push("." + value);
+        classes.push(`.${value}`);
       } else {
         if (value.startsWith(".")) {
           classes.push(value);
         } else {
-          classes.push("." + value);
+          classes.push(`.${value}`);
         }
       }
     }
-  });
+  }
 
   return {
     /** Unique classes in the current component. */

@@ -142,10 +142,10 @@ a { color: blue }
 
   test("preserves .bx--body class", () => {
     const result = createOptimizedCss({
-      source: `.bx--body { margin: 0 } .bx--unused-class { color: red }`,
+      source: ".bx--body { margin: 0 } .bx--unused-class { color: red }",
       ids: [],
     });
-    expect(result).toEqual(`.bx--body { margin: 0 }`);
+    expect(result).toEqual(".bx--body { margin: 0 }");
   });
 
   test("handles complex selectors with Carbon classes", () => {
@@ -161,19 +161,19 @@ button.bx--btn.bx--btn--primary { color: white }`);
 
   test("avoids false positives", () => {
     const result = createOptimizedCss({
-      source: `.bx--btn, .bx--btn--primary, .bx--unused { color: white }`,
+      source: ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
       ids: ["Button"],
     });
     expect(result).toEqual(
-      `.bx--btn, .bx--btn--primary, .bx--unused { color: white }`,
+      ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
     );
   });
 
   test("ignores non-Carbon prefixed rules", () => {
     const result = createOptimizedCss({
-      source: `.custom-class { color: red }`,
+      source: ".custom-class { color: red }",
       ids: ["Button"],
     });
-    expect(result).toEqual(`.custom-class { color: red }`);
+    expect(result).toEqual(".custom-class { color: red }");
   });
 });

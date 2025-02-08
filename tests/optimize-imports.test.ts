@@ -38,8 +38,7 @@ import { Airplane } from "carbon-pictograms-svelte";
 import { Airplane as Airplane2 } from "carbon-pictograms-svelte";
 import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`,
       }),
-    )
-      .toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import Accordion2 from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
@@ -69,8 +68,7 @@ import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`);
 import { Add, Download } from "carbon-icons-svelte";
 import { Airplane, Analytics } from "carbon-pictograms-svelte";`,
       }),
-    )
-      .toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import bp from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
 import Add from "carbon-icons-svelte/lib/Add.svelte";

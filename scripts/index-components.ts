@@ -1,6 +1,6 @@
+import path from "node:path";
 import { Glob } from "bun";
 import { walk } from "estree-walker";
-import path from "node:path";
 import { parse } from "svelte/compiler";
 import { CarbonSvelte } from "../src/constants";
 import { isSvelteFile } from "../src/utils";
@@ -81,9 +81,10 @@ for (const [parent, components] of sub_components.entries()) {
   if (parent_map) {
     const sub_classes = components.flatMap((component) => {
       if (exports_map.has(component)) {
-        return exports_map.get(component)!.classes;
-      } else if (internal_components.has(component)) {
-        return internal_components.get(component)!.classes;
+        return exports_map.get(component)?.classes;
+      }
+      if (internal_components.has(component)) {
+        return internal_components.get(component)?.classes;
       }
 
       // Components that fall through here are icon components,
