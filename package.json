@@ -27,7 +27,7 @@
     "carbon-components-svelte": "0.87.0",
     "culls": "latest",
     "prettier": "latest",
-    "svelte": "^5.19.4",
+    "svelte": "^5.19.9",
     "typescript": "latest",
     "vite": "latest",
     "webpack": "latest"
