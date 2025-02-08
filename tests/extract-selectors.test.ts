@@ -1,3 +1,4 @@
+import { describe, expect, test } from "bun:test";
 import { extractSelectors } from "../scripts/extract-selectors";
 
 describe("extractSelectors", () => {
@@ -7,6 +8,7 @@ describe("extractSelectors", () => {
       filename: "test.svelte",
     });
     expect(result.classes).toEqual([".test-class"]);
+    expect(result.components).toEqual([]);
   });
 
   test("extracts multiple classes from class attribute", () => {
@@ -15,70 +17,87 @@ describe("extractSelectors", () => {
       filename: "test.svelte",
     });
     expect(result.classes).toEqual([".class1", ".class2", ".class3"]);
+    expect(result.components).toEqual([]);
+  });
+
+  test("extracts Carbon classes with bx-- prefix", () => {
+    const result = extractSelectors({
+      code: '<div class="bx--btn bx--modal"></div>',
+      filename: "test.svelte",
+    });
+    expect(result.classes).toEqual([".bx--btn", ".bx--modal"]);
   });
 
   test("extracts class directives", () => {
     const result = extractSelectors({
-      code: "<div class:active={isActive}></div>",
+      code: "<div class:active={isActive} class:bx--selected={isSelected}></div>",
       filename: "test.svelte",
     });
-    expect(result.classes).toEqual([".active"]);
+    expect(result.classes).toEqual([".active", ".bx--selected"]);
+  });
+
+  test("extracts classes from dynamic expressions", () => {
+    const result = extractSelectors({
+      code: "<div class=\"{dynamic} static-class {condition ? 'bx--active' : ''}\"></div>",
+      filename: "test.svelte",
+    });
+    expect(result.classes).toEqual([".static-class", ".bx--active"]);
   });
 
   test("extracts global selectors", () => {
     const result = extractSelectors({
-      code: "<style>:global(div) { color: red; }</style>",
+      code: "<style>:global(.bx--global-class) { color: red; }</style>",
       filename: "test.svelte",
     });
-    expect(result.classes).toEqual([".div"]);
+    expect(result.classes).toEqual([".bx--global-class"]);
   });
 
-  test("handles Carbon prefix classes", () => {
-    const result = extractSelectors({
-      code: '<div class="bx--button bx--text"></div>',
-      filename: "test.svelte",
-    });
-    expect(result.classes).toEqual([".bx--button", ".bx--text"]);
-  });
-
-  test("deduplicates repeated classes", () => {
-    const result = extractSelectors({
-      code: '<div class="test test test"></div>',
-      filename: "test.svelte",
-    });
-    expect(result.classes).toEqual([".test"]);
-  });
-
-  test("handles mixed scenarios", () => {
+  test("extracts component references", () => {
     const result = extractSelectors({
       code: `
-        <div class="regular-class bx--carbon-class">
-          <span class:active={isActive}></span>
-          <style>:global(body) { margin: 0; }</style>
-        </div>
+        <script>
+          import { Button, Modal } from 'carbon-components-svelte';
+        </script>
+        <Button />
+        <Modal />
+        <svelte:component this={DynamicComponent} />
       `,
       filename: "test.svelte",
     });
-    expect(result.classes).toEqual([
-      ".regular-class",
-      ".bx--carbon-class",
-      ".active",
-    ]);
+    expect(result.components).toEqual(["Button", "Modal", "DynamicComponent"]);
   });
 
-  test("handles empty class attributes", () => {
+  test("handles template literals with Carbon classes", () => {
     const result = extractSelectors({
-      code: '<div class=""></div>',
+      code: `
+        <script>
+          const className = \`bx--template-class\`;
+        </script>
+        <div class={className}></div>
+      `,
+      filename: "test.svelte",
+    });
+    expect(result.classes).toEqual([".bx--template-class"]);
+  });
+
+  test("deduplicates classes and components", () => {
+    const result = extractSelectors({
+      code: `
+        <div class="duplicate duplicate bx--duplicate bx--duplicate"></div>
+        <Button />
+        <Button />
+      `,
+      filename: "test.svelte",
+    });
+    expect(result.classes).toEqual([".duplicate", ".bx--duplicate"]);
+    expect(result.components).toEqual(["Button"]);
+  });
+
+  test("handles empty and whitespace-only classes", () => {
+    const result = extractSelectors({
+      code: '<div class="   "></div>',
       filename: "test.svelte",
     });
     expect(result.classes).toEqual([]);
-  });
-
-  test("handles inline components", () => {
-    const result = extractSelectors({
-      code: "<div><Test /><Component /></div>",
-      filename: "test.svelte",
-    });
-    expect(result.components).toEqual(["Test", "Component"]);
   });
 });
