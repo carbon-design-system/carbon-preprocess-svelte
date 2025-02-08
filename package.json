@@ -12,7 +12,7 @@
     "build:prune-package": "bunx culls",
     "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
-    "format": "bun --bun prettier --write . --cache",
+    "format": "bunx biome check --write .",
     "upgrade-examples": "bun scripts/upgrade-examples.ts"
   },
   "dependencies": {
@@ -22,11 +22,11 @@
     "postcss-discard-empty": "^7.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@types/bun": "latest",
     "@types/jest": "latest",
     "carbon-components-svelte": "0.87.0",
     "culls": "latest",
-    "prettier": "latest",
     "svelte": "^5.19.9",
     "typescript": "latest",
     "vite": "latest",
@@ -47,10 +47,6 @@
     "optimize imports",
     "optimize CSS"
   ],
-  "files": [
-    "dist"
-  ],
-  "maintainers": [
-    "Eric Liu (https://github.com/metonym)"
-  ]
+  "files": ["dist"],
+  "maintainers": ["Eric Liu (https://github.com/metonym)"]
 }

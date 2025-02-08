@@ -113,7 +113,6 @@ await Bun.write(
   `// @generated
 // This file was automatically generated and should not be edited.
 // @see scripts/index-components.ts
-// prettier-ignore
 
 export const components: Record<string, { path: string; classes: string[]; }> = Object.freeze(${JSON.stringify(
     components,
