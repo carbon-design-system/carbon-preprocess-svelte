@@ -6,7 +6,7 @@
       "dependencies": {
         "estree-walker": "^2.0.2",
         "magic-string": "^0.30.17",
-        "postcss": "^8.5.2",
+        "postcss": "^8.5.3",
         "postcss-discard-empty": "^7.0.0",
       },
       "devDependencies": {
@@ -15,7 +15,7 @@
         "@types/jest": "latest",
         "carbon-components-svelte": "0.87.0",
         "culls": "latest",
-        "svelte": "^5.20.1",
+        "svelte": "^5.20.5",
         "typescript": "latest",
         "vite": "latest",
         "webpack": "latest",
