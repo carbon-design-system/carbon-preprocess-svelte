@@ -32,7 +32,7 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
       if (/node_modules/.test(filename)) return;
 
       // Wrap the content in a `<script>` tag to parse it with the Svelte parser.
-      const content = `<script>${raw}</script>`;
+      const content = `<script lang="ts">${raw}</script>`;
       const s = new MagicString(content);
 
       walk(parse(content), {
@@ -60,7 +60,7 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
         },
       });
 
-      s.replace(/^<script>/, "");
+      s.replace(/^<script lang="ts">/, "");
       s.replace(/<\/script>$/, "");
 
       return {
