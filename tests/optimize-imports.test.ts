@@ -138,4 +138,18 @@ import Analytics from "carbon-pictograms-svelte/lib/Analytics.svelte";`);
           import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
         `);
   });
+
+  test("import type statements should be preserved", () => {
+    expect(
+      preprocess({
+        content: `
+          import { Theme } from "carbon-components-svelte";
+          import type { CarbonTheme } from "carbon-components-svelte/src/Theme/Theme.svelte";
+        `,
+      }),
+    ).toEqual(`
+          import Theme from "carbon-components-svelte/src/Theme/Theme.svelte";
+          import type { CarbonTheme } from "carbon-components-svelte/src/Theme/Theme.svelte";
+        `);
+  });
 });
