@@ -13,6 +13,8 @@
     "mini-css-extract-plugin": "latest",
     "svelte": "^5.20.5",
     "svelte-loader": "latest",
+    "svelte-preprocess": "latest",
+    "typescript": "latest",
     "webpack": "latest",
     "webpack-cli": "latest",
     "webpack-dev-server": "latest"
