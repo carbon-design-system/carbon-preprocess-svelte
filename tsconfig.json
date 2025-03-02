@@ -2,6 +2,8 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "erasableSyntaxOnly": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "target": "ESNext",
     "module": "ESNext",
     "lib": ["ESNext"],
