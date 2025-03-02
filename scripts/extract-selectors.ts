@@ -69,9 +69,7 @@ export function extractSelectors(props: ExtractSelectorsProps) {
   const classes: string[] = [];
 
   // Iterate through all class attribute identifiers
-  for (const [v = "", { type, name }] of selectors) {
-    const value = v.trim();
-
+  for (const [v = ""] of selectors) {
     if (typeof v === "string") {
       const value = v.trim();
 
