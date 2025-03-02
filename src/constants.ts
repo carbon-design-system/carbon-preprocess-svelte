@@ -1,8 +1,8 @@
-export enum CarbonSvelte {
-  Components = "carbon-components-svelte",
-  Icons = "carbon-icons-svelte",
-  Pictograms = "carbon-pictograms-svelte",
-}
+export const CarbonSvelte = {
+  Components: "carbon-components-svelte",
+  Icons: "carbon-icons-svelte",
+  Pictograms: "carbon-pictograms-svelte",
+} as const;
 
 export const CARBON_PREFIX = /bx--/;
 
