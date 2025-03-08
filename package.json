@@ -27,7 +27,7 @@
     "@types/jest": "latest",
     "carbon-components-svelte": "0.87.0",
     "culls": "latest",
-    "svelte": "^5.20.5",
+    "svelte": "^5.22.6",
     "typescript": "latest",
     "vite": "latest",
     "webpack": "latest"
