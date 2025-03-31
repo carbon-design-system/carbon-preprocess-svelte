@@ -22,12 +22,12 @@
     "postcss-discard-empty": "^7.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@types/bun": "latest",
+    "@biomejs/biome": "1.9.4",
+    "@types/bun": "1.2.6",
     "@types/jest": "latest",
     "carbon-components-svelte": "0.87.0",
     "culls": "latest",
-    "svelte": "^5.23.0",
+    "svelte": "^5.25.3",
     "typescript": "latest",
     "vite": "latest",
     "webpack": "latest"
