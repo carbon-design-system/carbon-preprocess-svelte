@@ -3,7 +3,7 @@
 import "carbon-components-svelte/css/g100.css";
 import { DataTable } from "carbon-components-svelte";
 
-let tableProps = {
+const tableProps = {
   sortable: true,
   selectable: true,
 };
