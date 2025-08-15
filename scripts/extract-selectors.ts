@@ -29,7 +29,7 @@ export function extractSelectors(props: ExtractSelectorsProps) {
         // class="c1"
         // class="c1 c2"
         // class="{c} c1 c2 c3"
-        node.value?.map((value: ANode) => {
+        node.value?.forEach((value: ANode) => {
           if (value.type === "Text") {
             for (const selector of value.data.split(/\s+/).filter(Boolean)) {
               selectors.set(selector, { type: node.type });
