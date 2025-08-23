@@ -250,7 +250,7 @@ optimizeCss({
    * retain *all* IBM Plex `@font-face` rules.
    * @default false
    */
-  preserveAllIBMFonts: false,
+  preserveAllIBMFonts: true,
 });
 ```
 
