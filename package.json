@@ -27,10 +27,10 @@
     "@types/jest": "latest",
     "carbon-components-svelte": "0.87.0",
     "culls": "latest",
-    "svelte": "^5.38.1",
+    "svelte": "^5.38.3",
     "typescript": "^5.9.2",
-    "vite": "7.1.2",
-    "webpack": "^5.101.2"
+    "vite": "7.1.3",
+    "webpack": "^5.101.3"
   },
   "repository": {
     "type": "git",
