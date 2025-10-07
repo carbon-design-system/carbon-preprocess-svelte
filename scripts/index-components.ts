@@ -2,9 +2,9 @@ import path from "node:path";
 import { Glob } from "bun";
 import { walk } from "estree-walker";
 import { parse } from "svelte/compiler";
-import { CarbonSvelte } from "../src/constants";
-import { isSvelteFile } from "../src/utils";
-import { extractSelectors } from "./extract-selectors";
+import { CarbonSvelte } from "../src/constants.ts";
+import { isSvelteFile } from "../src/utils.ts";
+import { extractSelectors } from "./extract-selectors.ts";
 
 const carbon_path = path.join("node_modules", CarbonSvelte.Components);
 const index_js = path.join(carbon_path, "src/index.js");

@@ -1,6 +1,6 @@
 import type { Compiler } from "webpack";
-import { CarbonSvelte } from "../src/constants";
-import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
+import { CarbonSvelte } from "../src/constants.ts";
+import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin.ts";
 
 // Mock webpack compiler and related types
 const createMockCompiler = (

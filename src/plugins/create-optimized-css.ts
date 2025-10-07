@@ -1,8 +1,8 @@
 import path from "node:path";
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
-import { components } from "../component-index";
-import { CARBON_PREFIX } from "../constants";
+import { components } from "../component-index.ts";
+import { CARBON_PREFIX } from "../constants.ts";
 
 export type OptimizeCssOptions = {
   /**

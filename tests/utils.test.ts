@@ -1,5 +1,5 @@
-import { CarbonSvelte } from "../src/constants";
-import { isCarbonSvelteImport, isCssFile, isSvelteFile } from "../src/utils";
+import { CarbonSvelte } from "../src/constants.ts";
+import { isCarbonSvelteImport, isCssFile, isSvelteFile } from "../src/utils.ts";
 
 describe("isSvelteFile", () => {
   test("returns true for .svelte files", () => {

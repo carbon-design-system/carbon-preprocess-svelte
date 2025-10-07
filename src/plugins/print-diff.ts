@@ -1,4 +1,4 @@
-import { BITS_DENOM } from "../constants";
+import { BITS_DENOM } from "../constants.ts";
 
 const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractSelectors } from "../scripts/extract-selectors";
+import { extractSelectors } from "../scripts/extract-selectors.ts";
 
 describe("extractSelectors", () => {
   test("extracts single class from class attribute", () => {

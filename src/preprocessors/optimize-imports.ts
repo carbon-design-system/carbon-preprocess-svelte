@@ -3,8 +3,8 @@ import { walk } from "estree-walker";
 import MagicString from "magic-string";
 import { parse } from "svelte/compiler";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
-import { components } from "../component-index";
-import { CarbonSvelte } from "../constants";
+import { components } from "../component-index.ts";
+import { CarbonSvelte } from "../constants.ts";
 
 function rewriteImport(
   s: MagicString,

@@ -1,8 +1,8 @@
 import type { Compiler } from "webpack";
-import { isCarbonSvelteImport, isCssFile } from "../utils";
-import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createOptimizedCss } from "./create-optimized-css";
-import { printDiff } from "./print-diff";
+import { isCarbonSvelteImport, isCssFile } from "../utils.ts";
+import type { OptimizeCssOptions } from "./create-optimized-css.ts";
+import { createOptimizedCss } from "./create-optimized-css.ts";
+import { printDiff } from "./print-diff.ts";
 
 // Webpack plugin to optimize CSS for Carbon Svelte components.
 class OptimizeCssPlugin {

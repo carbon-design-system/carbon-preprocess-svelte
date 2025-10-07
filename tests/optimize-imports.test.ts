@@ -1,4 +1,4 @@
-import { optimizeImports } from "carbon-preprocess-svelte";
+import { optimizeImports } from "carbon-preprocess-svelte/index.ts";
 import type { Preprocessor, Processed } from "svelte/compiler";
 
 const preprocess = (options?: Partial<Parameters<Preprocessor>[0]>) => {

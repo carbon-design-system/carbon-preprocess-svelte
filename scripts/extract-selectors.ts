@@ -1,6 +1,6 @@
 import { type ANode, walk } from "estree-walker";
 import { parse } from "svelte/compiler";
-import { CARBON_PREFIX } from "../src/constants";
+import { CARBON_PREFIX } from "../src/constants.ts";
 
 type ExtractSelectorsProps = {
   code: string;

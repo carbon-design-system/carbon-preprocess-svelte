@@ -1,4 +1,4 @@
-import { CarbonSvelte, RE_EXT_CSS, RE_EXT_SVELTE } from "./constants";
+import { CarbonSvelte, RE_EXT_CSS, RE_EXT_SVELTE } from "./constants.ts";
 
 export function isSvelteFile(id: string): id is `${string}.svelte` {
   return RE_EXT_SVELTE.test(id);
