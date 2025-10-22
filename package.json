@@ -22,7 +22,7 @@
     "postcss-discard-empty": "^7.0.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.6",
+    "@biomejs/biome": "2.2.7",
     "@types/bun": "latest",
     "@types/jest": "latest",
     "carbon-components-svelte": "0.87.0",
