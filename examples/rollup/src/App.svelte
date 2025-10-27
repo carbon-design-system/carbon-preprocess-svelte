@@ -1,12 +1,12 @@
 <script>
-// @ts-check
-import "carbon-components-svelte/css/g100.css";
-import { DataTable } from "carbon-components-svelte";
+  // @ts-check
+  import "carbon-components-svelte/css/g100.css";
+  import { DataTable } from "carbon-components-svelte";
 
-const tableProps = {
-  sortable: true,
-  selectable: true,
-};
+  const tableProps = {
+    sortable: true,
+    selectable: true,
+  };
 </script>
   
   <DataTable

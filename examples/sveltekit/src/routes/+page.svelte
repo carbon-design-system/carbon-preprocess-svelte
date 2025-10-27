@@ -1,12 +1,12 @@
 <script lang="ts">
-import "carbon-components-svelte/css/g100.css";
-import { DataTable } from "carbon-components-svelte";
-import type { DataTableProps } from "carbon-components-svelte/src/DataTable/DataTable.svelte";
+  import "carbon-components-svelte/css/g100.css";
+  import { DataTable } from "carbon-components-svelte";
+  import type { DataTableProps } from "carbon-components-svelte/src/DataTable/DataTable.svelte";
 
-const tableProps: DataTableProps = {
-  sortable: true,
-  selectable: true,
-};
+  const tableProps: DataTableProps = {
+    sortable: true,
+    selectable: true,
+  };
 </script>
   
   <DataTable

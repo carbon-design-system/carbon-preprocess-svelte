@@ -20,6 +20,11 @@
     "attributePosition": "multiline",
     "indentStyle": "space"
   },
+  "html": {
+    "formatter": {
+      "indentScriptAndStyle": true
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
