@@ -8,7 +8,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
-    "build": "bun --bun tsc -p tsconfig.build.json",
+    "build": "bun tsgo -p tsconfig.build.json",
     "build:prune-package": "bunx culls",
     "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
@@ -25,10 +25,10 @@
     "@biomejs/biome": "2.3.2",
     "@types/bun": "latest",
     "@types/jest": "latest",
+    "@typescript/native-preview": "^7.0.0-dev.20251031.1",
     "carbon-components-svelte": "0.90.1",
     "culls": "latest",
     "svelte": "^5.39.9",
-    "typescript": "^5.9.3",
     "vite": "7.1.4",
     "webpack": "^5.102.0"
   },
