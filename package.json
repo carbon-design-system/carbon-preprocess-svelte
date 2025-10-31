@@ -25,7 +25,7 @@
     "@biomejs/biome": "2.3.2",
     "@types/bun": "latest",
     "@types/jest": "latest",
-    "carbon-components-svelte": "0.87.0",
+    "carbon-components-svelte": "0.90.1",
     "culls": "latest",
     "svelte": "^5.39.9",
     "typescript": "^5.9.3",
