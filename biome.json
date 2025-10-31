@@ -28,7 +28,19 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "bun:test": {
+                "message": "bun:test imports are unnecessary."
+              }
+            }
+          }
+        }
+      }
     }
   },
   "overrides": [
