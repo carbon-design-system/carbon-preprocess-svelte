@@ -1,4 +1,3 @@
-import { describe, expect, test } from "bun:test";
 import { extractSelectors } from "../scripts/extract-selectors";
 
 describe("extractSelectors", () => {
