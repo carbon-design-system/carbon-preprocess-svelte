@@ -13,7 +13,7 @@
         "@biomejs/biome": "2.3.2",
         "@types/bun": "latest",
         "@types/jest": "latest",
-        "carbon-components-svelte": "0.87.0",
+        "carbon-components-svelte": "0.90.1",
         "culls": "latest",
         "svelte": "^5.39.9",
         "typescript": "^5.9.3",
@@ -257,7 +257,7 @@
 
     "caniuse-lite": ["caniuse-lite@1.0.30001748", "", {}, "sha512-5P5UgAr0+aBmNiplks08JLw+AW/XG/SurlgZLgB1dDLfAw7EfRGxIwzPHxdSCGY/BTKDqIVyJL87cCN6s0ZR0w=="],
 
-    "carbon-components-svelte": ["carbon-components-svelte@0.87.0", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-c4wPLzVFlPPsLSqNLvQjP3e/1Fq+01sN7EiA9uh17qsHZS2agRCXa0Qp8xhE98JKENAwVJTT5e08gIjxIXPI+Q=="],
+    "carbon-components-svelte": ["carbon-components-svelte@0.90.1", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-Qnwxf43aVxI08Jrw+WYoYkr0WRIVBnCIDlvyxlILE9OM7YBK7KWDUksdgx0eVEXttd0jHjTYihl/7+7c0XE/yA=="],
 
     "chalk": ["chalk@4.1.2", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA=="],
 
