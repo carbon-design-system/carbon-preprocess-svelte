@@ -21,6 +21,7 @@
     "indentStyle": "space"
   },
   "html": {
+    "experimentalFullSupportEnabled": true,
     "formatter": {
       "indentScriptAndStyle": true
     }
