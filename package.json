@@ -12,7 +12,8 @@
     "build:prune-package": "bunx culls",
     "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
-    "format": "bunx biome check --write .",
+    "lint": "biome lint .",
+    "lint:fix": "biome check --write --unsafe .",
     "upgrade-examples": "bun scripts/upgrade-examples.ts"
   },
   "dependencies": {
