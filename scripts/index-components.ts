@@ -109,13 +109,16 @@ const components = Object.fromEntries(
   ),
 );
 
+const isBuild = process.env.BUILD === "true";
+const jsonString = isBuild
+  ? JSON.stringify(components)
+  : JSON.stringify(components, null, 2);
+
 await Bun.write(
   "src/component-index.ts",
   `// @generated
 // This file was automatically generated and should not be edited.
 // @see scripts/index-components.ts
 
-export const components: Record<string, { path: string; classes: string[]; }> = Object.freeze(${JSON.stringify(
-    components,
-  )});\n`,
+export const components: Record<string, { path: string; classes: string[]; }> = Object.freeze(${jsonString});\n`,
 );

@@ -8,6 +8,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
+    "prebuild": "BUILD=true bun run index:components",
     "build": "tsgo -p tsconfig.build.json",
     "build:prune-package": "bunx culls",
     "test": "bun test",
