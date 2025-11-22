@@ -8,7 +8,7 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/build", "!**/dist", "!**/.svelte-kit"]
+    "includes": ["**", "!!**/build", "!!**/dist", "!!**/.svelte-kit"]
   },
   "formatter": {
     "attributePosition": "multiline",
