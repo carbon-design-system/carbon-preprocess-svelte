@@ -1727,6 +1727,27 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--slider__thumb",
       ],
     },
+    Stack: {
+      path: "carbon-components-svelte/src/Stack/Stack.svelte",
+      classes: [
+        ".bx--stack",
+        ".bx--stack-vertical",
+        ".bx--stack-horizontal",
+        ".bx--stack-scale-1",
+        ".bx--stack-scale-2",
+        ".bx--stack-scale-3",
+        ".bx--stack-scale-4",
+        ".bx--stack-scale-5",
+        ".bx--stack-scale-6",
+        ".bx--stack-scale-7",
+        ".bx--stack-scale-8",
+        ".bx--stack-scale-9",
+        ".bx--stack-scale-10",
+        ".bx--stack-scale-11",
+        ".bx--stack-scale-12",
+        ".bx--stack-scale-13",
+      ],
+    },
     StructuredList: {
       path: "carbon-components-svelte/src/StructuredList/StructuredList.svelte",
       classes: [
