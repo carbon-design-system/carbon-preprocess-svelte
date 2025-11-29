@@ -1161,6 +1161,23 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--inline-notification__icon",
       ],
     },
+    NotificationQueue: {
+      path: "carbon-components-svelte/src/Notification/NotificationQueue.svelte",
+      classes: [
+        ".bx--toast-notification",
+        ".bx--toast-notification--low-contrast",
+        ".bx--toast-notification--error",
+        ".bx--toast-notification--info",
+        ".bx--toast-notification--info-square",
+        ".bx--toast-notification--success",
+        ".bx--toast-notification--warning",
+        ".bx--toast-notification--warning-alt",
+        ".bx--toast-notification__details",
+        ".bx--toast-notification__title",
+        ".bx--toast-notification__subtitle",
+        ".bx--toast-notification__caption",
+      ],
+    },
     NumberInput: {
       path: "carbon-components-svelte/src/NumberInput/NumberInput.svelte",
       classes: [
@@ -1609,6 +1626,10 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--tile__checkmark",
         ".bx--tile-content",
       ],
+    },
+    SelectableTileGroup: {
+      path: "carbon-components-svelte/src/Tile/SelectableTileGroup.svelte",
+      classes: [".bx--tile-group", ".bx--label"],
     },
     SelectItem: {
       path: "carbon-components-svelte/src/Select/SelectItem.svelte",
