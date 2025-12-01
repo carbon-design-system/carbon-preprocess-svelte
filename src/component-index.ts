@@ -1436,6 +1436,10 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--popover-contents",
       ],
     },
+    Portal: {
+      path: "carbon-components-svelte/src/Portal/Portal.svelte",
+      classes: [],
+    },
     ProgressBar: {
       path: "carbon-components-svelte/src/ProgressBar/ProgressBar.svelte",
       classes: [
