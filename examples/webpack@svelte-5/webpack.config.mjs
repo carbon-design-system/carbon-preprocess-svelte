@@ -1,11 +1,9 @@
 // @ts-check
 import path from "node:path";
-import carbonPreprocess from "carbon-preprocess-svelte";
+import { OptimizeCssPlugin, optimizeImports } from "carbon-preprocess-svelte";
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
 import { sveltePreprocess } from "svelte-preprocess";
-
-const { optimizeImports, OptimizeCssPlugin } = carbonPreprocess;
 
 /** @type {"development" | "production"} */
 const NODE_ENV =

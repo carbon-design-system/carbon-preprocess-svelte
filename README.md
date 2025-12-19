@@ -130,10 +130,10 @@ export default {
 This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
 
 ```js
-// webpack.config.js
-const { optimizeImports } = require("carbon-preprocess-svelte");
+// webpack.config.mjs
+import { optimizeImports } from "carbon-preprocess-svelte";
 
-module.exports = {
+export default {
   module: {
     rules: [
       {
@@ -261,12 +261,12 @@ For Webpack users, `OptimizeCssPlugin` is a drop-in replacement for `optimizeCss
 This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
 
 ```js
-// webpack.config.js
-const { OptimizeCssPlugin } = require("carbon-preprocess-svelte");
+// webpack.config.mjs
+import { OptimizeCssPlugin } from "carbon-preprocess-svelte";
 
 const PROD = process.env.NODE_ENV === "production";
 
-module.exports = {
+export default {
   plugins: [
     // Only apply the plugin when building for production.
     PROD && new OptimizeCssPlugin(),
