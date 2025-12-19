@@ -4,12 +4,20 @@
   "license": "Apache-2.0",
   "description": "Svelte preprocessors for the Carbon Design System",
   "author": "Eric Liu (https://github.com/metonym)",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
     "prebuild": "BUILD=true bun run index:components",
-    "build": "tsgo -p tsconfig.build.json",
+    "build": "bun scripts/build.ts",
     "build:prune-package": "bunx culls",
     "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
