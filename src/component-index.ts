@@ -319,6 +319,38 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--modal-container--lg",
       ],
     },
+    ContainedList: {
+      path: "carbon-components-svelte/src/ContainedList/ContainedList.svelte",
+      classes: [
+        ".bx--contained-list",
+        ".bx--contained-list--inset-rulers",
+        ".bx--contained-list--sm",
+        ".bx--contained-list--md",
+        ".bx--contained-list--lg",
+        ".bx--contained-list--xl",
+        ".bx--layout--size-sm",
+        ".bx--layout--size-md",
+        ".bx--layout--size-lg",
+        ".bx--layout--size-xl",
+        ".bx--contained-list--on-page",
+        ".bx--contained-list--disclosed",
+        ".bx--contained-list__header",
+        ".bx--contained-list__label",
+        ".bx--contained-list__action",
+      ],
+    },
+    ContainedListItem: {
+      path: "carbon-components-svelte/src/ContainedList/ContainedListItem.svelte",
+      classes: [
+        ".bx--contained-list-item",
+        ".bx--contained-list-item--clickable",
+        ".bx--contained-list-item--with-icon",
+        ".bx--contained-list-item--with-action",
+        ".bx--contained-list-item__content",
+        ".bx--contained-list-item__icon",
+        ".bx--contained-list-item__action",
+      ],
+    },
     Content: {
       path: "carbon-components-svelte/src/UIShell/Content.svelte",
       classes: [".bx--content"],
@@ -856,6 +888,10 @@ export const components: Record<string, { path: string; classes: string[] }> =
     HeaderUtilities: {
       path: "carbon-components-svelte/src/UIShell/HeaderUtilities.svelte",
       classes: [".bx--header__global"],
+    },
+    Heading: {
+      path: "carbon-components-svelte/src/Heading/Heading.svelte",
+      classes: [],
     },
     ImageLoader: {
       path: "carbon-components-svelte/src/ImageLoader/ImageLoader.svelte",
@@ -1616,6 +1652,10 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--search-input",
       ],
     },
+    Section: {
+      path: "carbon-components-svelte/src/Heading/Section.svelte",
+      classes: [],
+    },
     Select: {
       path: "carbon-components-svelte/src/Select/Select.svelte",
       classes: [
@@ -1758,10 +1798,14 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--slider__thumb",
         ".bx--slider__track",
         ".bx--slider__filled-track",
+        ".bx--slider-text-input-wrapper",
+        ".bx--slider__invalid-icon",
+        ".bx--slider__invalid-icon--warning",
         ".bx--text-input",
         ".bx--slider-text-input",
         ".bx--text-input--light",
         ".bx--text-input--invalid",
+        ".bx--slider-text-input--warn",
         ".bx--slider__validation-msg",
         ".bx--slider__validation-msg--invalid",
         ".bx--form-requirement",
