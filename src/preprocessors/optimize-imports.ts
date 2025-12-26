@@ -43,8 +43,13 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
             switch (import_name) {
               case CarbonSvelte.Components:
                 rewriteImport(s, node, ({ imported, local }) => {
+                  // Use index if available for backwards compatibility with special paths, like .js files.
+                  // Otherwise, use optimistic path for new components.
                   const import_path = components[imported.name]?.path;
-                  if (!import_path) return "";
+                  if (!import_path) {
+                    return `import ${local.name} from "${import_name}/src/${imported.name}/${imported.name}.svelte";`;
+                  }
+
                   return `import ${local.name} from "${import_path}";`;
                 });
                 break;
