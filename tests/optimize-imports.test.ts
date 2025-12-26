@@ -53,12 +53,14 @@ import Airplane2 from "carbon-pictograms-svelte/lib/Airplane.svelte";
 import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`);
   });
 
-  test("invalid imports should fail open", () => {
+  test("invalid imports should be optimistic", () => {
     expect(
       preprocess({
         content: "import { NonExistent } from 'carbon-components-svelte'",
       }),
-    ).toEqual("import { NonExistent } from 'carbon-components-svelte'");
+    ).toEqual(
+      'import NonExistent from "carbon-components-svelte/src/NonExistent/NonExistent.svelte";',
+    );
   });
 
   test("mixed imports should be handled correctly", () => {
@@ -151,5 +153,26 @@ import Analytics from "carbon-pictograms-svelte/lib/Analytics.svelte";`);
           import Theme from "carbon-components-svelte/src/Theme/Theme.svelte";
           import type { CarbonTheme } from "carbon-components-svelte/src/Theme/Theme.svelte";
         `);
+  });
+
+  test("backward compatibility with various export patterns", () => {
+    expect(
+      preprocess({
+        content: `import { Accordion, AccordionItem, AccordionSkeleton } from "carbon-components-svelte";
+import { breakpointObserver, breakpoints } from "carbon-components-svelte";
+import { ContainedList, ContainedListItem } from "carbon-components-svelte";
+import { filterTreeNodes, toHierarchy } from "carbon-components-svelte";
+import { NewComponent } from "carbon-components-svelte";`,
+      }),
+    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
+import AccordionSkeleton from "carbon-components-svelte/src/Accordion/AccordionSkeleton.svelte";
+import breakpointObserver from "carbon-components-svelte/src/Breakpoint/breakpointObserver.js";
+import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
+import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedList.svelte";
+import ContainedListItem from "carbon-components-svelte/src/ContainedList/ContainedListItem.svelte";
+import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";
+import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
+import NewComponent from "carbon-components-svelte/src/NewComponent/NewComponent.svelte";`);
   });
 });
