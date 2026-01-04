@@ -48,8 +48,7 @@
             "noUnusedVariables": "off"
           },
           "style": {
-            "useConst": "off",
-            "useImportType": "off"
+            "useConst": "off"
           }
         }
       }
