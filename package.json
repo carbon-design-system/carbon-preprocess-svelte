@@ -6,6 +6,12 @@
   "author": "Eric Liu (https://github.com/metonym)",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "index:components": "bun scripts/index-components.ts",
     "prebuild": "BUILD=true bun run index:components",
