@@ -71,6 +71,22 @@ Rebuilding the project in watch mode will automatically update the linked exampl
 bun run build -w
 ```
 
+### End-to-end tests
+
+The e2e tests build all examples and verify that CSS optimization results match expected snapshots. This guards against regressions.
+
+```sh
+bun run test:e2e
+```
+
+Snapshots are stored in `tests/__snapshots__/e2e.json` and track before/after file sizes and reduction percentages.
+
+If the CSS optimization improves (a progression), update the snapshots:
+
+```sh
+bun run test:e2e:update
+```
+
 ## Submitting a Pull Request
 
 ### Sync Your Fork
