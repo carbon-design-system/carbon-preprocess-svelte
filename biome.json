@@ -33,6 +33,21 @@
         "noReExportAll": "error",
         "useTopLevelRegex": "error"
       },
+      "complexity": {
+        "noCommaOperator": "error",
+        "noForEach": "error",
+        "noUselessConstructor": "error",
+        "noUselessEmptyExport": "error",
+        "noUselessFragments": "error",
+        "noUselessLabel": "error",
+        "noUselessLoneBlockStatements": "error",
+        "noUselessRename": "error",
+        "noUselessSwitchCase": "error",
+        "noUselessTypeConstraint": "error",
+        "useArrowFunction": "error",
+        "useLiteralKeys": "error",
+        "noImportantStyles": "error"
+      },
       "style": {
         "noRestrictedImports": {
           "level": "error",
