@@ -6,6 +6,10 @@ import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { components } from "../component-index";
 import { CarbonSvelte } from "../constants";
 
+const NODE_MODULES_REGEX = /node_modules/;
+const SCRIPT_OPEN_TAG_REGEX = /^<script lang="ts">/;
+const SCRIPT_CLOSE_TAG_REGEX = /<\/script>$/;
+
 function rewriteImport(
   s: MagicString,
   node: ImportDeclaration,
@@ -29,7 +33,7 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
     script({ filename, content: raw }) {
       // Skip files in node_modules to minimize unnecessary preprocessing
       if (!filename) return;
-      if (/node_modules/.test(filename)) return;
+      if (NODE_MODULES_REGEX.test(filename)) return;
 
       // Wrap the content in a `<script>` tag to parse it with the Svelte parser.
       const content = `<script lang="ts">${raw}</script>`;
@@ -65,8 +69,8 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
         },
       });
 
-      s.replace(/^<script lang="ts">/, "");
-      s.replace(/<\/script>$/, "");
+      s.replace(SCRIPT_OPEN_TAG_REGEX, "");
+      s.replace(SCRIPT_CLOSE_TAG_REGEX, "");
 
       return {
         code: s.toString(),
