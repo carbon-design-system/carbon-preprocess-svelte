@@ -2,6 +2,9 @@ import { type ANode, walk } from "estree-walker";
 import { parse } from "svelte/compiler";
 import { CARBON_PREFIX } from "../src/constants";
 
+const WHITESPACE_REGEX = /\s+/;
+const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
+
 type ExtractSelectorsProps = {
   code: string;
   filename: string;
@@ -31,7 +34,9 @@ export function extractSelectors(props: ExtractSelectorsProps) {
         // class="{c} c1 c2 c3"
         node.value?.forEach((value: ANode) => {
           if (value.type === "Text") {
-            for (const selector of value.data.split(/\s+/).filter(Boolean)) {
+            for (const selector of value.data
+              .split(WHITESPACE_REGEX)
+              .filter(Boolean)) {
               selectors.set(selector, { type: node.type });
             }
           }
@@ -49,7 +54,7 @@ export function extractSelectors(props: ExtractSelectorsProps) {
         const selector = code.slice(node.start, node.end);
 
         // Remove :global( from start and ) from end
-        const cleanSelector = selector.replace(/^:global\((.*)\)$/, "$1");
+        const cleanSelector = selector.replace(GLOBAL_SELECTOR_REGEX, "$1");
         selectors.set(cleanSelector, { type: node.type, name: node.name });
       }
 

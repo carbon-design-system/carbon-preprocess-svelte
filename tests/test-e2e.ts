@@ -6,6 +6,11 @@ import { name } from "../package.json";
 const SNAPSHOT_PATH = join(import.meta.dirname, "__snapshots__/e2e.json");
 const UPDATE_SNAPSHOTS = process.env.UPDATE_SNAPSHOTS === "true";
 
+const OPTIMIZED_REGEX = /Optimized\s+(.+\.css)/;
+const BEFORE_REGEX = /Before:\s*([\d,.]+)\s*(kB|MB)/;
+const AFTER_REGEX = /After:\s*([\d,.]+)\s*(kB|MB)\s*\(-?([\d.]+)%\)/;
+const DOUBLE_NEWLINE_REGEX = /\n\n+/;
+
 type OptimizationResult = {
   file: string;
   before_kb: number;
@@ -20,11 +25,9 @@ function parseOptimizationOutput(output: string): OptimizationResult | null {
   // Optimized build/bundle.2d903152c49d244a9e80.css
   // Before: 616.43 kB
   // After:  158.03 kB (-74.36%)
-  const optimizedMatch = output.match(/Optimized\s+(.+\.css)/);
-  const beforeMatch = output.match(/Before:\s*([\d,.]+)\s*(kB|MB)/);
-  const afterMatch = output.match(
-    /After:\s*([\d,.]+)\s*(kB|MB)\s*\(-?([\d.]+)%\)/,
-  );
+  const optimizedMatch = output.match(OPTIMIZED_REGEX);
+  const beforeMatch = output.match(BEFORE_REGEX);
+  const afterMatch = output.match(AFTER_REGEX);
 
   if (!optimizedMatch || !beforeMatch || !afterMatch) {
     return null;
@@ -128,6 +131,70 @@ Run with UPDATE_SNAPSHOTS=true to update.`,
   return { passed: true, message: "OK" };
 }
 
+async function buildExample(
+  dir: string,
+  snapshots: Snapshots,
+  newSnapshots: Snapshots,
+): Promise<{ example: string; passed: boolean; message: string }> {
+  const exampleName = dir.replace("examples/", "");
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(`Building: ${exampleName}`);
+  console.log("=".repeat(60));
+
+  await $`cd ${dir} && bun link ${name} && bun install`;
+
+  const buildResult = await $`cd ${dir} && bun run build`.text();
+  console.log(buildResult);
+
+  const optimizationBlocks = buildResult
+    .split(DOUBLE_NEWLINE_REGEX)
+    .filter(
+      (block) => block.includes("Optimized") && block.includes("Before:"),
+    );
+
+  if (optimizationBlocks.length === 0) {
+    return {
+      example: exampleName,
+      passed: false,
+      message: "No CSS optimization output found",
+    };
+  }
+
+  const lastBlock = optimizationBlocks[optimizationBlocks.length - 1];
+  const parsed = parseOptimizationOutput(lastBlock);
+
+  if (!parsed) {
+    return {
+      example: exampleName,
+      passed: false,
+      message: "Failed to parse CSS optimization output",
+    };
+  }
+
+  const normalizedResult: OptimizationResult = {
+    file: normalizeFile(parsed.file),
+    before_kb: parsed.before_kb,
+    after_kb: parsed.after_kb,
+    reduction_percent: parsed.reduction_percent,
+  };
+  newSnapshots[exampleName] = normalizedResult;
+
+  if (UPDATE_SNAPSHOTS) {
+    return {
+      example: exampleName,
+      passed: true,
+      message: `Updated: ${normalizedResult.before_kb} kB -> ${normalizedResult.after_kb} kB (-${normalizedResult.reduction_percent}%)`,
+    };
+  }
+
+  const comparison = compareResults(
+    exampleName,
+    parsed,
+    snapshots[exampleName],
+  );
+  return { example: exampleName, ...comparison };
+}
+
 async function main() {
   console.log("Building and linking package...\n");
   await $`bun run build && bun link`;
@@ -142,66 +209,9 @@ async function main() {
   }
 
   for (const dir of examples) {
-    const exampleName = dir.replace("examples/", "");
-    console.log(`\n${"=".repeat(60)}`);
-    console.log(`Building: ${exampleName}`);
-    console.log("=".repeat(60));
-
-    await $`cd ${dir} && bun link ${name}`;
-    await $`cd ${dir} && bun install`;
-
-    const buildResult = await $`cd ${dir} && bun run build`.text();
-    console.log(buildResult);
-
-    const optimizationBlocks = buildResult
-      .split(/\n\n+/)
-      .filter(
-        (block) => block.includes("Optimized") && block.includes("Before:"),
-      );
-
-    if (optimizationBlocks.length === 0) {
-      results.push({
-        example: exampleName,
-        passed: false,
-        message: "No CSS optimization output found",
-      });
-      continue;
-    }
-
-    const lastBlock = optimizationBlocks[optimizationBlocks.length - 1];
-    const parsed = parseOptimizationOutput(lastBlock);
-
-    if (!parsed) {
-      results.push({
-        example: exampleName,
-        passed: false,
-        message: "Failed to parse CSS optimization output",
-      });
-      continue;
-    }
-
-    const normalizedResult: OptimizationResult = {
-      file: normalizeFile(parsed.file),
-      before_kb: parsed.before_kb,
-      after_kb: parsed.after_kb,
-      reduction_percent: parsed.reduction_percent,
-    };
-    newSnapshots[exampleName] = normalizedResult;
-
-    if (UPDATE_SNAPSHOTS) {
-      results.push({
-        example: exampleName,
-        passed: true,
-        message: `Updated: ${normalizedResult.before_kb} kB -> ${normalizedResult.after_kb} kB (-${normalizedResult.reduction_percent}%)`,
-      });
-    } else {
-      const comparison = compareResults(
-        exampleName,
-        parsed,
-        snapshots[exampleName],
-      );
-      results.push({ example: exampleName, ...comparison });
-    }
+    // biome-ignore lint/performance/noAwaitInLoops: build examples sequentially to capture output correctly
+    const result = await buildExample(dir, snapshots, newSnapshots);
+    results.push(result);
   }
 
   console.log(`\n${"=".repeat(60)}`);
