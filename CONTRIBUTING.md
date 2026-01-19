@@ -60,8 +60,9 @@ Example set-ups are located in the `examples` directory:
 - `examples/vite`: Vite
 - `examples/vite@svelte-5`: Vite using Svelte 5
 - `examples/webpack`: Webpack
+- `examples/webpack@svelte-5`: Webpack using Svelte 5
 
-Note that other Svelte frameworks use Vite under the hood (e.g., Astro, Routify).
+Other Svelte frameworks use Vite under the hood (e.g., Astro, Routify), so the Vite examples should be sufficient.
 
 `carbon-preprocess-svelte` is linked locally in these examples, so changes to the package will be reflected in the example projects.
 
