@@ -1,4 +1,4 @@
-import { type ANode, walk } from "estree-walker";
+import { walk } from "estree-walker";
 import { parse } from "svelte/compiler";
 import { CARBON_PREFIX } from "../src/constants";
 
@@ -32,15 +32,17 @@ export function extractSelectors(props: ExtractSelectorsProps) {
         // class="c1"
         // class="c1 c2"
         // class="{c} c1 c2 c3"
-        node.value?.forEach((value: ANode) => {
-          if (value.type === "Text") {
-            for (const selector of value.data
-              .split(WHITESPACE_REGEX)
-              .filter(Boolean)) {
-              selectors.set(selector, { type: node.type });
+        if (node.value) {
+          for (const value of node.value) {
+            if (value.type === "Text") {
+              for (const selector of value.data
+                .split(WHITESPACE_REGEX)
+                .filter(Boolean)) {
+                selectors.set(selector, { type: node.type });
+              }
             }
           }
-        });
+        }
       }
 
       // class:directive
