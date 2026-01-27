@@ -1728,6 +1728,7 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--side-nav--expanded",
         ".bx--side-nav--collapsed",
         ".bx--side-nav--rail",
+        ".bx--body--with-modal-open",
       ],
     },
     SideNavDivider: {
