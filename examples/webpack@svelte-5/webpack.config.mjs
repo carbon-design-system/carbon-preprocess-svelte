@@ -49,7 +49,7 @@ export default {
   },
   mode: NODE_ENV,
   plugins: [
-    PROD && new OptimizeCssPlugin(),
+    new OptimizeCssPlugin(),
     new MiniCssExtractPlugin({
       filename: PROD ? "[name].[chunkhash].css" : "[name].css",
     }),
