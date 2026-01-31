@@ -256,21 +256,16 @@ optimizeCss({
 
 ### `OptimizeCssPlugin`
 
-For Webpack users, `OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`. The plugin API is identical to that of `optimizeCss`.
+For Webpack users, `OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`. The plugin API is identical to that of `optimizeCss`. Similarly, the plugin only runs in production mode.
 
-This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
+This code is abridged; see [examples/webpack](examples/webpack) or [examples/webpack@svelte-5](examples/webpack@svelte-5) for a full set-up.
 
 ```js
 // webpack.config.mjs
 import { OptimizeCssPlugin } from "carbon-preprocess-svelte";
 
-const PROD = process.env.NODE_ENV === "production";
-
 export default {
-  plugins: [
-    // Only apply the plugin when building for production.
-    PROD && new OptimizeCssPlugin(),
-  ],
+  plugins: [new OptimizeCssPlugin()],
 };
 ```
 
