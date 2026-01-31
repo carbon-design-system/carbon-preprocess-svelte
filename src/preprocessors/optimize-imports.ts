@@ -24,7 +24,7 @@ function rewriteImport(
     }
   }
 
-  if (content) s.overwrite(node.start, node.end, content.trimEnd());
+  if (content) s.update(node.start, node.end, content.trimEnd());
 }
 
 /**
@@ -93,8 +93,7 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
         },
       });
 
-      s.replace(SCRIPT_OPEN_TAG_REGEX, "");
-      s.replace(SCRIPT_CLOSE_TAG_REGEX, "");
+      s.replace(SCRIPT_OPEN_TAG_REGEX, "").replace(SCRIPT_CLOSE_TAG_REGEX, "");
 
       return {
         code: s.toString(),
