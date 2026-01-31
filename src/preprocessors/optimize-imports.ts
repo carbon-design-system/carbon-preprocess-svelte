@@ -27,6 +27,26 @@ function rewriteImport(
   if (content) s.overwrite(node.start, node.end, content.trimEnd());
 }
 
+/**
+ * Svelte preprocessor that transforms barrel imports from Carbon libraries
+ * into direct path imports for better tree-shaking and faster builds.
+ *
+ * This avoids loading the entire component index during development,
+ * which can significantly improve HMR performance and build times.
+ * @example
+ * ```ts
+ *   import { Button, Modal } from "carbon-components-svelte";
+ *   import { Add } from "carbon-icons-svelte";
+ *   import { Airplane } from "carbon-pictograms-svelte";
+ * ```
+ * becomes:
+ * ```ts
+ *   import Button from "carbon-components-svelte/src/Button/Button.svelte";
+ *   import Modal from "carbon-components-svelte/src/Modal/Modal.svelte";
+ *   import Add from "carbon-icons-svelte/lib/Add.svelte";
+ *   import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
+ * ```
+ */
 export const optimizeImports: SveltePreprocessor<"script"> = () => {
   return {
     name: "carbon:optimize-imports",
@@ -35,7 +55,11 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
       if (!filename) return;
       if (NODE_MODULES_REGEX.test(filename)) return;
 
-      // Wrap the content in a `<script>` tag to parse it with the Svelte parser.
+      /**
+       * The Svelte compiler's parse() function expects a full Svelte component,
+       * not just a script fragment. Wrap the raw script content in script tags
+       * to make it parseable, then strip the tags from output after transformation.
+       */
       const content = `<script lang="ts">${raw}</script>`;
       const s = new MagicString(content);
 
