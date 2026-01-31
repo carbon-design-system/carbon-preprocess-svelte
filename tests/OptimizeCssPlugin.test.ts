@@ -7,15 +7,18 @@ const createMockCompiler = (
   options: {
     assets?: Record<string, unknown>;
     fileDependencies?: string[];
+    mode?: "production" | "development" | "none";
   } = {},
 ) => {
-  const { assets = {}, fileDependencies = [] } = options;
+  const { assets = {}, fileDependencies = [], mode = "production" } = options;
+
+  let processAssetsPromise: Promise<void> | null = null;
 
   const compilation = {
     hooks: {
       processAssets: {
-        tap: jest.fn((_, callback) => {
-          callback(assets);
+        tapPromise: jest.fn((_, callback) => {
+          processAssetsPromise = callback(assets);
         }),
       },
     },
@@ -31,6 +34,7 @@ const createMockCompiler = (
   };
 
   return {
+    options: { mode },
     hooks: {
       thisCompilation: {
         tap: jest.fn((_, callback) => callback(compilation)),
@@ -38,7 +42,8 @@ const createMockCompiler = (
     },
     webpack: {
       Compilation: {
-        PROCESS_ASSETS_STAGE_DERIVED: "PROCESS_ASSETS_STAGE_DERIVED",
+        PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE:
+          "PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE",
       },
       NormalModule: {
         getCompilationHooks: () => normalModuleHooks,
@@ -49,6 +54,7 @@ const createMockCompiler = (
     },
     compilation,
     normalModuleHooks,
+    waitForProcessAssets: () => processAssetsPromise,
   };
 };
 
@@ -78,6 +84,18 @@ describe("OptimizeCssPlugin", () => {
     });
   });
 
+  test("skips processing in development mode", () => {
+    const plugin = new OptimizeCssPlugin();
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => ".bx--btn { color: blue; }" } },
+      fileDependencies: ["node_modules/carbon-components-svelte/Button.svelte"],
+      mode: "development",
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    expect(mockCompiler.hooks.thisCompilation.tap).not.toHaveBeenCalled();
+  });
+
   test("skips processing if no Carbon Svelte imports are found", () => {
     const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({
@@ -86,11 +104,10 @@ describe("OptimizeCssPlugin", () => {
     });
 
     plugin.apply(asCompiler(mockCompiler));
-
     expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
   });
 
-  test("processes CSS files when Carbon Svelte imports are found", () => {
+  test("processes CSS files when Carbon Svelte imports are found", async () => {
     const plugin = new OptimizeCssPlugin();
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
     const cssContent = ".bx--btn { color: blue; }";
@@ -103,6 +120,7 @@ describe("OptimizeCssPlugin", () => {
     });
 
     plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledWith(
       "styles.css",
@@ -110,7 +128,7 @@ describe("OptimizeCssPlugin", () => {
     );
   });
 
-  test("handles Buffer input correctly", () => {
+  test("handles Buffer input correctly", async () => {
     const plugin = new OptimizeCssPlugin();
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
     const cssContent = Buffer.from(".bx--btn { color: blue; }");
@@ -123,6 +141,7 @@ describe("OptimizeCssPlugin", () => {
     });
 
     plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledWith(
       "styles.css",
@@ -130,7 +149,7 @@ describe("OptimizeCssPlugin", () => {
     );
   });
 
-  test("respects verbose option for printing diff", () => {
+  test("respects verbose option for printing diff", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
     const plugin = new OptimizeCssPlugin({ verbose: true });
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
@@ -143,6 +162,7 @@ describe("OptimizeCssPlugin", () => {
     });
 
     plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
 
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();

@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { AcceptedPlugin } from "postcss";
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import { components } from "../component-index";
@@ -32,26 +33,46 @@ export type OptimizeCssOptions = {
 
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;
-  ids: string[];
+  ids: Iterable<string>;
 };
 
-export function createOptimizedCss(options: CreateOptimizedCssOptions) {
-  const { source, ids } = options;
-  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-
+function buildAllowlist(ids: Iterable<string>): Set<string> {
   // List of Carbon classes that must be preserved in the CSS
   // but that are not referenced in Carbon Svelte components.
-  const css_allowlist = [".bx--body"];
+  const allowlist = new Set([".bx--body"]);
 
   for (const id of ids) {
     const { name } = path.parse(id);
 
     if (name in components) {
-      css_allowlist.push(...components[name].classes);
+      for (const cls of components[name].classes) {
+        allowlist.add(cls);
+      }
     }
   }
 
-  return postcss([
+  return allowlist;
+}
+
+function shouldKeepRule(classes: string[], allowlist: Set<string>): boolean {
+  for (const name of classes) {
+    // Fast path: exact match.
+    if (allowlist.has(name)) return true;
+
+    // Slow path: check if any allowlist item is a substring.
+    // This handles BEM-style suffixes (e.g., .bx--body matches .bx--body__content).
+    for (const selector of allowlist) {
+      if (name.includes(selector)) return true;
+    }
+  }
+  return false;
+}
+
+function createPostcssPlugins(
+  allowlist: Set<string>,
+  preserveAllIBMFonts: boolean,
+): AcceptedPlugin[] {
+  return [
     {
       postcssPlugin: "postcss-plugin:carbon:optimize-css",
       Rule(node) {
@@ -68,20 +89,7 @@ export function createOptimizedCss(options: CreateOptimizedCssOptions) {
             return Boolean(rest);
           });
 
-          let remove_rule = true;
-
-          for (const name of classes) {
-            for (const selector of css_allowlist) {
-              // If at least one class is in the allowlist, keep the rule.
-              // This is a simplistic approach and can be further optimized.
-              if (name.includes(selector)) {
-                remove_rule = false;
-                break;
-              }
-            }
-          }
-
-          if (remove_rule) {
+          if (!shouldKeepRule(classes, allowlist)) {
             node.remove();
           }
         }
@@ -126,5 +134,29 @@ export function createOptimizedCss(options: CreateOptimizedCssOptions) {
       },
     },
     discardEmpty(),
-  ]).process(source).css;
+  ];
+}
+
+export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
+  const { source, ids } = options;
+  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
+  const allowlist = buildAllowlist(ids);
+
+  return postcss(createPostcssPlugins(allowlist, preserveAllIBMFonts)).process(
+    source,
+  ).css;
+}
+
+export async function createOptimizedCssAsync(
+  options: CreateOptimizedCssOptions,
+): Promise<string> {
+  const { source, ids } = options;
+  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
+  const allowlist = buildAllowlist(ids);
+
+  const result = await postcss(
+    createPostcssPlugins(allowlist, preserveAllIBMFonts),
+  ).process(source);
+
+  return result.css;
 }
