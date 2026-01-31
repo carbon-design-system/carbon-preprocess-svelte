@@ -1,7 +1,7 @@
 import type { Compiler } from "webpack";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createOptimizedCss } from "./create-optimized-css";
+import { createOptimizedCssAsync } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
 
 // Webpack plugin to optimize CSS for Carbon Svelte components.
@@ -10,12 +10,17 @@ class OptimizeCssPlugin {
 
   public constructor(options?: OptimizeCssOptions) {
     this.options = {
-      verbose: options?.verbose !== false,
-      preserveAllIBMFonts: options?.preserveAllIBMFonts === true,
+      verbose: true,
+      preserveAllIBMFonts: false,
+      ...options,
     };
   }
 
   public apply(compiler: Compiler) {
+    if (compiler.options.mode !== "production") {
+      return;
+    }
+
     const {
       webpack: {
         Compilation,
@@ -28,43 +33,48 @@ class OptimizeCssPlugin {
       OptimizeCssPlugin.name,
       (compilation) => {
         const hooks = NormalModule.getCompilationHooks(compilation);
-        const ids: string[] = [];
+        const ids = new Set<string>();
 
         hooks.beforeSnapshot.tap(OptimizeCssPlugin.name, ({ buildInfo }) => {
           if (buildInfo?.fileDependencies) {
             for (const id of buildInfo.fileDependencies) {
               if (isCarbonSvelteImport(id)) {
-                ids.push(id);
+                ids.add(id);
               }
             }
           }
         });
 
-        compilation.hooks.processAssets.tap(
+        compilation.hooks.processAssets.tapPromise(
           {
             name: OptimizeCssPlugin.name,
-            stage: Compilation.PROCESS_ASSETS_STAGE_DERIVED,
+            stage: Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE,
           },
-          (assets) => {
+          async (assets) => {
             // Skip processing if no Carbon Svelte imports are found.
-            if (ids.length === 0) return;
+            if (ids.size === 0) return;
 
-            for (const [id] of Object.entries(assets)) {
-              if (isCssFile(id)) {
+            const cssAssetIds = Object.keys(assets).filter(isCssFile);
+
+            const results = await Promise.all(
+              cssAssetIds.map(async (id) => {
                 const original_css = assets[id].source();
-                const optimized_css = createOptimizedCss({
+                const optimized_css = await createOptimizedCssAsync({
                   ...this.options,
                   source: Buffer.isBuffer(original_css)
                     ? original_css.toString()
                     : original_css,
                   ids,
                 });
+                return { id, original_css, optimized_css };
+              }),
+            );
 
-                compilation.updateAsset(id, new RawSource(optimized_css));
+            for (const { id, original_css, optimized_css } of results) {
+              compilation.updateAsset(id, new RawSource(optimized_css));
 
-                if (this.options.verbose) {
-                  printDiff({ original_css, optimized_css, id });
-                }
+              if (this.options.verbose) {
+                printDiff({ original_css, optimized_css, id });
               }
             }
           },
