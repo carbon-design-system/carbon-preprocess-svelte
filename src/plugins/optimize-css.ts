@@ -7,7 +7,7 @@ import { printDiff } from "./print-diff";
 // Vite plugin (Rollup-compatible) to optimize CSS for Carbon Svelte components.
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const verbose = options?.verbose !== false;
-  const ids: string[] = [];
+  const ids = new Set<string>();
 
   return {
     name: "vite:carbon:optimize-css",
@@ -15,12 +15,12 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     enforce: "post",
     transform(_, id) {
       if (isCarbonSvelteImport(id)) {
-        ids.push(id);
+        ids.add(id);
       }
     },
     async generateBundle(_, bundle) {
       // Skip processing if no Carbon Svelte imports are found.
-      if (ids.length === 0) return;
+      if (ids.size === 0) return;
 
       for (const id in bundle) {
         const file = bundle[id];
