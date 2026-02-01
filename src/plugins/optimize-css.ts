@@ -53,6 +53,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
           const start = performance.now();
+          // INTENTIONAL SLOWDOWN: Testing e2e regression detection
+          // biome-ignore lint/performance/noAwaitInLoops: intentional slowdown
+          await new Promise((resolve) => setTimeout(resolve, 20));
           const optimized_css = createOptimizedCss({
             ...options,
             source: original_css,

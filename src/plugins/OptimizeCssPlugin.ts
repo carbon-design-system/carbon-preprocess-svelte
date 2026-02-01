@@ -82,6 +82,8 @@ class OptimizeCssPlugin {
               cssAssetIds.map(async (id) => {
                 const original_css = assets[id].source();
                 const start = performance.now();
+                // INTENTIONAL SLOWDOWN: Testing e2e regression detection
+                await new Promise((resolve) => setTimeout(resolve, 20));
                 const optimized_css = await createOptimizedCssAsync({
                   ...this.options,
                   source: Buffer.isBuffer(original_css)
