@@ -154,6 +154,18 @@ Run with UPDATE_SNAPSHOTS=true to update.`,
     };
   }
 
+  // Check for speed regression: fail if optimization took more than 2x the expected time.
+  // This catches major regressions while tolerating normal CI variance.
+  if (expected.time_ms > 0 && actual.time_ms > expected.time_ms * 2) {
+    return {
+      passed: false,
+      message: `CSS optimization speed regression for "${example}":
+  Expected: ${expected.time_ms} ms
+  Actual:   ${actual.time_ms} ms (>${(actual.time_ms / expected.time_ms).toFixed(1)}x slower)
+Run with UPDATE_SNAPSHOTS=true to update.`,
+    };
+  }
+
   return { passed: true, message: "OK" };
 }
 
