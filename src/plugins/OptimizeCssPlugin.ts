@@ -81,6 +81,7 @@ class OptimizeCssPlugin {
             const results = await Promise.all(
               cssAssetIds.map(async (id) => {
                 const original_css = assets[id].source();
+                const start = performance.now();
                 const optimized_css = await createOptimizedCssAsync({
                   ...this.options,
                   source: Buffer.isBuffer(original_css)
@@ -88,15 +89,21 @@ class OptimizeCssPlugin {
                     : original_css,
                   ids,
                 });
-                return { id, original_css, optimized_css };
+                const elapsed_ms = performance.now() - start;
+                return { id, original_css, optimized_css, elapsed_ms };
               }),
             );
 
-            for (const { id, original_css, optimized_css } of results) {
+            for (const {
+              id,
+              original_css,
+              optimized_css,
+              elapsed_ms,
+            } of results) {
               compilation.updateAsset(id, new RawSource(optimized_css));
 
               if (this.options.verbose) {
-                printDiff({ original_css, optimized_css, id });
+                printDiff({ original_css, optimized_css, id, elapsed_ms });
               }
             }
           },

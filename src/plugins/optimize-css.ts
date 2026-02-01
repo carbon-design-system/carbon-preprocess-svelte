@@ -52,16 +52,18 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
+          const start = performance.now();
           const optimized_css = createOptimizedCss({
             ...options,
             source: original_css,
             ids,
           });
+          const elapsed_ms = performance.now() - start;
 
           file.source = optimized_css;
 
           if (verbose) {
-            printDiff({ original_css, optimized_css, id });
+            printDiff({ original_css, optimized_css, id, elapsed_ms });
           }
         }
       }

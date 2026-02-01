@@ -19,7 +19,8 @@ describe("print-diff", () => {
       ["\n"],
       ["Optimized", "id"],
       ["Before:", "0.03 kB"],
-      ["After: ", "0.02 kB", "(-37.5%)\n"],
+      ["After: ", "0.02 kB", "(-37.5%)"],
+      [],
     ]);
   });
 
@@ -52,7 +53,8 @@ describe("print-diff", () => {
       ["\n"],
       ["Optimized", "large-file"],
       ["Before:", "  2 MB"],
-      ["After: ", "1.5 MB", "(-25%)\n"],
+      ["After: ", "1.5 MB", "(-25%)"],
+      [],
     ]);
   });
 
@@ -69,7 +71,8 @@ describe("print-diff", () => {
       ["\n"],
       ["Optimized", "empty"],
       ["Before:", "0.01 kB"],
-      ["After: ", "   0 kB", "(-100%)\n"],
+      ["After: ", "   0 kB", "(-100%)"],
+      [],
     ]);
   });
 
@@ -87,7 +90,8 @@ describe("print-diff", () => {
       ["\n"],
       ["Optimized", "buffer-input"],
       ["Before:", "0.02 kB"],
-      ["After: ", "0.02 kB", "(-25%)\n"],
+      ["After: ", "0.02 kB", "(-25%)"],
+      [],
     ]);
   });
 
@@ -105,7 +109,8 @@ describe("print-diff", () => {
       ["\n"],
       ["Optimized", "uint8array-input"],
       ["Before:", "0.07 kB"],
-      ["After: ", "0.02 kB", "(-78.87%)\n"],
+      ["After: ", "0.02 kB", "(-78.87%)"],
+      [],
     ]);
   });
 });
