@@ -4,7 +4,7 @@
 ![GitHub](https://img.shields.io/github/license/ibm/carbon-preprocess-svelte?color=262626&style=for-the-badge)
 ![npm downloads to date](https://img.shields.io/npm/dt/carbon-preprocess-svelte?color=262626&style=for-the-badge)
 
-> [Svelte preprocessors](https://svelte.dev/docs/svelte-compiler#types-preprocessor) for the Carbon Design System.
+> A zero-dependency library providing Svelte preprocessors and build plugins for the [Carbon Design System](https://carbondesignsystem.com/).
 
 ## Installation
 
