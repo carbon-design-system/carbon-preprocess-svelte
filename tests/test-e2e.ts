@@ -9,6 +9,7 @@ const UPDATE_SNAPSHOTS = process.env.UPDATE_SNAPSHOTS === "true";
 const OPTIMIZED_REGEX = /Optimized\s+(.+\.css)/;
 const BEFORE_REGEX = /Before:\s*([\d,.]+)\s*(kB|MB)/;
 const AFTER_REGEX = /After:\s*([\d,.]+)\s*(kB|MB)\s*\(-?([\d.]+)%\)/;
+const TIME_REGEX = /Time:\s*([\d,.]+)\s*ms/;
 const DOUBLE_NEWLINE_REGEX = /\n\n+/;
 
 type OptimizationResult = {
@@ -16,6 +17,7 @@ type OptimizationResult = {
   before_kb: number;
   after_kb: number;
   reduction_percent: number;
+  time_ms: number;
 };
 
 type Snapshots = Record<string, OptimizationResult>;
@@ -28,6 +30,7 @@ function parseOptimizationOutput(output: string): OptimizationResult | null {
   const optimizedMatch = output.match(OPTIMIZED_REGEX);
   const beforeMatch = output.match(BEFORE_REGEX);
   const afterMatch = output.match(AFTER_REGEX);
+  const timeMatch = output.match(TIME_REGEX);
 
   if (!optimizedMatch || !beforeMatch || !afterMatch) {
     return null;
@@ -37,6 +40,9 @@ function parseOptimizationOutput(output: string): OptimizationResult | null {
   let before_kb = Number.parseFloat(beforeMatch[1].replace(",", ""));
   let after_kb = Number.parseFloat(afterMatch[1].replace(",", ""));
   const reduction_percent = Number.parseFloat(afterMatch[3]);
+  const time_ms = timeMatch
+    ? Number.parseFloat(timeMatch[1].replace(",", ""))
+    : 0;
 
   // Convert MB to kB if needed
   if (beforeMatch[2] === "MB") {
@@ -46,7 +52,7 @@ function parseOptimizationOutput(output: string): OptimizationResult | null {
     after_kb *= 1000;
   }
 
-  return { file, before_kb, after_kb, reduction_percent };
+  return { file, before_kb, after_kb, reduction_percent, time_ms };
 }
 
 function normalizeFile(file: string): string {
@@ -121,9 +127,29 @@ function compareResults(
     return {
       passed: false,
       message: `CSS optimization mismatch for "${example}":
-  Before: ${expected.before_kb} kB -> ${actual.before_kb} kB (diff: ${beforeDiff.toFixed(2)})
-  After:  ${expected.after_kb} kB -> ${actual.after_kb} kB (diff: ${afterDiff.toFixed(2)})
-  Reduction: ${expected.reduction_percent}% -> ${actual.reduction_percent}% (diff: ${percentDiff.toFixed(2)})
+  Before: ${expected.before_kb} kB -> ${
+    actual.before_kb
+  } kB (diff: ${beforeDiff.toFixed(2)})
+  After:  ${expected.after_kb} kB -> ${
+    actual.after_kb
+  } kB (diff: ${afterDiff.toFixed(2)})
+  Reduction: ${expected.reduction_percent}% -> ${
+    actual.reduction_percent
+  }% (diff: ${percentDiff.toFixed(2)})
+Run with UPDATE_SNAPSHOTS=true to update.`,
+    };
+  }
+
+  // Check for speed regression: fail if optimization took more than 1.5x the expected time.
+  // This catches major regressions while tolerating normal CI variance.
+  if (expected.time_ms > 0 && actual.time_ms > expected.time_ms * 1.5) {
+    return {
+      passed: false,
+      message: `CSS optimization speed regression for "${example}":
+  Expected: ${expected.time_ms} ms
+  Actual:   ${actual.time_ms} ms (>${(
+    actual.time_ms / expected.time_ms
+  ).toFixed(1)}x slower)
 Run with UPDATE_SNAPSHOTS=true to update.`,
     };
   }
@@ -176,6 +202,7 @@ async function buildExample(
     before_kb: parsed.before_kb,
     after_kb: parsed.after_kb,
     reduction_percent: parsed.reduction_percent,
+    time_ms: parsed.time_ms,
   };
   newSnapshots[exampleName] = normalizedResult;
 
@@ -183,7 +210,7 @@ async function buildExample(
     return {
       example: exampleName,
       passed: true,
-      message: `Updated: ${normalizedResult.before_kb} kB -> ${normalizedResult.after_kb} kB (-${normalizedResult.reduction_percent}%)`,
+      message: `Updated: ${normalizedResult.before_kb} kB -> ${normalizedResult.after_kb} kB (-${normalizedResult.reduction_percent}%) in ${normalizedResult.time_ms} ms`,
     };
   }
 

@@ -44,8 +44,9 @@ export function printDiff(props: {
   original_css: Uint8Array | Buffer | string;
   optimized_css: string;
   id: string;
+  elapsed_ms?: number;
 }) {
-  const { original_css, optimized_css, id } = props;
+  const { original_css, optimized_css, id, elapsed_ms } = props;
 
   const original_size = stringSizeInKB(original_css.toString());
   const optimized_size = stringSizeInKB(optimized_css);
@@ -67,5 +68,11 @@ export function printDiff(props: {
   console.log("\n");
   console.log("Optimized", id);
   console.log("Before:", original_display);
-  console.log("After: ", optimized_display, `(-${diff})\n`);
+  console.log("After: ", optimized_display, `(-${diff})`);
+
+  if (elapsed_ms !== undefined) {
+    console.log("Time:  ", `${formatter.format(elapsed_ms)} ms`);
+  }
+
+  console.log();
 }
