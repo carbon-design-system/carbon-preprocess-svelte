@@ -65,8 +65,7 @@ async function buildProject() {
     outdir: "./dist",
     format: "esm",
     target: "node",
-    minify: false,
-    sourcemap: false,
+    minify: true,
   });
 
   if (!result.success) {
