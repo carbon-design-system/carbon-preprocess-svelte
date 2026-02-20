@@ -67,19 +67,18 @@ describe("OptimizeCssPlugin", () => {
     const plugin = new OptimizeCssPlugin();
     // @ts-expect-error – options is private
     expect(plugin.options).toEqual({
-      verbose: true,
       preserveAllIBMFonts: false,
     } as const);
   });
 
   test("constructor respects provided options", () => {
     const plugin = new OptimizeCssPlugin({
-      verbose: false,
+      silent: true,
       preserveAllIBMFonts: true,
     });
     // @ts-expect-error – options is private
     expect(plugin.options).toEqual({
-      verbose: false,
+      silent: true,
       preserveAllIBMFonts: true,
     });
   });
@@ -149,9 +148,9 @@ describe("OptimizeCssPlugin", () => {
     );
   });
 
-  test("respects verbose option for printing diff", async () => {
+  test("respects silent option for printing diff", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
-    const plugin = new OptimizeCssPlugin({ verbose: true });
+    const plugin = new OptimizeCssPlugin({ silent: false });
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
 
     const mockCompiler = createMockCompiler({

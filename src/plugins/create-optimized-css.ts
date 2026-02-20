@@ -7,11 +7,16 @@ import { CARBON_PREFIX } from "../constants";
 
 export type OptimizeCssOptions = {
   /**
-   * By default, the plugin will print the size
-   * difference between the original and optimized CSS.
-   *
+   * Set to `true` to suppress the size difference
+   * logging between original and optimized CSS.
+   * @default false
+   */
+  silent?: boolean;
+
+  /**
    * Set to `false` to disable verbose logging.
    * @default true
+   * @deprecated Use `silent` instead.
    */
   verbose?: boolean;
 
@@ -30,6 +35,16 @@ export type OptimizeCssOptions = {
    */
   preserveAllIBMFonts?: boolean;
 };
+
+/**
+ * Resolves the `silent` / `verbose` options into a single boolean.
+ * `silent` takes precedence when provided; otherwise falls back
+ * to inverting `verbose` (which defaults to `true`).
+ */
+export function isSilent(options?: OptimizeCssOptions): boolean {
+  if (options?.silent !== undefined) return options.silent;
+  return options?.verbose === false;
+}
 
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;

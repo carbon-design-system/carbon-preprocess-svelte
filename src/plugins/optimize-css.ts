@@ -1,7 +1,7 @@
 import type { Plugin } from "vite";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createOptimizedCss } from "./create-optimized-css";
+import { createOptimizedCss, isSilent } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
 
 /**
@@ -17,7 +17,7 @@ import { printDiff } from "./print-diff";
  * - It runs after other plugins have finished transforming modules
  */
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
-  const verbose = options?.verbose !== false;
+  const silent = isSilent(options);
   /**
    * Set of absolute file paths to Carbon Svelte components used in the app.
    * Populated during the transform phase, consumed during generateBundle.
@@ -60,7 +60,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
           file.source = optimized_css;
 
-          if (verbose) {
+          if (!silent) {
             printDiff({ original_css, optimized_css, id });
           }
         }
