@@ -1,7 +1,7 @@
 import type { Compiler } from "webpack";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createOptimizedCssAsync } from "./create-optimized-css";
+import { createOptimizedCssAsync, isSilent } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
 
 /**
@@ -21,7 +21,6 @@ class OptimizeCssPlugin {
 
   public constructor(options?: OptimizeCssOptions) {
     this.options = {
-      verbose: true,
       preserveAllIBMFonts: false,
       ...options,
     };
@@ -95,7 +94,7 @@ class OptimizeCssPlugin {
             for (const { id, original_css, optimized_css } of results) {
               compilation.updateAsset(id, new RawSource(optimized_css));
 
-              if (this.options.verbose) {
+              if (!isSilent(this.options)) {
                 printDiff({ original_css, optimized_css, id });
               }
             }

@@ -229,13 +229,11 @@ export default {
 ```ts
 optimizeCss({
   /**
-   * By default, the plugin will print the size
-   * difference between the original and optimized CSS.
-   *
-   * Set to `false` to disable verbose logging.
-   * @default true
+   * Set to `true` to suppress the size difference
+   * logging between original and optimized CSS.
+   * @default false
    */
-  verbose: false,
+  silent: true,
 
   /**
    * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
