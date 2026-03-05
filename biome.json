@@ -48,6 +48,9 @@
         "useLiteralKeys": "error",
         "noImportantStyles": "error"
       },
+      "suspicious": {
+        "noImportCycles": "error"
+      },
       "style": {
         "noRestrictedImports": {
           "level": "error",
