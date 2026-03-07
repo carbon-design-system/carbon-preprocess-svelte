@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.27](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.27) - 2026-03-07
+
+**Fixes**
+
+- re-index exports using `carbon-components-svelte@0.102.0`
+- `optimizeCss`: add `silent` option, deprecate `verbose`
+
 ## [0.11.26](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.26) - 2026-02-16
 
 **Fixes**
