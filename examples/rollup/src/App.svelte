@@ -8,16 +8,16 @@
     selectable: true,
   };
 </script>
-  
-  <DataTable
-    {...tableProps}
-    headers={[
+
+<DataTable
+  {...tableProps}
+  headers={[
       { key: "name", value: "Name" },
       { key: "protocol", value: "Protocol" },
       { key: "port", value: "Port" },
       { key: "rule", value: "Rule" },
     ]}
-    rows={[
+  rows={[
       {
         id: "a",
         name: "Load Balancer 3",
@@ -61,5 +61,4 @@
         rule: "DNS delegation",
       },
     ]}
-  />
-  
+/>
