@@ -56,6 +56,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
             ...options,
             source: original_css,
             ids,
+            from: id,
           });
 
           file.source = optimized_css;

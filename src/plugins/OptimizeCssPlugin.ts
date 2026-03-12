@@ -86,6 +86,7 @@ class OptimizeCssPlugin {
                     ? original_css.toString()
                     : original_css,
                   ids,
+                  from: id,
                 });
                 return { id, original_css, optimized_css };
               }),
