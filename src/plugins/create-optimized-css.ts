@@ -49,6 +49,8 @@ export function isSilent(options?: OptimizeCssOptions): boolean {
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;
   ids: Iterable<string>;
+  /** PostCSS `from` option. Pass asset/chunk path when available, or omit for `undefined`. */
+  from?: string | undefined;
 };
 
 /**
@@ -198,6 +200,7 @@ export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
 
   return postcss(createPostcssPlugins(allowlist, preserveAllIBMFonts)).process(
     source,
+    { from: options.from },
   ).css;
 }
 
@@ -210,7 +213,7 @@ export async function createOptimizedCssAsync(
 
   const result = await postcss(
     createPostcssPlugins(allowlist, preserveAllIBMFonts),
-  ).process(source);
+  ).process(source, { from: options.from });
 
   return result.css;
 }
