@@ -19,9 +19,9 @@
   },
   "vite@svelte-5": {
     "file": "assets/index-*.css",
-    "before_kb": 605.75,
-    "after_kb": 72.49,
-    "reduction_percent": 88.03
+    "before_kb": 568.58,
+    "after_kb": 64.69,
+    "reduction_percent": 88.62
   },
   "webpack": {
     "file": "build/bundle.*.css",
