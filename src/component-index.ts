@@ -1752,6 +1752,7 @@ export const components: Record<string, { path: string; classes: string[] }> =
       path: "carbon-components-svelte/src/UIShell/SideNav.svelte",
       classes: [
         ".bx--side-nav__overlay",
+        ".bx--side-nav__overlay--mobile",
         ".bx--side-nav__overlay-active",
         ".bx--side-nav__navigation",
         ".bx--side-nav",
@@ -1953,6 +1954,10 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--tabs__nav-item--disabled",
         ".bx--tabs__nav-item--selected",
         ".bx--tabs__nav-link",
+        ".bx--tabs__nav-item-label-wrapper",
+        ".bx--tabs__nav-item-label",
+        ".bx--tabs__nav-item--icon",
+        ".bx--tabs__nav-item-secondary-label",
       ],
     },
     TabContent: {
@@ -2017,6 +2022,8 @@ export const components: Record<string, { path: string; classes: string[] }> =
       classes: [
         ".bx--tabs",
         ".bx--tabs--container",
+        ".bx--tabs--tall",
+        ".bx--tabs--full-width",
         ".bx--tabs-trigger",
         ".bx--tabs-trigger-text",
         ".bx--tabs__nav",
