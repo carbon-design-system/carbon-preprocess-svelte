@@ -6,7 +6,7 @@
       "devDependencies": {
         "@rollup/plugin-commonjs": "latest",
         "@rollup/plugin-node-resolve": "latest",
-        "carbon-components-svelte": "^0.85.4",
+        "carbon-components-svelte": "latest",
         "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
         "rollup": "latest",
         "rollup-plugin-css-only": "latest",
@@ -107,7 +107,7 @@
 
     "buffer-from": ["buffer-from@1.1.2", "", {}, "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ=="],
 
-    "carbon-components-svelte": ["carbon-components-svelte@0.85.4", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-8dBgRF8Y6TPu+WiythDrYilNAJbhbpHu3kThJazquCO1hyGftWsa2T0HhY+k4+szIiutcc8qVzUMfRZvcGUflQ=="],
+    "carbon-components-svelte": ["carbon-components-svelte@0.103.0", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-fVVFBvKngQyJhDAWfdFUAFsFbuUANP1x/iygII0YnAUFtoHdt9ZA6DmxaR/42GMJfzO5lvCJUz3so85lERbp1Q=="],
 
     "carbon-preprocess-svelte": ["carbon-preprocess-svelte@link:carbon-preprocess-svelte", {}],
 
