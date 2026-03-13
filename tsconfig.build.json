@@ -5,7 +5,7 @@
     "emitDeclarationOnly": true,
     "outDir": "dist",
     "target": "ES6",
-    "module": "CommonJS"
+    "module": "ESNext"
   },
   "include": ["src/**/*"]
 }
