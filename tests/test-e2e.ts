@@ -221,7 +221,7 @@ async function main() {
   let allPassed = true;
   for (const result of results) {
     const status = result.passed ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✗\x1b[0m";
-    console.log(`\n${status} ${result.example}`);
+    console.log(`${status} ${result.example}`);
     if (!result.passed || UPDATE_SNAPSHOTS) {
       console.log(`  ${result.message}`);
     }
