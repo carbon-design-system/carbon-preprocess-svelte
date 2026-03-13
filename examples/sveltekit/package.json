@@ -8,12 +8,12 @@
   "devDependencies": {
     "@sveltejs/adapter-static": "latest",
     "@sveltejs/kit": "latest",
-    "@sveltejs/vite-plugin-svelte": "^3.1.2",
+    "@sveltejs/vite-plugin-svelte": "latest",
     "carbon-components-svelte": "^0.85.4",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
-    "svelte": "^4.2.20",
+    "svelte": "latest",
     "typescript": "latest",
-    "vite": "^5.4.21"
+    "vite": "latest"
   },
   "type": "module"
 }
