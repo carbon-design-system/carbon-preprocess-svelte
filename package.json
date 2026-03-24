@@ -22,6 +22,7 @@
     "test": "bun test",
     "test:e2e": "bun tests/test-e2e.ts",
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
+    "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "lint:fix": "biome check --write --unsafe .",
     "upgrade-examples": "bun scripts/upgrade-examples.ts"

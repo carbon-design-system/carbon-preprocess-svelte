@@ -16,6 +16,9 @@ jobs:
       - name: Lint and format
         run: bunx biome ci --error-on-warnings
 
+      - name: Typecheck
+        run: bun run typecheck
+
       - name: Run unit tests
         run: bun run test
 

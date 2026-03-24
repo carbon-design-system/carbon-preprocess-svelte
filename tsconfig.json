@@ -14,7 +14,8 @@
     "paths": {
       "carbon-preprocess-svelte": ["./src/index.ts"],
       "carbon-preprocess-svelte/*": ["./src/*"]
-    }
+    },
+    "types": ["jest"]
   },
   "include": ["scripts/**/*", "src/**/*", "tests/**/*"]
 }
