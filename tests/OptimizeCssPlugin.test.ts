@@ -152,10 +152,14 @@ describe("OptimizeCssPlugin", () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
     const plugin = new OptimizeCssPlugin({ silent: false });
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    // CSS must shrink after optimization or printDiff skips logging (same kB)
+    const cssWithUnusedCarbon = `* { box-sizing: border-box }
+.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
 
     const mockCompiler = createMockCompiler({
       assets: {
-        "styles.css": { source: () => ".bx--btn { color: blue; }" },
+        "styles.css": { source: () => cssWithUnusedCarbon },
       },
       fileDependencies: [carbonComponent],
     });
