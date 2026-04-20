@@ -5,6 +5,10 @@ describe("print-diff", () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test("output", () => {
     const log = jest.spyOn(console, "log");
 
