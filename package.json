@@ -19,7 +19,7 @@
     "prebuild": "BUILD=true bun run index:components",
     "build": "bun scripts/build.ts",
     "build:prune-package": "bunx culls",
-    "test": "bun test",
+    "test": "bun test --parallel",
     "test:e2e": "bun tests/test-e2e.ts",
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
     "typecheck": "tsc --noEmit",
