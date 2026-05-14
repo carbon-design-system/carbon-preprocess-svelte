@@ -155,6 +155,35 @@ export default {
 
 `optimizeCss` is a Vite plugin that removes unused Carbon styles at build time. The plugin is compatible with Rollup ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
 
+<details>
+<summary>How it works</summary>
+
+The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on production builds and after other plugins.
+
+1. During `transform`, it collects absolute paths of imported `carbon-components-svelte` sources.
+2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components via an internal index, plus global selectors like `.bx--body`.
+3. A PostCSS plugin removes rules whose selectors are only Carbon (`bx--`) classes outside that allowlist. BEM-style variants are kept when they match a needed base class; selectors without that prefix are left unchanged.
+4. Empty rules are discarded, and the CSS bundles are optimized.
+
+```mermaid
+flowchart TB
+  subgraph scan["Module scan"]
+    T[transform hook] --> S["Collect imported Carbon<br/>component paths"]
+  end
+  subgraph emit["Bundle phase"]
+    S --> G[generateBundle]
+    G --> A["Allowlist bx-- selectors<br/>(index + .bx--body)"]
+    A --> P[Prune unused Carbon styles with PostCSS]
+    P --> R[Optimize CSS assets]
+  end
+
+  class T,G hook
+  class S,A data
+  class P,R css
+```
+
+</details>
+
 ```diff
 $ vite build
 
