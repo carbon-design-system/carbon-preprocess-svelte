@@ -3,8 +3,18 @@ import { Glob } from "bun";
 import { walk } from "estree-walker";
 import { parse } from "svelte/compiler";
 import { CarbonSvelte } from "../src/constants";
+import type {
+  ComponentConditions,
+  Observed,
+} from "../src/plugins/analyze-usage";
+import { extractUsages } from "../src/plugins/analyze-usage";
 import { isSvelteFile } from "../src/utils";
 import { extractSelectors } from "./extract-selectors";
+
+/** Gate analysis per component basename (for experimental prop-aware pruning). */
+const conditions_map = new Map<Identifier, ComponentConditions>();
+/** Carbon-internal Carbon-child usage per component basename. */
+const internal_usages = new Map<Identifier, Observed>();
 
 const carbon_path = path.join("node_modules", CarbonSvelte.Components);
 const index_js = path.join(carbon_path, "src/index.js");
@@ -62,6 +72,16 @@ for await (const file of files) {
     const selectors = extractSelectors({ code: file_text, filename: file });
 
     map.classes = selectors.classes;
+    conditions_map.set(moduleName, selectors.conditions);
+
+    const usage = extractUsages({
+      code: file_text,
+      filename: file,
+      treatRelativeSvelteAsComponent: true,
+    });
+    if (usage.ok && Object.keys(usage.observed).length > 0) {
+      internal_usages.set(moduleName, usage.observed);
+    }
 
     if (selectors.components.length > 0) {
       sub_components.set(moduleName, selectors.components);
@@ -121,4 +141,30 @@ await Bun.write(
 // @see scripts/index-components.ts
 
 export const components: Record<string, { path: string; classes: string[]; }> = Object.freeze(${jsonString});\n`,
+);
+
+// ---- Conditions index (experimental prop-aware pruning) ----
+
+const sortObject = <T>(map: Map<string, T>): Record<string, T> =>
+  Object.fromEntries(
+    [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+  );
+
+const conditionsObject = sortObject(conditions_map);
+const internalUsagesObject = sortObject(internal_usages);
+
+const stringify = (value: unknown) =>
+  isBuild ? JSON.stringify(value) : JSON.stringify(value, null, 2);
+
+await Bun.write(
+  "src/component-conditions.ts",
+  `// @generated
+// This file was automatically generated and should not be edited.
+// @see scripts/index-components.ts
+
+import type { ComponentConditions, Observed } from "./plugins/analyze-usage";
+
+export const conditions: Record<string, ComponentConditions> = Object.freeze(${stringify(conditionsObject)});
+
+export const internalUsages: Record<string, Observed> = Object.freeze(${stringify(internalUsagesObject)});\n`,
 );

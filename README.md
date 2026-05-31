@@ -277,8 +277,48 @@ optimizeCss({
    * @default false
    */
   preserveAllIBMFonts: true,
+
+  /**
+   * Opt-in, experimental optimizations. These analyze how your app uses
+   * Carbon components more aggressively and may change between releases.
+   */
+  experimental: {
+    /**
+     * Set to `true` to statically analyze the props passed to Carbon
+     * components in your `.svelte` source and prune CSS for prop-gated
+     * classes that are provably never rendered.
+     * @default false
+     */
+    prunePropClasses: true,
+  },
 });
 ```
+
+#### `experimental.prunePropClasses`
+
+By default, `optimizeCss` is conservative: if a component is used anywhere, its
+entire precomputed class map is preserved. Many of those classes are only
+rendered for specific prop values — `Button` emits `.bx--btn--lg` only when
+`size="lg"`, and `.bx--btn--expressive` only when `expressive` is truthy.
+
+When `experimental.prunePropClasses` is enabled, the plugin reads your app's
+`.svelte` source and records the prop values actually passed to each Carbon
+component (across direct usage and Carbon's own internal composition). Classes
+gated by a single prop via `prop === "literal"` or a truthy boolean are removed
+when no usage can reach them.
+
+The analysis is **sound first**: whenever a prop is passed dynamically (`{expr}`),
+spread (`{...props}`), bound (`bind:`), or a file uses a dynamic
+`<svelte:component>`, the affected classes (or the whole optimization) fall back
+to the conservative behavior. Interpolated class families (e.g.
+`` `bx--btn--${kind}` ``) are always preserved.
+
+Savings depend on your components and how Carbon authors its CSS — modifier
+classes that ship as standalone rules are pruned, while compound selectors that
+also target a live class are kept.
+
+> This option is Vite/Rollup only; `OptimizeCssPlugin` (Webpack) does not yet
+> support it.
 
 ### `OptimizeCssPlugin`
 

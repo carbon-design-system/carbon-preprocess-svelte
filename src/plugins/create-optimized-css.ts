@@ -34,6 +34,26 @@ export type OptimizeCssOptions = {
    * @default false
    */
   preserveAllIBMFonts?: boolean;
+
+  /**
+   * Opt-in, experimental optimizations. These analyze how your app uses
+   * Carbon components more aggressively and may change between releases.
+   */
+  experimental?: {
+    /**
+     * Set to `true` to statically analyze the props passed to Carbon
+     * components in your `.svelte` source and prune CSS for prop-gated
+     * classes that are provably never rendered.
+     *
+     * For example, if no `<Button>` in your app ever sets `size="lg"`
+     * (and `size` is never bound dynamically or spread), the `.bx--btn--lg`
+     * rule is removed. The analysis is conservative: whenever a prop is
+     * passed dynamically, spread, or otherwise can't be resolved, the
+     * affected classes are kept.
+     * @default false
+     */
+    prunePropClasses?: boolean;
+  };
 };
 
 /**
@@ -51,7 +71,33 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
   ids: Iterable<string>;
   /** PostCSS `from` option. Pass asset/chunk path when available, or omit for `undefined`. */
   from?: string | undefined;
+  /**
+   * Exact class selectors (e.g. ".bx--btn--lg") proven unreachable by the
+   * experimental prop analysis. Rules whose every Carbon selector is in this
+   * set are removed, overriding the conservative substring allowlist match.
+   */
+  pruneSet?: Set<string>;
 };
+
+/** Matches every Carbon (`.bx--*`) class token within a single selector. */
+const CARBON_CLASS_REGEX = /\.bx--[A-Za-z0-9_-]+/g;
+
+/** Extracts all Carbon class tokens (with leading dot) from one selector. */
+function carbonTokens(selector: string): string[] {
+  return selector.match(CARBON_CLASS_REGEX) ?? [];
+}
+
+/**
+ * A selector is pruned only when it contains at least one Carbon class and
+ * *every* Carbon class it references is proven unreachable. The `.every`
+ * guard preserves compound/descendant selectors (e.g. ".bx--btn--lg
+ * .bx--btn__icon") where a live class is also targeted.
+ */
+function isPrunedSelector(selector: string, pruneSet: Set<string>): boolean {
+  const tokens = carbonTokens(selector);
+  if (tokens.length === 0) return false;
+  return tokens.every((token) => pruneSet.has(token));
+}
 
 /**
  * Builds an allowlist of CSS class selectors that should be preserved.
@@ -111,7 +157,10 @@ function shouldKeepRule(classes: string[], allowlist: Set<string>): boolean {
 function createPostcssPlugins(
   allowlist: Set<string>,
   preserveAllIBMFonts: boolean,
+  pruneSet?: Set<string>,
 ): AcceptedPlugin[] {
+  const hasPruneSet = pruneSet !== undefined && pruneSet.size > 0;
+
   return [
     {
       postcssPlugin: "postcss-plugin:carbon:optimize-css",
@@ -123,23 +172,42 @@ function createPostcssPlugins(
        * (e.g., ".bx--btn, .bx--link"), each selector is checked individually.
        */
       Rule(node) {
-        const selector = node.selector;
+        if (!CARBON_PREFIX.test(node.selector)) return;
 
-        if (CARBON_PREFIX.test(selector)) {
-          /**
-           * Parse comma-separated selectors, handling cases where Carbon classes
-           * are prefixed with HTML tags for specificity (e.g., "a.bx--link").
-           * The split on "." extracts the class portion after any tag prefix.
-           */
-          const classes = selector.split(",").filter((selectee) => {
-            const value = selectee.trim() ?? "";
-            const [, rest] = value.split(".");
-            return Boolean(rest);
-          });
+        /**
+         * Experimental: drop individual comma-separated selectors that the
+         * prop analysis proved unreachable. This runs first so an exact
+         * prune-set match overrides the conservative substring allowlist
+         * (which would otherwise re-admit e.g. ".bx--btn--lg" via ".bx--btn").
+         */
+        if (hasPruneSet) {
+          const survivors = node.selectors.filter(
+            (selectee) => !isPrunedSelector(selectee, pruneSet),
+          );
 
-          if (!shouldKeepRule(classes, allowlist)) {
+          if (survivors.length === 0) {
             node.remove();
+            return;
           }
+
+          if (survivors.length !== node.selectors.length) {
+            node.selectors = survivors;
+          }
+        }
+
+        /**
+         * Parse comma-separated selectors, handling cases where Carbon classes
+         * are prefixed with HTML tags for specificity (e.g., "a.bx--link").
+         * The split on "." extracts the class portion after any tag prefix.
+         */
+        const classes = node.selector.split(",").filter((selectee) => {
+          const value = selectee.trim() ?? "";
+          const [, rest] = value.split(".");
+          return Boolean(rest);
+        });
+
+        if (!shouldKeepRule(classes, allowlist)) {
+          node.remove();
         }
       },
       /**
@@ -194,25 +262,24 @@ function createPostcssPlugins(
 }
 
 export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
-  const { source, ids } = options;
+  const { source, ids, pruneSet } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const allowlist = buildAllowlist(ids);
 
-  return postcss(createPostcssPlugins(allowlist, preserveAllIBMFonts)).process(
-    source,
-    { from: options.from },
-  ).css;
+  return postcss(
+    createPostcssPlugins(allowlist, preserveAllIBMFonts, pruneSet),
+  ).process(source, { from: options.from }).css;
 }
 
 export async function createOptimizedCssAsync(
   options: CreateOptimizedCssOptions,
 ): Promise<string> {
-  const { source, ids } = options;
+  const { source, ids, pruneSet } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const allowlist = buildAllowlist(ids);
 
   const result = await postcss(
-    createPostcssPlugins(allowlist, preserveAllIBMFonts),
+    createPostcssPlugins(allowlist, preserveAllIBMFonts, pruneSet),
   ).process(source, { from: options.from });
 
   return result.css;

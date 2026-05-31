@@ -176,4 +176,56 @@ button.bx--btn.bx--btn--primary { color: white }`);
     });
     expect(result).toEqual(".custom-class { color: red }");
   });
+
+  describe("experimental prune-set", () => {
+    const pruneSet = new Set([".bx--btn--lg"]);
+
+    test("prunes a gated class even though its base is allowlisted", () => {
+      const result = createOptimizedCss({
+        source: ".bx--btn { color: red }\n.bx--btn--lg { color: blue }",
+        ids: ["Button"],
+        pruneSet,
+      });
+      expect(result).toEqual(".bx--btn { color: red }");
+    });
+
+    test("keeps compound selectors that also target a live class", () => {
+      const result = createOptimizedCss({
+        source: ".bx--btn--lg .bx--btn__icon { color: blue }",
+        ids: ["Button"],
+        pruneSet,
+      });
+      expect(result).toEqual(".bx--btn--lg .bx--btn__icon { color: blue }");
+    });
+
+    test("drops only the pruned selector from a multi-selector rule", () => {
+      const result = createOptimizedCss({
+        source: ".bx--btn--lg, .bx--btn { color: white }",
+        ids: ["Button"],
+        pruneSet,
+      });
+      expect(result).toEqual(".bx--btn { color: white }");
+    });
+
+    test("prunes pseudo-class variants of a pruned class", () => {
+      const result = createOptimizedCss({
+        source: ".bx--btn--lg:hover { color: blue }",
+        ids: ["Button"],
+        pruneSet,
+      });
+      expect(result).toEqual("");
+    });
+
+    test("an empty/absent prune-set is identical to conservative output", () => {
+      const source = ".bx--btn--lg { color: blue }";
+      const conservative = createOptimizedCss({ source, ids: ["Button"] });
+      const empty = createOptimizedCss({
+        source,
+        ids: ["Button"],
+        pruneSet: new Set(),
+      });
+      expect(empty).toEqual(conservative);
+      expect(conservative).toEqual(".bx--btn--lg { color: blue }");
+    });
+  });
 });
