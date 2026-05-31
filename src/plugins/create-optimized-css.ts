@@ -4,6 +4,10 @@ import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import { components } from "../component-index";
 import { CARBON_PREFIX } from "../constants";
+import {
+  optimizeStrictAtRule,
+  optimizeStrictRule,
+} from "./strict-css-optimizer";
 
 export type OptimizeCssOptions = {
   /**
@@ -34,6 +38,28 @@ export type OptimizeCssOptions = {
    * @default false
    */
   preserveAllIBMFonts?: boolean;
+
+  experimental?: {
+    /**
+     * Enables stricter CSS tree-shaking. Compared to the default baseline,
+     * this can drastically reduce output size depending on which Carbon
+     * components you import — especially for small bundles that only use a
+     * handful of components.
+     *
+     * Improvements over the default matcher:
+     * - Prunes individual selectors from comma-separated lists instead of
+     *   keeping the entire rule when any selector matches
+     * - Requires every Carbon class in a compound selector to match the
+     *   allowlist when only shared modifiers (e.g. `.bx--skeleton`) hit,
+     *   so importing Button no longer pulls in Tabs skeleton styles
+     * - Drops flatpickr and legacy single-hyphen `bx-` rules unless
+     *   DatePicker (or similar) is in the bundle
+     * - Uses parenthesis-aware selector parsing for `:is()` and similar
+     *
+     * @default false
+     */
+    strict?: boolean;
+  };
 };
 
 /**
@@ -46,6 +72,10 @@ export function isSilent(options?: OptimizeCssOptions): boolean {
   return options?.verbose === false;
 }
 
+function isStrict(options?: OptimizeCssOptions): boolean {
+  return options?.experimental?.strict === true;
+}
+
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;
   ids: Iterable<string>;
@@ -54,20 +84,26 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
 };
 
 /**
- * Builds an allowlist of CSS class selectors that should be preserved.
+ * Build the class allowlist from bundled component paths and whether flatpickr
+ * CSS should stay (any DatePicker import).
  *
- * Takes a list of component file paths (e.g., "Button.svelte") and looks up
- * each component in the pre-generated component-index to find its associated
- * CSS classes. Returns a Set for O(1) lookups during CSS tree-shaking.
- *
- * The ".bx--body" class is always included since it's applied to the document
- * body by apps using Carbon, but isn't referenced in any component file.
+ * Paths like "Button.svelte" map through component-index to `.bx--*` classes.
+ * `.bx--body` is always kept; apps set it on `<body>` but no component file
+ * references it.
  */
-function buildAllowlist(ids: Iterable<string>): Set<string> {
+function buildUsage(ids: Iterable<string>): {
+  allowlist: Set<string>;
+  preserveFlatpickr: boolean;
+} {
   const allowlist = new Set([".bx--body"]);
+  let preserveFlatpickr = false;
 
   for (const id of ids) {
     const { name } = path.parse(id);
+
+    if (name === "DatePicker") {
+      preserveFlatpickr = true;
+    }
 
     if (name in components) {
       for (const cls of components[name].classes) {
@@ -76,22 +112,11 @@ function buildAllowlist(ids: Iterable<string>): Set<string> {
     }
   }
 
-  return allowlist;
+  return { allowlist, preserveFlatpickr };
 }
 
-/**
- * Determines whether a CSS rule should be preserved based on its selectors.
- *
- * Uses a two-tier matching strategy for performance:
- * 1. Fast path: O(1) exact match check against the allowlist Set
- * 2. Slow path: O(n) substring check for BEM-style class variations
- *
- * The substring check is necessary because Carbon uses BEM naming conventions
- * where a parent class like ".bx--btn" may have related selectors like
- * ".bx--btn--primary" or ".bx--btn__icon" that should also be preserved.
- */
-function shouldKeepRule(classes: string[], allowlist: Set<string>): boolean {
-  for (const name of classes) {
+function shouldKeepRule(selectors: string[], allowlist: Set<string>): boolean {
+  for (const name of selectors) {
     if (allowlist.has(name)) return true;
 
     for (const selector of allowlist) {
@@ -111,6 +136,8 @@ function shouldKeepRule(classes: string[], allowlist: Set<string>): boolean {
 function createPostcssPlugins(
   allowlist: Set<string>,
   preserveAllIBMFonts: boolean,
+  preserveFlatpickr: boolean,
+  strict: boolean,
 ): AcceptedPlugin[] {
   return [
     {
@@ -123,24 +150,24 @@ function createPostcssPlugins(
        * (e.g., ".bx--btn, .bx--link"), each selector is checked individually.
        */
       Rule(node) {
-        const selector = node.selector;
+        if (!strict) {
+          const selector = node.selector;
 
-        if (CARBON_PREFIX.test(selector)) {
-          /**
-           * Parse comma-separated selectors, handling cases where Carbon classes
-           * are prefixed with HTML tags for specificity (e.g., "a.bx--link").
-           * The split on "." extracts the class portion after any tag prefix.
-           */
-          const classes = selector.split(",").filter((selectee) => {
-            const value = selectee.trim() ?? "";
-            const [, rest] = value.split(".");
-            return Boolean(rest);
-          });
+          if (CARBON_PREFIX.test(selector)) {
+            const selectors = selector.split(",").filter((selectee) => {
+              const value = selectee.trim() ?? "";
+              const [, rest] = value.split(".");
+              return Boolean(rest);
+            });
 
-          if (!shouldKeepRule(classes, allowlist)) {
-            node.remove();
+            if (!shouldKeepRule(selectors, allowlist)) {
+              node.remove();
+            }
           }
+          return;
         }
+
+        optimizeStrictRule(node, { allowlist, preserveFlatpickr });
       },
       /**
        * AtRule visitor that removes unused IBM Plex @font-face declarations.
@@ -152,6 +179,11 @@ function createPostcssPlugins(
        * - IBM Plex Mono: weight 400 in normal style (for code snippets)
        */
       AtRule(node) {
+        if (strict) {
+          optimizeStrictAtRule(node, { preserveFlatpickr });
+          if (!node.parent) return;
+        }
+
         if (!preserveAllIBMFonts && node.name === "font-face") {
           const attributes = {
             "font-family": "",
@@ -196,12 +228,17 @@ function createPostcssPlugins(
 export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
   const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const allowlist = buildAllowlist(ids);
+  const strict = isStrict(options);
+  const { allowlist, preserveFlatpickr } = buildUsage(ids);
 
-  return postcss(createPostcssPlugins(allowlist, preserveAllIBMFonts)).process(
-    source,
-    { from: options.from },
-  ).css;
+  return postcss(
+    createPostcssPlugins(
+      allowlist,
+      preserveAllIBMFonts,
+      preserveFlatpickr,
+      strict,
+    ),
+  ).process(source, { from: options.from }).css;
 }
 
 export async function createOptimizedCssAsync(
@@ -209,10 +246,16 @@ export async function createOptimizedCssAsync(
 ): Promise<string> {
   const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const allowlist = buildAllowlist(ids);
+  const strict = isStrict(options);
+  const { allowlist, preserveFlatpickr } = buildUsage(ids);
 
   const result = await postcss(
-    createPostcssPlugins(allowlist, preserveAllIBMFonts),
+    createPostcssPlugins(
+      allowlist,
+      preserveAllIBMFonts,
+      preserveFlatpickr,
+      strict,
+    ),
   ).process(source, { from: options.from });
 
   return result.css;

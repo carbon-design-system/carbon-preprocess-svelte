@@ -277,6 +277,28 @@ optimizeCss({
    * @default false
    */
   preserveAllIBMFonts: true,
+
+  /**
+   * Experimental. Enables stricter CSS tree-shaking that can drastically
+   * reduce output size compared to the default baseline, depending on which
+   * Carbon components you import. Small bundles that only use a handful of
+   * components tend to see the largest gains.
+   *
+   * Compared to the default matcher, `strict`:
+   * - Prunes individual selectors from comma-separated lists instead of
+   *   keeping the entire rule when any selector matches
+   * - Requires every Carbon class in a compound selector to match when only
+   *   shared modifiers (e.g. `.bx--skeleton`) hit, so importing Button no
+   *   longer pulls in Tabs skeleton styles
+   * - Drops flatpickr and legacy single-hyphen `bx-` rules unless DatePicker
+   *   (or similar) is in the bundle
+   * - Uses parenthesis-aware selector parsing for `:is()` and similar
+   *
+   * @default false
+   */
+  experimental: {
+    strict: true,
+  },
 });
 ```
 

@@ -1,6 +1,8 @@
 import { createOptimizedCss } from "carbon-preprocess-svelte/plugins/create-optimized-css";
 
 describe("create-optimized-css", () => {
+  const strict = { experimental: { strict: true } } as const;
+
   test("removes unused selectors", () => {
     const result = createOptimizedCss({
       source: `* { box-sizing: border-box }
@@ -159,13 +161,111 @@ button.bx--btn.bx--btn--primary { color: white }`,
 button.bx--btn.bx--btn--primary { color: white }`);
   });
 
-  test("avoids false positives", () => {
+  test("preserves mixed selector lists by default", () => {
     const result = createOptimizedCss({
       source: ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
       ids: ["Button"],
     });
     expect(result).toEqual(
       ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
+    );
+  });
+
+  test("removes unused selectors from mixed selector lists in strict mode", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
+      ids: ["Button"],
+    });
+    expect(result).toEqual(".bx--btn, .bx--btn--primary { color: white }");
+  });
+
+  test("does not preserve unrelated component skeleton styles in strict mode", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: `.bx--btn.bx--skeleton { width: 9rem }
+.bx--tabs.bx--skeleton { cursor: default }
+.bx--tabs.bx--skeleton .bx--tabs__nav-link span:before { animation: skeleton 3s infinite }
+.bx--structured-list.bx--skeleton span { height: 1rem }
+.bx--skeleton__text { height: 1rem }
+.bx--skeleton { position: relative }`,
+      ids: ["Button"],
+    });
+    expect(result).toEqual(`.bx--btn.bx--skeleton { width: 9rem }
+.bx--skeleton { position: relative }`);
+  });
+
+  test("preserves selectors for explicit skeleton components", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: `.bx--skeleton__text { height: 1rem }
+.bx--skeleton__heading { height: 1.5rem }
+.bx--skeleton__placeholder { width: 100% }
+.bx--tabs.bx--skeleton { cursor: default }`,
+      ids: ["SkeletonText"],
+    });
+    expect(result).toEqual(`.bx--skeleton__text { height: 1rem }
+.bx--skeleton__heading { height: 1.5rem }`);
+  });
+
+  test("keeps non-Carbon selectors when pruning mixed selector lists", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: "button, .bx--unused { color: red }",
+      ids: ["Button"],
+    });
+    expect(result).toEqual("button { color: red }");
+  });
+
+  test("preserves flatpickr selectors by default", () => {
+    const source = `.flatpickr-calendar { visibility: hidden }
+.numInputWrapper:hover { background-color: #353535 }`;
+
+    expect(createOptimizedCss({ source, ids: ["Button"] })).toEqual(source);
+  });
+
+  test("removes flatpickr selectors unless DatePicker is used in strict mode", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: `@keyframes fpFadeInDown { from { opacity: 0 } to { opacity: 1 } }
+.flatpickr-calendar { visibility: hidden }
+.flatpickr-calendar.open, .flatpickr-calendar.inline { visibility: inherit }
+.numInputWrapper:hover { background-color: #353535 }
+.flatpickr-current-month .cur-month { margin: 0 .25rem }
+button, .flatpickr-day.selected { color: red }`,
+      ids: ["Button"],
+    });
+    expect(result).toEqual("button { color: red }");
+  });
+
+  test("preserves flatpickr selectors when DatePicker is used", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: `@keyframes fpFadeInDown { from { opacity: 0 } to { opacity: 1 } }
+.flatpickr-calendar { visibility: hidden }
+.numInputWrapper:hover { background-color: #353535 }
+.flatpickr-current-month .cur-month { margin: 0 .25rem }`,
+      ids: ["DatePicker"],
+    });
+    expect(
+      result,
+    ).toEqual(`@keyframes fpFadeInDown { from { opacity: 0 } to { opacity: 1 } }
+.flatpickr-calendar { visibility: hidden }
+.numInputWrapper:hover { background-color: #353535 }
+.flatpickr-current-month .cur-month { margin: 0 .25rem }`);
+  });
+
+  test("matches legacy single-hyphen Carbon selectors against the allowlist", () => {
+    const source = `.bx-slider-text-input { appearance: textfield }
+.bx-slider-text-input::-webkit-outer-spin-button { display: none }
+.bx-slider-text-input::-webkit-inner-spin-button { display: none }`;
+
+    expect(createOptimizedCss({ source, ids: ["Button"] })).toEqual(source);
+    expect(createOptimizedCss({ ...strict, source, ids: ["Button"] })).toEqual(
+      "",
+    );
+    expect(createOptimizedCss({ ...strict, source, ids: ["Slider"] })).toEqual(
+      source,
     );
   });
 
