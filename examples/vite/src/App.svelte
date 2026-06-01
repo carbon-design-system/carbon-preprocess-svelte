@@ -1,16 +1,11 @@
 <script lang="ts">
   import "carbon-components-svelte/css/g100.css";
   import { DataTable } from "carbon-components-svelte";
-  import type { DataTableProps } from "carbon-components-svelte/src/DataTable/DataTable.svelte";
-
-  const tableProps: DataTableProps = {
-    sortable: true,
-    selectable: true,
-  };
 </script>
 
 <DataTable
-  {...tableProps}
+  sortable
+  selectable
   headers={[
     { key: "name", value: "Name" },
     { key: "protocol", value: "Protocol" },
