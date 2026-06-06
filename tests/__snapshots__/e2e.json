@@ -2,20 +2,20 @@
   "rollup": {
     "file": "bundle.css",
     "before_kb": 664.74,
-    "after_kb": 136.98,
-    "reduction_percent": 79.39
+    "after_kb": 132.92,
+    "reduction_percent": 80
   },
   "sveltekit": {
     "file": "_app/immutable/assets/2.C-*.css",
     "before_kb": 617.52,
-    "after_kb": 45.56,
-    "reduction_percent": 92.62
+    "after_kb": 41.51,
+    "reduction_percent": 93.28
   },
   "vite": {
     "file": "assets/index-*.css",
     "before_kb": 654.96,
-    "after_kb": 52.01,
-    "reduction_percent": 92.06
+    "after_kb": 47.95,
+    "reduction_percent": 92.68
   },
   "vite@svelte-5": {
     "composed-modal-bundle": {
@@ -27,14 +27,14 @@
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
       "before_kb": 617.62,
-      "after_kb": 54.21,
-      "reduction_percent": 91.22
+      "after_kb": 51.4,
+      "reduction_percent": 91.68
     },
     "datatable-toolbar": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 70.17,
-      "reduction_percent": 88.64
+      "after_kb": 63.11,
+      "reduction_percent": 89.78
     },
     "datepicker": {
       "file": "assets/index-*.css",
@@ -57,26 +57,26 @@
     "multiselect": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 44.43,
-      "reduction_percent": 92.81
+      "after_kb": 44.13,
+      "reduction_percent": 92.85
     },
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 81.33,
-      "reduction_percent": 86.83
+      "after_kb": 81.07,
+      "reduction_percent": 86.87
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 27.23,
-      "reduction_percent": 95.59
+      "after_kb": 24.93,
+      "reduction_percent": 95.96
     },
     "textinput": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 20.01,
-      "reduction_percent": 96.76
+      "after_kb": 19.96,
+      "reduction_percent": 96.77
     },
     "timepicker-bundle": {
       "file": "assets/index-*.css",
@@ -87,20 +87,20 @@
     "uishell": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 46.73,
-      "reduction_percent": 92.43
+      "after_kb": 45.83,
+      "reduction_percent": 92.58
     }
   },
   "webpack": {
     "file": "build/bundle.*.css",
     "before_kb": 664.74,
-    "after_kb": 136.98,
-    "reduction_percent": 79.39
+    "after_kb": 132.92,
+    "reduction_percent": 80
   },
   "webpack@svelte-5": {
     "file": "build/bundle.*.css",
     "before_kb": 664.74,
-    "after_kb": 136.98,
-    "reduction_percent": 79.39
+    "after_kb": 132.92,
+    "reduction_percent": 80
   }
 }
