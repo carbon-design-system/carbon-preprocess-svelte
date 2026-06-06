@@ -4,12 +4,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 164737,
-  "reduction_percent": 75.22,
-  "kept_rules": 475,
-  "leaked_count": 2,
-  "leaked_classes": [
-    ".bx--overflow-menu-options",
-    ".bx--tooltip"
-  ]
+  "after_bytes": 164587,
+  "reduction_percent": 75.25,
+  "kept_rules": 473,
+  "leaked_count": 0,
+  "leaked_classes": []
 }

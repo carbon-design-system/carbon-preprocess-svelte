@@ -1,13 +1,12 @@
 {
   "ids": [
-    "Button",
-    "Accordion"
+    "Modal"
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 168359,
-  "reduction_percent": 74.68,
-  "kept_rules": 509,
+  "after_bytes": 169260,
+  "reduction_percent": 74.54,
+  "kept_rules": 513,
   "leaked_count": 0,
   "leaked_classes": []
 }

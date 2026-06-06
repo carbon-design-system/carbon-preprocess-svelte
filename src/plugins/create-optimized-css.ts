@@ -3,7 +3,7 @@ import type { AcceptedPlugin } from "postcss";
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import { components } from "../component-index";
-import { CARBON_PREFIX } from "../constants";
+import { ALWAYS_ON_CLASSES, CARBON_PREFIX } from "../constants";
 import {
   optimizeStrictAtRule,
   optimizeStrictRule,
@@ -95,7 +95,7 @@ function buildUsage(ids: Iterable<string>): {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
 } {
-  const allowlist = new Set([".bx--body"]);
+  const allowlist = new Set(ALWAYS_ON_CLASSES);
   let preserveFlatpickr = false;
 
   for (const id of ids) {

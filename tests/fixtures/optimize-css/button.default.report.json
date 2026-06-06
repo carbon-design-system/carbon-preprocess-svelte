@@ -7,7 +7,7 @@
   "after_bytes": 295313,
   "reduction_percent": 55.59,
   "kept_rules": 1143,
-  "leaked_count": 111,
+  "leaked_count": 112,
   "leaked_classes": [
     ".bx--accordion",
     ".bx--accordion--end",
@@ -17,6 +17,7 @@
     ".bx--accordion__title",
     ".bx--action-list",
     ".bx--batch-summary__cancel",
+    ".bx--body--with-modal-open",
     ".bx--breadcrumb",
     ".bx--btn-set",
     ".bx--btn-set--stacked",
