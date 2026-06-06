@@ -7,7 +7,7 @@
   "after_bytes": 126427,
   "reduction_percent": 80.99,
   "kept_rules": 312,
-  "leaked_count": 11,
+  "leaked_count": 9,
   "leaked_classes": [
     ".bx--content",
     ".bx--header",
@@ -17,8 +17,6 @@
     ".bx--header__menu-item--current",
     ".bx--header__menu-title",
     ".bx--header__nav",
-    ".bx--side-nav-collapse-icon",
-    ".bx--side-nav-expand-icon",
     ".bx--text-truncate-end"
   ]
 }
