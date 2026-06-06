@@ -9,7 +9,7 @@
         "@types/bun": "^1.3.14",
         "@types/jest": "^30.0.0",
         "@typescript/native-preview": "^7.0.0-dev.20260527.2",
-        "carbon-components-svelte": "0.106.1",
+        "carbon-components-svelte": "0.108.0",
         "culls": "^0.2.0",
         "estree-walker": "^2.0.2",
         "magic-string": "^0.30.17",
@@ -222,7 +222,7 @@
 
     "caniuse-lite": ["caniuse-lite@1.0.30001760", "", {}, "sha512-7AAMPcueWELt1p3mi13HR/LHH0TJLT11cnwDJEs3xA4+CK/PLKeO9Kl1oru24htkyUKtkGCvAx4ohB0Ttry8Dw=="],
 
-    "carbon-components-svelte": ["carbon-components-svelte@0.106.1", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-PeDQqbu7FTA76zTsJRVVt3RaQ94Wzq5DqzKdsI3l8AZmxoR+8GUjzQD/LLPBpwGA7bXW6W3yJrgkK2SY1x022Q=="],
+    "carbon-components-svelte": ["carbon-components-svelte@0.108.0", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-eMd5HL0CFFr7jtcQp42QNY5oSYDNlGyVcoa5QiEbIePI2pmkl9yI6DHAiYvqo3BBMDP2G9ZhKoKXC7t/xx+y/Q=="],
 
     "chalk": ["chalk@4.1.2", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA=="],
 
