@@ -1865,6 +1865,8 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--side-nav--rail",
         ".bx--side-nav--ui-shell-classic",
         ".bx--side-nav--ux",
+        ".bx--side-nav-collapse-icon",
+        ".bx--side-nav-expand-icon",
       ],
     },
     SideNavDivider: {
