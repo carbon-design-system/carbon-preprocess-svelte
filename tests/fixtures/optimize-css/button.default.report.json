@@ -7,7 +7,7 @@
   "after_bytes": 295313,
   "reduction_percent": 55.59,
   "kept_rules": 1143,
-  "leaked_count": 112,
+  "leaked_count": 111,
   "leaked_classes": [
     ".bx--accordion",
     ".bx--accordion--end",
@@ -85,7 +85,6 @@
     ".bx--table-toolbar--small",
     ".bx--tabs",
     ".bx--tabs--scrollable",
-    ".bx--tabs--scrollable--container",
     ".bx--tabs--scrollable__nav-item",
     ".bx--tabs--scrollable__nav-link",
     ".bx--tabs-trigger",

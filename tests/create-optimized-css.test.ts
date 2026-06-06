@@ -221,6 +221,31 @@ button.bx--btn.bx--btn--primary { color: white }`);
     ).toEqual("");
   });
 
+  test("does not require classes inside :not() in strict mode", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source:
+        ".bx--header__global button.bx--header__action:not(.bx--header-search-button):hover { color: inherit }",
+      ids: ["HeaderGlobalAction"],
+    });
+    expect(result).toEqual(
+      ".bx--header__global button.bx--header__action:not(.bx--header-search-button):hover { color: inherit }",
+    );
+  });
+
+  test("keeps header global action button hover styles in strict mode", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: `.bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button) { color: inherit }
+.bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button):hover { background-color: #e5e5e5 }`,
+      ids: ["HeaderGlobalAction"],
+    });
+    expect(
+      result,
+    ).toEqual(`.bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button) { color: inherit }
+.bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button):hover { background-color: #e5e5e5 }`);
+  });
+
   test("keeps multi-class selectors when every class matches in strict mode", () => {
     const result = createOptimizedCss({
       ...strict,

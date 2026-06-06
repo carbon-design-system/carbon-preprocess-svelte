@@ -25,6 +25,12 @@ const RUNTIME_CLASSES: Record<string, string[]> = {
     ".bx--side-nav-collapse-icon",
     ".bx--side-nav-expand-icon",
   ],
+  // HeaderGlobalAction and siblings render inside HeaderUtilities, but apps
+  // often import only the action. Carbon scopes button/link hover styles under
+  // `.bx--header__global` (including `color: inherit` so icon fills update).
+  HeaderAction: [".bx--header__global"],
+  HeaderActionLink: [".bx--header__global"],
+  HeaderGlobalAction: [".bx--header__global"],
 };
 
 const carbon_path = path.join("node_modules", CarbonSvelte.Components);

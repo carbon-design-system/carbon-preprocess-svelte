@@ -1,12 +1,12 @@
 {
   "ids": [
-    "Dropdown"
+    "HeaderGlobalAction"
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 121042,
-  "reduction_percent": 81.8,
-  "kept_rules": 312,
+  "after_bytes": 167410,
+  "reduction_percent": 74.82,
+  "kept_rules": 496,
   "leaked_count": 0,
   "leaked_classes": []
 }
