@@ -6,6 +6,8 @@ export const CarbonSvelte = {
 
 export const CARBON_PREFIX = /bx--/;
 
+export const ALWAYS_ON_CLASSES = [".bx--body"];
+
 export const RE_EXT_SVELTE = /\.svelte$/;
 
 export const RE_EXT_CSS = /\.css$/;

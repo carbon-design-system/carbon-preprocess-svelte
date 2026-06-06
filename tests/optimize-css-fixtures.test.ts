@@ -37,6 +37,9 @@ const SCENARIOS: Scenario[] = [
     ids: ["DatePicker", "DatePickerInput"],
     strict: true,
   },
+  // Modal adds `.bx--body--with-modal-open` on `<body>` at runtime. Keep that
+  // rule; drop descendant rules for tooltip/overflow-menu (Modal does not import them).
+  { name: "modal.strict", ids: ["Modal"], strict: true },
 ];
 
 type Report = {
@@ -183,6 +186,15 @@ for (const scenario of SCENARIOS) {
     // Strict mode: no output selector should consist only of foreign Carbon classes.
     // Default mode keeps whole rules when any branch matches; see leaked_classes
     // and button.default vs button.strict for the gap.
+    if (scenario.name === "modal.strict") {
+      // Scroll-lock rule stays; tooltip/overflow descendants go.
+      test("keeps modal scroll-lock but drops its foreign descendants", () => {
+        expect(output).toContain(".bx--body--with-modal-open{");
+        expect(output).not.toContain(".bx--body--with-modal-open .bx--tooltip");
+        expect(output).not.toContain(".bx--overflow-menu-options");
+      });
+    }
+
     if (scenario.strict) {
       test("keeps no selector that is entirely foreign Carbon classes", () => {
         const offenders = selectorsOf(output).filter((selector) => {

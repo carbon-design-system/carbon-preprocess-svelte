@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { components } from "carbon-preprocess-svelte/component-index";
+import { ALWAYS_ON_CLASSES } from "carbon-preprocess-svelte/constants";
 import postcss from "postcss";
 
 const require = createRequire(import.meta.url);
@@ -9,6 +10,7 @@ const require = createRequire(import.meta.url);
 const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
 const LEGACY_CARBON_CLASS = /\.bx-(?!-)[A-Za-z0-9_-]+/g;
 const BEM_PREFIXES = ["--", "__"];
+const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
 
 /**
  * Load Carbon's pre-compiled theme CSS from `carbon-components-svelte`.
@@ -76,7 +78,7 @@ export function carbonClassesIn(selector: string): string[] {
  * Duplicated here instead of importing private plugin code.
  */
 export function buildAllowlist(ids: string[]): Set<string> {
-  const allowlist = new Set([".bx--body"]);
+  const allowlist = new Set(ALWAYS_ON_CLASSES);
 
   for (const id of ids) {
     const entry = components[id as keyof typeof components];
@@ -117,6 +119,7 @@ export function matchesAllowlist(
   if (allowlist.has(name)) return true;
 
   for (const selector of allowlist) {
+    if (EXACT_ONLY_CLASSES.has(selector)) continue;
     if (selector.endsWith("-") && name.startsWith(selector)) return true;
     if (sharedClasses.has(selector)) continue;
     if (

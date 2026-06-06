@@ -1,6 +1,6 @@
 import type { AtRule, Rule } from "postcss";
 import { components } from "../component-index";
-import { CARBON_PREFIX } from "../constants";
+import { ALWAYS_ON_CLASSES, CARBON_PREFIX } from "../constants";
 
 const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
 const LEGACY_CARBON_CLASS = /\.bx-(?!-)[A-Za-z0-9_-]+/g;
@@ -31,6 +31,7 @@ const FLATPICKR_SELECTOR = new RegExp(
   `\\.(?:flatpickr-[A-Za-z0-9_-]+|${FLATPICKR_CLASS_NAMES.join("|")})(?![A-Za-z0-9_-])`,
 );
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
+const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
 const SHARED_CLASSES = getSharedClasses();
 
 export type StrictCssOptimizerOptions = {
@@ -98,6 +99,8 @@ function matchesAllowlist(
   }
 
   for (const selector of allowlist) {
+    if (EXACT_ONLY_CLASSES.has(selector)) continue;
+
     const shared = SHARED_CLASSES.has(selector);
     if (selector.endsWith("-") && name.startsWith(selector)) {
       return { matched: true, shared };
