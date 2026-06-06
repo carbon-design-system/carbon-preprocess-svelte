@@ -4,13 +4,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 132350,
-  "reduction_percent": 80.09,
-  "kept_rules": 394,
-  "leaked_count": 3,
-  "leaked_classes": [
-    ".bx--list-box__field--wrapper",
-    ".bx--list-box__field--wrapper--input-focused",
-    ".bx--modal"
-  ]
+  "after_bytes": 132051,
+  "reduction_percent": 80.14,
+  "kept_rules": 392,
+  "leaked_count": 0,
+  "leaked_classes": []
 }

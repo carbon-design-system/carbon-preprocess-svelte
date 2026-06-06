@@ -6,17 +6,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 143134,
-  "reduction_percent": 78.47,
-  "kept_rules": 441,
-  "leaked_count": 7,
-  "leaked_classes": [
-    ".bx--data-table--sm",
-    ".bx--data-table--visible-overflow-menu",
-    ".bx--data-table--xl",
-    ".bx--data-table--xs",
-    ".bx--overflow-menu__trigger",
-    ".bx--table-column-icon",
-    ".bx--table-expand-v2"
-  ]
+  "after_bytes": 140324,
+  "reduction_percent": 78.9,
+  "kept_rules": 436,
+  "leaked_count": 0,
+  "leaked_classes": []
 }

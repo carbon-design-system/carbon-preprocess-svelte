@@ -6,13 +6,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 163735,
-  "reduction_percent": 75.37,
-  "kept_rules": 487,
-  "leaked_count": 3,
-  "leaked_classes": [
-    ".bx--file",
-    ".bx--file-btn",
-    ".bx--file__selected-file--field"
-  ]
+  "after_bytes": 163454,
+  "reduction_percent": 75.42,
+  "kept_rules": 485,
+  "leaked_count": 0,
+  "leaked_classes": []
 }

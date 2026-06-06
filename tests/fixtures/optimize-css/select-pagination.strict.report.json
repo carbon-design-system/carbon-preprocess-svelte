@@ -5,12 +5,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 175351,
-  "reduction_percent": 73.63,
-  "kept_rules": 568,
-  "leaked_count": 2,
-  "leaked_classes": [
-    ".bx--pagination--lg",
-    ".bx--pagination--sm"
-  ]
+  "after_bytes": 175099,
+  "reduction_percent": 73.67,
+  "kept_rules": 566,
+  "leaked_count": 0,
+  "leaked_classes": []
 }

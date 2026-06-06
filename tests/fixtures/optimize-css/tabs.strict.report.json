@@ -4,20 +4,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 112794,
-  "reduction_percent": 83.04,
-  "kept_rules": 216,
-  "leaked_count": 10,
-  "leaked_classes": [
-    ".bx--skeleton",
-    ".bx--tab-content",
-    ".bx--tabs--light",
-    ".bx--tabs--scrollable",
-    ".bx--tabs__nav-item",
-    ".bx--tabs__nav-item--disabled",
-    ".bx--tabs__nav-item--icon",
-    ".bx--tabs__nav-item--selected",
-    ".bx--tabs__nav-item-secondary-label",
-    ".bx--tabs__nav-link"
-  ]
+  "after_bytes": 107193,
+  "reduction_percent": 83.88,
+  "kept_rules": 181,
+  "leaked_count": 0,
+  "leaked_classes": []
 }
