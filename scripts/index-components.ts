@@ -7,17 +7,24 @@ import { isSvelteFile } from "../src/utils";
 import { extractSelectors } from "./extract-selectors";
 
 /**
- * Classes applied imperatively at runtime (e.g. `document.body.classList`),
- * keyed by the component that triggers them. The markup-based selector
- * extractor cannot see these because they are not present in any `class`
- * attribute or `<style>` block.
+ * Classes the markup-based extractor cannot see: runtime `classList` toggles,
+ * or Carbon UIShell CSS that targets SVG descendants without a matching
+ * `class:` directive in carbon-components-svelte.
  *
  * `.bx--body--with-modal-open` is toggled by `src/utils/bodyScrollLock.js`,
  * used by Modal (via `modalStore`) and SideNav's overlay.
+ *
+ * `.bx--side-nav-{collapse,expand}-icon` appear in compiled UIShell CSS on
+ * submenu SVGs; carbon-components-svelte uses `submenu-chevron` instead but
+ * the compiled theme still ships rules for the collapse/expand pair.
  */
 const RUNTIME_CLASSES: Record<string, string[]> = {
   Modal: [".bx--body--with-modal-open"],
-  SideNav: [".bx--body--with-modal-open"],
+  SideNav: [
+    ".bx--body--with-modal-open",
+    ".bx--side-nav-collapse-icon",
+    ".bx--side-nav-expand-icon",
+  ],
 };
 
 const carbon_path = path.join("node_modules", CarbonSvelte.Components);
