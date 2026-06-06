@@ -75,11 +75,13 @@ describe("OptimizeCssPlugin", () => {
     const plugin = new OptimizeCssPlugin({
       silent: true,
       preserveAllIBMFonts: true,
+      experimental: { strict: true },
     });
     // @ts-expect-error – options is private
     expect(plugin.options).toEqual({
       silent: true,
       preserveAllIBMFonts: true,
+      experimental: { strict: true },
     });
   });
 
@@ -169,5 +171,28 @@ describe("OptimizeCssPlugin", () => {
 
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
+  });
+
+  test("passes experimental strict option to CSS optimization", async () => {
+    const plugin = new OptimizeCssPlugin({
+      silent: true,
+      experimental: { strict: true },
+    });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const cssContent = `.bx--btn { color: blue }
+.bx-slider-text-input { appearance: textfield }`;
+
+    const mockCompiler = createMockCompiler({
+      assets: {
+        "styles.css": { source: () => cssContent },
+      },
+      fileDependencies: [carbonComponent],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
+    expect(asset.source()).toEqual(".bx--btn { color: blue }");
   });
 });
