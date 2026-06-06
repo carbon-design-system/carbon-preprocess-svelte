@@ -195,6 +195,43 @@ button.bx--btn.bx--btn--primary { color: white }`);
 .bx--skeleton { position: relative }`);
   });
 
+  test("drops multi-class selectors with a foreign ancestor in strict mode", () => {
+    expect(
+      createOptimizedCss({
+        ...strict,
+        source: ".bx--modal .bx--number { width: 100% }",
+        ids: ["NumberInput"],
+      }),
+    ).toEqual("");
+
+    expect(
+      createOptimizedCss({
+        ...strict,
+        source: ".bx--form--fluid .bx--text-input__field-wrapper { margin: 0 }",
+        ids: ["TextInput"],
+      }),
+    ).toEqual("");
+
+    expect(
+      createOptimizedCss({
+        ...strict,
+        source: ".bx--body--with-modal-open .bx--tooltip { display: none }",
+        ids: ["Modal"],
+      }),
+    ).toEqual("");
+  });
+
+  test("keeps multi-class selectors when every class matches in strict mode", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source: `.bx--modal .bx--number { width: 100% }
+.bx--btn.bx--btn--primary { color: white }`,
+      ids: ["Modal", "NumberInput", "Button"],
+    });
+    expect(result).toEqual(`.bx--modal .bx--number { width: 100% }
+.bx--btn.bx--btn--primary { color: white }`);
+  });
+
   test("preserves selectors for explicit skeleton components", () => {
     const result = createOptimizedCss({
       ...strict,
