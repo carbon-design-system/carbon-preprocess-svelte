@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "index:components": "bun scripts/index-components.ts",
+    "index:components": "bun scripts/index-components.ts && biome check --write --unsafe src/component-index.ts",
     "prebuild": "BUILD=true bun run index:components",
     "build": "bun scripts/build.ts",
     "build:prune-package": "bunx culls",
