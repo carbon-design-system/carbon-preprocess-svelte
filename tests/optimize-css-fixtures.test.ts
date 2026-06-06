@@ -57,6 +57,11 @@ const SCENARIOS: Scenario[] = [
   { name: "slider.strict", ids: ["Slider"], strict: true },
   { name: "breadcrumb.strict", ids: ["Breadcrumb"], strict: true },
   { name: "textinput.strict", ids: ["TextInput"], strict: true },
+  {
+    name: "fluid-form.strict",
+    ids: ["TextInput", "FluidForm"],
+    strict: true,
+  },
   { name: "toggle.strict", ids: ["Toggle"], strict: true },
   { name: "numberinput.strict", ids: ["NumberInput"], strict: true },
   // Multi-import bundles — import sets users actually ship.
@@ -341,6 +346,12 @@ for (const scenario of SCENARIOS) {
       });
     }
 
+    if (scenario.name === "fluid-form.strict") {
+      test("keeps fluid form ancestor selectors", () => {
+        expect(output).toContain(".bx--form--fluid .bx--text-input");
+      });
+    }
+
     if (scenario.name === "numberinput.strict") {
       test("drops modal context selectors", () => {
         expect(output).not.toContain(".bx--modal .bx--number");
@@ -357,7 +368,9 @@ for (const scenario of SCENARIOS) {
       test("keeps no selector that is entirely foreign Carbon classes", () => {
         const offenders = selectorsOf(output).filter((selector) => {
           const classes = carbonClassesIn(selector);
-          return classes.length > 0 && !shouldKeepStrictSelector(selector, allowlist);
+          return (
+            classes.length > 0 && !shouldKeepStrictSelector(selector, allowlist)
+          );
         });
 
         expect(offenders).toEqual([]);

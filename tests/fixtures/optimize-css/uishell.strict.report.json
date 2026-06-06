@@ -6,9 +6,11 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 136011,
-  "reduction_percent": 79.54,
-  "kept_rules": 392,
-  "leaked_count": 0,
-  "leaked_classes": []
+  "after_bytes": 111649,
+  "reduction_percent": 83.21,
+  "kept_rules": 224,
+  "leaked_count": 1,
+  "leaked_classes": [
+    ".bx--header__global"
+  ]
 }
