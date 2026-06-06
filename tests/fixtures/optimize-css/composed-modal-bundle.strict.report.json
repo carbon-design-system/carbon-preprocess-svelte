@@ -1,0 +1,15 @@
+{
+  "ids": [
+    "ComposedModal",
+    "ModalHeader",
+    "ModalBody",
+    "ModalFooter"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 169867,
+  "reduction_percent": 74.45,
+  "kept_rules": 517,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

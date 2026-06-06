@@ -2,9 +2,13 @@
   "datatable-toolbar",
   "datatable-overflowmenu",
   "datepicker",
+  "timepicker-bundle",
   "modal",
+  "composed-modal-bundle",
   "uishell",
   "tabs-bundle",
   "select-pagination",
-  "dropdown"
+  "dropdown",
+  "textinput",
+  "multiselect"
 ]

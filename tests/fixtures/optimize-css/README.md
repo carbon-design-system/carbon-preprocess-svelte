@@ -69,6 +69,9 @@ datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without i
 | checkbox.strict | Checkbox | Form control |
 | slider.strict | Slider | Range input |
 | breadcrumb.strict | Breadcrumb | Navigation trail |
+| textinput.strict | TextInput | Text input |
+| toggle.strict | Toggle | Toggle switch |
+| numberinput.strict | NumberInput | Number input with steppers |
 
 ### Multi-import bundles
 
@@ -78,6 +81,9 @@ datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without i
 | select-pagination.strict | Select, Pagination | Inline select wrapper (Carbon nests under Pagination) |
 | tabs-bundle.strict | Tabs, Tab, TabContent | Typical tabs page (slot children) |
 | datatable-overflowmenu.strict | DataTable, OverflowMenu, Link | Table with row actions; fewer leaks than datatable.strict alone |
+| accordion-bundle.strict | Accordion, AccordionItem | Typical accordion page (slot children) |
+| composed-modal-bundle.strict | ComposedModal, ModalHeader, ModalBody, ModalFooter | Composed modal usage (footer btn classes) |
+| timepicker-bundle.strict | TimePicker, TimePickerSelect | Time picker with child select (Stack + Select cross-refs) |
 
 ### Leaky regression baselines
 
@@ -89,6 +95,10 @@ datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without i
 | uishell.strict | Header, SideNav, SideNavItems | Full shell bundle |
 | tooltip.strict | Tooltip | High cross-component noise |
 | datatable-toolbar.strict | DataTable, Toolbar, ToolbarSearch | Table toolbar bundle |
+| multiselect.strict | MultiSelect | Checkbox + list-box + combo-box + tag piggybacking |
+| passwordinput.strict | PasswordInput | Btn / visibility-toggle bleed |
+| fileuploader-bundle.strict | FileUploader, FileUploaderButton, FileUploaderItem | File upload btn + state classes |
+| inline-notification.strict | InlineNotification | Notification namespace cross-refs |
 
 ## When to add a scenario
 
@@ -96,3 +106,5 @@ datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without i
 - New typical multi-import bundle (like DatePicker + DatePickerInput)
 - Optimizer behavior change that should be regression-tested
 - Component with suspected over-prune or leak regression
+
+Skip new fixtures when an existing scenario already covers the same import set or leak family. Prefer net-new component namespaces or parent+child bundles not yet represented (for example, do not add another UIShell bundle when header/sidenav/uishell already exist, or OverflowMenuItem when overflowmenu.strict is zero-leak).
