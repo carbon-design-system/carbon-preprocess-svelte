@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "Checkbox"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 109592,
+  "reduction_percent": 83.52,
+  "kept_rules": 192,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

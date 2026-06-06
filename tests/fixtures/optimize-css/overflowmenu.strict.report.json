@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "OverflowMenu"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 109255,
+  "reduction_percent": 83.57,
+  "kept_rules": 199,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

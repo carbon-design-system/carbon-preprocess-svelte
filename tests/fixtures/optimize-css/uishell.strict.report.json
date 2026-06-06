@@ -1,0 +1,23 @@
+{
+  "ids": [
+    "Header",
+    "SideNav",
+    "SideNavItems"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 136660,
+  "reduction_percent": 79.45,
+  "kept_rules": 398,
+  "leaked_count": 8,
+  "leaked_classes": [
+    ".bx--btn--ghost",
+    ".bx--content",
+    ".bx--header-search-button",
+    ".bx--navigation-menu-panel-collapse-icon",
+    ".bx--navigation-menu-panel-expand-icon",
+    ".bx--side-nav-collapse-icon",
+    ".bx--side-nav-expand-icon",
+    ".bx--text-truncate-end"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "Select"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 110307,
+  "reduction_percent": 83.41,
+  "kept_rules": 213,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

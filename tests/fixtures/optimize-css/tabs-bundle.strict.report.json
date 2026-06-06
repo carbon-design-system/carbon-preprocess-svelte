@@ -1,0 +1,20 @@
+{
+  "ids": [
+    "Tabs",
+    "Tab",
+    "TabContent"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 117244,
+  "reduction_percent": 82.37,
+  "kept_rules": 249,
+  "leaked_count": 5,
+  "leaked_classes": [
+    ".bx--skeleton",
+    ".bx--tabs--light",
+    ".bx--tabs--scrollable",
+    ".bx--tabs--scrollable__nav-item",
+    ".bx--tabs--scrollable__nav-item--selected"
+  ]
+}

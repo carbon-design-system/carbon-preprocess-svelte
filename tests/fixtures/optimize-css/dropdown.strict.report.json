@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "Dropdown"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 120902,
+  "reduction_percent": 81.82,
+  "kept_rules": 312,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

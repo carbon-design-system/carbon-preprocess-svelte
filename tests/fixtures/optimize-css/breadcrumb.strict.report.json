@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "Breadcrumb"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 107165,
+  "reduction_percent": 83.88,
+  "kept_rules": 189,
+  "leaked_count": 0,
+  "leaked_classes": []
+}
