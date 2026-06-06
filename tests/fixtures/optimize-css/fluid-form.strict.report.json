@@ -1,0 +1,13 @@
+{
+  "ids": [
+    "TextInput",
+    "FluidForm"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 118261,
+  "reduction_percent": 82.21,
+  "kept_rules": 284,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

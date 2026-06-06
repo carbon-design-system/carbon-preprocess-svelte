@@ -25,9 +25,9 @@ Review the .report.json diff. Carbon ships minified CSS; the test pretty-prints 
 
 Each scenario also validates against src/component-index.ts, the same component-to-class map the plugin uses:
 
-- No over-prune: if every Carbon class in a source selector is allowed, those classes must still appear in the output.
-- No foreign survivor (strict only): no kept selector should reference only classes outside the allowlist.
-- Multi-class strict pruning: selectors with more than one Carbon class (descendants or same-element compounds) require every positive class to match the allowlist. Classes inside `:not(...)` are exclusions and are not required.
+- No over-prune: if a source selector would survive strict pruning, its Carbon classes must still appear in the output.
+- No foreign survivor (strict only): no kept selector should fail strict allowlist matching (subject classes must match; context ancestors may be exempt).
+- Multi-class strict pruning: same-element compounds require every class to match. Descendant selectors require every subject class to match; ancestor classes must match unless listed in `CONTEXT_ANCESTORS`. Classes inside `:not(...)` are exclusions and are not required.
 
 Compare button.default and button.strict for the strict-mode delta. Strict scenarios target `leaked_count: 0`.
 
@@ -37,7 +37,9 @@ Non-zero `leaked_count` in strict scenarios is not a test failure when it occurs
 
 Compare button.default (`leaked_count: 112`) with button.strict (`leaked_count: 0`) for the default-vs-strict gap. Default mode keeps whole comma-list rules when any branch matches.
 
-RUNTIME_CLASSES in scripts/index-components.ts covers body scroll-lock, SideNav submenu SVG icons, HeaderGlobalAction's `.bx--header__global` wrapper context, and other tokens absent from class: attributes.
+`scripts/index-components.ts` automates most context classes: import-graph `classList` tracing, slot-wrapper detection, gated Carbon CSS cross-reference, and CSS-orphan SVG classes. `MANUAL_OVERRIDES` is the fallback when automation misses on a Carbon bump.
+
+Bundle pairs that stay strict (import both components): Select + Pagination for inline select, TextInput + FluidForm for fluid layout.
 
 ## Scenario catalog
 
@@ -63,7 +65,8 @@ RUNTIME_CLASSES in scripts/index-components.ts covers body scroll-lock, SideNav 
 | checkbox.strict | Checkbox | Form control |
 | slider.strict | Slider | Range input |
 | breadcrumb.strict | Breadcrumb | Navigation trail |
-| textinput.strict | TextInput | Text input |
+| textinput.strict | TextInput | Text input; drops fluid form ancestors |
+| fluid-form.strict | TextInput, FluidForm | Fluid form ancestor rules |
 | toggle.strict | Toggle | Toggle switch |
 | numberinput.strict | NumberInput | Number input with steppers |
 | multiselect.strict | MultiSelect | Checkbox + list-box + combo-box + tag |
@@ -99,7 +102,7 @@ RUNTIME_CLASSES in scripts/index-components.ts covers body scroll-lock, SideNav 
 
 ## When to add a scenario
 
-- New RUNTIME_CLASSES entry in scripts/index-components.ts
+- New `MANUAL_OVERRIDES` entry or automation gate change in scripts/index-components.ts
 - New typical multi-import bundle (like DatePicker + DatePickerInput)
 - Optimizer behavior change that should be regression-tested
 - Component with suspected over-prune or leak regression
