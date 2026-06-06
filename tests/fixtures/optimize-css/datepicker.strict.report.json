@@ -1,0 +1,16 @@
+{
+  "ids": [
+    "DatePicker",
+    "DatePickerInput"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 119913,
+  "reduction_percent": 81.97,
+  "kept_rules": 298,
+  "leaked_count": 2,
+  "leaked_classes": [
+    ".bx--overflow-menu-options",
+    ".bx--tooltip"
+  ]
+}

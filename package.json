@@ -22,6 +22,7 @@
     "test": "bun test --parallel",
     "test:e2e": "bun tests/test-e2e.ts",
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
+    "test:fixtures:update": "UPDATE_FIXTURES=true bun test tests/optimize-css-fixtures.test.ts",
     "typecheck": "tsgo --noEmit",
     "lint": "biome lint .",
     "lint:fix": "biome check --write --unsafe .",
