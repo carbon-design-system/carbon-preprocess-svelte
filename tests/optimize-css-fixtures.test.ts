@@ -46,6 +46,12 @@ const SCENARIOS: Scenario[] = [
   { name: "overflowmenu.strict", ids: ["OverflowMenu"], strict: true },
   { name: "search.strict", ids: ["Search"], strict: true },
   { name: "select.strict", ids: ["Select"], strict: true },
+  // Select `inline` styles live under Pagination descendants in Carbon CSS.
+  {
+    name: "select-pagination.strict",
+    ids: ["Select", "Pagination"],
+    strict: true,
+  },
   { name: "checkbox.strict", ids: ["Checkbox"], strict: true },
   { name: "slider.strict", ids: ["Slider"], strict: true },
   { name: "breadcrumb.strict", ids: ["Breadcrumb"], strict: true },
@@ -254,6 +260,12 @@ for (const scenario of SCENARIOS) {
       test("keeps typical tabs page selectors", () => {
         expect(output).toContain(".bx--tabs__nav-link");
         expect(output).toContain(".bx--tab-content");
+      });
+    }
+
+    if (scenario.name === "select-pagination.strict") {
+      test("keeps inline select wrapper styles under pagination", () => {
+        expect(output).toContain(".bx--select-input--inline__wrapper");
       });
     }
 

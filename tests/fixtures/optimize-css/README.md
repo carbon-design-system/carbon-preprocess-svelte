@@ -37,7 +37,8 @@ Non-zero `leaked_count` is not a test failure — it is a documented regression 
 - **Compound piggybacking** — Carbon bundles unrelated classes in one selector (e.g. `.bx--data-table--compact, .bx--data-table--sm`). Strict mode keeps the rule when any class matches; foreign co-occurrences show up as leaks.
 - **Missing import** — importing `Tabs` alone omits `Tab` / `TabContent` classes. Compare `tabs.strict` vs `tabs-bundle.strict`.
 - **Cross-component CSS** — UIShell rules reference both `.bx--header` and `.bx--side-nav`; importing one component leaks classes from the other.
-- **Runtime classes** — `Modal` and `SideNav` add `.bx--body--with-modal-open` on `<body>` via `RUNTIME_CLASSES` in `scripts/index-components.ts`.
+- **Runtime / invisible classes** — `RUNTIME_CLASSES` in `scripts/index-components.ts` covers body scroll-lock, SideNav submenu SVG icons, and other tokens absent from `class:` attributes.
+- **Unknown child components** — `datatable-toolbar`, `tooltip`, and bare `datatable` cannot reach zero leaks without importing every possible child; compound piggybacking is expected.
 
 ## Scenario catalog
 
@@ -60,7 +61,7 @@ Non-zero `leaked_count` is not a test failure — it is a documented regression 
 | `combobox.strict` | ComboBox | Autocomplete listbox |
 | `overflowmenu.strict` | OverflowMenu | Menu trigger and options |
 | `search.strict` | Search | Search input |
-| `select.strict` | Select | Native select styling |
+| `select.strict` | Select | Native select styling (`inline` needs Pagination — see bundle) |
 | `checkbox.strict` | Checkbox | Form control |
 | `slider.strict` | Slider | Range input |
 | `breadcrumb.strict` | Breadcrumb | Navigation trail |
@@ -70,6 +71,7 @@ Non-zero `leaked_count` is not a test failure — it is a documented regression 
 | Scenario | ids | Exercises |
 | --- | --- | --- |
 | `dropdown-skeleton.strict` | Dropdown, DropdownSkeleton | Parent + loading skeleton |
+| `select-pagination.strict` | Select, Pagination | Inline select wrapper (Carbon nests under Pagination) |
 | `tabs-bundle.strict` | Tabs, Tab, TabContent | Typical tabs page (slot children) |
 | `datatable-overflowmenu.strict` | DataTable, OverflowMenu, Link | Table with row actions; fewer leaks than `datatable.strict` alone |
 
@@ -78,7 +80,7 @@ Non-zero `leaked_count` is not a test failure — it is a documented regression 
 | Scenario | ids | Exercises |
 | --- | --- | --- |
 | `tabs.strict` | Tabs | Missing slot children (Tab, TabContent) |
-| `sidenav.strict` | SideNav | Runtime body class + Header cross-refs |
+| `sidenav.strict` | SideNav | Runtime body class, UIShell SVG icons + Header cross-refs |
 | `header.strict` | Header | SideNav / content cross-refs |
 | `uishell.strict` | Header, SideNav, SideNavItems | Full shell bundle |
 | `tooltip.strict` | Tooltip | High cross-component noise |
