@@ -40,6 +40,46 @@ const SCENARIOS: Scenario[] = [
   // Modal adds `.bx--body--with-modal-open` on `<body>` at runtime. Keep that
   // rule; drop descendant rules for tooltip/overflow-menu (Modal does not import them).
   { name: "modal.strict", ids: ["Modal"], strict: true },
+  // Zero-leak gold standard — well-indexed single components.
+  { name: "dropdown.strict", ids: ["Dropdown"], strict: true },
+  { name: "combobox.strict", ids: ["ComboBox"], strict: true },
+  { name: "overflowmenu.strict", ids: ["OverflowMenu"], strict: true },
+  { name: "search.strict", ids: ["Search"], strict: true },
+  { name: "select.strict", ids: ["Select"], strict: true },
+  { name: "checkbox.strict", ids: ["Checkbox"], strict: true },
+  { name: "slider.strict", ids: ["Slider"], strict: true },
+  { name: "breadcrumb.strict", ids: ["Breadcrumb"], strict: true },
+  // Multi-import bundles — import sets users actually ship.
+  {
+    name: "dropdown-skeleton.strict",
+    ids: ["Dropdown", "DropdownSkeleton"],
+    strict: true,
+  },
+  {
+    name: "tabs-bundle.strict",
+    ids: ["Tabs", "Tab", "TabContent"],
+    strict: true,
+  },
+  {
+    name: "datatable-overflowmenu.strict",
+    ids: ["DataTable", "OverflowMenu", "Link"],
+    strict: true,
+  },
+  // Leaky regression baselines — compound-selector piggybacking.
+  { name: "tabs.strict", ids: ["Tabs"], strict: true },
+  { name: "sidenav.strict", ids: ["SideNav"], strict: true },
+  { name: "header.strict", ids: ["Header"], strict: true },
+  {
+    name: "uishell.strict",
+    ids: ["Header", "SideNav", "SideNavItems"],
+    strict: true,
+  },
+  { name: "tooltip.strict", ids: ["Tooltip"], strict: true },
+  {
+    name: "datatable-toolbar.strict",
+    ids: ["DataTable", "Toolbar", "ToolbarSearch"],
+    strict: true,
+  },
 ];
 
 type Report = {
@@ -192,6 +232,28 @@ for (const scenario of SCENARIOS) {
         expect(output).toContain(".bx--body--with-modal-open{");
         expect(output).not.toContain(".bx--body--with-modal-open .bx--tooltip");
         expect(output).not.toContain(".bx--overflow-menu-options");
+      });
+    }
+
+    if (scenario.name === "sidenav.strict") {
+      // SideNav toggles `.bx--body--with-modal-open` via bodyScrollLock (overlay).
+      test("keeps sidenav scroll-lock but drops its foreign descendants", () => {
+        expect(output).toContain(".bx--body--with-modal-open{");
+        expect(output).not.toContain(".bx--body--with-modal-open .bx--tooltip");
+      });
+    }
+
+    if (scenario.name === "uishell.strict") {
+      test("keeps core UIShell selectors", () => {
+        expect(output).toContain(".bx--side-nav");
+        expect(output).toContain(".bx--header");
+      });
+    }
+
+    if (scenario.name === "tabs-bundle.strict") {
+      test("keeps typical tabs page selectors", () => {
+        expect(output).toContain(".bx--tabs__nav-link");
+        expect(output).toContain(".bx--tab-content");
       });
     }
 

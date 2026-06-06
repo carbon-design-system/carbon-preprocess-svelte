@@ -1,0 +1,30 @@
+{
+  "ids": [
+    "Tooltip"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 179428,
+  "reduction_percent": 73.01,
+  "kept_rules": 537,
+  "leaked_count": 17,
+  "leaked_classes": [
+    ".bx--assistive-text",
+    ".bx--body--with-modal-open",
+    ".bx--btn",
+    ".bx--btn--disabled",
+    ".bx--btn--icon-only",
+    ".bx--btn--icon-only--bottom",
+    ".bx--btn--icon-only--left",
+    ".bx--btn--icon-only--right",
+    ".bx--btn--icon-only--top",
+    ".bx--link",
+    ".bx--overflow-menu__trigger",
+    ".bx--progress--vertical",
+    ".bx--progress-label-overflow",
+    ".bx--progress-step",
+    ".bx--progress-step--disabled",
+    ".bx--progress-step-button--unclickable",
+    ".bx--text-input--password__visibility"
+  ]
+}

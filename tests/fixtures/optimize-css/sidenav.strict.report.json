@@ -1,0 +1,24 @@
+{
+  "ids": [
+    "SideNav"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 126427,
+  "reduction_percent": 80.99,
+  "kept_rules": 312,
+  "leaked_count": 11,
+  "leaked_classes": [
+    ".bx--content",
+    ".bx--header",
+    ".bx--header__menu",
+    ".bx--header__menu-arrow",
+    ".bx--header__menu-item",
+    ".bx--header__menu-item--current",
+    ".bx--header__menu-title",
+    ".bx--header__nav",
+    ".bx--side-nav-collapse-icon",
+    ".bx--side-nav-expand-icon",
+    ".bx--text-truncate-end"
+  ]
+}

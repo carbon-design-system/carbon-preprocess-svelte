@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "Slider"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 113028,
+  "reduction_percent": 83,
+  "kept_rules": 225,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "Search"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 116899,
+  "reduction_percent": 82.42,
+  "kept_rules": 257,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

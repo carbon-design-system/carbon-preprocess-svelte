@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "ComboBox"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 124753,
+  "reduction_percent": 81.24,
+  "kept_rules": 341,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

@@ -1,0 +1,36 @@
+{
+  "ids": [
+    "DataTable",
+    "Toolbar",
+    "ToolbarSearch"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 155436,
+  "reduction_percent": 76.62,
+  "kept_rules": 522,
+  "leaked_count": 21,
+  "leaked_classes": [
+    ".bx--action-list",
+    ".bx--batch-actions",
+    ".bx--batch-summary",
+    ".bx--batch-summary__cancel",
+    ".bx--btn",
+    ".bx--btn--primary",
+    ".bx--data-table--sm",
+    ".bx--data-table--visible-overflow-menu",
+    ".bx--data-table--xl",
+    ".bx--data-table--xs",
+    ".bx--link",
+    ".bx--link--disabled",
+    ".bx--overflow-menu",
+    ".bx--overflow-menu--open",
+    ".bx--overflow-menu__icon",
+    ".bx--overflow-menu__trigger",
+    ".bx--table-column-icon",
+    ".bx--table-expand-v2",
+    ".bx--table-toolbar--sm",
+    ".bx--toolbar-action",
+    ".bx--toolbar-content"
+  ]
+}
