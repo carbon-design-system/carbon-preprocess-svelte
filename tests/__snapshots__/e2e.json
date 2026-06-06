@@ -18,10 +18,54 @@
     "reduction_percent": 92.06
   },
   "vite@svelte-5": {
-    "file": "assets/index-*.css",
-    "before_kb": 617.52,
-    "after_kb": 45.56,
-    "reduction_percent": 92.62
+    "datatable-overflowmenu": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.62,
+      "after_kb": 54.21,
+      "reduction_percent": 91.22
+    },
+    "datatable-toolbar": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 70.17,
+      "reduction_percent": 88.64
+    },
+    "datepicker": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 29.08,
+      "reduction_percent": 95.29
+    },
+    "dropdown": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 35.02,
+      "reduction_percent": 94.33
+    },
+    "modal": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 75.5,
+      "reduction_percent": 87.77
+    },
+    "select-pagination": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 81.33,
+      "reduction_percent": 86.83
+    },
+    "tabs-bundle": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 27.23,
+      "reduction_percent": 95.59
+    },
+    "uishell": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 46.73,
+      "reduction_percent": 92.43
+    }
   },
   "webpack": {
     "file": "build/bundle.*.css",

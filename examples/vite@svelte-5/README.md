@@ -1,37 +1,67 @@
 # vite@svelte-5
 
-> Used for end-to-end testing and development purposes.
+Used for end-to-end testing and development. Svelte 5 with strict `optimizeCss`.
 
-Identical to the `vite` example, but using Svelte 5.
+Each entry is a small app that mirrors an optimize-css fixture scenario. Pick one with `ENTRY` or the matching script.
 
-## Quick Start
+## Entries
+
+| Entry | Fixture | Components |
+| --- | --- | --- |
+| datatable-toolbar | datatable-toolbar.strict | TableContainer, Toolbar, ToolbarSearch, DataTable |
+| datatable-overflowmenu | datatable-overflowmenu.strict | DataTable, OverflowMenu, Link |
+| datepicker | datepicker.strict | DatePicker, DatePickerInput |
+| modal | modal.strict | Modal |
+| uishell | uishell.strict | Header, SideNav, SideNavItems, Content |
+| tabs-bundle | tabs-bundle.strict | Tabs, Tab, TabContent |
+| select-pagination | select-pagination.strict | Select (inline), Pagination |
+| dropdown | dropdown.strict | Dropdown |
+
+## Quick start
+
+From the repo root:
 
 ```sh
-# First, build the library locally
 bun run build
-
-# Create a local link to the library
 bun link
-
-# When developing, rebuild the library when making changes
-bun run build -w
 ```
 
-In this folder, you can run the following commands:
+In this folder:
 
 ```sh
-# Install dependencies
 bun i
 ```
 
-Run the app in development mode. This should only apply the `optimizeImports` preprocessor.
+Run one entry in dev (optimizeImports only):
 
 ```sh
-bun run dev
+bun run dev:modal
+bun run dev:uishell
 ```
 
-Build the app for production. This should run both the `optimizeImports` and `optimizeCss` preprocessors.
+Build one entry (optimizeImports + optimizeCss):
+
+```sh
+bun run build:datatable-toolbar
+```
+
+Build all entries (what e2e uses):
 
 ```sh
 bun run build
+# or
+bun run build:all
+```
+
+Default dev/build target is `datatable-toolbar`.
+
+## Layout
+
+```
+entries/<name>/
+  index.html
+  App.svelte
+entries.manifest.json   # list for e2e
+vite.config.ts          # root = entries/<ENTRY>
+dist/<name>/            # per-entry build output
 ```
