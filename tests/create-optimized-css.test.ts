@@ -233,6 +233,36 @@ button.bx--btn.bx--btn--primary { color: white }`);
     );
   });
 
+  test("exempts context ancestors but drops foreign subjects in strict mode", () => {
+    expect(
+      createOptimizedCss({
+        ...strict,
+        source: ".bx--body--with-modal-open .bx--tooltip { display: none }",
+        ids: ["Modal"],
+      }),
+    ).toEqual("");
+
+    expect(
+      createOptimizedCss({
+        ...strict,
+        source: ".bx--form--fluid .bx--text-input { margin: 0 }",
+        ids: ["TextInput"],
+      }),
+    ).toEqual("");
+  });
+
+  test("keeps descendant selectors when context ancestor is exempt", () => {
+    const result = createOptimizedCss({
+      ...strict,
+      source:
+        ".bx--header__global button.bx--header__action { color: inherit }",
+      ids: ["HeaderGlobalAction"],
+    });
+    expect(result).toEqual(
+      ".bx--header__global button.bx--header__action { color: inherit }",
+    );
+  });
+
   test("keeps header global action button hover styles in strict mode", () => {
     const result = createOptimizedCss({
       ...strict,

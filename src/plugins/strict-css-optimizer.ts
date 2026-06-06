@@ -1,8 +1,13 @@
 import type { AtRule, Rule } from "postcss";
 import { components } from "../component-index";
-import { ALWAYS_ON_CLASSES, CARBON_PREFIX } from "../constants";
+import {
+  ALWAYS_ON_CLASSES,
+  CARBON_PREFIX,
+  CONTEXT_ANCESTORS,
+} from "../constants";
 
 const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
+const SELECTOR_COMBINATOR = /[\s>+~]/;
 const LEGACY_CARBON_CLASS = /\.bx-(?!-)[A-Za-z0-9_-]+/g;
 const LEGACY_CARBON_PREFIX = /bx-(?!-)/;
 const BEM_PREFIXES = ["--", "__"];
@@ -32,6 +37,7 @@ const FLATPICKR_SELECTOR = new RegExp(
 );
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
 const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
+const CONTEXT_ANCESTOR_SET = new Set<string>(CONTEXT_ANCESTORS);
 const SHARED_CLASSES = getSharedClasses();
 
 export type StrictCssOptimizerOptions = {
@@ -111,6 +117,49 @@ function stripNotPseudoClasses(selector: string): string {
   return result;
 }
 
+/**
+ * Split a selector branch into ancestor compounds and the subject compound.
+ */
+function splitSelectorParts(
+  selector: string,
+): { ancestors: string[]; subject: string } | null {
+  const normalized = stripNotPseudoClasses(selector);
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized[i];
+
+    if (char === "(") {
+      depth++;
+    } else if (char === ")") {
+      depth = Math.max(0, depth - 1);
+    } else if (depth === 0 && SELECTOR_COMBINATOR.test(char)) {
+      if (current.trim()) {
+        parts.push(current.trim());
+      }
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
+
+  if (parts.length <= 1) {
+    return null;
+  }
+
+  return {
+    ancestors: parts.slice(0, -1),
+    subject: parts[parts.length - 1],
+  };
+}
+
 function getCarbonClasses(selector: string): string[] {
   const normalized = stripNotPseudoClasses(selector);
   const classes = normalized.match(CARBON_CLASS) ?? [];
@@ -151,25 +200,47 @@ function matchesAllowlist(
   return { matched: false };
 }
 
+function classMatchesAllowlist(name: string, allowlist: Set<string>): boolean {
+  return (
+    CONTEXT_ANCESTOR_SET.has(name) || matchesAllowlist(name, allowlist).matched
+  );
+}
+
 /**
  * Whether to keep this selector in strict mode.
  *
  * Allowlist hits use Set lookup; otherwise prefix-match BEM children
  * (`.bx--btn--primary`, `.bx--btn__icon`).
  *
- * Selectors with multiple Carbon classes (descendants or same-element
- * compounds) require every class to match the allowlist, so importing
- * NumberInput does not pull in `.bx--modal .bx--number` context rules.
+ * Descendant selectors require every subject class to match. Ancestor classes
+ * may match CONTEXT_ANCESTORS without being imported. Same-element compounds
+ * still require every class to match.
  */
 function shouldKeepSelector(selector: string, allowlist: Set<string>): boolean {
   const classes = getCarbonClasses(selector);
   if (classes.length === 0) return true;
 
-  if (classes.length > 1) {
+  const parts = splitSelectorParts(selector);
+
+  if (!parts) {
     return classes.every((name) => matchesAllowlist(name, allowlist).matched);
   }
 
-  return matchesAllowlist(classes[0], allowlist).matched;
+  const subjectClasses = getCarbonClasses(parts.subject);
+  const ancestorClasses = parts.ancestors.flatMap((part) =>
+    getCarbonClasses(part),
+  );
+
+  if (
+    subjectClasses.length > 0 &&
+    !subjectClasses.every((name) => matchesAllowlist(name, allowlist).matched)
+  ) {
+    return false;
+  }
+
+  return ancestorClasses.every((name) =>
+    classMatchesAllowlist(name, allowlist),
+  );
 }
 
 export function optimizeStrictRule(

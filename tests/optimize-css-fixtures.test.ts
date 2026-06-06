@@ -8,6 +8,7 @@ import {
   matchesAllowlist,
   prettifyCss,
   resolveCarbonCss,
+  shouldKeepStrictSelector,
 } from "./helpers/carbon-css";
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/optimize-css");
@@ -252,7 +253,7 @@ for (const scenario of SCENARIOS) {
       for (const selector of selectorsOf(source)) {
         const classes = carbonClassesIn(selector);
         if (classes.length === 0) continue;
-        if (classes.every((cls) => matchesAllowlist(cls, allowlist))) {
+        if (shouldKeepStrictSelector(selector, allowlist)) {
           for (const cls of classes) expectedSurvive.add(cls);
         }
       }
@@ -356,10 +357,7 @@ for (const scenario of SCENARIOS) {
       test("keeps no selector that is entirely foreign Carbon classes", () => {
         const offenders = selectorsOf(output).filter((selector) => {
           const classes = carbonClassesIn(selector);
-          return (
-            classes.length > 0 &&
-            !classes.some((cls) => matchesAllowlist(cls, allowlist))
-          );
+          return classes.length > 0 && !shouldKeepStrictSelector(selector, allowlist);
         });
 
         expect(offenders).toEqual([]);
