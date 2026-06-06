@@ -18,13 +18,23 @@ type OptimizationResult = {
   reduction_percent: number;
 };
 
-type Snapshots = Record<string, OptimizationResult>;
+type ExampleSnapshot = OptimizationResult | Record<string, OptimizationResult>;
+
+type Snapshots = Record<string, ExampleSnapshot>;
+
+type BuildOutcome = {
+  example: string;
+  passed: boolean;
+  message: string;
+};
+
+function isOptimizationResult(
+  value: ExampleSnapshot,
+): value is OptimizationResult {
+  return "file" in value;
+}
 
 function parseOptimizationOutput(output: string): OptimizationResult | null {
-  // Match patterns like:
-  // Optimized build/bundle.2d903152c49d244a9e80.css
-  // Before: 616.43 kB
-  // After:  158.03 kB (-74.36%)
   const optimizedMatch = output.match(OPTIMIZED_REGEX);
   const beforeMatch = output.match(BEFORE_REGEX);
   const afterMatch = output.match(AFTER_REGEX);
@@ -38,7 +48,6 @@ function parseOptimizationOutput(output: string): OptimizationResult | null {
   let after_kb = Number.parseFloat(afterMatch[1].replace(",", ""));
   const reduction_percent = Number.parseFloat(afterMatch[3]);
 
-  // Convert MB to kB if needed
   if (beforeMatch[2] === "MB") {
     before_kb *= 1000;
   }
@@ -50,15 +59,19 @@ function parseOptimizationOutput(output: string): OptimizationResult | null {
 }
 
 function normalizeFile(file: string): string {
-  // Replace hash patterns with wildcards for comparison
-  // e.g., "bundle.2d903152c49d244a9e80.css" -> "bundle.*.css"
-  // e.g., "index-Dy4ZbPK8.css" -> "index-*.css"
-  // e.g., "2.Dy4ZbPK8.css" -> "*.*.css" (SvelteKit client build)
-  // e.g., "_page.Dt0_NptM.css" -> "_page.*.css"
   return file
     .replace(/\.[a-f0-9]{16,}\./g, ".*.")
     .replace(/-[A-Za-z0-9_-]{6,}\./g, "-*.")
     .replace(/\.[A-Za-z0-9_-]{6,}\./g, ".*.");
+}
+
+function normalizeResult(parsed: OptimizationResult): OptimizationResult {
+  return {
+    file: normalizeFile(parsed.file),
+    before_kb: parsed.before_kb,
+    after_kb: parsed.after_kb,
+    reduction_percent: parsed.reduction_percent,
+  };
 }
 
 function loadSnapshots(): Snapshots {
@@ -66,6 +79,17 @@ function loadSnapshots(): Snapshots {
     return {};
   }
   return JSON.parse(readFileSync(SNAPSHOT_PATH, "utf-8"));
+}
+
+function sortSnapshotValue(value: ExampleSnapshot): ExampleSnapshot {
+  if (!("file" in value)) {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, value[key]]),
+    );
+  }
+  return value;
 }
 
 function saveSnapshots(snapshots: Snapshots): void {
@@ -76,36 +100,44 @@ function saveSnapshots(snapshots: Snapshots): void {
   const sorted = Object.keys(snapshots)
     .sort()
     .reduce<Snapshots>((acc, key) => {
-      acc[key] = snapshots[key];
+      acc[key] = sortSnapshotValue(snapshots[key]);
       return acc;
     }, {});
   writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(sorted, null, 2)}\n`);
 }
 
+function loadEntryManifest(dir: string): string[] | null {
+  const manifestPath = join(dir, "entries.manifest.json");
+  if (!existsSync(manifestPath)) {
+    return null;
+  }
+  return JSON.parse(readFileSync(manifestPath, "utf-8")) as string[];
+}
+
 function compareResults(
-  example: string,
+  label: string,
   actual: OptimizationResult,
   expected: OptimizationResult | undefined,
-): { passed: boolean; message: string } {
+): BuildOutcome {
   if (!expected) {
     return {
+      example: label,
       passed: false,
-      message: `No snapshot found for "${example}". Run with UPDATE_SNAPSHOTS=true to create.`,
+      message: `No snapshot found for "${label}". Run with UPDATE_SNAPSHOTS=true to create.`,
     };
   }
 
   const normalizedActual = normalizeFile(actual.file);
   const normalizedExpected = expected.file;
 
-  // Check if file pattern matches
   if (normalizedActual !== normalizedExpected) {
     return {
+      example: label,
       passed: false,
-      message: `File pattern mismatch for "${example}":\n  Expected: ${normalizedExpected}\n  Actual:   ${normalizedActual}`,
+      message: `File pattern mismatch for "${label}":\n  Expected: ${normalizedExpected}\n  Actual:   ${normalizedActual}`,
     };
   }
 
-  // Allow small floating point tolerance (0.01 kB)
   const tolerance = 0.01;
   const beforeDiff = Math.abs(actual.before_kb - expected.before_kb);
   const afterDiff = Math.abs(actual.after_kb - expected.after_kb);
@@ -119,8 +151,9 @@ function compareResults(
     percentDiff > tolerance
   ) {
     return {
+      example: label,
       passed: false,
-      message: `CSS optimization mismatch for "${example}":
+      message: `CSS optimization mismatch for "${label}":
   Before: ${expected.before_kb} kB -> ${actual.before_kb} kB (diff: ${beforeDiff.toFixed(2)})
   After:  ${expected.after_kb} kB -> ${actual.after_kb} kB (diff: ${afterDiff.toFixed(2)})
   Reduction: ${expected.reduction_percent}% -> ${actual.reduction_percent}% (diff: ${percentDiff.toFixed(2)})
@@ -128,31 +161,36 @@ Run with UPDATE_SNAPSHOTS=true to update.`,
     };
   }
 
-  return { passed: true, message: "OK" };
+  return { example: label, passed: true, message: "OK" };
 }
 
-async function buildExample(
-  dir: string,
-  snapshots: Snapshots,
-  newSnapshots: Snapshots,
-): Promise<{ example: string; passed: boolean; message: string }> {
-  const exampleName = dir.replace("examples/", "");
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`Building: ${exampleName}`);
-  console.log("=".repeat(60));
-
-  await $`cd ${dir} && bun link ${name} && bun install`;
-
-  const buildResult = await $`cd ${dir} && bun run build`.text();
-  console.log(buildResult);
-
-  const optimizationBlocks = buildResult
+function parseLastOptimizationBlock(output: string): OptimizationResult | null {
+  const optimizationBlocks = output
     .split(DOUBLE_NEWLINE_REGEX)
     .filter(
       (block) => block.includes("Optimized") && block.includes("Before:"),
     );
 
   if (optimizationBlocks.length === 0) {
+    return null;
+  }
+
+  return parseOptimizationOutput(
+    optimizationBlocks[optimizationBlocks.length - 1],
+  );
+}
+
+async function buildSingleEntry(
+  dir: string,
+  exampleName: string,
+  snapshots: Snapshots,
+  newSnapshots: Snapshots,
+): Promise<BuildOutcome> {
+  const buildResult = await $`cd ${dir} && bun run build`.text();
+  console.log(buildResult);
+
+  const parsed = parseLastOptimizationBlock(buildResult);
+  if (!parsed) {
     return {
       example: exampleName,
       passed: false,
@@ -160,23 +198,7 @@ async function buildExample(
     };
   }
 
-  const lastBlock = optimizationBlocks[optimizationBlocks.length - 1];
-  const parsed = parseOptimizationOutput(lastBlock);
-
-  if (!parsed) {
-    return {
-      example: exampleName,
-      passed: false,
-      message: "Failed to parse CSS optimization output",
-    };
-  }
-
-  const normalizedResult: OptimizationResult = {
-    file: normalizeFile(parsed.file),
-    before_kb: parsed.before_kb,
-    after_kb: parsed.after_kb,
-    reduction_percent: parsed.reduction_percent,
-  };
+  const normalizedResult = normalizeResult(parsed);
   newSnapshots[exampleName] = normalizedResult;
 
   if (UPDATE_SNAPSHOTS) {
@@ -187,12 +209,90 @@ async function buildExample(
     };
   }
 
-  const comparison = compareResults(
+  const expected = snapshots[exampleName];
+  if (!expected || !isOptimizationResult(expected)) {
+    return compareResults(exampleName, parsed, undefined);
+  }
+
+  return compareResults(exampleName, parsed, expected);
+}
+
+async function buildMultiEntry(
+  dir: string,
+  exampleName: string,
+  entries: string[],
+  snapshots: Snapshots,
+  newSnapshots: Snapshots,
+): Promise<BuildOutcome[]> {
+  const entrySnapshots: Record<string, OptimizationResult> = {};
+  const outcomes: BuildOutcome[] = [];
+  const expectedExample = snapshots[exampleName];
+  const expectedEntries =
+    expectedExample && !isOptimizationResult(expectedExample)
+      ? expectedExample
+      : undefined;
+
+  for (const entry of entries) {
+    console.log(`\n--- entry: ${entry} ---\n`);
+    // biome-ignore lint/performance/noAwaitInLoops: build entries sequentially to capture output correctly
+    const buildResult = await $`cd ${dir} && bun run build:${entry}`.text();
+    console.log(buildResult);
+
+    const label = `${exampleName}/${entry}`;
+    const parsed = parseLastOptimizationBlock(buildResult);
+
+    if (!parsed) {
+      outcomes.push({
+        example: label,
+        passed: false,
+        message: "No CSS optimization output found",
+      });
+      continue;
+    }
+
+    const normalizedResult = normalizeResult(parsed);
+    entrySnapshots[entry] = normalizedResult;
+
+    if (UPDATE_SNAPSHOTS) {
+      outcomes.push({
+        example: label,
+        passed: true,
+        message: `Updated: ${normalizedResult.before_kb} kB -> ${normalizedResult.after_kb} kB (-${normalizedResult.reduction_percent}%)`,
+      });
+      continue;
+    }
+
+    outcomes.push(compareResults(label, parsed, expectedEntries?.[entry]));
+  }
+
+  newSnapshots[exampleName] = entrySnapshots;
+  return outcomes;
+}
+
+async function buildExample(
+  dir: string,
+  snapshots: Snapshots,
+  newSnapshots: Snapshots,
+): Promise<BuildOutcome[]> {
+  const exampleName = dir.replace("examples/", "");
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(`Building: ${exampleName}`);
+  console.log("=".repeat(60));
+
+  await $`cd ${dir} && bun link ${name} && bun install`;
+
+  const entries = loadEntryManifest(dir);
+  if (entries) {
+    return buildMultiEntry(dir, exampleName, entries, snapshots, newSnapshots);
+  }
+
+  const outcome = await buildSingleEntry(
+    dir,
     exampleName,
-    parsed,
-    snapshots[exampleName],
+    snapshots,
+    newSnapshots,
   );
-  return { example: exampleName, ...comparison };
+  return [outcome];
 }
 
 async function main() {
@@ -201,7 +301,7 @@ async function main() {
 
   const snapshots = loadSnapshots();
   const newSnapshots: Snapshots = {};
-  const results: { example: string; passed: boolean; message: string }[] = [];
+  const results: BuildOutcome[] = [];
 
   const examples: string[] = [];
   for await (const dir of $`find examples -maxdepth 1 -mindepth 1 -type d`.lines()) {
@@ -210,8 +310,8 @@ async function main() {
 
   for (const dir of examples) {
     // biome-ignore lint/performance/noAwaitInLoops: build examples sequentially to capture output correctly
-    const result = await buildExample(dir, snapshots, newSnapshots);
-    results.push(result);
+    const outcomes = await buildExample(dir, snapshots, newSnapshots);
+    results.push(...outcomes);
   }
 
   console.log(`\n${"=".repeat(60)}`);
