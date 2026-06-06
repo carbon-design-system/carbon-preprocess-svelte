@@ -124,26 +124,19 @@ function matchesAllowlist(
  * Allowlist hits use Set lookup; otherwise prefix-match BEM children
  * (`.bx--btn--primary`, `.bx--btn__icon`).
  *
- * Shared classes like `.bx--skeleton` only count if every Carbon class in
- * the selector is allowed, so Button imports do not pull in Tabs skeleton rules.
+ * Selectors with multiple Carbon classes (descendants or same-element
+ * compounds) require every class to match the allowlist, so importing
+ * NumberInput does not pull in `.bx--modal .bx--number` context rules.
  */
 function shouldKeepSelector(selector: string, allowlist: Set<string>): boolean {
   const classes = getCarbonClasses(selector);
   if (classes.length === 0) return true;
 
-  let hasMatch = false;
-
-  for (const name of classes) {
-    const match = matchesAllowlist(name, allowlist);
-    if (!match.matched) continue;
-    if (!match.shared) return true;
-    hasMatch = true;
+  if (classes.length > 1) {
+    return classes.every((name) => matchesAllowlist(name, allowlist).matched);
   }
 
-  return (
-    hasMatch &&
-    classes.every((name) => matchesAllowlist(name, allowlist).matched)
-  );
+  return matchesAllowlist(classes[0], allowlist).matched;
 }
 
 export function optimizeStrictRule(

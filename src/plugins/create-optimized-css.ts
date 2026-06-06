@@ -49,9 +49,10 @@ export type OptimizeCssOptions = {
      * Improvements over the default matcher:
      * - Prunes individual selectors from comma-separated lists instead of
      *   keeping the entire rule when any selector matches
-     * - Requires every Carbon class in a compound selector to match the
-     *   allowlist when only shared modifiers (e.g. `.bx--skeleton`) hit,
-     *   so importing Button no longer pulls in Tabs skeleton styles
+     * - Requires every Carbon class in a multi-class selector to match the
+     *   allowlist (descendants and same-element compounds), so importing
+     *   NumberInput no longer pulls in `.bx--modal .bx--number` context rules
+     *   and Button no longer pulls in Tabs skeleton styles via `.bx--skeleton`
      * - Drops flatpickr and legacy single-hyphen `bx-` rules unless
      *   DatePicker (or similar) is in the bundle
      * - Uses parenthesis-aware selector parsing for `:is()` and similar
