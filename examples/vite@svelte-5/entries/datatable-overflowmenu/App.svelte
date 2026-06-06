@@ -10,13 +10,13 @@
   const headers = [
     { key: "name", value: "Name" },
     { key: "link", value: "Details" },
-    { key: "action", value: "", empty: true },
-  ];
+    { key: "action", empty: true },
+  ] as const;
 
   const rows = [
     { id: "1", name: "Production API", link: "View docs" },
     { id: "2", name: "Staging API", link: "View docs" },
-  ];
+  ] as const;
 </script>
 
 <DataTable
@@ -26,7 +26,6 @@
   <svelte:fragment
     slot="cell"
     let:cell
-    let:row
   >
     {#if cell.key === "link"}
       <Link href="#">{cell.value}</Link>
