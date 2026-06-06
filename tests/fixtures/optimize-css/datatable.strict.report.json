@@ -1,0 +1,27 @@
+{
+  "ids": [
+    "DataTable"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 137110,
+  "reduction_percent": 79.38,
+  "kept_rules": 384,
+  "leaked_count": 14,
+  "leaked_classes": [
+    ".bx--data-table--sm",
+    ".bx--data-table--visible-overflow-menu",
+    ".bx--data-table--xl",
+    ".bx--data-table--xs",
+    ".bx--link",
+    ".bx--link--disabled",
+    ".bx--overflow-menu",
+    ".bx--overflow-menu--open",
+    ".bx--overflow-menu-options",
+    ".bx--overflow-menu__icon",
+    ".bx--overflow-menu__trigger",
+    ".bx--table-column-icon",
+    ".bx--table-expand-v2",
+    ".bx--tooltip"
+  ]
+}

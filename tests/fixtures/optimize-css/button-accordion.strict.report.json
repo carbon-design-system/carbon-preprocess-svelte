@@ -1,0 +1,16 @@
+{
+  "ids": [
+    "Button",
+    "Accordion"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 168509,
+  "reduction_percent": 74.66,
+  "kept_rules": 511,
+  "leaked_count": 2,
+  "leaked_classes": [
+    ".bx--overflow-menu-options",
+    ".bx--tooltip"
+  ]
+}

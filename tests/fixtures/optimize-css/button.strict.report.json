@@ -1,0 +1,15 @@
+{
+  "ids": [
+    "Button"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 164737,
+  "reduction_percent": 75.22,
+  "kept_rules": 475,
+  "leaked_count": 2,
+  "leaked_classes": [
+    ".bx--overflow-menu-options",
+    ".bx--tooltip"
+  ]
+}

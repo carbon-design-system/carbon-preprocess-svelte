@@ -1,0 +1,200 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { createOptimizedCss } from "carbon-preprocess-svelte/plugins/create-optimized-css";
+import postcss from "postcss";
+import {
+  buildAllowlist,
+  carbonClassesIn,
+  matchesAllowlist,
+  prettifyCss,
+  resolveCarbonCss,
+} from "./helpers/carbon-css";
+
+const FIXTURES_DIR = join(import.meta.dirname, "fixtures/optimize-css");
+const UPDATE_FIXTURES = process.env.UPDATE_FIXTURES === "true";
+const THEME = "white";
+
+type Scenario = {
+  /** Fixture base name, e.g. "button.strict". */
+  name: string;
+  /** Component ids to treat as imported (drives the allowlist). */
+  ids: string[];
+  strict: boolean;
+};
+
+const SCENARIOS: Scenario[] = [
+  { name: "button.strict", ids: ["Button"], strict: true },
+  { name: "button.default", ids: ["Button"], strict: false },
+  { name: "datatable.strict", ids: ["DataTable"], strict: true },
+  {
+    name: "button-accordion.strict",
+    ids: ["Button", "Accordion"],
+    strict: true,
+  },
+  // DatePicker ships with Flatpickr CSS; import DatePickerInput too (typical usage).
+  {
+    name: "datepicker.strict",
+    ids: ["DatePicker", "DatePickerInput"],
+    strict: true,
+  },
+];
+
+type Report = {
+  ids: string[];
+  strict: boolean;
+  before_bytes: number;
+  after_bytes: number;
+  reduction_percent: number;
+  kept_rules: number;
+  leaked_count: number;
+  /** Carbon classes that survived but the allowlist does not justify. */
+  leaked_classes: string[];
+};
+
+/** Split a selector list on top-level commas (parenthesis-aware), like the source. */
+function splitSelectorList(selector: string): string[] {
+  const selectors: string[] = [];
+  let depth = 0;
+  let start = 0;
+
+  for (let i = 0; i < selector.length; i++) {
+    const char = selector[i];
+    if (char === "(") depth++;
+    else if (char === ")") depth = Math.max(0, depth - 1);
+    else if (char === "," && depth === 0) {
+      selectors.push(selector.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  selectors.push(selector.slice(start).trim());
+
+  return selectors.filter(Boolean);
+}
+
+/** Every individual selector (parenthesis-aware) across all rules in the CSS. */
+function selectorsOf(css: string): string[] {
+  const out: string[] = [];
+  postcss.parse(css).walkRules((rule) => {
+    out.push(...splitSelectorList(rule.selector));
+  });
+  return out;
+}
+
+function ruleCount(css: string): number {
+  let count = 0;
+  postcss.parse(css).walkRules(() => {
+    count++;
+  });
+  return count;
+}
+
+/** Unique Carbon classes referenced anywhere in the CSS. */
+function carbonClassesOf(css: string): Set<string> {
+  const classes = new Set<string>();
+  for (const selector of selectorsOf(css)) {
+    for (const cls of carbonClassesIn(selector)) classes.add(cls);
+  }
+  return classes;
+}
+
+function readFixture(file: string): string | null {
+  const path = join(FIXTURES_DIR, file);
+  return existsSync(path) ? readFileSync(path, "utf-8") : null;
+}
+
+function writeFixture(file: string, content: string): void {
+  if (!existsSync(FIXTURES_DIR)) mkdirSync(FIXTURES_DIR, { recursive: true });
+  writeFileSync(join(FIXTURES_DIR, file), content);
+}
+
+const source = resolveCarbonCss(THEME);
+
+for (const scenario of SCENARIOS) {
+  describe(`optimize-css fixtures: ${scenario.name}`, () => {
+    const output = createOptimizedCss({
+      source,
+      ids: scenario.ids,
+      experimental: { strict: scenario.strict },
+    });
+    const allowlist = buildAllowlist(scenario.ids);
+    const outputClasses = carbonClassesOf(output);
+
+    const leakedClasses = [...outputClasses]
+      .filter((cls) => !matchesAllowlist(cls, allowlist))
+      .sort();
+
+    const beforeBytes = Buffer.byteLength(source);
+    const afterBytes = Buffer.byteLength(output);
+    const report: Report = {
+      ids: scenario.ids,
+      strict: scenario.strict,
+      before_bytes: beforeBytes,
+      after_bytes: afterBytes,
+      reduction_percent: Number(
+        (((beforeBytes - afterBytes) / beforeBytes) * 100).toFixed(2),
+      ),
+      kept_rules: ruleCount(output),
+      leaked_count: leakedClasses.length,
+      leaked_classes: leakedClasses,
+    };
+
+    // Pretty CSS for local inspection (.gitignore). Baseline is .report.json.
+    writeFixture(`${scenario.name}.css`, prettifyCss(output));
+
+    if (UPDATE_FIXTURES) {
+      writeFixture(
+        `${scenario.name}.report.json`,
+        `${JSON.stringify(report, null, 2)}\n`,
+      );
+    }
+
+    test("matches the committed leak report", () => {
+      const expected = readFixture(`${scenario.name}.report.json`);
+      if (expected === null) {
+        throw new Error(
+          `Missing fixture ${scenario.name}.report.json. Run \`bun run test:fixtures:update\`.`,
+        );
+      }
+      expect(`${JSON.stringify(report, null, 2)}\n`).toBe(expected);
+    });
+
+    // Every Carbon class in a fully-allowed source selector must appear in output.
+    // Scope to selectors where all classes match the allowlist, so we do not flag
+    // classes pruned because a co-occurring foreign class was dropped (e.g.
+    // DatePicker range rules that mention DatePickerInput).
+    test("does not over-prune self-justified selectors", () => {
+      const expectedSurvive = new Set<string>();
+
+      for (const selector of selectorsOf(source)) {
+        const classes = carbonClassesIn(selector);
+        if (classes.length === 0) continue;
+        if (classes.every((cls) => matchesAllowlist(cls, allowlist))) {
+          for (const cls of classes) expectedSurvive.add(cls);
+        }
+      }
+
+      const missing = [...expectedSurvive]
+        .filter((cls) => !outputClasses.has(cls))
+        .sort();
+
+      expect(missing).toEqual([]);
+    });
+
+    // Strict mode: no output selector should consist only of foreign Carbon classes.
+    // Default mode keeps whole rules when any branch matches; see leaked_classes
+    // and button.default vs button.strict for the gap.
+    if (scenario.strict) {
+      test("keeps no selector that is entirely foreign Carbon classes", () => {
+        const offenders = selectorsOf(output).filter((selector) => {
+          const classes = carbonClassesIn(selector);
+          return (
+            classes.length > 0 &&
+            !classes.some((cls) => matchesAllowlist(cls, allowlist))
+          );
+        });
+
+        expect(offenders).toEqual([]);
+      });
+    }
+  });
+}
