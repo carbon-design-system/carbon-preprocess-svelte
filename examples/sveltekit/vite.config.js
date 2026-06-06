@@ -3,7 +3,7 @@ import { optimizeCss } from "carbon-preprocess-svelte";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [sveltekit(), optimizeCss()],
+  plugins: [sveltekit(), optimizeCss({ experimental: { strict: true } })],
 
   // Optional, but recommended for even faster cold starts.
   // Instruct Vite to exclude packages that `optimizeImports` will resolve.

@@ -7,7 +7,7 @@ export default {
     svelte({
       preprocess: [vitePreprocess(), optimizeImports()],
     }),
-    optimizeCss(),
+    optimizeCss({ experimental: { strict: true } }),
   ],
 
   // Optional, but recommended for even faster cold starts.
