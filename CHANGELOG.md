@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.32](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.32) - 2026-06-06
+
+**Fixes**
+
+- `optimizeCss`: improve strict mode optimizer by ~0.02%
+- `optimizeCss`: add SideNav submenu SVG classes to RUNTIME_CLASSES
+- `optimizeCss`: retain shared `bx--body--with-modal-open` class
+
 ## [0.11.31](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.31) - 2026-06-05
 
 **Fixes**
