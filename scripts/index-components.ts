@@ -6,6 +6,20 @@ import { CarbonSvelte } from "../src/constants";
 import { isSvelteFile } from "../src/utils";
 import { extractSelectors } from "./extract-selectors";
 
+/**
+ * Classes applied imperatively at runtime (e.g. `document.body.classList`),
+ * keyed by the component that triggers them. The markup-based selector
+ * extractor cannot see these because they are not present in any `class`
+ * attribute or `<style>` block.
+ *
+ * `.bx--body--with-modal-open` is toggled by `src/utils/bodyScrollLock.js`,
+ * used by Modal (via `modalStore`) and SideNav's overlay.
+ */
+const RUNTIME_CLASSES: Record<string, string[]> = {
+  Modal: [".bx--body--with-modal-open"],
+  SideNav: [".bx--body--with-modal-open"],
+};
+
 const carbon_path = path.join("node_modules", CarbonSvelte.Components);
 const index_js = path.join(carbon_path, "src/index.js");
 const index_file = await Bun.file(index_js).text();
@@ -97,6 +111,15 @@ for (const [parent, components] of sub_components.entries()) {
         ...new Set([...parent_map.classes, ...sub_classes]),
       ];
     }
+  }
+}
+
+// Merge in classes applied imperatively at runtime, which the markup-based
+// extractor cannot detect.
+for (const [identifier, classes] of Object.entries(RUNTIME_CLASSES)) {
+  const entry = exports_map.get(identifier);
+  if (entry) {
+    entry.classes = [...new Set([...entry.classes, ...classes])];
   }
 }
 

@@ -1069,6 +1069,7 @@ export const components: Record<string, { path: string; classes: string[] }> =
       path: "carbon-components-svelte/src/Modal/Modal.svelte",
       classes: [
         ".bx--assistive-text",
+        ".bx--body--with-modal-open",
         ".bx--btn",
         ".bx--btn__icon",
         ".bx--btn--",
@@ -1853,6 +1854,7 @@ export const components: Record<string, { path: string; classes: string[] }> =
     SideNav: {
       path: "carbon-components-svelte/src/UIShell/SideNav.svelte",
       classes: [
+        ".bx--body--with-modal-open",
         ".bx--side-nav",
         ".bx--side-nav__navigation",
         ".bx--side-nav__overlay",
