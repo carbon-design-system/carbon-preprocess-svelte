@@ -18,6 +18,12 @@
     "reduction_percent": 92.06
   },
   "vite@svelte-5": {
+    "composed-modal-bundle": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 75.45,
+      "reduction_percent": 87.78
+    },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
       "before_kb": 617.62,
@@ -48,6 +54,12 @@
       "after_kb": 75.5,
       "reduction_percent": 87.77
     },
+    "multiselect": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 44.43,
+      "reduction_percent": 92.81
+    },
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
@@ -59,6 +71,18 @@
       "before_kb": 617.52,
       "after_kb": 27.23,
       "reduction_percent": 95.59
+    },
+    "textinput": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 20.01,
+      "reduction_percent": 96.76
+    },
+    "timepicker-bundle": {
+      "file": "assets/index-*.css",
+      "before_kb": 617.52,
+      "after_kb": 24.69,
+      "reduction_percent": 96
     },
     "uishell": {
       "file": "assets/index-*.css",

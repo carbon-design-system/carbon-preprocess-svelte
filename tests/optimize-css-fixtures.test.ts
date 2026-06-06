@@ -55,6 +55,9 @@ const SCENARIOS: Scenario[] = [
   { name: "checkbox.strict", ids: ["Checkbox"], strict: true },
   { name: "slider.strict", ids: ["Slider"], strict: true },
   { name: "breadcrumb.strict", ids: ["Breadcrumb"], strict: true },
+  { name: "textinput.strict", ids: ["TextInput"], strict: true },
+  { name: "toggle.strict", ids: ["Toggle"], strict: true },
+  { name: "numberinput.strict", ids: ["NumberInput"], strict: true },
   // Multi-import bundles — import sets users actually ship.
   {
     name: "dropdown-skeleton.strict",
@@ -71,6 +74,21 @@ const SCENARIOS: Scenario[] = [
     ids: ["DataTable", "OverflowMenu", "Link"],
     strict: true,
   },
+  {
+    name: "accordion-bundle.strict",
+    ids: ["Accordion", "AccordionItem"],
+    strict: true,
+  },
+  {
+    name: "composed-modal-bundle.strict",
+    ids: ["ComposedModal", "ModalHeader", "ModalBody", "ModalFooter"],
+    strict: true,
+  },
+  {
+    name: "timepicker-bundle.strict",
+    ids: ["TimePicker", "TimePickerSelect"],
+    strict: true,
+  },
   // Leaky regression baselines — compound-selector piggybacking.
   { name: "tabs.strict", ids: ["Tabs"], strict: true },
   { name: "sidenav.strict", ids: ["SideNav"], strict: true },
@@ -84,6 +102,18 @@ const SCENARIOS: Scenario[] = [
   {
     name: "datatable-toolbar.strict",
     ids: ["DataTable", "Toolbar", "ToolbarSearch"],
+    strict: true,
+  },
+  { name: "multiselect.strict", ids: ["MultiSelect"], strict: true },
+  { name: "passwordinput.strict", ids: ["PasswordInput"], strict: true },
+  {
+    name: "fileuploader-bundle.strict",
+    ids: ["FileUploader", "FileUploaderButton", "FileUploaderItem"],
+    strict: true,
+  },
+  {
+    name: "inline-notification.strict",
+    ids: ["InlineNotification"],
     strict: true,
   },
 ];
@@ -266,6 +296,31 @@ for (const scenario of SCENARIOS) {
     if (scenario.name === "select-pagination.strict") {
       test("keeps inline select wrapper styles under pagination", () => {
         expect(output).toContain(".bx--select-input--inline__wrapper");
+      });
+    }
+
+    if (scenario.name === "accordion-bundle.strict") {
+      test("keeps typical accordion page selectors", () => {
+        expect(output).toContain(".bx--accordion__item");
+      });
+    }
+
+    if (scenario.name === "composed-modal-bundle.strict") {
+      test("keeps composed modal shell selectors", () => {
+        expect(output).toContain(".bx--modal-header");
+        expect(output).toContain(".bx--modal-content");
+      });
+    }
+
+    if (scenario.name === "timepicker-bundle.strict") {
+      test("keeps time picker child select selectors", () => {
+        expect(output).toContain(".bx--time-picker__select");
+      });
+    }
+
+    if (scenario.name === "multiselect.strict") {
+      test("keeps list-box core selectors", () => {
+        expect(output).toContain(".bx--list-box");
       });
     }
 

@@ -11,11 +11,15 @@ Each entry is a small app that mirrors an optimize-css fixture scenario. Pick on
 | datatable-toolbar | datatable-toolbar.strict | TableContainer, Toolbar, ToolbarSearch, DataTable |
 | datatable-overflowmenu | datatable-overflowmenu.strict | DataTable, OverflowMenu, Link |
 | datepicker | datepicker.strict | DatePicker, DatePickerInput |
+| timepicker-bundle | timepicker-bundle.strict | TimePicker, TimePickerSelect |
 | modal | modal.strict | Modal |
+| composed-modal-bundle | composed-modal-bundle.strict | ComposedModal, ModalHeader, ModalBody, ModalFooter |
 | uishell | uishell.strict | Header, SideNav, SideNavItems, Content |
 | tabs-bundle | tabs-bundle.strict | Tabs, Tab, TabContent |
 | select-pagination | select-pagination.strict | Select (inline), Pagination |
 | dropdown | dropdown.strict | Dropdown |
+| textinput | textinput.strict | TextInput |
+| multiselect | multiselect.strict | MultiSelect |
 
 ## Quick start
 

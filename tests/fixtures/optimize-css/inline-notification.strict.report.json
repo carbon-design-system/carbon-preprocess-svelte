@@ -1,0 +1,16 @@
+{
+  "ids": [
+    "InlineNotification"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 114782,
+  "reduction_percent": 82.74,
+  "kept_rules": 223,
+  "leaked_count": 3,
+  "leaked_classes": [
+    ".bx--actionable-notification__icon",
+    ".bx--btn",
+    ".bx--btn--ghost"
+  ]
+}

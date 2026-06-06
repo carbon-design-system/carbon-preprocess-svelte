@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "Toggle"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 110128,
+  "reduction_percent": 83.44,
+  "kept_rules": 195,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

@@ -1,0 +1,16 @@
+{
+  "ids": [
+    "NumberInput"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 118591,
+  "reduction_percent": 82.16,
+  "kept_rules": 277,
+  "leaked_count": 3,
+  "leaked_classes": [
+    ".bx--data-table",
+    ".bx--modal",
+    ".bx--number--lg"
+  ]
+}

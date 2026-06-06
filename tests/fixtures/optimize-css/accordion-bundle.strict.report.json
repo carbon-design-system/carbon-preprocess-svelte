@@ -1,0 +1,13 @@
+{
+  "ids": [
+    "Accordion",
+    "AccordionItem"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 109147,
+  "reduction_percent": 83.58,
+  "kept_rules": 202,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

@@ -1,0 +1,13 @@
+{
+  "ids": [
+    "TimePicker",
+    "TimePickerSelect"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 114197,
+  "reduction_percent": 82.82,
+  "kept_rules": 261,
+  "leaked_count": 0,
+  "leaked_classes": []
+}

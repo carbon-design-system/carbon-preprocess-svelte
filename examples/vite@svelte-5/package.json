@@ -29,7 +29,19 @@
     "preview:select-pagination": "ENTRY=select-pagination vite preview",
     "dev:dropdown": "ENTRY=dropdown vite",
     "build:dropdown": "ENTRY=dropdown vite build",
-    "preview:dropdown": "ENTRY=dropdown vite preview"
+    "preview:dropdown": "ENTRY=dropdown vite preview",
+    "dev:textinput": "ENTRY=textinput vite",
+    "build:textinput": "ENTRY=textinput vite build",
+    "preview:textinput": "ENTRY=textinput vite preview",
+    "dev:multiselect": "ENTRY=multiselect vite",
+    "build:multiselect": "ENTRY=multiselect vite build",
+    "preview:multiselect": "ENTRY=multiselect vite preview",
+    "dev:composed-modal-bundle": "ENTRY=composed-modal-bundle vite",
+    "build:composed-modal-bundle": "ENTRY=composed-modal-bundle vite build",
+    "preview:composed-modal-bundle": "ENTRY=composed-modal-bundle vite preview",
+    "dev:timepicker-bundle": "ENTRY=timepicker-bundle vite",
+    "build:timepicker-bundle": "ENTRY=timepicker-bundle vite build",
+    "preview:timepicker-bundle": "ENTRY=timepicker-bundle vite preview"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "latest",

@@ -1,0 +1,14 @@
+{
+  "ids": [
+    "TextInput"
+  ],
+  "strict": true,
+  "before_bytes": 664899,
+  "after_bytes": 109377,
+  "reduction_percent": 83.55,
+  "kept_rules": 206,
+  "leaked_count": 1,
+  "leaked_classes": [
+    ".bx--form--fluid"
+  ]
+}
