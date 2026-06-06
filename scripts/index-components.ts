@@ -100,6 +100,12 @@ for (const [parent, components] of sub_components.entries()) {
   }
 }
 
+for (const entry of exports_map.values()) {
+  if (entry) {
+    entry.classes.sort((a, b) => a.localeCompare(b));
+  }
+}
+
 // Sort Map keys alphabetically and convert to object.
 const components = Object.fromEntries(
   new Map(
