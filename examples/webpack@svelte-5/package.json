@@ -11,7 +11,7 @@
     "css-loader": "latest",
     "html-webpack-plugin": "latest",
     "mini-css-extract-plugin": "latest",
-    "svelte": "^5.55.10",
+    "svelte": "^5.56.2",
     "svelte-loader": "latest",
     "svelte-preprocess": "latest",
     "typescript": "latest",
