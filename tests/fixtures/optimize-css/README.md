@@ -27,7 +27,7 @@ Each scenario also validates against src/component-index.ts, the same component-
 
 - No over-prune: if every Carbon class in a source selector is allowed, those classes must still appear in the output.
 - No foreign survivor (strict only): no kept selector should reference only classes outside the allowlist.
-- Multi-class strict pruning: selectors with more than one Carbon class (descendants or same-element compounds) require every class to match the allowlist.
+- Multi-class strict pruning: selectors with more than one Carbon class (descendants or same-element compounds) require every positive class to match the allowlist. Classes inside `:not(...)` are exclusions and are not required.
 
 Compare button.default and button.strict for the strict-mode delta. Strict scenarios target `leaked_count: 0`.
 
@@ -37,7 +37,7 @@ Non-zero `leaked_count` in strict scenarios is not a test failure when it occurs
 
 Compare button.default (`leaked_count: 112`) with button.strict (`leaked_count: 0`) for the default-vs-strict gap. Default mode keeps whole comma-list rules when any branch matches.
 
-RUNTIME_CLASSES in scripts/index-components.ts covers body scroll-lock, SideNav submenu SVG icons, and other tokens absent from class: attributes.
+RUNTIME_CLASSES in scripts/index-components.ts covers body scroll-lock, SideNav submenu SVG icons, HeaderGlobalAction's `.bx--header__global` wrapper context, and other tokens absent from class: attributes.
 
 ## Scenario catalog
 
@@ -71,6 +71,7 @@ RUNTIME_CLASSES in scripts/index-components.ts covers body scroll-lock, SideNav 
 | tabs.strict | Tabs | Parent without slot children |
 | sidenav.strict | SideNav | Runtime body class, UIShell cross-refs |
 | header.strict | Header | SideNav / content cross-refs |
+| header-global-action.strict | HeaderGlobalAction | Header global button hover / icon fill |
 | uishell.strict | Header, SideNav, SideNavItems | Full shell bundle |
 | tooltip.strict | Tooltip | Cross-component descendant rules |
 | datatable.strict | DataTable | Compound size/menu variants |

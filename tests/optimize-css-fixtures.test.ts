@@ -94,6 +94,11 @@ const SCENARIOS: Scenario[] = [
   { name: "sidenav.strict", ids: ["SideNav"], strict: true },
   { name: "header.strict", ids: ["Header"], strict: true },
   {
+    name: "header-global-action.strict",
+    ids: ["HeaderGlobalAction"],
+    strict: true,
+  },
+  {
     name: "uishell.strict",
     ids: ["Header", "SideNav", "SideNavItems"],
     strict: true,
@@ -283,6 +288,17 @@ for (const scenario of SCENARIOS) {
       test("keeps core UIShell selectors", () => {
         expect(output).toContain(".bx--side-nav");
         expect(output).toContain(".bx--header");
+      });
+    }
+
+    if (scenario.name === "header-global-action.strict") {
+      test("keeps header global button hover styles for icon fill", () => {
+        expect(output).toContain(
+          ".bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button)",
+        );
+        expect(output).toContain(
+          ".bx--header__action.bx--header__action:hover>svg",
+        );
       });
     }
 

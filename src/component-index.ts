@@ -834,6 +834,7 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--header__action--active",
         ".bx--header__action--text",
         ".bx--header__action-text",
+        ".bx--header__global",
         ".bx--header-panel",
         ".bx--header-panel--expanded",
         ".bx--tooltip__trigger bx--tooltip--a11y",
@@ -842,7 +843,11 @@ export const components: Record<string, { path: string; classes: string[] }> =
     },
     HeaderActionLink: {
       path: "carbon-components-svelte/src/UIShell/HeaderActionLink.svelte",
-      classes: [".bx--header__action", ".bx--header__action--active"],
+      classes: [
+        ".bx--header__action",
+        ".bx--header__action--active",
+        ".bx--header__global",
+      ],
     },
     HeaderGlobalAction: {
       path: "carbon-components-svelte/src/UIShell/HeaderGlobalAction.svelte",
@@ -862,6 +867,7 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--btn--xl",
         ".bx--header__action",
         ".bx--header__action--active",
+        ".bx--header__global",
         ".bx--skeleton",
         ".bx--tooltip__trigger",
         ".bx--tooltip--a11y",

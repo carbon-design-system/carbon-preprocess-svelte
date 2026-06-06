@@ -5,8 +5,8 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 122602,
-  "reduction_percent": 81.56,
+  "after_bytes": 122742,
+  "reduction_percent": 81.54,
   "kept_rules": 322,
   "leaked_count": 0,
   "leaked_classes": []

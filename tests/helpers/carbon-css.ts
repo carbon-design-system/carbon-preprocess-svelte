@@ -60,13 +60,42 @@ export function prettifyCss(css: string): string {
   return `${root.toString().trim()}\n`;
 }
 
+/** Matches `stripNotPseudoClasses` in `strict-css-optimizer.ts`. */
+function stripNotPseudoClasses(selector: string): string {
+  let result = "";
+  let notDepth = 0;
+
+  for (let i = 0; i < selector.length; i++) {
+    if (
+      notDepth === 0 &&
+      selector[i] === ":" &&
+      selector.startsWith(":not(", i)
+    ) {
+      notDepth = 1;
+      i += 4;
+      continue;
+    }
+
+    if (notDepth > 0) {
+      if (selector[i] === "(") notDepth++;
+      else if (selector[i] === ")") notDepth--;
+      continue;
+    }
+
+    result += selector[i];
+  }
+
+  return result;
+}
+
 /**
  * Pull `.bx--*` tokens from a selector. Normalizes legacy `.bx-` to `.bx--`.
  * Matches `getCarbonClasses` in the source so drift shows up in tests.
  */
 export function carbonClassesIn(selector: string): string[] {
-  const classes = selector.match(CARBON_CLASS) ?? [];
-  const legacy = (selector.match(LEGACY_CARBON_CLASS) ?? []).map((cls) =>
+  const normalized = stripNotPseudoClasses(selector);
+  const classes = normalized.match(CARBON_CLASS) ?? [];
+  const legacy = (normalized.match(LEGACY_CARBON_CLASS) ?? []).map((cls) =>
     cls.replace(".bx-", ".bx--"),
   );
 

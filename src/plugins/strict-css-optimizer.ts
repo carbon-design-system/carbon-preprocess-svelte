@@ -79,10 +79,43 @@ function splitSelectorList(selector: string): string[] {
   return selectors.filter(Boolean);
 }
 
+/**
+ * Drop `:not(...)` subtrees before class extraction. Negated classes are
+ * exclusions, not part of the positive match (e.g. header global buttons
+ * vs `.bx--header-search-button`).
+ */
+function stripNotPseudoClasses(selector: string): string {
+  let result = "";
+  let notDepth = 0;
+
+  for (let i = 0; i < selector.length; i++) {
+    if (
+      notDepth === 0 &&
+      selector[i] === ":" &&
+      selector.startsWith(":not(", i)
+    ) {
+      notDepth = 1;
+      i += 4;
+      continue;
+    }
+
+    if (notDepth > 0) {
+      if (selector[i] === "(") notDepth++;
+      else if (selector[i] === ")") notDepth--;
+      continue;
+    }
+
+    result += selector[i];
+  }
+
+  return result;
+}
+
 function getCarbonClasses(selector: string): string[] {
-  const classes = selector.match(CARBON_CLASS) ?? [];
-  const legacyClasses = (selector.match(LEGACY_CARBON_CLASS) ?? []).map((cls) =>
-    cls.replace(".bx-", ".bx--"),
+  const normalized = stripNotPseudoClasses(selector);
+  const classes = normalized.match(CARBON_CLASS) ?? [];
+  const legacyClasses = (normalized.match(LEGACY_CARBON_CLASS) ?? []).map(
+    (cls) => cls.replace(".bx-", ".bx--"),
   );
 
   return [...new Set([...classes, ...legacyClasses])];
