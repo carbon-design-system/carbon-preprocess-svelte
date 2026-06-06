@@ -2,37 +2,37 @@
   "rollup": {
     "file": "bundle.css",
     "before_kb": 664.74,
-    "after_kb": 159.5,
-    "reduction_percent": 76.01
+    "after_kb": 137.13,
+    "reduction_percent": 79.37
   },
   "sveltekit": {
     "file": "_app/immutable/assets/2.C-*.css",
     "before_kb": 617.52,
-    "after_kb": 66.4,
-    "reduction_percent": 89.25
+    "after_kb": 45.71,
+    "reduction_percent": 92.6
   },
   "vite": {
     "file": "assets/index-*.css",
     "before_kb": 654.96,
-    "after_kb": 74.16,
-    "reduction_percent": 88.68
+    "after_kb": 52.16,
+    "reduction_percent": 92.04
   },
   "vite@svelte-5": {
     "file": "assets/index-*.css",
     "before_kb": 617.52,
-    "after_kb": 66.4,
-    "reduction_percent": 89.25
+    "after_kb": 45.71,
+    "reduction_percent": 92.6
   },
   "webpack": {
     "file": "build/bundle.*.css",
     "before_kb": 664.74,
-    "after_kb": 159.5,
-    "reduction_percent": 76.01
+    "after_kb": 137.13,
+    "reduction_percent": 79.37
   },
   "webpack@svelte-5": {
     "file": "build/bundle.*.css",
     "before_kb": 664.74,
-    "after_kb": 159.5,
-    "reduction_percent": 76.01
+    "after_kb": 137.13,
+    "reduction_percent": 79.37
   }
 }
