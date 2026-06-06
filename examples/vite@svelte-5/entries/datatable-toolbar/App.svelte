@@ -12,13 +12,13 @@
     { key: "name", value: "Name" },
     { key: "role", value: "Role" },
     { key: "status", value: "Status" },
-  ];
+  ] as const;
 
   const rows = [
     { id: "1", name: "Alice Chen", role: "Admin", status: "Active" },
     { id: "2", name: "Bob Patel", role: "Editor", status: "Active" },
     { id: "3", name: "Carol Diaz", role: "Viewer", status: "Inactive" },
-  ];
+  ] as const;
 </script>
 
 <TableContainer

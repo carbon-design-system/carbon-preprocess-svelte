@@ -6,9 +6,9 @@
     { id: "option-1", text: "Option 1" },
     { id: "option-2", text: "Option 2" },
     { id: "option-3", text: "Option 3" },
-  ];
+  ] as const;
 
-  let selectedId = "option-1";
+  let selectedId: (typeof items)[number]["id"] = "option-1";
 </script>
 
 <Dropdown
