@@ -4,22 +4,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 136960,
-  "reduction_percent": 79.4,
-  "kept_rules": 382,
-  "leaked_count": 12,
-  "leaked_classes": [
-    ".bx--data-table--sm",
-    ".bx--data-table--visible-overflow-menu",
-    ".bx--data-table--xl",
-    ".bx--data-table--xs",
-    ".bx--link",
-    ".bx--link--disabled",
-    ".bx--overflow-menu",
-    ".bx--overflow-menu--open",
-    ".bx--overflow-menu__icon",
-    ".bx--overflow-menu__trigger",
-    ".bx--table-column-icon",
-    ".bx--table-expand-v2"
-  ]
+  "after_bytes": 132898,
+  "reduction_percent": 80.01,
+  "kept_rules": 368,
+  "leaked_count": 0,
+  "leaked_classes": []
 }

@@ -318,6 +318,18 @@ for (const scenario of SCENARIOS) {
       });
     }
 
+    if (scenario.name === "textinput.strict") {
+      test("drops fluid form ancestor selectors", () => {
+        expect(output).not.toContain(".bx--form--fluid .bx--text-input");
+      });
+    }
+
+    if (scenario.name === "numberinput.strict") {
+      test("drops modal context selectors", () => {
+        expect(output).not.toContain(".bx--modal .bx--number");
+      });
+    }
+
     if (scenario.name === "multiselect.strict") {
       test("keeps list-box core selectors", () => {
         expect(output).toContain(".bx--list-box");

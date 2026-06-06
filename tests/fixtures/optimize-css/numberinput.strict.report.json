@@ -4,13 +4,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 118591,
-  "reduction_percent": 82.16,
-  "kept_rules": 277,
-  "leaked_count": 3,
-  "leaked_classes": [
-    ".bx--data-table",
-    ".bx--modal",
-    ".bx--number--lg"
-  ]
+  "after_bytes": 118024,
+  "reduction_percent": 82.25,
+  "kept_rules": 274,
+  "leaked_count": 0,
+  "leaked_classes": []
 }

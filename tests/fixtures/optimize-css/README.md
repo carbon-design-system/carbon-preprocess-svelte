@@ -27,22 +27,17 @@ Each scenario also validates against src/component-index.ts, the same component-
 
 - No over-prune: if every Carbon class in a source selector is allowed, those classes must still appear in the output.
 - No foreign survivor (strict only): no kept selector should reference only classes outside the allowlist.
+- Multi-class strict pruning: selectors with more than one Carbon class (descendants or same-element compounds) require every class to match the allowlist.
 
-Compare button.default and button.strict for the strict-mode delta. Look at reduction_percent and leaked_count.
+Compare button.default and button.strict for the strict-mode delta. Strict scenarios target `leaked_count: 0`.
 
 ## How to read leaked_classes
 
-Non-zero leaked_count is not a test failure. It is a documented regression metric.
+Non-zero `leaked_count` in strict scenarios is not a test failure when it occurs, but all strict fixtures currently target zero. Residual leaks usually come from single-class selectors where BEM prefix matching is broader than carbon-components-svelte markup (for example size tokens the library never renders).
 
-Carbon often bundles unrelated classes in one selector (for example .bx--data-table--compact and .bx--data-table--sm in the same rule). Strict mode keeps the rule when any class matches, so foreign co-occurrences show up as leaks.
-
-Importing Tabs alone omits Tab and TabContent. Compare tabs.strict with tabs-bundle.strict.
-
-UIShell rules reference both .bx--header and .bx--side-nav. Importing one component leaks classes from the other.
+Compare button.default (`leaked_count: 112`) with button.strict (`leaked_count: 0`) for the default-vs-strict gap. Default mode keeps whole comma-list rules when any branch matches.
 
 RUNTIME_CLASSES in scripts/index-components.ts covers body scroll-lock, SideNav submenu SVG icons, and other tokens absent from class: attributes.
-
-datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without importing every possible child. Compound piggybacking is expected there.
 
 ## Scenario catalog
 
@@ -53,7 +48,6 @@ datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without i
 | button.strict | Button | gold | BEM prefix (.bx--btn--), single component |
 | button.default | Button | default | Non-strict leak delta vs button.strict |
 | button-accordion.strict | Button, Accordion | bundle | Multi-import, zero overlap |
-| datatable.strict | DataTable | regression | Compound piggybacking (overflow-menu, size variants) |
 | datepicker.strict | DatePicker, DatePickerInput | bundle | Flatpickr preservation |
 | modal.strict | Modal | gold | Runtime body class, foreign descendant drop |
 
@@ -72,6 +66,24 @@ datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without i
 | textinput.strict | TextInput | Text input |
 | toggle.strict | Toggle | Toggle switch |
 | numberinput.strict | NumberInput | Number input with steppers |
+| multiselect.strict | MultiSelect | Checkbox + list-box + combo-box + tag |
+| passwordinput.strict | PasswordInput | Password visibility toggle |
+| tabs.strict | Tabs | Parent without slot children |
+| sidenav.strict | SideNav | Runtime body class, UIShell cross-refs |
+| header.strict | Header | SideNav / content cross-refs |
+| uishell.strict | Header, SideNav, SideNavItems | Full shell bundle |
+| tooltip.strict | Tooltip | Cross-component descendant rules |
+| datatable.strict | DataTable | Compound size/menu variants |
+| datatable-toolbar.strict | DataTable, Toolbar, ToolbarSearch | Table toolbar bundle |
+| datatable-overflowmenu.strict | DataTable, OverflowMenu, Link | Table row actions |
+| fileuploader-bundle.strict | FileUploader, FileUploaderButton, FileUploaderItem | File upload bundle |
+| inline-notification.strict | InlineNotification | Notification namespace |
+
+### Default-mode delta
+
+| Scenario | ids | Exercises |
+| --- | --- | --- |
+| button.default | Button | Non-strict leak delta vs button.strict |
 
 ### Multi-import bundles
 
@@ -80,25 +92,9 @@ datatable-toolbar, tooltip, and bare datatable cannot reach zero leaks without i
 | dropdown-skeleton.strict | Dropdown, DropdownSkeleton | Parent + loading skeleton |
 | select-pagination.strict | Select, Pagination | Inline select wrapper (Carbon nests under Pagination) |
 | tabs-bundle.strict | Tabs, Tab, TabContent | Typical tabs page (slot children) |
-| datatable-overflowmenu.strict | DataTable, OverflowMenu, Link | Table with row actions; fewer leaks than datatable.strict alone |
 | accordion-bundle.strict | Accordion, AccordionItem | Typical accordion page (slot children) |
 | composed-modal-bundle.strict | ComposedModal, ModalHeader, ModalBody, ModalFooter | Composed modal usage (footer btn classes) |
 | timepicker-bundle.strict | TimePicker, TimePickerSelect | Time picker with child select (Stack + Select cross-refs) |
-
-### Leaky regression baselines
-
-| Scenario | ids | Exercises |
-| --- | --- | --- |
-| tabs.strict | Tabs | Missing slot children (Tab, TabContent) |
-| sidenav.strict | SideNav | Runtime body class, UIShell SVG icons + Header cross-refs |
-| header.strict | Header | SideNav / content cross-refs |
-| uishell.strict | Header, SideNav, SideNavItems | Full shell bundle |
-| tooltip.strict | Tooltip | High cross-component noise |
-| datatable-toolbar.strict | DataTable, Toolbar, ToolbarSearch | Table toolbar bundle |
-| multiselect.strict | MultiSelect | Checkbox + list-box + combo-box + tag piggybacking |
-| passwordinput.strict | PasswordInput | Btn / visibility-toggle bleed |
-| fileuploader-bundle.strict | FileUploader, FileUploaderButton, FileUploaderItem | File upload btn + state classes |
-| inline-notification.strict | InlineNotification | Notification namespace cross-refs |
 
 ## When to add a scenario
 

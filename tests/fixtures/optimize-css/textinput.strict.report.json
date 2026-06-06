@@ -4,11 +4,9 @@
   ],
   "strict": true,
   "before_bytes": 664899,
-  "after_bytes": 109377,
-  "reduction_percent": 83.55,
+  "after_bytes": 109326,
+  "reduction_percent": 83.56,
   "kept_rules": 206,
-  "leaked_count": 1,
-  "leaked_classes": [
-    ".bx--form--fluid"
-  ]
+  "leaked_count": 0,
+  "leaked_classes": []
 }
