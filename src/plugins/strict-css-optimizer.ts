@@ -243,10 +243,15 @@ function shouldKeepSelector(selector: string, allowlist: Set<string>): boolean {
   );
 }
 
+/**
+ * Returns the number of Carbon selectors removed: the full selector count when
+ * the whole rule is dropped, the pruned count when a comma list is trimmed, or
+ * `0` when nothing changed.
+ */
 export function optimizeStrictRule(
   node: Rule,
   options: StrictCssOptimizerOptions,
-): void {
+): number {
   const { allowlist, preserveFlatpickr } = options;
   const selector = node.selector;
 
@@ -257,7 +262,7 @@ export function optimizeStrictRule(
       FLATPICKR_SELECTOR.test(selector)
     )
   ) {
-    return;
+    return 0;
   }
 
   const selectors = splitSelectorList(selector);
@@ -274,20 +279,32 @@ export function optimizeStrictRule(
 
   if (keptSelectors.length === 0) {
     node.remove();
-  } else if (keptSelectors.length < selectors.length) {
-    node.selector = keptSelectors.join(", ");
+    return selectors.length;
   }
+
+  if (keptSelectors.length < selectors.length) {
+    node.selector = keptSelectors.join(", ");
+    return selectors.length - keptSelectors.length;
+  }
+
+  return 0;
 }
 
+/**
+ * Returns `1` when the flatpickr keyframes node is removed, otherwise `0`.
+ */
 export function optimizeStrictAtRule(
   node: AtRule,
   options: Pick<StrictCssOptimizerOptions, "preserveFlatpickr">,
-): void {
+): number {
   if (
     !options.preserveFlatpickr &&
     node.name === "keyframes" &&
     FLATPICKR_KEYFRAMES.has(node.params)
   ) {
     node.remove();
+    return 1;
   }
+
+  return 0;
 }

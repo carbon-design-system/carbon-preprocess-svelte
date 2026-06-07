@@ -173,6 +173,29 @@ describe("OptimizeCssPlugin", () => {
     consoleSpy.mockRestore();
   });
 
+  test("skips diff logging when nothing is removed", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation();
+    const plugin = new OptimizeCssPlugin({ silent: false });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    // Button is imported and .bx--btn is the only Carbon class, so nothing is
+    // pruned even though Carbon imports exist (e.g. a secondary stylesheet).
+    const cssWithOnlyUsedCarbon = `* { box-sizing: border-box }
+.bx--btn { color: blue }`;
+
+    const mockCompiler = createMockCompiler({
+      assets: {
+        "styles.css": { source: () => cssWithOnlyUsedCarbon },
+      },
+      fileDependencies: [carbonComponent],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
   test("passes experimental strict option to CSS optimization", async () => {
     const plugin = new OptimizeCssPlugin({
       silent: true,

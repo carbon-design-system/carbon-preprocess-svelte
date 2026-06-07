@@ -1,7 +1,7 @@
 import type { Plugin } from "vite";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createOptimizedCss, isSilent } from "./create-optimized-css";
+import { isSilent, optimizeCssWithReport } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
 
 /**
@@ -52,7 +52,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
-          const optimized_css = createOptimizedCss({
+          const { css: optimized_css, removed } = optimizeCssWithReport({
             ...options,
             source: original_css,
             ids,
@@ -61,7 +61,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
           file.source = optimized_css;
 
-          if (!silent) {
+          if (!silent && removed > 0) {
             printDiff({ original_css, optimized_css, id });
           }
         }

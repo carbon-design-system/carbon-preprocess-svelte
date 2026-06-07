@@ -1,7 +1,7 @@
 import type { Compiler } from "webpack";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createOptimizedCssAsync, isSilent } from "./create-optimized-css";
+import { isSilent, optimizeCssWithReportAsync } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
 
 /**
@@ -80,22 +80,28 @@ class OptimizeCssPlugin {
             const results = await Promise.all(
               cssAssetIds.map(async (id) => {
                 const original_css = assets[id].source();
-                const optimized_css = await createOptimizedCssAsync({
-                  ...this.options,
-                  source: Buffer.isBuffer(original_css)
-                    ? original_css.toString()
-                    : original_css,
-                  ids,
-                  from: id,
-                });
-                return { id, original_css, optimized_css };
+                const { css: optimized_css, removed } =
+                  await optimizeCssWithReportAsync({
+                    ...this.options,
+                    source: Buffer.isBuffer(original_css)
+                      ? original_css.toString()
+                      : original_css,
+                    ids,
+                    from: id,
+                  });
+                return { id, original_css, optimized_css, removed };
               }),
             );
 
-            for (const { id, original_css, optimized_css } of results) {
+            for (const {
+              id,
+              original_css,
+              optimized_css,
+              removed,
+            } of results) {
               compilation.updateAsset(id, new RawSource(optimized_css));
 
-              if (!isSilent(this.options)) {
+              if (!isSilent(this.options) && removed > 0) {
                 printDiff({ original_css, optimized_css, id });
               }
             }
