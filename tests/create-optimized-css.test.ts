@@ -1,4 +1,7 @@
-import { createOptimizedCss } from "carbon-preprocess-svelte/plugins/create-optimized-css";
+import {
+  createOptimizedCss,
+  optimizeCssWithReport,
+} from "carbon-preprocess-svelte/plugins/create-optimized-css";
 
 describe("create-optimized-css", () => {
   const strict = { experimental: { strict: true } } as const;
@@ -367,5 +370,49 @@ button, .flatpickr-day.selected { color: red }`,
       ids: ["Button"],
     });
     expect(result).toEqual(".custom-class { color: red }");
+  });
+
+  describe("optimizeCssWithReport", () => {
+    test("counts pruned Carbon rules", () => {
+      const { css, removed } = optimizeCssWithReport({
+        source: `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`,
+        ids: ["Button"],
+      });
+      expect(removed).toBe(1);
+      expect(css).toEqual(".bx--btn { color: blue }");
+    });
+
+    test("reports zero when nothing is pruned", () => {
+      const source = ".bx--btn { color: blue }\n.custom { color: red }";
+      const { css, removed } = optimizeCssWithReport({
+        source,
+        ids: ["Button"],
+      });
+      expect(removed).toBe(0);
+      expect(css).toEqual(source);
+    });
+
+    test("counts removed @font-face rules", () => {
+      const { removed } = optimizeCssWithReport({
+        source: `@font-face {
+  font-family: IBM Plex Sans;
+  font-style: normal;
+  font-weight: 700;
+}`,
+        ids: ["/Accordion.svelte"],
+      });
+      expect(removed).toBe(1);
+    });
+
+    test("counts selectors pruned from a comma list in strict mode", () => {
+      const { css, removed } = optimizeCssWithReport({
+        ...strict,
+        source: ".bx--btn, .bx--accordion { color: white }",
+        ids: ["Button"],
+      });
+      expect(removed).toBe(1);
+      expect(css).toEqual(".bx--btn { color: white }");
+    });
   });
 });

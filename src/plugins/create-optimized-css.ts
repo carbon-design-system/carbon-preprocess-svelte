@@ -139,6 +139,7 @@ function createPostcssPlugins(
   preserveAllIBMFonts: boolean,
   preserveFlatpickr: boolean,
   strict: boolean,
+  report: { removed: number },
 ): AcceptedPlugin[] {
   return [
     {
@@ -163,12 +164,16 @@ function createPostcssPlugins(
 
             if (!shouldKeepRule(selectors, allowlist)) {
               node.remove();
+              report.removed++;
             }
           }
           return;
         }
 
-        optimizeStrictRule(node, { allowlist, preserveFlatpickr });
+        report.removed += optimizeStrictRule(node, {
+          allowlist,
+          preserveFlatpickr,
+        });
       },
       /**
        * AtRule visitor that removes unused IBM Plex @font-face declarations.
@@ -181,7 +186,7 @@ function createPostcssPlugins(
        */
       AtRule(node) {
         if (strict) {
-          optimizeStrictAtRule(node, { preserveFlatpickr });
+          report.removed += optimizeStrictAtRule(node, { preserveFlatpickr });
           if (!node.parent) return;
         }
 
@@ -218,6 +223,7 @@ function createPostcssPlugins(
 
           if (!(is_sans || is_mono)) {
             node.remove();
+            report.removed++;
           }
         }
       },
@@ -226,38 +232,67 @@ function createPostcssPlugins(
   ];
 }
 
-export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
+/**
+ * The optimized CSS plus a count of how many Carbon rules/selectors/font-faces
+ * were removed. Callers use `removed` to suppress the size diff log when nothing
+ * was actually pruned (a size change alone can be misleading — e.g. PostCSS
+ * re-serialization on a stylesheet with no Carbon styles to remove).
+ */
+export type OptimizedCssReport = {
+  css: string;
+  removed: number;
+};
+
+export function optimizeCssWithReport(
+  options: CreateOptimizedCssOptions,
+): OptimizedCssReport {
   const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const strict = isStrict(options);
   const { allowlist, preserveFlatpickr } = buildUsage(ids);
+  const report = { removed: 0 };
 
-  return postcss(
+  const { css } = postcss(
     createPostcssPlugins(
       allowlist,
       preserveAllIBMFonts,
       preserveFlatpickr,
       strict,
+      report,
     ),
-  ).process(source, { from: options.from }).css;
+  ).process(source, { from: options.from });
+
+  return { css, removed: report.removed };
+}
+
+export async function optimizeCssWithReportAsync(
+  options: CreateOptimizedCssOptions,
+): Promise<OptimizedCssReport> {
+  const { source, ids } = options;
+  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
+  const strict = isStrict(options);
+  const { allowlist, preserveFlatpickr } = buildUsage(ids);
+  const report = { removed: 0 };
+
+  const { css } = await postcss(
+    createPostcssPlugins(
+      allowlist,
+      preserveAllIBMFonts,
+      preserveFlatpickr,
+      strict,
+      report,
+    ),
+  ).process(source, { from: options.from });
+
+  return { css, removed: report.removed };
+}
+
+export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
+  return optimizeCssWithReport(options).css;
 }
 
 export async function createOptimizedCssAsync(
   options: CreateOptimizedCssOptions,
 ): Promise<string> {
-  const { source, ids } = options;
-  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const strict = isStrict(options);
-  const { allowlist, preserveFlatpickr } = buildUsage(ids);
-
-  const result = await postcss(
-    createPostcssPlugins(
-      allowlist,
-      preserveAllIBMFonts,
-      preserveFlatpickr,
-      strict,
-    ),
-  ).process(source, { from: options.from });
-
-  return result.css;
+  return (await optimizeCssWithReportAsync(options)).css;
 }
