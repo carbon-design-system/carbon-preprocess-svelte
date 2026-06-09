@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.35](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.35) - 2026-06-09
+
+**Fixes**
+
+- `optimizeCss`: suppress diff log when nothing is pruned
+- `optimizeImports`: resolve re-exports sharing a source module
+- `optimizeImports`: leave un-indexed utilities as barrel imports
+
 ## [0.11.34](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.34) - 2026-06-06
 
 **Fixes**
