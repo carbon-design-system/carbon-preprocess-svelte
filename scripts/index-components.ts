@@ -21,6 +21,7 @@ import { extractFromSvelte } from "./extract-selectors";
 const MANUAL_OVERRIDES: Record<string, string[]> = {};
 
 const debugIndex = process.env.DEBUG_INDEX === "1";
+const RELATIVE_SOURCE_PREFIX = /^\.\//;
 
 function logTiming(label: string, start: number): void {
   if (debugIndex) {
@@ -43,6 +44,10 @@ const internal_components = new Map<Identifier, null | IdentifierValue>();
 const sub_components = new Map<Identifier, Identifier[]>();
 const slot_wrapper_classes = new Map<Identifier, string[]>();
 const module_to_component = new Map<string, string>();
+// src-relative path -> scanned entry (for re-export lookup).
+const file_entries = new Map<string, IdentifierValue>();
+// export name -> index.js re-export source (filterTreeById -> ./utils/filterTreeNodes).
+const export_sources = new Map<Identifier, string>();
 
 const moduleGraph: ModuleGraphCache = {
   importsByModule: new Map(),
@@ -53,6 +58,12 @@ walk(parse(`<script>${index_file}</script>`), {
   enter(node) {
     if (node.type === "Identifier") {
       exports_map.set(node.name, null);
+    }
+
+    if (node.type === "ExportNamedDeclaration" && node.source) {
+      for (const specifier of node.specifiers) {
+        export_sources.set(specifier.exported.name, node.source.value);
+      }
     }
   },
 });
@@ -72,6 +83,8 @@ for await (const file of files) {
     path: `${CarbonSvelte.Components}/src/${file}`,
     classes: [],
   };
+
+  file_entries.set(moduleKey, map);
 
   if (isSvelteFile(file)) {
     const file_path = path.join(carbon_src, file);
@@ -107,6 +120,37 @@ for await (const file of files) {
 }
 
 logTiming("component scan", scanStart);
+
+function resolveSource(source: string): IdentifierValue | undefined {
+  const base = source.replace(RELATIVE_SOURCE_PREFIX, "");
+  for (const candidate of [
+    base,
+    `${base}.js`,
+    `${base}.svelte`,
+    `${base}/index.js`,
+  ]) {
+    const entry = file_entries.get(candidate);
+    if (entry) return entry;
+  }
+  return undefined;
+}
+
+// Filename scan only catches exports named after their file (filterTreeNodes).
+// Look up sibling re-exports from index.js or optimizeImports invents *.svelte.
+for (const [name, entry] of exports_map.entries()) {
+  if (entry !== null) continue;
+
+  const source = export_sources.get(name);
+  if (!source) continue;
+
+  const resolved = resolveSource(source);
+  if (resolved) {
+    exports_map.set(name, {
+      path: resolved.path,
+      classes: [...resolved.classes],
+    });
+  }
+}
 
 const markup_only_classes = new Map<string, Set<string>>();
 
