@@ -1052,6 +1052,14 @@ export const components: Record<string, { path: string; classes: string[] }> =
         ".bx--unstable-pagination__right",
       ],
     },
+    filterTreeById: {
+      path: "carbon-components-svelte/src/utils/filterTreeNodes.js",
+      classes: [],
+    },
+    filterTreeByText: {
+      path: "carbon-components-svelte/src/utils/filterTreeNodes.js",
+      classes: [],
+    },
     filterTreeNodes: {
       path: "carbon-components-svelte/src/utils/filterTreeNodes.js",
       classes: [],

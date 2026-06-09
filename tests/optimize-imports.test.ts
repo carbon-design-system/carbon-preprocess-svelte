@@ -53,6 +53,16 @@ import Airplane2 from "carbon-pictograms-svelte/lib/Airplane.svelte";
 import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`);
   });
 
+  test("re-exports from the same module resolve to their .js file", () => {
+    expect(
+      preprocess({
+        content: `import { filterTreeById, filterTreeByText, filterTreeNodes } from "carbon-components-svelte";`,
+      }),
+    ).toEqual(`import filterTreeById from "carbon-components-svelte/src/utils/filterTreeNodes.js";
+import filterTreeByText from "carbon-components-svelte/src/utils/filterTreeNodes.js";
+import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";`);
+  });
+
   test("invalid imports should be optimistic", () => {
     expect(
       preprocess({
