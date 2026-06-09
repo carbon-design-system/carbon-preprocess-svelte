@@ -73,6 +73,23 @@ import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.
     );
   });
 
+  test("un-indexed camelCase utility is left untouched", () => {
+    expect(
+      preprocess({
+        content: `import { someFutureUtil } from "carbon-components-svelte"`,
+      }),
+    ).toEqual(`import { someFutureUtil } from "carbon-components-svelte"`);
+  });
+
+  test("mixed component and un-indexed utility import", () => {
+    expect(
+      preprocess({
+        content: `import { Button, someFutureUtil } from "carbon-components-svelte";`,
+      }),
+    ).toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
+import { someFutureUtil } from "carbon-components-svelte";`);
+  });
+
   test("mixed imports should be handled correctly", () => {
     expect(
       preprocess({
