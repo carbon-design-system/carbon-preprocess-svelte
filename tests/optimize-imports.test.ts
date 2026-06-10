@@ -1,9 +1,13 @@
 import { optimizeImports } from "carbon-preprocess-svelte";
+import type { OptimizeImportsOptions } from "carbon-preprocess-svelte/preprocessors/optimize-imports";
 import type { Preprocessor, Processed } from "svelte/compiler";
 
-const preprocess = (options?: Partial<Parameters<Preprocessor>[0]>) => {
+const preprocess = (
+  options?: Partial<Parameters<Preprocessor>[0]>,
+  preprocessorOptions?: OptimizeImportsOptions,
+) => {
   return (
-    optimizeImports().script({
+    optimizeImports(preprocessorOptions).script({
       attributes: {},
       filename: "test.svelte",
       content: "",
@@ -71,6 +75,27 @@ import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.
     ).toEqual(
       'import NonExistent from "carbon-components-svelte/src/NonExistent/NonExistent.svelte";',
     );
+  });
+
+  test("optimistic: false leaves un-indexed component on the barrel", () => {
+    expect(
+      preprocess(
+        { content: "import { NonExistent } from 'carbon-components-svelte'" },
+        { optimistic: false },
+      ),
+    ).toEqual("import { NonExistent } from 'carbon-components-svelte'");
+  });
+
+  test("optimistic: false still rewrites indexed components", () => {
+    expect(
+      preprocess(
+        {
+          content: `import { Button, NonExistent } from "carbon-components-svelte";`,
+        },
+        { optimistic: false },
+      ),
+    ).toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
+import { NonExistent } from "carbon-components-svelte";`);
   });
 
   test("un-indexed camelCase utility is left untouched", () => {

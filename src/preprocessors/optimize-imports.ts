@@ -11,6 +11,19 @@ const COMPONENT_NAME_REGEX = /^[A-Z]/;
 const SCRIPT_OPEN_TAG_REGEX = /^<script lang="ts">/;
 const SCRIPT_CLOSE_TAG_REGEX = /<\/script>$/;
 
+export type OptimizeImportsOptions = {
+  /**
+   * If a PascalCase import isn't in the bundled index, guess
+   * `carbon-components-svelte/src/Name/Name.svelte`. Works for components added
+   * after the index was built. Breaks the build if the name isn't real.
+   *
+   * `false` leaves un-indexed names on the barrel import. camelCase utilities
+   * always stay on the barrel either way.
+   * @default true
+   */
+  optimistic?: boolean;
+};
+
 function rewriteImport(
   s: MagicString,
   node: ImportDeclaration,
@@ -65,11 +78,15 @@ function rewriteImport(
  *   import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
  * ```
  *
- * Names missing from the component index: PascalCase gets an optimistic
- * `src/Name/Name.svelte` path; camelCase stays on the barrel so utilities
- * don't point at a `.svelte` file that isn't there.
+ * Un-indexed PascalCase names get a guessed path by default. Pass
+ * `{ optimistic: false }` to skip that. See {@link OptimizeImportsOptions.optimistic}.
  */
-export const optimizeImports: SveltePreprocessor<"script"> = () => {
+export const optimizeImports: SveltePreprocessor<
+  "script",
+  OptimizeImportsOptions
+> = (options) => {
+  const optimistic = options?.optimistic ?? true;
+
   return {
     name: "carbon:optimize-imports",
     script({ filename, content: raw }) {
@@ -99,12 +116,13 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
                     return `import ${local.name} from "${import_path}";`;
                   }
 
-                  // Not in index: PascalCase gets an optimistic component path;
-                  // camelCase stays on the barrel (utility, not a .svelte file).
-                  const looks_like_component = COMPONENT_NAME_REGEX.test(
-                    imported.name,
-                  );
-                  if (looks_like_component) {
+                  // Not in index. When optimistic (the default), guess a src/
+                  // path for PascalCase names so newer carbon-components-svelte
+                  // releases work without re-indexing/upgrading this preprocessor
+                  // (see #97); a genuinely non-existent name surfaces as a
+                  // downstream resolution error. camelCase names are utilities,
+                  // not .svelte files, so they always stay on the barrel.
+                  if (optimistic && COMPONENT_NAME_REGEX.test(imported.name)) {
                     return `import ${local.name} from "${import_name}/src/${imported.name}/${imported.name}.svelte";`;
                   }
 
