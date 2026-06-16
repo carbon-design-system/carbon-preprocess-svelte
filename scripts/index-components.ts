@@ -152,14 +152,6 @@ for (const [name, entry] of exports_map.entries()) {
   }
 }
 
-const markup_only_classes = new Map<string, Set<string>>();
-
-for (const [name, entry] of exports_map.entries()) {
-  if (entry) {
-    markup_only_classes.set(name, new Set(entry.classes));
-  }
-}
-
 for (const [parent, children] of sub_components.entries()) {
   const parent_map = exports_map.get(parent);
 
@@ -180,6 +172,14 @@ for (const [parent, children] of sub_components.entries()) {
         ...new Set([...parent_map.classes, ...sub_classes]),
       ];
     }
+  }
+}
+
+const markup_only_classes = new Map<string, Set<string>>();
+
+for (const [name, entry] of exports_map.entries()) {
+  if (entry) {
+    markup_only_classes.set(name, new Set(entry.classes));
   }
 }
 

@@ -4,11 +4,9 @@
   ],
   "strict": true,
   "before_bytes": 740417,
-  "after_bytes": 18914,
-  "reduction_percent": 97.45,
-  "kept_rules": 106,
-  "leaked_count": 1,
-  "leaked_classes": [
-    ".bx--header__global"
-  ]
+  "after_bytes": 19068,
+  "reduction_percent": 97.42,
+  "kept_rules": 108,
+  "leaked_count": 0,
+  "leaked_classes": []
 }
