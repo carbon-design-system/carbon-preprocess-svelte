@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.36](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.36) - 2026-06-15
+
+**Fixes**
+
+- re-index exports using `carbon-components-svelte@0.109.0`
+- `index`: restore zero-leak strict baselines for Header after 0.109.0 re-index
+
 ## [0.11.35](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.35) - 2026-06-09
 
 **Fixes**
