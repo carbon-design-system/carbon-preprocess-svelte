@@ -3,10 +3,10 @@
     "Button"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 175713,
-  "reduction_percent": 73.57,
-  "kept_rules": 554,
+  "before_bytes": 740417,
+  "after_bytes": 86843,
+  "reduction_percent": 88.27,
+  "kept_rules": 488,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -3,10 +3,10 @@
     "Tabs"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 108280,
-  "reduction_percent": 83.71,
-  "kept_rules": 189,
+  "before_bytes": 740417,
+  "after_bytes": 18763,
+  "reduction_percent": 97.47,
+  "kept_rules": 104,
   "leaked_count": 0,
   "leaked_classes": []
 }

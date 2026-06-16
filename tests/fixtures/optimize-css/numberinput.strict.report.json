@@ -3,10 +3,10 @@
     "NumberInput"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 121216,
-  "reduction_percent": 81.77,
-  "kept_rules": 303,
+  "before_bytes": 740417,
+  "after_bytes": 43985,
+  "reduction_percent": 94.06,
+  "kept_rules": 267,
   "leaked_count": 0,
   "leaked_classes": []
 }

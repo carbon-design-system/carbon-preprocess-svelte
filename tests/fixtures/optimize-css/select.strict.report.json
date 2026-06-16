@@ -3,10 +3,10 @@
     "Select"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 115562,
-  "reduction_percent": 82.62,
-  "kept_rules": 263,
+  "before_bytes": 740417,
+  "after_bytes": 42129,
+  "reduction_percent": 94.31,
+  "kept_rules": 261,
   "leaked_count": 0,
   "leaked_classes": []
 }
