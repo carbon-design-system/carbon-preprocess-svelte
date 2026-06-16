@@ -3,10 +3,10 @@
     "Toggle"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 115101,
-  "reduction_percent": 82.69,
-  "kept_rules": 229,
+  "before_bytes": 740417,
+  "after_bytes": 25198,
+  "reduction_percent": 96.6,
+  "kept_rules": 143,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -3,10 +3,10 @@
     "InlineNotification"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 113615,
-  "reduction_percent": 82.91,
-  "kept_rules": 215,
+  "before_bytes": 740417,
+  "after_bytes": 24259,
+  "reduction_percent": 96.72,
+  "kept_rules": 129,
   "leaked_count": 0,
   "leaked_classes": []
 }

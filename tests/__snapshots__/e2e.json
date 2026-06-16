@@ -21,8 +21,8 @@
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 86.45,
-      "reduction_percent": 86
+      "after_kb": 91.56,
+      "reduction_percent": 85.17
     },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
@@ -45,32 +45,32 @@
     "dropdown": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 46.18,
-      "reduction_percent": 92.52
+      "after_kb": 46.53,
+      "reduction_percent": 92.47
     },
     "modal": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 86.45,
-      "reduction_percent": 86
+      "after_kb": 91.56,
+      "reduction_percent": 85.17
     },
     "multiselect": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 53.42,
-      "reduction_percent": 91.35
+      "after_kb": 54.42,
+      "reduction_percent": 91.19
     },
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 99.03,
-      "reduction_percent": 83.96
+      "after_kb": 104.13,
+      "reduction_percent": 83.14
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 26.82,
-      "reduction_percent": 95.66
+      "after_kb": 32.21,
+      "reduction_percent": 94.78
     },
     "textinput": {
       "file": "assets/index-*.css",
@@ -81,8 +81,8 @@
     "timepicker-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 617.52,
-      "after_kb": 32.55,
-      "reduction_percent": 94.73
+      "after_kb": 33.43,
+      "reduction_percent": 94.59
     },
     "uishell": {
       "file": "assets/index-*.css",

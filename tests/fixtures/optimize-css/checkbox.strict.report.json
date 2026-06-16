@@ -3,10 +3,10 @@
     "Checkbox"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 115613,
-  "reduction_percent": 82.61,
-  "kept_rules": 242,
+  "before_bytes": 740417,
+  "after_bytes": 25798,
+  "reduction_percent": 96.52,
+  "kept_rules": 154,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -5,10 +5,10 @@
     "SideNavItems"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 111649,
-  "reduction_percent": 83.21,
-  "kept_rules": 224,
+  "before_bytes": 740417,
+  "after_bytes": 22311,
+  "reduction_percent": 96.99,
+  "kept_rules": 136,
   "leaked_count": 1,
   "leaked_classes": [
     ".bx--header__global"

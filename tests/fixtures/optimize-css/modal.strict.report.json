@@ -3,10 +3,10 @@
     "Modal"
   ],
   "strict": true,
-  "before_bytes": 664899,
-  "after_bytes": 170085,
-  "reduction_percent": 74.42,
-  "kept_rules": 518,
+  "before_bytes": 740417,
+  "after_bytes": 75977,
+  "reduction_percent": 89.74,
+  "kept_rules": 428,
   "leaked_count": 0,
   "leaked_classes": []
 }
