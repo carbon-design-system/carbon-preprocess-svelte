@@ -7,7 +7,7 @@ const isWatchMode =
 await $`rm -rf dist; mkdir dist`;
 
 async function emitTypeDeclarations() {
-  const result = await $`tsgo --project tsconfig.build.json`.quiet();
+  const result = await $`tsc --project tsconfig.build.json`.quiet();
   if (result.exitCode !== 0) {
     console.error(result.stderr.toString());
     if (!isWatchMode) {
