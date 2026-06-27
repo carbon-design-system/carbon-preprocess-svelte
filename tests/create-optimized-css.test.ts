@@ -1,5 +1,6 @@
 import {
   createOptimizedCss,
+  DEBUG_PRUNED_SAMPLE_CAP,
   optimizeCssWithReport,
 } from "carbon-preprocess-svelte/plugins/create-optimized-css";
 
@@ -516,6 +517,68 @@ button, .flatpickr-day.selected { color: red }`,
       });
       expect(removed).toBe(1);
       expect(css).toEqual(".bx--btn { color: white }");
+    });
+  });
+
+  describe("debug", () => {
+    test("omits debug info when disabled", () => {
+      const { debug } = optimizeCssWithReport({
+        source:
+          ".bx--btn { color: blue }\n.bx--accordion { background: yellow }",
+        ids: ["Button"],
+      });
+      expect(debug).toBeUndefined();
+    });
+
+    test("reports detected components, allowlist, flags, and pruned sample", () => {
+      const { debug } = optimizeCssWithReport({
+        debug: true,
+        source:
+          ".bx--btn { color: blue }\n.bx--accordion { background: yellow }",
+        ids: ["Button", "DataTable"],
+      });
+      expect(debug).toBeDefined();
+      expect(debug?.components).toEqual(["Button", "DataTable"]);
+      expect(debug?.allowlistSize).toBeGreaterThan(0);
+      expect(debug?.strict).toBe(false);
+      expect(debug?.preserveFlatpickr).toBe(false);
+      expect(debug?.prunedSample).toEqual([".bx--accordion"]);
+      expect(debug?.prunedSampleTruncated).toBe(false);
+    });
+
+    test("sets preserveFlatpickr when DatePicker is present", () => {
+      const { debug } = optimizeCssWithReport({
+        debug: true,
+        source: ".bx--btn { color: blue }",
+        ids: ["DatePicker"],
+      });
+      expect(debug?.preserveFlatpickr).toBe(true);
+    });
+
+    test("collects selectors pruned from comma lists in strict mode", () => {
+      const { debug } = optimizeCssWithReport({
+        ...strict,
+        debug: true,
+        source: ".bx--btn, .bx--accordion { color: white }",
+        ids: ["Button"],
+      });
+      expect(debug?.strict).toBe(true);
+      expect(debug?.prunedSample).toEqual([".bx--accordion"]);
+    });
+
+    test("caps the pruned sample at 20 selectors", () => {
+      const source = Array.from(
+        { length: 30 },
+        (_, i) => `.bx--accordion-${i} { color: red }`,
+      ).join("\n");
+      const { debug, removed } = optimizeCssWithReport({
+        debug: true,
+        source,
+        ids: ["Button"],
+      });
+      expect(removed).toBe(30);
+      expect(debug?.prunedSample).toHaveLength(DEBUG_PRUNED_SAMPLE_CAP);
+      expect(debug?.prunedSampleTruncated).toBe(true);
     });
   });
 });

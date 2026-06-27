@@ -26,6 +26,15 @@ export type OptimizeCssOptions = {
   verbose?: boolean;
 
   /**
+   * Print a per-asset summary after optimization: detected components,
+   * allowlist size, strict/flatpickr flags, removed rule count, and up to
+   * {@link DEBUG_PRUNED_SAMPLE_CAP} pruned selectors. Still prints when
+   * `silent` is `true`.
+   * @default false
+   */
+  debug?: boolean;
+
+  /**
    * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
    * for all available IBM Plex fonts, many of which are not actually
    * used in Carbon Svelte components.
@@ -110,6 +119,23 @@ function isStrict(options?: OptimizeCssOptions): boolean {
   return options?.experimental?.strict === true;
 }
 
+/** Max pruned selectors kept for the `debug` summary. */
+export const DEBUG_PRUNED_SAMPLE_CAP = 20;
+
+function createPruneCollector(sample: string[]) {
+  let truncated = false;
+  return {
+    collect: (selector: string) => {
+      if (sample.length < DEBUG_PRUNED_SAMPLE_CAP) {
+        sample.push(selector);
+        return;
+      }
+      truncated = true;
+    },
+    wasTruncated: () => truncated,
+  };
+}
+
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;
   ids: Iterable<string>;
@@ -134,11 +160,14 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
 function buildUsage(
   ids: Iterable<string>,
   contentClasses?: Iterable<string>,
+  debug = false,
 ): {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
+  detectedComponents: string[];
 } {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
+  const detected = debug ? new Set<string>() : null;
   let preserveFlatpickr = false;
 
   for (const id of ids) {
@@ -149,6 +178,7 @@ function buildUsage(
     }
 
     if (name in components) {
+      detected?.add(name);
       for (const cls of components[name].classes) {
         allowlist.add(cls);
       }
@@ -159,7 +189,11 @@ function buildUsage(
     allowlist.add(cls);
   }
 
-  return { allowlist, preserveFlatpickr };
+  return {
+    allowlist,
+    preserveFlatpickr,
+    detectedComponents: detected ? [...detected].sort() : [],
+  };
 }
 
 function shouldKeepRule(selectors: string[], allowlist: Set<string>): boolean {
@@ -187,6 +221,7 @@ function createPostcssPlugins(
   strict: boolean,
   safelist: readonly SafelistEntry[],
   report: { removed: number },
+  collectPruned?: (selector: string) => void,
 ): AcceptedPlugin[] {
   return [
     {
@@ -219,6 +254,12 @@ function createPostcssPlugins(
             });
 
             if (!shouldKeepRule(selectors, allowlist)) {
+              if (collectPruned) {
+                for (const selectee of selector.split(",")) {
+                  const trimmed = selectee.trim();
+                  if (trimmed) collectPruned(trimmed);
+                }
+              }
               node.remove();
               report.removed++;
             }
@@ -230,6 +271,7 @@ function createPostcssPlugins(
           allowlist,
           preserveFlatpickr,
           safelist,
+          onRemove: collectPruned,
         });
       },
       /**
@@ -298,60 +340,86 @@ function createPostcssPlugins(
 export type OptimizedCssReport = {
   css: string;
   removed: number;
+  debug?: OptimizeCssDebugInfo;
 };
+
+export type OptimizeCssDebugInfo = {
+  components: string[];
+  allowlistSize: number;
+  preserveFlatpickr: boolean;
+  strict: boolean;
+  prunedSample: string[];
+  prunedSampleTruncated: boolean;
+};
+
+function prepareOptimization(options: CreateOptimizedCssOptions): {
+  plugins: AcceptedPlugin[];
+  finalize: (css: string) => OptimizedCssReport;
+} {
+  const { ids } = options;
+  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
+  const strict = isStrict(options);
+  const debug = options?.debug === true;
+  const safelist = options.safelist ?? [];
+  const { allowlist, preserveFlatpickr, detectedComponents } = buildUsage(
+    ids,
+    options.contentClasses,
+    debug,
+  );
+  const report = { removed: 0 };
+  const prunedSample = debug ? ([] as string[]) : undefined;
+  const pruneCollector = prunedSample
+    ? createPruneCollector(prunedSample)
+    : undefined;
+  const collectPruned = pruneCollector?.collect;
+
+  const plugins = createPostcssPlugins(
+    allowlist,
+    preserveAllIBMFonts,
+    preserveFlatpickr,
+    strict,
+    safelist,
+    report,
+    collectPruned,
+  );
+
+  return {
+    plugins,
+    finalize: (css) => {
+      const result: OptimizedCssReport = { css, removed: report.removed };
+      if (debug && prunedSample && pruneCollector) {
+        result.debug = {
+          components: detectedComponents,
+          allowlistSize: allowlist.size,
+          preserveFlatpickr,
+          strict,
+          prunedSample,
+          prunedSampleTruncated: pruneCollector.wasTruncated(),
+        };
+      }
+      return result;
+    },
+  };
+}
 
 export function optimizeCssWithReport(
   options: CreateOptimizedCssOptions,
 ): OptimizedCssReport {
-  const { source, ids } = options;
-  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const strict = isStrict(options);
-  const safelist = options.safelist ?? [];
-  const { allowlist, preserveFlatpickr } = buildUsage(
-    ids,
-    options.contentClasses,
-  );
-  const report = { removed: 0 };
-
-  const { css } = postcss(
-    createPostcssPlugins(
-      allowlist,
-      preserveAllIBMFonts,
-      preserveFlatpickr,
-      strict,
-      safelist,
-      report,
-    ),
-  ).process(source, { from: options.from });
-
-  return { css, removed: report.removed };
+  const { plugins, finalize } = prepareOptimization(options);
+  const { css } = postcss(plugins).process(options.source, {
+    from: options.from,
+  });
+  return finalize(css);
 }
 
 export async function optimizeCssWithReportAsync(
   options: CreateOptimizedCssOptions,
 ): Promise<OptimizedCssReport> {
-  const { source, ids } = options;
-  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const strict = isStrict(options);
-  const safelist = options.safelist ?? [];
-  const { allowlist, preserveFlatpickr } = buildUsage(
-    ids,
-    options.contentClasses,
-  );
-  const report = { removed: 0 };
-
-  const { css } = await postcss(
-    createPostcssPlugins(
-      allowlist,
-      preserveAllIBMFonts,
-      preserveFlatpickr,
-      strict,
-      safelist,
-      report,
-    ),
-  ).process(source, { from: options.from });
-
-  return { css, removed: report.removed };
+  const { plugins, finalize } = prepareOptimization(options);
+  const { css } = await postcss(plugins).process(options.source, {
+    from: options.from,
+  });
+  return finalize(css);
 }
 
 export function createOptimizedCss(options: CreateOptimizedCssOptions): string {

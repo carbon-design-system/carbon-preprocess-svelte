@@ -2,7 +2,7 @@ import type { Compiler } from "webpack";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { isSilent, optimizeCssWithReportAsync } from "./create-optimized-css";
-import { printDiff } from "./print-diff";
+import { logOptimizationResult } from "./print-diff";
 import { scanContentClasses } from "./scan-content";
 
 /**
@@ -82,17 +82,20 @@ class OptimizeCssPlugin {
             const results = await Promise.all(
               cssAssetIds.map(async (id) => {
                 const original_css = assets[id].source();
-                const { css: optimized_css, removed } =
-                  await optimizeCssWithReportAsync({
-                    ...this.options,
-                    source: Buffer.isBuffer(original_css)
-                      ? original_css.toString()
-                      : original_css,
-                    ids,
-                    from: id,
-                    contentClasses,
-                  });
-                return { id, original_css, optimized_css, removed };
+                const {
+                  css: optimized_css,
+                  removed,
+                  debug: debugInfo,
+                } = await optimizeCssWithReportAsync({
+                  ...this.options,
+                  source: Buffer.isBuffer(original_css)
+                    ? original_css.toString()
+                    : original_css,
+                  ids,
+                  from: id,
+                  contentClasses,
+                });
+                return { id, original_css, optimized_css, removed, debugInfo };
               }),
             );
 
@@ -101,12 +104,18 @@ class OptimizeCssPlugin {
               original_css,
               optimized_css,
               removed,
+              debugInfo,
             } of results) {
               compilation.updateAsset(id, new RawSource(optimized_css));
 
-              if (!isSilent(this.options) && removed > 0) {
-                printDiff({ original_css, optimized_css, id });
-              }
+              logOptimizationResult({
+                id,
+                original_css,
+                optimized_css,
+                removed,
+                debug: debugInfo,
+                silent: isSilent(this.options),
+              });
             }
           },
         );

@@ -1,4 +1,7 @@
 import { BITS_DENOM } from "../constants";
+import type { OptimizeCssDebugInfo } from "./create-optimized-css";
+
+const LOG_PREFIX = "[carbon-preprocess-svelte]";
 
 const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
@@ -68,4 +71,50 @@ export function printDiff(props: {
   console.log("Optimized", id);
   console.log("Before:", original_display);
   console.log("After: ", optimized_display, `(-${diff})\n`);
+}
+
+export function printDebug(
+  props: { id: string; removed: number } & OptimizeCssDebugInfo,
+) {
+  const {
+    id,
+    removed,
+    components,
+    allowlistSize,
+    preserveFlatpickr,
+    strict,
+    prunedSample,
+    prunedSampleTruncated,
+  } = props;
+
+  const detected = components.length > 0 ? components.join(", ") : "(none)";
+  const sample = prunedSample.length > 0 ? prunedSample.join(", ") : "(none)";
+  const ellipsis = prunedSampleTruncated ? ", …" : "";
+
+  console.log(`\n${LOG_PREFIX} optimizeCss · ${id}`);
+  console.log(`  components detected: ${detected} (${components.length})`);
+  console.log(
+    `  allowlist classes:   ${allowlistSize} · strict: ${strict} · flatpickr: ${preserveFlatpickr}`,
+  );
+  console.log(`  removed:             ${removed}`);
+  console.log(`  sample pruned:       ${sample}${ellipsis}`);
+}
+
+export function logOptimizationResult(props: {
+  id: string;
+  original_css: Uint8Array | Buffer | string;
+  optimized_css: string;
+  removed: number;
+  debug?: OptimizeCssDebugInfo;
+  silent: boolean;
+}) {
+  const { id, original_css, optimized_css, removed, debug, silent } = props;
+
+  if (debug) {
+    printDebug({ id, removed, ...debug });
+  }
+
+  if (!silent && removed > 0) {
+    printDiff({ original_css, optimized_css, id });
+  }
 }

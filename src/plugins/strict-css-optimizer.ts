@@ -45,6 +45,10 @@ export type StrictCssOptimizerOptions = {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
   safelist: readonly SafelistEntry[];
+  /**
+   * Optional sink invoked once per pruned selector (for the `debug` summary).
+   */
+  onRemove?: (selector: string) => void;
 };
 
 function getSharedClasses(): Set<string> {
@@ -254,7 +258,7 @@ export function optimizeStrictRule(
   node: Rule,
   options: StrictCssOptimizerOptions,
 ): number {
-  const { allowlist, preserveFlatpickr, safelist } = options;
+  const { allowlist, preserveFlatpickr, safelist, onRemove } = options;
   const selector = node.selector;
 
   if (
@@ -282,6 +286,14 @@ export function optimizeStrictRule(
       shouldKeepSelector(selectee, allowlist)
     );
   });
+
+  if (onRemove && keptSelectors.length < selectors.length) {
+    for (const selectee of selectors) {
+      if (!keptSelectors.includes(selectee)) {
+        onRemove(selectee);
+      }
+    }
+  }
 
   if (keptSelectors.length === 0) {
     node.remove();

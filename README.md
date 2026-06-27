@@ -264,6 +264,15 @@ optimizeCss({
   silent: true,
 
   /**
+   * Set to `true` to print a per-asset summary after optimization: which Carbon
+   * components were found, allowlist size, strict/flatpickr flags, how many
+   * rules were removed, and up to 20 pruned selectors. Use when styles vanish
+   * and you need to see why. Still prints when `silent` is `true`.
+   * @default false
+   */
+  debug: false,
+
+  /**
    * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
    * for all available IBM Plex fonts, many of which are not actually
    * used in Carbon Svelte components.
@@ -341,6 +350,16 @@ optimizeCss({
 >
 > - **`safelist`**: list selectors (or a `RegExp`) to keep: `safelist: [".bx--grid", /^\.bx--btn--/]`.
 > - **`content`**: scan your source for literal `bx--` prefixes: `content: ["src/**/*.{svelte,js,ts}"]`.
+>
+> Set `debug: true` to print which components were detected and a sample of pruned selectors:
+>
+> ```
+> [carbon-preprocess-svelte] optimizeCss · assets/index-CU4gbKFa.css
+>   components detected: Button, DataTable, Modal (3)
+>   allowlist classes:   214 · strict: false · flatpickr: false
+>   rules removed:       1180
+>   sample pruned:       .bx--accordion, .bx--tabs--scrollable__nav-link, …
+> ```
 
 ### `OptimizeCssPlugin`
 
