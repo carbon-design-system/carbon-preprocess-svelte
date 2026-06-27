@@ -16,11 +16,16 @@ function rewriteImport(
   node: ImportDeclaration,
   map: (specifier: ImportDeclaration["specifiers"][0]) => string,
 ) {
+  // Type-only statements (`import type { ... }`) never reference a real
+  // `.svelte` file, so leave them entirely untouched.
+  if (node.importKind === "type") return;
+
   const rewritten: string[] = [];
   const preserved: ImportDeclaration["specifiers"] = [];
 
   for (const specifier of node.specifiers) {
-    const fragment = map(specifier);
+    // Per-specifier type imports (`import { type X, Y }`) stay on the barrel.
+    const fragment = specifier.importKind === "type" ? "" : map(specifier);
     if (fragment) {
       rewritten.push(fragment.trimEnd());
     } else {
@@ -33,11 +38,12 @@ function rewriteImport(
 
   // Mixed imports: put preserved names back on the barrel next to rewritten paths.
   if (preserved.length > 0) {
-    const names = preserved.map((specifier) =>
-      specifier.imported.name === specifier.local.name
-        ? specifier.local.name
-        : `${specifier.imported.name} as ${specifier.local.name}`,
-    );
+    const names = preserved.map((specifier) => {
+      const prefix = specifier.importKind === "type" ? "type " : "";
+      return specifier.imported.name === specifier.local.name
+        ? `${prefix}${specifier.local.name}`
+        : `${prefix}${specifier.imported.name} as ${specifier.local.name}`;
+    });
     rewritten.push(
       `import { ${names.join(", ")} } from "${node.source.value}";`,
     );

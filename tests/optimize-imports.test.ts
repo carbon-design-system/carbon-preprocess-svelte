@@ -182,6 +182,23 @@ import Analytics from "carbon-pictograms-svelte/lib/Analytics.svelte";`);
         `);
   });
 
+  test("type-only barrel statements are left untouched", () => {
+    expect(
+      preprocess({
+        content: `import type { ButtonProps } from "carbon-components-svelte";`,
+      }),
+    ).toEqual(`import type { ButtonProps } from "carbon-components-svelte";`);
+  });
+
+  test("type-only specifiers stay on the barrel while values are rewritten", () => {
+    expect(
+      preprocess({
+        content: `import { Button, type ButtonSize } from "carbon-components-svelte";`,
+      }),
+    ).toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
+import { type ButtonSize } from "carbon-components-svelte";`);
+  });
+
   test("backward compatibility with various export patterns", () => {
     expect(
       preprocess({

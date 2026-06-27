@@ -35,9 +35,11 @@ declare module "estree-walker" {
   type ImportDeclaration = CustomElement<{
     type: "ImportDeclaration";
     source: { value: string };
+    importKind?: "type" | "value";
     specifiers: Array<{
       local: { name: string };
       imported: { name: string };
+      importKind?: "type" | "value";
     }>;
   }>;
 
