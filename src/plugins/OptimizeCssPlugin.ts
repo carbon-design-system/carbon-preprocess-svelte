@@ -3,6 +3,7 @@ import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { isSilent, optimizeCssWithReportAsync } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
+import { scanContentClasses } from "./scan-content";
 
 /**
  * Webpack plugin that removes unused Carbon CSS classes from production builds.
@@ -76,6 +77,7 @@ class OptimizeCssPlugin {
             if (ids.size === 0) return;
 
             const cssAssetIds = Object.keys(assets).filter(isCssFile);
+            const contentClasses = scanContentClasses(this.options.content);
 
             const results = await Promise.all(
               cssAssetIds.map(async (id) => {
@@ -88,6 +90,7 @@ class OptimizeCssPlugin {
                       : original_css,
                     ids,
                     from: id,
+                    contentClasses,
                   });
                 return { id, original_css, optimized_css, removed };
               }),

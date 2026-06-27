@@ -3,6 +3,8 @@ import {
   optimizeCssWithReport,
 } from "carbon-preprocess-svelte/plugins/create-optimized-css";
 
+const BTN_VARIANT_RE = /^\.bx--btn--/;
+
 describe("create-optimized-css", () => {
   const strict = { experimental: { strict: true } } as const;
 
@@ -370,6 +372,107 @@ button, .flatpickr-day.selected { color: red }`,
       ids: ["Button"],
     });
     expect(result).toEqual(".custom-class { color: red }");
+  });
+
+  describe("safelist", () => {
+    const grid = ".bx--grid { display: grid }";
+
+    test("prunes a hand-written bx--grid rule when not safelisted", () => {
+      expect(createOptimizedCss({ source: grid, ids: ["Button"] })).toEqual("");
+      expect(
+        createOptimizedCss({ ...strict, source: grid, ids: ["Button"] }),
+      ).toEqual("");
+    });
+
+    test("keeps a safelisted bx--grid rule (string entry)", () => {
+      const safelist = [".bx--grid"];
+      expect(
+        createOptimizedCss({ source: grid, ids: ["Button"], safelist }),
+      ).toEqual(grid);
+      expect(
+        createOptimizedCss({
+          ...strict,
+          source: grid,
+          ids: ["Button"],
+          safelist,
+        }),
+      ).toEqual(grid);
+    });
+
+    test("string entry matches a class token, not a prefix", () => {
+      const source = ".bx--grid { display: grid }\n.bx--grid-narrow { gap: 0 }";
+      expect(
+        createOptimizedCss({
+          ...strict,
+          source,
+          ids: ["Button"],
+          safelist: [".bx--grid"],
+        }),
+      ).toEqual(".bx--grid { display: grid }");
+    });
+
+    test("RegExp entry keeps every matching selector", () => {
+      const source =
+        ".bx--btn--primary { color: white }\n.bx--btn--secondary { color: gray }";
+      expect(
+        createOptimizedCss({
+          ...strict,
+          source,
+          ids: ["Accordion"],
+          safelist: [BTN_VARIANT_RE],
+        }),
+      ).toEqual(source);
+    });
+
+    test("keeps the whole rule in default mode when any selector matches", () => {
+      const source = ".bx--grid, .bx--unused { display: grid }";
+      expect(
+        createOptimizedCss({
+          source,
+          ids: ["Button"],
+          safelist: [".bx--grid"],
+        }),
+      ).toEqual(source);
+    });
+
+    test("keeps only the matching selector in strict mode", () => {
+      const source = ".bx--grid, .bx--unused { display: grid }";
+      expect(
+        createOptimizedCss({
+          ...strict,
+          source,
+          ids: ["Button"],
+          safelist: [".bx--grid"],
+        }),
+      ).toEqual(".bx--grid { display: grid }");
+    });
+
+    test("keeps a safelisted flatpickr selector in strict mode", () => {
+      const source = ".flatpickr-calendar { visibility: hidden }";
+      expect(
+        createOptimizedCss({
+          ...strict,
+          source,
+          ids: ["Button"],
+          safelist: [".flatpickr-calendar"],
+        }),
+      ).toEqual(source);
+    });
+  });
+
+  describe("content (scanned classes)", () => {
+    test("keeps dynamic class variants from a scanned prefix", () => {
+      const source = ".bx--btn--ghost { color: blue }";
+      expect(createOptimizedCss({ source, ids: ["Accordion"] })).toEqual("");
+      expect(
+        createOptimizedCss({
+          ...strict,
+          source,
+          ids: ["Accordion"],
+          contentClasses: [".bx--btn--"],
+        }),
+      ).toEqual(source);
+    });
   });
 
   describe("optimizeCssWithReport", () => {

@@ -5,6 +5,7 @@ import {
   CARBON_PREFIX,
   CONTEXT_ANCESTORS,
 } from "../constants";
+import { isSafelisted, type SafelistEntry } from "./safelist";
 
 const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
 const SELECTOR_COMBINATOR = /[\s>+~]/;
@@ -43,6 +44,7 @@ const SHARED_CLASSES = getSharedClasses();
 export type StrictCssOptimizerOptions = {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
+  safelist: readonly SafelistEntry[];
 };
 
 function getSharedClasses(): Set<string> {
@@ -252,7 +254,7 @@ export function optimizeStrictRule(
   node: Rule,
   options: StrictCssOptimizerOptions,
 ): number {
-  const { allowlist, preserveFlatpickr } = options;
+  const { allowlist, preserveFlatpickr, safelist } = options;
   const selector = node.selector;
 
   if (
@@ -267,6 +269,10 @@ export function optimizeStrictRule(
 
   const selectors = splitSelectorList(selector);
   const keptSelectors = selectors.filter((selectee) => {
+    if (isSafelisted(selectee, safelist)) {
+      return true;
+    }
+
     if (FLATPICKR_SELECTOR.test(selectee) && !preserveFlatpickr) {
       return false;
     }
