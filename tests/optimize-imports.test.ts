@@ -22,6 +22,15 @@ describe("optimizeImports", () => {
     ).toBeUndefined();
   });
 
+  test("files without a carbon- substring are returned untouched", () => {
+    expect(
+      preprocess({
+        content: `import { something } from "other-module";
+import defaultThing from "another-module";`,
+      }),
+    ).toBeUndefined();
+  });
+
   test("barrel imports", () => {
     expect(
       preprocess({
