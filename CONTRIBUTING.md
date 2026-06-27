@@ -1,12 +1,23 @@
 # Contributing
 
+`carbon-preprocess-svelte` ships Svelte preprocessors and build plugins that make [Carbon Design System](https://github.com/carbon-design-system/carbon-components-svelte) apps smaller and faster. Two separate problems:
+
+- **`optimizeImports`**, a Svelte _script_ preprocessor that rewrites barrel imports (`import { Button } from "carbon-components-svelte"`) into direct path imports (`import Button from "carbon-components-svelte/src/Button/Button.svelte"`) so bundlers tree-shake and HMR stays fast.
+- **`optimizeCss` / `OptimizeCssPlugin`**, build plugins (Vite/Rollup and Webpack) that strip unused Carbon CSS rules from production output.
+
+Option shapes, usage per bundler, and what each export does are in [README.md](README.md). That file is the source of truth for what the package supports. This file is how the code is built and changed.
+
+If you're not sure what to build or how to approach a change, [file an issue](https://github.com/carbon-design-system/carbon-preprocess-svelte/issues) before opening a PR.
+
 ## Prerequisites
 
-[Bun](https://bun.sh/) is used to develop this project.
+[Bun](https://bun.sh/) is the package manager, test runner, and bundler. There is no separate Node toolchain for development. Run package scripts with `bun run <script>` and one-off binaries with `bunx <bin>`.
 
-## Set-up
+The package has no runtime dependencies. Everything it needs (`postcss`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. `carbon-components-svelte` is _also_ a `devDependency`. The index generator reads it (see below); the published package does not.
 
-Fork the repository and clone your fork:
+## Project set-up
+
+Fork the repo and clone your fork:
 
 ```sh
 git clone <YOUR_FORK>
@@ -21,78 +32,201 @@ git remote add upstream git@github.com:carbon-design-system/carbon-preprocess-sv
 git remote -v
 ```
 
-Finally, install the project dependencies:
+Install dependencies:
 
 ```sh
 bun install
 ```
 
-## Workflow
+## Scripts
 
-Imports for `carbon-components-svelte` must be regenerated if the `carbon-components-svelte` package is updated (i.e., a new component is added).
+| Script | What it does |
+| --- | --- |
+| `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`). |
+| `bun run build` | Regenerate the component index, bundle `src/index.ts` to `dist/`, emit `.d.ts`. Add `-w` for watch mode. |
+| `bun run typecheck` | `tsc --noEmit` over `scripts/`, `src/`, `tests/`. |
+| `bun run index:components` | Regenerate [`src/component-index.ts`](src/component-index.ts) from the installed `carbon-components-svelte`. |
+| `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
+| `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). |
+| `bun run test:fixtures:update` | Rewrite the `optimize-css` fixture baselines under [`tests/fixtures/`](tests/fixtures/optimize-css). |
+| `bun run lint` | `biome lint .` |
+| `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
+| `bun run upgrade-examples` | `bun update` inside each `examples/*` project. |
 
-To update the imports, run the following command:
+Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds six real apps.
 
-```sh
-bun run index:components
+## How it works
+
+The package has two entry points, exported from [`src/index.ts`](src/index.ts):
+
+```ts
+export { default as OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin"; // Webpack
+export { optimizeCss } from "./plugins/optimize-css";                       // Vite/Rollup
+export { optimizeImports } from "./preprocessors/optimize-imports";         // Svelte preprocessor
 ```
 
-This will update `src/component-index.ts`, which should be checked into source control.
+Both paths lean on the generated **component index** and the helpers in [`src/constants.ts`](src/constants.ts) / [`src/utils.ts`](src/utils.ts) (`isSvelteFile`, `isCssFile`, `isCarbonSvelteImport`, the `CarbonSvelte` package-name map, the `bx--` prefix regex).
 
-Note that for this package, `carbon-components-svelte` is intentionally a `devDependency`, as it is only used for generating the component index, and not depended on at runtime.
+### The component index
+
+Most of the interesting work hangs off [`src/component-index.ts`](src/component-index.ts). It is a large **generated** file (`// @generated`, frozen, ~4.5k lines) that maps each public Carbon component name to its source path and the `.bx--*` classes it renders:
+
+```ts
+export const components: Record<string, { path: string; classes: string[] }> = Object.freeze({
+  Button: { path: "carbon-components-svelte/src/Button/Button.svelte", classes: [".bx--btn", ".bx--btn--primary", …] },
+  …
+});
+```
+
+`optimizeImports` reads `path` to rewrite imports. `optimizeCss` reads `classes` to decide which CSS rules to keep. **Do not edit this file by hand.** Regenerate it with `bun run index:components` (also run automatically by `prebuild`) whenever `carbon-components-svelte` is bumped. A new component or a renamed class will not show up otherwise.
+
+[`scripts/index-components.ts`](scripts/index-components.ts) builds the index from the installed `carbon-components-svelte` in `node_modules`:
+
+1. Parse `src/index.js` (the barrel) to learn which names are public and how they re-export.
+2. Scan every `.svelte`/`.js` under `src/`, parsing markup with `svelte/compiler` + `estree-walker` to pull static classes, sub-components, slot wrappers, and imports.
+3. Run three extractors. Each one gates what it adds so the index stays tight:
+   - [`extract-selectors.ts`](scripts/extract-selectors.ts) pulls static `class` attributes and `:global(...)` selectors from markup.
+   - [`extract-runtime-classes.ts`](scripts/extract-runtime-classes.ts) follows `classList.add/remove/toggle("bx--…")` calls across the module import graph.
+   - [`extract-css-context.ts`](scripts/extract-css-context.ts) cross-references Carbon's compiled CSS to recover context/descendant classes. `LAYOUT_ANCESTOR_DENYLIST` stops layout ancestors from spreading too far. Shares selector parsing with [`css-selector-utils.ts`](scripts/css-selector-utils.ts).
+4. `MANUAL_OVERRIDES` (currently empty) is the last resort. Fix an extractor's gate instead of hardcoding here. A manual entry rots on the next Carbon bump.
+
+Set `DEBUG_INDEX=1` to print per-stage timings.
+
+### `optimizeImports`
+
+[`src/preprocessors/optimize-imports.ts`](src/preprocessors/optimize-imports.ts) is a Svelte `script` preprocessor. Per file:
+
+- **Fast path.** Bail immediately on `node_modules` files and on any file whose raw source does not contain the substring `"carbon-"`. That skips the parse for almost every file. Do not remove this when changing the module.
+- The Svelte compiler's `parse()` wants a whole component, so the raw script is wrapped in `<script lang="ts">…</script>`, parsed, walked for `ImportDeclaration`s, rewritten with `MagicString`, then the wrapper tags are stripped back off.
+- Carbon component names resolve through the index `path`. Names missing from the index get an _optimistic_ `src/Name/Name.svelte` path **only if PascalCase**. camelCase utilities stay on the barrel so we never point at a `.svelte` file that is not there. Icons and pictograms map to `lib/Name.svelte`.
+- **Type imports stay on the barrel.** `import type { … }` statements are left alone. In `import { type X, Y }`, `X` stays on the barrel and only `Y` is rewritten. Recent fixes ([#138](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/138), [#133](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/133)) live here. Add a fixture in [`tests/optimize-imports.test.ts`](tests/optimize-imports.test.ts) for any import-shape change.
+
+### `optimizeCss` (Vite/Rollup) and `OptimizeCssPlugin` (Webpack)
+
+Both plugins do the same job through different bundler hooks, then call the same optimizer.
+
+- [`src/plugins/optimize-css.ts`](src/plugins/optimize-css.ts) is the Vite plugin (`apply: "build"`, `enforce: "post"`). It collects Carbon component ids in the `transform` hook (it transforms nothing, just records ids), then rewrites CSS assets in `generateBundle` by mutating `file.source` in place. Synchronous PostCSS.
+- [`src/plugins/OptimizeCssPlugin.ts`](src/plugins/OptimizeCssPlugin.ts) is the Webpack plugin, production-only. It collects ids from `NormalModule` `beforeSnapshot` `fileDependencies`, processes CSS assets at `PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE` (before minification). Async PostCSS, all assets in parallel via `Promise.all`.
+
+The shared core is [`src/plugins/create-optimized-css.ts`](src/plugins/create-optimized-css.ts). It builds an **allowlist** of `.bx--*` classes from the bundled components' index entries, plus `ALWAYS_ON_CLASSES` and any `content`-scanned tokens, then runs a PostCSS pipeline (the Carbon rule/at-rule visitor + `postcss-discard-empty`). It exposes sync (`optimizeCssWithReport`) and async (`…Async`) variants because Vite and Webpack differ. Keep the two in lockstep when you change behavior. The `report.removed` count suppresses the size-diff log when nothing was pruned ([#131](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/131)).
+
+Two pruning modes:
+
+- **Default.** Keep a rule if any of its comma-separated selectors matches the allowlist. Coarse but safe.
+- **`experimental.strict`**, implemented in [`src/plugins/strict-css-optimizer.ts`](src/plugins/strict-css-optimizer.ts). Prunes individual selectors out of comma lists. Every Carbon class in a same-element compound must match. Descendant selectors split into ancestors + subject (subject must fully match; ancestors may match `CONTEXT_ANCESTORS` without being imported). Strips `:not(...)` before matching. Drops flatpickr/legacy `bx-` rules unless DatePicker is bundled. Parenthesis-aware for `:is()`. Most CSS-correctness work happens here.
+
+Supporting modules: [`safelist.ts`](src/plugins/safelist.ts) (string = literal class-token match, RegExp = whole-selector match), [`scan-content.ts`](src/plugins/scan-content.ts) (glob source files for literal `bx--` tokens, for runtime-built class names like `` `bx--btn--${kind}` ``), [`print-diff.ts`](src/plugins/print-diff.ts) (the before/after size log the e2e tests parse). Safelist and `content` are the user-facing overrides added in [#140](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/140).
+
+## Conventions
+
+Biome enforces most of this in CI (`biome ci --error-on-warnings`). Config: [`biome.json`](biome.json), space indent, multiline attributes, imports auto-organized. The recommended preset is on. The rules below are **errors**, so a violation fails the build:
+
+- **Hoist regexes to module scope.** `useTopLevelRegex` is an error. A regex literal inside a function fails lint. Declare it as a named top-level `const` (see the `*_REGEX` / `CARBON_*` constants at the top of nearly every module).
+- **No `await` in loops, no `forEach`.** `noAwaitInLoops` and `noForEach` are errors. Build the work and `await Promise.all(...)`, or use `for...of` with hoisted awaits. The two intentional sequential-await loops in [`tests/test-e2e.ts`](tests/test-e2e.ts) carry `// biome-ignore` comments explaining why. Match that pattern if you genuinely need ordering.
+- **No namespace imports, no barrel re-exports, no import cycles.** `noNamespaceImport`, `noReExportAll`, `noImportCycles`. Export named bindings explicitly, as [`src/index.ts`](src/index.ts) does.
+- **No `delete`, no accumulating spread, prefer arrow functions and literal keys.** `noDelete`, `noAccumulatingSpread`, `useArrowFunction`, `useLiteralKeys`.
+- **No `!important` in authored styles** (`noImportantStyles`) and **no `bun:test` imports**. The Bun test globals (`describe`, `test`, `expect`) are ambient. Importing them is an error.
+- **Use `node:` import specifiers**, e.g. `import path from "node:path"`, as the scripts and plugins do.
+
+TypeScript ([`tsconfig.json`](tsconfig.json)) runs `strict` with `noUnusedLocals`, `noUnusedParameters`, and `erasableSyntaxOnly` (no runtime-emitting TS syntax: enums, parameter properties, etc.). The `carbon-preprocess-svelte` path alias resolves to `src/` so tests and fixtures import the package by name. `estree-walker`'s loose AST types are tightened in [`src/global.d.ts`](src/global.d.ts). Extend that module declaration instead of reaching for `any` when you walk new node types.
+
+Comment the _why_ behind non-obvious parser, hook-ordering, and CSS-matching logic. The existing modules are heavily annotated; match that density. Skip comments that restate the code.
+
+## Testing
+
+Tests use the Bun test runner and live in [`tests/`](tests), mostly one `*.test.ts` per `src/` module.
+
+```sh
+bun run test                       # everything, in parallel
+bun test optimize-imports          # filter by file-path substring
+bun test tests/utils.test.ts       # a single file
+bun test --watch                   # watch mode
+```
+
+Three layers, smallest to largest:
 
 ### Unit tests
 
-Run `bun test` to execute the unit tests (located in `/tests`).
+Per-module behavior: [`utils.test.ts`](tests/utils.test.ts), [`scan-content.test.ts`](tests/scan-content.test.ts), [`print-diff.test.ts`](tests/print-diff.test.ts), [`extract-selectors.test.ts`](tests/extract-selectors.test.ts), [`optimize-imports.test.ts`](tests/optimize-imports.test.ts), [`create-optimized-css.test.ts`](tests/create-optimized-css.test.ts), [`OptimizeCssPlugin.test.ts`](tests/OptimizeCssPlugin.test.ts). Add a focused case here for any logic change.
 
-For watch mode, run `bun test --watch`.
+### CSS optimization fixtures
 
-To update snapshots, run `bun test --update-snapshots`.
+[`tests/optimize-css-fixtures.test.ts`](tests/optimize-css-fixtures.test.ts) is the main regression check for the optimizer. It runs `createOptimizedCss` against Carbon's compiled stylesheet (`carbon-components-svelte/css/white.css`) for ~35 scenarios. Each scenario is a set of imported component ids in default or strict mode. Output is compared to committed baselines under [`tests/fixtures/optimize-css/`](tests/fixtures/optimize-css).
 
-### Linked examples
+Each scenario has two files:
 
-To simulate real-world usage of the package, you can link the package to an example project. This is useful for testing changes end-to-end.
+- `<name>.css`, the pruned, pretty-printed output. **Gitignored**, regenerated every run. Open it to see what survived.
+- `<name>.report.json`, the **committed** baseline: `reduction_percent`, `kept_rules`, byte counts, and `leaked_classes` (Carbon classes still present that the import allowlist cannot explain). Strict scenarios target `leaked_count: 0`.
 
-Example set-ups are located in the `examples` directory:
+Beyond byte baselines, the test also checks the index: no over-prune (a selector that should survive keeps its classes), no foreign survivor in strict mode, correct multi-class strict pruning. See [`tests/fixtures/optimize-css/README.md`](tests/fixtures/optimize-css/README.md) for the scenario catalog and when to add a fixture (new `MANUAL_OVERRIDES` entry, new typical multi-import bundle, suspected leak/over-prune regression, not a duplicate import set).
 
-- `examples/rollup`: Rollup (Vite-compatible API)
-- `examples/sveltekit`: SvelteKit
-- `examples/vite`: Vite
-- `examples/vite@svelte-5`: Vite using Svelte 5
-- `examples/webpack`: Webpack
-- `examples/webpack@svelte-5`: Webpack using Svelte 5
-
-Other Svelte frameworks use Vite under the hood (e.g., Astro, Routify), so the Vite examples should be sufficient.
-
-`carbon-preprocess-svelte` is linked locally in these examples, so changes to the package will be reflected in the example projects.
-
-Rebuilding the project in watch mode will automatically update the linked examples.
+After an optimizer change or a Carbon bump, regenerate and **review the `.report.json` diff**. A baseline change is a behavior change:
 
 ```sh
-bun run build -w
+bun run test:fixtures:update
 ```
+
+Shared helpers (`buildAllowlist`, `matchesAllowlist`, `shouldKeepStrictSelector`, `resolveCarbonCss`, `prettifyCss`) live in [`tests/helpers/carbon-css.ts`](tests/helpers/carbon-css.ts). They mirror production matching logic so the test can re-derive what the optimizer should have done.
 
 ### End-to-end tests
 
-The e2e tests build all examples and verify that CSS optimization results match expected snapshots. This guards against regressions.
+[`tests/test-e2e.ts`](tests/test-e2e.ts) (`bun run test:e2e`) builds the package, `bun link`s it into each project under [`examples/`](examples), builds every example, parses the `printDiff` output, and compares CSS reduction to [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json) within 0.01 tolerance. Unit tests will not catch a plugin that silently no-ops inside a real Vite or Webpack build. This suite will.
 
-```sh
-bun run test:e2e
-```
+The examples are real downstream consumers, each linking the package via `"carbon-preprocess-svelte": "link:carbon-preprocess-svelte"`:
 
-Snapshots are stored in `tests/__snapshots__/e2e.json` and track before/after file sizes and reduction percentages.
+- `examples/rollup`, `examples/vite`, `examples/vite@svelte-5`, `examples/sveltekit`: Vite/Rollup plugin path
+- `examples/webpack`, `examples/webpack@svelte-5`: Webpack plugin path
 
-If the CSS optimization improves (a progression), update the snapshots:
+Other Svelte frameworks (Astro, Routify, …) run Vite under the hood, so the Vite examples cover them. When you change output shape or reduction behavior, update snapshots and read the diff:
 
 ```sh
 bun run test:e2e:update
 ```
 
-## Submitting a Pull Request
+`bun run upgrade-examples` bumps each example's dependencies.
 
-### Sync Your Fork
+## Build
 
-Before submitting a pull request, make sure your fork is up to date with the latest upstream changes.
+[`scripts/build.ts`](scripts/build.ts) (`bun run build`) removes `dist/`, regenerates the component index (the `prebuild` step runs `index:components` with `BUILD=true`, which writes the index as minified JSON), bundles `src/index.ts` with `Bun.build` (minified ESM, Node target), then runs `tsc --project tsconfig.build.json` ([`tsconfig.build.json`](tsconfig.build.json)) to emit declarations. `dist/` is gitignored and never committed. `bun run build -w` rebuilds on changes under `src/` and keeps linked examples current.
+
+`bun run build:prune-package` (`bunx culls`) trims `package.json` for publishing and runs in the release workflow.
+
+## Continuous integration
+
+[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on every PR and on pushes to `main` (macOS runner):
+
+1. `bun ci`
+2. `bunx biome ci --error-on-warnings`
+3. `bun run typecheck`
+4. `bun run test`
+5. `bun run test:e2e`
+
+Run those locally before pushing. The e2e suite runs in CI, so a snapshot you forgot to update will fail the build.
+
+## Commit messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <subject>
+```
+
+- Common types: `fix`, `feat`, `perf`, `chore`, `test`, `docs`, `refactor`.
+- Scope is the area touched: `optimize-css`, `optimize-imports`, `index`, `components`, `examples`, `e2e`, `deps-dev`, `ci`.
+- Imperative mood, one concise line. Put detail in the body and reference issues with `Fixes #N`.
+
+Examples from the log:
+
+```
+feat(optimize-css): add safelist and content escape hatches
+perf(optimize-imports): skip parse for files without carbon- imports
+fix(index): automate runtime and CSS context classes
+chore(components): re-index using v0.109.0
+```
+
+## Submit a pull request
+
+Sync your fork with upstream first:
 
 ```sh
 git fetch upstream
@@ -100,50 +234,30 @@ git checkout main
 git merge upstream/main
 ```
 
-### Submit a PR
-
-After you've pushed your changes to remote, submit your PR. Make sure you are comparing `<YOUR_USER_ID>/feature` to `origin/main`.
+Push your branch and open a PR comparing your feature branch to `origin/main`. Keep PRs focused. Include regenerated artifacts your change needs: the component index, fixture baselines, and e2e snapshots. Those diffs are part of the review.
 
 ## Maintainer guide
 
-The following items only apply to project maintainers.
+The following applies only to maintainers.
 
 ### Release
 
-This library is published to NPM with [provenance](https://docs.npmjs.com/generating-provenance-statements) via a [GitHub workflow](https://github.com/carbon-design-system/carbon-icons-svelte/blob/master/.github/workflows/release.yml).
+[`.github/workflows/release.yml`](.github/workflows/release.yml) publishes to NPM with [provenance](https://docs.npmjs.com/generating-provenance-statements) when a tag starting with `v` is pushed. It installs, runs `bun run build` and `bun run build:prune-package`, then `npm publish --provenance --access public`.
 
-The workflow is automatically triggered when pushing a tag that begins with `v` (e.g., `v0.9.0`).
+To cut a release:
 
-However, maintainers must perform a few things in preparation for a release.
-
-### Pre-release checklist
-
-1. Update `CHANGELOG.md` and increment `package.json#version`.
-
-```diff
--  "version": "0.8.0",
-+  "version": "0.9.0",
-```
-
-2. Commit the changes and tag the release.
+1. Bump `version` in [`package.json`](package.json) and update [`CHANGELOG.md`](CHANGELOG.md).
+2. Commit with the version as the message, tag, and push the tag:
 
 ```sh
-git commit -am "v0.9.0"
-git tag v0.9.0
+git commit -am "v0.11.37"
+git tag v0.11.37
+git push origin v0.11.37
 ```
 
-3. Push the tag to the remote.
+A successful workflow publishes the new version to NPM.
 
-Finally, push the tag to the remote repository.
+### Post-release
 
-This will trigger the `release.yml` workflow. If the build steps succeed, the new version of the packge will be published to NPM.
-
-### Post-release checklist
-
-After confirming that the new release is published to NPM, perform the following:
-
-1. Create a [new release](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/new) on GitHub.
-
-2. Publish the release as the latest release.
-
-3. Close out any issues that were resolved in the release.
+1. Create a [new release](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/new) on GitHub and publish it as the latest release.
+2. Close out any issues resolved in the release.
