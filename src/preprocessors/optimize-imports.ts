@@ -77,6 +77,10 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
       if (!filename) return;
       if (NODE_MODULES_REGEX.test(filename)) return;
 
+      // Fast path: the only rewritable import sources contain "carbon-".
+      // Skip MagicString + svelte parse for the common no-Carbon file.
+      if (!raw.includes("carbon-")) return;
+
       /**
        * The Svelte compiler's parse() function expects a full Svelte component,
        * not just a script fragment. Wrap the raw script content in script tags
