@@ -279,6 +279,31 @@ optimizeCss({
   preserveAllIBMFonts: true,
 
   /**
+   * Class selectors to always keep, regardless of which components are
+   * imported. Use for Carbon classes the allowlist misses: hand-written
+   * classes in app markup (e.g. `<div class="bx--grid">`) and theme/layout
+   * utilities that no component file references.
+   *
+   * Each entry is either:
+   * - a `string`, matched literally as a complete class token. `.bx--grid`
+   *   keeps `.bx--grid` and `.bx--grid:hover`, but not `.bx--grid--wide`
+   * - a `RegExp`, tested against the whole selector. `/^\.bx--btn--/` keeps
+   *   every `.bx--btn--*` variant
+   *
+   * @default []
+   */
+  safelist: [".bx--grid", ".bx--aspect-ratio", /^\.bx--btn--/],
+
+  /**
+   * Glob patterns (relative to the working directory) of source files to scan
+   * for literal `bx--`-prefixed tokens. Every token found is kept. Use when
+   * class names are built at runtime. See the warning below.
+   *
+   * @default undefined
+   */
+  content: ["src/**/*.{svelte,js,ts}"],
+
+  /**
    * Experimental. Enables stricter CSS tree-shaking that can drastically
    * reduce output size compared to the default baseline, depending on which
    * Carbon components you import. Small bundles that only use a handful of
@@ -301,6 +326,21 @@ optimizeCss({
   },
 });
 ```
+
+> [!WARNING]
+> **Dynamically constructed class names are not detected.** The allowlist comes from Carbon component source files you import. It only knows about classes those components reference. Runtime assembly is invisible:
+>
+> ```svelte
+> <!-- pruned: optimizer never sees literal `bx--btn--secondary` -->
+> <button class={`bx--btn--${kind}`}>...</button>
+> ```
+>
+> Hand-written Carbon classes in your markup (e.g. `<div class="bx--grid">`) have the same problem. No imported component references them, so they get pruned. If the plugin "deleted your styles," this is usually why.
+>
+> Two ways to fix it:
+>
+> - **`safelist`**: list selectors (or a `RegExp`) to keep: `safelist: [".bx--grid", /^\.bx--btn--/]`.
+> - **`content`**: scan your source for literal `bx--` prefixes: `content: ["src/**/*.{svelte,js,ts}"]`.
 
 ### `OptimizeCssPlugin`
 

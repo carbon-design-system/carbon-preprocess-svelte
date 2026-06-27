@@ -3,6 +3,7 @@ import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { isSilent, optimizeCssWithReport } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
+import { scanContentClasses } from "./scan-content";
 
 /**
  * Vite/Rollup plugin that removes unused Carbon CSS classes from production builds.
@@ -23,6 +24,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
    * Populated during the transform phase, consumed during generateBundle.
    */
   const ids = new Set<string>();
+  /** Classes from `content` globs. Cached after first scan. */
+  let contentClasses: string[] | undefined;
 
   return {
     name: "vite:carbon:optimize-css",
@@ -47,6 +50,10 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       // Skip processing if no Carbon Svelte imports are found.
       if (ids.size === 0) return;
 
+      if (contentClasses === undefined) {
+        contentClasses = scanContentClasses(options?.content);
+      }
+
       for (const id in bundle) {
         const file = bundle[id];
 
@@ -57,6 +64,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
             source: original_css,
             ids,
             from: id,
+            contentClasses,
           });
 
           file.source = optimized_css;

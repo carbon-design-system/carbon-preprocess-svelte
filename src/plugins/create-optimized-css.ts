@@ -4,6 +4,7 @@ import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import { components } from "../component-index";
 import { ALWAYS_ON_CLASSES, CARBON_PREFIX } from "../constants";
+import { isSafelisted, type SafelistEntry } from "./safelist";
 import {
   optimizeStrictAtRule,
   optimizeStrictRule,
@@ -38,6 +39,38 @@ export type OptimizeCssOptions = {
    * @default false
    */
   preserveAllIBMFonts?: boolean;
+
+  /**
+   * Class selectors to always keep, regardless of which components are
+   * imported. For Carbon classes the allowlist misses:
+   * - Hand-written Carbon classes in app markup (e.g. `<div class="bx--grid">`)
+   * - Theme/layout utilities that no component file references
+   *
+   * Each entry is either:
+   * - a `string`, matched literally as a complete class token. `.bx--grid`
+   *   keeps `.bx--grid` and `.bx--grid:hover` but not `.bx--grid--wide`
+   * - a `RegExp`, tested against the whole selector. `/^\.bx--btn--/` keeps
+   *   every `.bx--btn--*` variant
+   *
+   * Matching selectors are kept in both default and `experimental.strict`
+   * modes. For ``class={`bx--btn--${x}`}``, a literal string entry is not
+   * enough. Use a `RegExp` entry or the `content` option.
+   *
+   * @example
+   * safelist: [".bx--grid", ".bx--aspect-ratio", /^\.bx--btn--/]
+   */
+  safelist?: Array<SafelistEntry>;
+
+  /**
+   * Glob patterns (relative to the current working directory) of source files
+   * to scan for literal `bx--`-prefixed tokens. Every token found is kept.
+   * For ``class={`bx--btn--${kind}`}``, the prefix `bx--btn--` in source
+   * keeps runtime variants like `.bx--btn--primary`.
+   *
+   * @example
+   * content: ["src/**\/*.{svelte,js,ts}"]
+   */
+  content?: string[];
 
   experimental?: {
     /**
@@ -82,6 +115,12 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
   ids: Iterable<string>;
   /** PostCSS `from` option. Pass asset/chunk path when available, or omit for `undefined`. */
   from?: string | undefined;
+  /**
+   * Class selectors (`.bx--*`) from scanning `content` globs. Pre-scanned by
+   * the plugin so the per-asset optimizer does no filesystem I/O. Merged into
+   * the allowlist with imported component classes.
+   */
+  contentClasses?: Iterable<string>;
 };
 
 /**
@@ -92,7 +131,10 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
  * `.bx--body` is always kept; apps set it on `<body>` but no component file
  * references it.
  */
-function buildUsage(ids: Iterable<string>): {
+function buildUsage(
+  ids: Iterable<string>,
+  contentClasses?: Iterable<string>,
+): {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
 } {
@@ -111,6 +153,10 @@ function buildUsage(ids: Iterable<string>): {
         allowlist.add(cls);
       }
     }
+  }
+
+  for (const cls of contentClasses ?? []) {
+    allowlist.add(cls);
   }
 
   return { allowlist, preserveFlatpickr };
@@ -139,6 +185,7 @@ function createPostcssPlugins(
   preserveAllIBMFonts: boolean,
   preserveFlatpickr: boolean,
   strict: boolean,
+  safelist: readonly SafelistEntry[],
   report: { removed: number },
 ): AcceptedPlugin[] {
   return [
@@ -156,6 +203,15 @@ function createPostcssPlugins(
           const selector = node.selector;
 
           if (CARBON_PREFIX.test(selector)) {
+            if (
+              safelist.length > 0 &&
+              selector
+                .split(",")
+                .some((selectee) => isSafelisted(selectee.trim(), safelist))
+            ) {
+              return;
+            }
+
             const selectors = selector.split(",").filter((selectee) => {
               const value = selectee.trim() ?? "";
               const [, rest] = value.split(".");
@@ -173,6 +229,7 @@ function createPostcssPlugins(
         report.removed += optimizeStrictRule(node, {
           allowlist,
           preserveFlatpickr,
+          safelist,
         });
       },
       /**
@@ -249,7 +306,11 @@ export function optimizeCssWithReport(
   const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const strict = isStrict(options);
-  const { allowlist, preserveFlatpickr } = buildUsage(ids);
+  const safelist = options.safelist ?? [];
+  const { allowlist, preserveFlatpickr } = buildUsage(
+    ids,
+    options.contentClasses,
+  );
   const report = { removed: 0 };
 
   const { css } = postcss(
@@ -258,6 +319,7 @@ export function optimizeCssWithReport(
       preserveAllIBMFonts,
       preserveFlatpickr,
       strict,
+      safelist,
       report,
     ),
   ).process(source, { from: options.from });
@@ -271,7 +333,11 @@ export async function optimizeCssWithReportAsync(
   const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const strict = isStrict(options);
-  const { allowlist, preserveFlatpickr } = buildUsage(ids);
+  const safelist = options.safelist ?? [];
+  const { allowlist, preserveFlatpickr } = buildUsage(
+    ids,
+    options.contentClasses,
+  );
   const report = { removed: 0 };
 
   const { css } = await postcss(
@@ -280,6 +346,7 @@ export async function optimizeCssWithReportAsync(
       preserveAllIBMFonts,
       preserveFlatpickr,
       strict,
+      safelist,
       report,
     ),
   ).process(source, { from: options.from });
