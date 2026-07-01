@@ -1,5 +1,5 @@
 import type { AtRule, Rule } from "postcss";
-import { components } from "../component-index";
+import { getComponents } from "../component-index-registry";
 import {
   ALWAYS_ON_CLASSES,
   CARBON_PREFIX,
@@ -39,7 +39,6 @@ const FLATPICKR_SELECTOR = new RegExp(
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
 const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
 const CONTEXT_ANCESTOR_SET = new Set<string>(CONTEXT_ANCESTORS);
-const SHARED_CLASSES = getSharedClasses();
 
 export type StrictCssOptimizerOptions = {
   allowlist: Set<string>;
@@ -47,18 +46,28 @@ export type StrictCssOptimizerOptions = {
   safelist: readonly SafelistEntry[];
 };
 
+// Lazily computed (and memoized) on first use rather than at module load, so
+// it reflects a `liveIndex` swap of the active component index. Safe only
+// because `setComponents` always runs before strict-mode optimization starts
+// (see `optimizeCss`'s `buildStart`/`OptimizeCssPlugin`'s pre-asset hook).
+let sharedClassesCache: Set<string> | undefined;
+
 function getSharedClasses(): Set<string> {
+  if (sharedClassesCache) return sharedClassesCache;
+
   const counts = new Map<string, number>();
 
-  for (const component of Object.values(components)) {
+  for (const component of Object.values(getComponents())) {
     for (const cls of new Set(component.classes)) {
       counts.set(cls, (counts.get(cls) ?? 0) + 1);
     }
   }
 
-  return new Set(
+  sharedClassesCache = new Set(
     [...counts].filter(([, count]) => count > 1).map(([cls]) => cls),
   );
+
+  return sharedClassesCache;
 }
 
 /**
@@ -179,13 +188,13 @@ function matchesAllowlist(
   allowlist: Set<string>,
 ): AllowlistMatch {
   if (allowlist.has(name)) {
-    return { matched: true, shared: SHARED_CLASSES.has(name) };
+    return { matched: true, shared: getSharedClasses().has(name) };
   }
 
   for (const selector of allowlist) {
     if (EXACT_ONLY_CLASSES.has(selector)) continue;
 
-    const shared = SHARED_CLASSES.has(selector);
+    const shared = getSharedClasses().has(selector);
     if (selector.endsWith("-") && name.startsWith(selector)) {
       return { matched: true, shared };
     }

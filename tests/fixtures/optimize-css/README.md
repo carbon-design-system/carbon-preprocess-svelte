@@ -37,7 +37,7 @@ Non-zero `leaked_count` in strict scenarios is not a test failure when it occurs
 
 Compare button.default (`leaked_count: 112`) with button.strict (`leaked_count: 0`) for the default-vs-strict gap. Default mode keeps whole comma-list rules when any branch matches.
 
-`scripts/index-components.ts` automates most context classes: import-graph `classList` tracing, slot-wrapper detection, gated Carbon CSS cross-reference, and CSS-orphan SVG classes. `MANUAL_OVERRIDES` is the fallback when automation misses on a Carbon bump.
+`src/indexer/build-index.ts` (invoked by `scripts/index-components.ts`) automates most context classes: import-graph `classList` tracing, slot-wrapper detection, gated Carbon CSS cross-reference, and CSS-orphan SVG classes. `MANUAL_OVERRIDES` is the fallback when automation misses on a Carbon bump.
 
 Bundle pairs that stay strict (import both components): Select + Pagination for inline select, TextInput + FluidForm for fluid layout.
 
@@ -102,7 +102,7 @@ Bundle pairs that stay strict (import both components): Select + Pagination for 
 
 ## When to add a scenario
 
-- New `MANUAL_OVERRIDES` entry or automation gate change in scripts/index-components.ts
+- New `MANUAL_OVERRIDES` entry or automation gate change in src/indexer/build-index.ts
 - New typical multi-import bundle (like DatePicker + DatePickerInput)
 - Optimizer behavior change that should be regression-tested
 - Component with suspected over-prune or leak regression

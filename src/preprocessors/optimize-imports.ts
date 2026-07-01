@@ -3,8 +3,9 @@ import { walk } from "estree-walker";
 import MagicString from "magic-string";
 import { parse } from "svelte/compiler";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
-import { components } from "../component-index";
+import { getComponents, setComponents } from "../component-index-registry";
 import { CarbonSvelte } from "../constants";
+import { ensureLiveComponentIndex } from "../indexer/live-index";
 
 const NODE_MODULES_REGEX = /node_modules/;
 const COMPONENT_NAME_REGEX = /^[A-Z]/;
@@ -75,9 +76,89 @@ function rewriteImport(
  * `src/Name/Name.svelte` path; camelCase stays on the barrel so utilities
  * don't point at a `.svelte` file that isn't there.
  */
-export const optimizeImports: SveltePreprocessor<"script"> = () => {
+export type OptimizeImportsOptions = {
+  experimental?: {
+    /**
+     * Build the component index from *this project's* installed
+     * `carbon-components-svelte` instead of using the version bundled with
+     * `carbon-preprocess-svelte`. Resolved once per build (cached on disk,
+     * keyed by the installed Carbon version) and falls back to the bundled
+     * index if anything about the live build fails.
+     * @default false
+     */
+    liveIndex?: boolean;
+  };
+};
+
+function transformScript(raw: string, filename: string) {
+  const components = getComponents();
+
+  /**
+   * The Svelte compiler's parse() function expects a full Svelte component,
+   * not just a script fragment. Wrap the raw script content in script tags
+   * to make it parseable, then strip the tags from output after transformation.
+   */
+  const content = `<script lang="ts">${raw}</script>`;
+  const s = new MagicString(content);
+
+  walk(parse(content), {
+    enter(node) {
+      if (node.type === "ImportDeclaration") {
+        const import_name = node.source.value;
+
+        switch (import_name) {
+          case CarbonSvelte.Components:
+            rewriteImport(s, node, ({ imported, local }) => {
+              // Prefer indexed path (handles .js and other special cases).
+              const import_path = components[imported.name]?.path;
+              if (import_path) {
+                return `import ${local.name} from "${import_path}";`;
+              }
+
+              // Not in index: PascalCase gets an optimistic component path;
+              // camelCase stays on the barrel (utility, not a .svelte file).
+              const looks_like_component = COMPONENT_NAME_REGEX.test(
+                imported.name,
+              );
+              if (looks_like_component) {
+                return `import ${local.name} from "${import_name}/src/${imported.name}/${imported.name}.svelte";`;
+              }
+
+              return "";
+            });
+            break;
+
+          case CarbonSvelte.Icons:
+          case CarbonSvelte.Pictograms:
+            rewriteImport(s, node, ({ imported, local }) => {
+              return `import ${local.name} from "${import_name}/lib/${imported.name}.svelte";`;
+            });
+            break;
+        }
+      }
+    },
+  });
+
+  s.replace(SCRIPT_OPEN_TAG_REGEX, "").replace(SCRIPT_CLOSE_TAG_REGEX, "");
+
+  return {
+    code: s.toString(),
+    map: s.generateMap({ source: filename, hires: true }),
+  };
+}
+
+export const optimizeImports: SveltePreprocessor<"script"> = (
+  options?: OptimizeImportsOptions,
+) => {
+  let liveIndexReady: Promise<void> | undefined;
+
   return {
     name: "carbon:optimize-imports",
+    // Not declared `async`: without `experimental.liveIndex`, this returns
+    // the transformed result synchronously (existing callers rely on that).
+    // Svelte's own preprocess pipeline accepts either a plain result or a
+    // Promise, so the `liveIndex` branch returning a Promise below is
+    // equally valid.
     script({ filename, content: raw }) {
       // Skip files in node_modules to minimize unnecessary preprocessing
       if (!filename) return;
@@ -87,58 +168,12 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
       // Skip MagicString + svelte parse for the common no-Carbon file.
       if (!raw.includes("carbon-")) return;
 
-      /**
-       * The Svelte compiler's parse() function expects a full Svelte component,
-       * not just a script fragment. Wrap the raw script content in script tags
-       * to make it parseable, then strip the tags from output after transformation.
-       */
-      const content = `<script lang="ts">${raw}</script>`;
-      const s = new MagicString(content);
+      if (options?.experimental?.liveIndex) {
+        liveIndexReady ??= ensureLiveComponentIndex().then(setComponents);
+        return liveIndexReady.then(() => transformScript(raw, filename));
+      }
 
-      walk(parse(content), {
-        enter(node) {
-          if (node.type === "ImportDeclaration") {
-            const import_name = node.source.value;
-
-            switch (import_name) {
-              case CarbonSvelte.Components:
-                rewriteImport(s, node, ({ imported, local }) => {
-                  // Prefer indexed path (handles .js and other special cases).
-                  const import_path = components[imported.name]?.path;
-                  if (import_path) {
-                    return `import ${local.name} from "${import_path}";`;
-                  }
-
-                  // Not in index: PascalCase gets an optimistic component path;
-                  // camelCase stays on the barrel (utility, not a .svelte file).
-                  const looks_like_component = COMPONENT_NAME_REGEX.test(
-                    imported.name,
-                  );
-                  if (looks_like_component) {
-                    return `import ${local.name} from "${import_name}/src/${imported.name}/${imported.name}.svelte";`;
-                  }
-
-                  return "";
-                });
-                break;
-
-              case CarbonSvelte.Icons:
-              case CarbonSvelte.Pictograms:
-                rewriteImport(s, node, ({ imported, local }) => {
-                  return `import ${local.name} from "${import_name}/lib/${imported.name}.svelte";`;
-                });
-                break;
-            }
-          }
-        },
-      });
-
-      s.replace(SCRIPT_OPEN_TAG_REGEX, "").replace(SCRIPT_CLOSE_TAG_REGEX, "");
-
-      return {
-        code: s.toString(),
-        map: s.generateMap({ source: filename, hires: true }),
-      };
+      return transformScript(raw, filename);
     },
   };
 };

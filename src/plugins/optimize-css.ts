@@ -1,4 +1,6 @@
 import type { Plugin } from "vite";
+import { setComponents } from "../component-index-registry";
+import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { isSilent, optimizeCssWithReport } from "./create-optimized-css";
@@ -31,6 +33,18 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     name: "vite:carbon:optimize-css",
     apply: "build",
     enforce: "post",
+    /**
+     * Runs once before any module is transformed. When
+     * `experimental.liveIndex` is set, this is where the component index
+     * gets rebuilt from the project's installed `carbon-components-svelte`
+     * (or read from cache), so it's ready before `transform`/`generateBundle`
+     * ever consult it.
+     */
+    async buildStart() {
+      if (options?.experimental?.liveIndex) {
+        setComponents(await ensureLiveComponentIndex());
+      }
+    },
     /**
      * The transform hook is called for every module in the build graph.
      * We don't modify the code here—we just track which Carbon components
