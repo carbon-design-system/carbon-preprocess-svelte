@@ -13,6 +13,7 @@ import {
   type ModuleGraphCache,
 } from "./extract-runtime-classes";
 import { extractFromSvelte } from "./extract-selectors";
+import { mergeSubComponentClasses } from "./merge-sub-component-classes";
 
 /**
  * Proven exceptions when automation misses on a Carbon bump. Prefer updating
@@ -152,28 +153,13 @@ for (const [name, entry] of exports_map.entries()) {
   }
 }
 
-for (const [parent, children] of sub_components.entries()) {
-  const parent_map = exports_map.get(parent);
+const all_components = new Map(
+  [...exports_map, ...internal_components].filter(
+    (entry): entry is [Identifier, IdentifierValue] => entry[1] !== null,
+  ),
+);
 
-  if (parent_map) {
-    const sub_classes = children.flatMap((component) => {
-      if (exports_map.has(component)) {
-        return exports_map.get(component)?.classes ?? [];
-      }
-      if (internal_components.has(component)) {
-        return internal_components.get(component)?.classes ?? [];
-      }
-
-      return [];
-    });
-
-    if (sub_classes.length > 0) {
-      parent_map.classes = [
-        ...new Set([...parent_map.classes, ...sub_classes]),
-      ];
-    }
-  }
-}
+mergeSubComponentClasses(sub_components, all_components);
 
 const markup_only_classes = new Map<string, Set<string>>();
 
