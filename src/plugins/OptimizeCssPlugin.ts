@@ -1,4 +1,6 @@
 import type { Compiler } from "webpack";
+import { setComponents } from "../component-index-registry";
+import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { isSilent, optimizeCssWithReportAsync } from "./create-optimized-css";
@@ -75,6 +77,10 @@ class OptimizeCssPlugin {
           async (assets) => {
             // Skip processing if no Carbon Svelte imports are found.
             if (ids.size === 0) return;
+
+            if (this.options.experimental?.liveIndex) {
+              setComponents(await ensureLiveComponentIndex());
+            }
 
             const cssAssetIds = Object.keys(assets).filter(isCssFile);
             const contentClasses = scanContentClasses(this.options.content);

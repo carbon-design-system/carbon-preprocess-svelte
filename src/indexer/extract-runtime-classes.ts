@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { walk } from "estree-walker";
 import { parse } from "svelte/compiler";
@@ -117,7 +118,7 @@ export async function buildRuntimeClassMap(
     }
 
     const filePath = path.join(carbonSrcPath, resolvedKey);
-    const code = await Bun.file(filePath).text();
+    const code = await readFile(filePath, "utf8");
     const runtime = extractRuntimeClassesFromSource(code);
 
     if (runtime.length > 0) {

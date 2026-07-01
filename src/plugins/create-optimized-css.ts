@@ -2,7 +2,7 @@ import path from "node:path";
 import type { AcceptedPlugin } from "postcss";
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
-import { components } from "../component-index";
+import { getComponents } from "../component-index-registry";
 import { ALWAYS_ON_CLASSES, CARBON_PREFIX } from "../constants";
 import { isSafelisted, type SafelistEntry } from "./safelist";
 import {
@@ -93,6 +93,16 @@ export type OptimizeCssOptions = {
      * @default false
      */
     strict?: boolean;
+
+    /**
+     * Build the component index from *this project's* installed
+     * `carbon-components-svelte` instead of using the version bundled with
+     * `carbon-preprocess-svelte`. Resolved once per build (cached on disk,
+     * keyed by the installed Carbon version) and falls back to the bundled
+     * index if anything about the live build fails.
+     * @default false
+     */
+    liveIndex?: boolean;
   };
 };
 
@@ -139,6 +149,7 @@ function buildUsage(
   preserveFlatpickr: boolean;
 } {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
+  const components = getComponents();
   let preserveFlatpickr = false;
 
   for (const id of ids) {

@@ -1,4 +1,4 @@
-import { extractSelectors } from "../scripts/extract-selectors";
+import { extractSelectors } from "../src/indexer/extract-selectors";
 
 describe("extractSelectors", () => {
   test("extracts single class from class attribute", () => {

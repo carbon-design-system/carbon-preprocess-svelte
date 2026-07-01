@@ -55,6 +55,8 @@ The preprocessor optimizes imports from the following packages:
 > Today, [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte) enables [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries) by default.
 > However, this preprocessor is still useful for non-Vite bundlers, like Rollup and Webpack. Also, it can further improve cold start development times even with `prebundleSvelteLibraries: true`.
 
+`optimizeImports({ experimental: { liveIndex: true } })` builds its component index from your installed `carbon-components-svelte` instead of the version bundled with this package — see [`experimental.liveIndex`](#optimizecss-api) under `optimizeCss` for details; the behavior is identical here.
+
 #### SvelteKit
 
 See [examples/sveltekit](examples/sveltekit).
@@ -323,6 +325,28 @@ optimizeCss({
    */
   experimental: {
     strict: true,
+
+    /**
+     * Experimental. Builds the component index from *this project's*
+     * installed `carbon-components-svelte` instead of the version bundled
+     * with `carbon-preprocess-svelte`. Useful when your app is ahead of (or
+     * behind) the Carbon version this package was last released against —
+     * new/renamed components and classes are picked up without waiting on a
+     * `carbon-preprocess-svelte` release.
+     *
+     * Resolved once per build and cached on disk at
+     * `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>.json`,
+     * so a Carbon bump invalidates the cache automatically. Falls back to
+     * the bundled static index if the live build fails for any reason
+     * (unresolvable `carbon-components-svelte`, unexpected `src` layout,
+     * etc.), so enabling it can't turn a working build into a broken one.
+     *
+     * `optimizeImports` accepts the same option, independently, since it
+     * doesn't share a config object with `optimizeCss`.
+     *
+     * @default false
+     */
+    liveIndex: true,
   },
 });
 ```

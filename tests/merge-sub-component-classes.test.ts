@@ -1,4 +1,4 @@
-import { mergeSubComponentClasses } from "../scripts/merge-sub-component-classes";
+import { mergeSubComponentClasses } from "../src/indexer/merge-sub-component-classes";
 
 type Entry = { classes: string[] };
 

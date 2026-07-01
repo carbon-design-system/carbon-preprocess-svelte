@@ -1,13 +1,11 @@
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import postcss from "postcss";
 import {
   getCarbonClasses,
   splitSelectorList,
   splitSelectorParts,
 } from "./css-selector-utils";
-
-const require = createRequire(import.meta.url);
+import { resolveCarbonRoot } from "./resolve-carbon-root";
 
 /** Ancestors we must never auto-propagate (strict bundle pairs stay manual). */
 export const LAYOUT_ANCESTOR_DENYLIST = new Set([
@@ -28,8 +26,7 @@ export const LAYOUT_ANCESTOR_DENYLIST = new Set([
 ]);
 
 export function resolveCarbonCssPath(theme = "white"): string {
-  const pkg = require.resolve("carbon-components-svelte/package.json");
-  return join(dirname(pkg), "css", `${theme}.css`);
+  return join(resolveCarbonRoot(), "css", `${theme}.css`);
 }
 
 function walkCarbonRules(

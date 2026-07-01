@@ -1,7 +1,7 @@
 import path from "node:path";
 import { walk } from "estree-walker";
 import { parse } from "svelte/compiler";
-import { CARBON_PREFIX } from "../src/constants";
+import { CARBON_PREFIX } from "../constants";
 import { extractRuntimeClassesFromSource } from "./extract-runtime-classes";
 
 const WHITESPACE_REGEX = /\s+/;
