@@ -1,15 +1,24 @@
 import { watch } from "node:fs";
+import { resolve } from "node:path";
 import { $, build } from "bun";
+import { bundleDts } from "./bundle-dts";
 
 const isWatchMode =
   process.argv.includes("-w") || process.argv.includes("--watch");
+const root = process.cwd();
 
 await $`rm -rf dist; mkdir dist`;
 
 async function emitTypeDeclarations() {
-  const result = await $`tsc --project tsconfig.build.json`.quiet();
-  if (result.exitCode !== 0) {
-    console.error(result.stderr.toString());
+  try {
+    await bundleDts({
+      root,
+      source: resolve(root, "src/index.ts"),
+      ambientRoots: [resolve(root, "src/global.d.ts")],
+      outFile: resolve(root, "dist/index.d.ts"),
+    });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
     if (!isWatchMode) {
       process.exit(1);
     }
