@@ -5,9 +5,9 @@
     "SideNavItems"
   ],
   "strict": true,
-  "before_bytes": 740417,
+  "before_bytes": 772119,
   "after_bytes": 22465,
-  "reduction_percent": 96.97,
+  "reduction_percent": 97.09,
   "kept_rules": 138,
   "leaked_count": 0,
   "leaked_classes": []

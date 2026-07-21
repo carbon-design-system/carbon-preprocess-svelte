@@ -4,10 +4,10 @@
     "DatePickerInput"
   ],
   "strict": true,
-  "before_bytes": 740417,
-  "after_bytes": 36524,
-  "reduction_percent": 95.07,
-  "kept_rules": 248,
+  "before_bytes": 772119,
+  "after_bytes": 37271,
+  "reduction_percent": 95.17,
+  "kept_rules": 256,
   "leaked_count": 0,
   "leaked_classes": []
 }
