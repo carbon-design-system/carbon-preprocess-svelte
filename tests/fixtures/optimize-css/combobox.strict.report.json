@@ -3,10 +3,10 @@
     "ComboBox"
   ],
   "strict": true,
-  "before_bytes": 740417,
-  "after_bytes": 54745,
-  "reduction_percent": 92.61,
-  "kept_rules": 358,
+  "before_bytes": 772119,
+  "after_bytes": 55175,
+  "reduction_percent": 92.85,
+  "kept_rules": 363,
   "leaked_count": 0,
   "leaked_classes": []
 }

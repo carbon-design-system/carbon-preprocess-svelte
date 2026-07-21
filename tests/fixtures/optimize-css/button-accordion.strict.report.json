@@ -4,10 +4,10 @@
     "Accordion"
   ],
   "strict": true,
-  "before_bytes": 740417,
-  "after_bytes": 90142,
-  "reduction_percent": 87.83,
-  "kept_rules": 519,
+  "before_bytes": 772119,
+  "after_bytes": 90825,
+  "reduction_percent": 88.24,
+  "kept_rules": 525,
   "leaked_count": 0,
   "leaked_classes": []
 }

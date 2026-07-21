@@ -6,10 +6,10 @@
     "ModalFooter"
   ],
   "strict": true,
-  "before_bytes": 740417,
-  "after_bytes": 91900,
-  "reduction_percent": 87.59,
-  "kept_rules": 534,
+  "before_bytes": 772119,
+  "after_bytes": 92583,
+  "reduction_percent": 88.01,
+  "kept_rules": 540,
   "leaked_count": 0,
   "leaked_classes": []
 }

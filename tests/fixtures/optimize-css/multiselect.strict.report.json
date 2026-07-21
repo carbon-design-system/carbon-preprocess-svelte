@@ -3,10 +3,10 @@
     "MultiSelect"
   ],
   "strict": true,
-  "before_bytes": 740417,
-  "after_bytes": 73123,
-  "reduction_percent": 90.12,
-  "kept_rules": 478,
+  "before_bytes": 772119,
+  "after_bytes": 74155,
+  "reduction_percent": 90.4,
+  "kept_rules": 488,
   "leaked_count": 0,
   "leaked_classes": []
 }

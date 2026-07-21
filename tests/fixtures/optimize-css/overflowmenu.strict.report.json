@@ -3,9 +3,9 @@
     "OverflowMenu"
   ],
   "strict": true,
-  "before_bytes": 740417,
+  "before_bytes": 772119,
   "after_bytes": 25724,
-  "reduction_percent": 96.53,
+  "reduction_percent": 96.67,
   "kept_rules": 167,
   "leaked_count": 0,
   "leaked_classes": []

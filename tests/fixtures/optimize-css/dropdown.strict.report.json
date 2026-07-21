@@ -3,10 +3,10 @@
     "Dropdown"
   ],
   "strict": true,
-  "before_bytes": 740417,
-  "after_bytes": 48579,
-  "reduction_percent": 93.44,
-  "kept_rules": 336,
+  "before_bytes": 772119,
+  "after_bytes": 49064,
+  "reduction_percent": 93.65,
+  "kept_rules": 341,
   "leaked_count": 0,
   "leaked_classes": []
 }
