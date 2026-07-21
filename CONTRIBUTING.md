@@ -198,7 +198,7 @@ bun run test:e2e:update
 
 ## Build
 
-[`scripts/build.ts`](scripts/build.ts) (`bun run build`) removes `dist/`, regenerates the component index (the `prebuild` step runs `index:components` with `BUILD=true`, which writes the index as minified JSON), bundles `src/index.ts` with `Bun.build` (minified ESM, Node target), then runs `tsc --project tsconfig.build.json` ([`tsconfig.build.json`](tsconfig.build.json)) to emit declarations. `dist/` is gitignored and never committed. `bun run build -w` rebuilds on changes under `src/` and keeps linked examples current.
+[`scripts/build.ts`](scripts/build.ts) (`bun run build`) removes `dist/`, regenerates the component index (the `prebuild` step runs `index:components` with `BUILD=true`, which writes the index as minified JSON), bundles `src/index.ts` with `Bun.build` (minified ESM, Node target), then runs [`scripts/bundle-dts.ts`](scripts/bundle-dts.ts) to emit `dist/index.d.ts`. Rather than mirroring every `src` module into `dist/` (`tsc`'s default behavior), it uses the TypeScript compiler API (via `@typescript/typescript6`, since TypeScript 7's `typescript` package no longer ships it) to inline only the declarations reachable from `src/index.ts`'s public exports into a single tree-shaken file. `dist/` is gitignored and never committed. `bun run build -w` rebuilds on changes under `src/` and keeps linked examples current.
 
 `bun run build:prune-package` (`bunx culls`) trims `package.json` for publishing and runs in the release workflow.
 
