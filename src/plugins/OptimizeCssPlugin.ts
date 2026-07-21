@@ -19,7 +19,7 @@ import { scanContentClasses } from "./scan-content";
  * This can dramatically reduce CSS bundle size since Carbon's full stylesheet
  * includes styles for all components, but apps typically use only a subset.
  */
-class OptimizeCssPlugin {
+export default class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
 
   public constructor(options?: OptimizeCssOptions) {
@@ -120,5 +120,3 @@ class OptimizeCssPlugin {
     );
   }
 }
-
-export default OptimizeCssPlugin;
