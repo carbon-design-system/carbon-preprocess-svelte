@@ -2,7 +2,6 @@
   "ids": [
     "Modal"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 83334,
   "reduction_percent": 88.46,

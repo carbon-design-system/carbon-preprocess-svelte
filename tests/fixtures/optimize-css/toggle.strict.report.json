@@ -2,7 +2,6 @@
   "ids": [
     "Toggle"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 23368,
   "reduction_percent": 96.76,

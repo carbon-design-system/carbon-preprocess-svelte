@@ -1,6 +1,6 @@
 # vite@svelte-5
 
-Used for end-to-end testing and development. Svelte 5 with strict `optimizeCss`.
+Used for end-to-end testing and development. Svelte 5 with `optimizeCss`.
 
 Each entry is a small app that mirrors an optimize-css fixture scenario. Pick one with `ENTRY` or the matching script.
 

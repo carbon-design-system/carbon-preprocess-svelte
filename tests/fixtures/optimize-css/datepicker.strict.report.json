@@ -3,7 +3,6 @@
     "DatePicker",
     "DatePickerInput"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 37648,
   "reduction_percent": 94.78,

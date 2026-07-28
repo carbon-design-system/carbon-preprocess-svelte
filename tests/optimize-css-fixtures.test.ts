@@ -20,118 +20,79 @@ type Scenario = {
   name: string;
   /** Component ids to treat as imported (drives the allowlist). */
   ids: string[];
-  strict: boolean;
 };
 
 const SCENARIOS: Scenario[] = [
-  { name: "button.strict", ids: ["Button"], strict: true },
-  { name: "button.default", ids: ["Button"], strict: false },
-  { name: "datatable.strict", ids: ["DataTable"], strict: true },
-  {
-    name: "button-accordion.strict",
-    ids: ["Button", "Accordion"],
-    strict: true,
-  },
+  { name: "button.strict", ids: ["Button"] },
+  { name: "datatable.strict", ids: ["DataTable"] },
+  { name: "button-accordion.strict", ids: ["Button", "Accordion"] },
   // DatePicker ships with Flatpickr CSS; import DatePickerInput too (typical usage).
-  {
-    name: "datepicker.strict",
-    ids: ["DatePicker", "DatePickerInput"],
-    strict: true,
-  },
+  { name: "datepicker.strict", ids: ["DatePicker", "DatePickerInput"] },
   // Modal adds `.bx--body--with-modal-open` on `<body>` at runtime. Keep that
   // rule; drop descendant rules for tooltip/overflow-menu (Modal does not import them).
-  { name: "modal.strict", ids: ["Modal"], strict: true },
+  { name: "modal.strict", ids: ["Modal"] },
   // Zero-leak gold standard — well-indexed single components.
-  { name: "dropdown.strict", ids: ["Dropdown"], strict: true },
-  { name: "combobox.strict", ids: ["ComboBox"], strict: true },
-  { name: "overflowmenu.strict", ids: ["OverflowMenu"], strict: true },
-  { name: "search.strict", ids: ["Search"], strict: true },
-  { name: "select.strict", ids: ["Select"], strict: true },
+  { name: "dropdown.strict", ids: ["Dropdown"] },
+  { name: "combobox.strict", ids: ["ComboBox"] },
+  { name: "overflowmenu.strict", ids: ["OverflowMenu"] },
+  { name: "search.strict", ids: ["Search"] },
+  { name: "select.strict", ids: ["Select"] },
   // Select `inline` styles live under Pagination descendants in Carbon CSS.
-  {
-    name: "select-pagination.strict",
-    ids: ["Select", "Pagination"],
-    strict: true,
-  },
-  { name: "checkbox.strict", ids: ["Checkbox"], strict: true },
-  { name: "slider.strict", ids: ["Slider"], strict: true },
-  { name: "breadcrumb.strict", ids: ["Breadcrumb"], strict: true },
-  { name: "textinput.strict", ids: ["TextInput"], strict: true },
-  {
-    name: "fluid-form.strict",
-    ids: ["TextInput", "FluidForm"],
-    strict: true,
-  },
-  { name: "toggle.strict", ids: ["Toggle"], strict: true },
-  { name: "numberinput.strict", ids: ["NumberInput"], strict: true },
+  { name: "select-pagination.strict", ids: ["Select", "Pagination"] },
+  { name: "checkbox.strict", ids: ["Checkbox"] },
+  { name: "slider.strict", ids: ["Slider"] },
+  { name: "breadcrumb.strict", ids: ["Breadcrumb"] },
+  { name: "textinput.strict", ids: ["TextInput"] },
+  { name: "fluid-form.strict", ids: ["TextInput", "FluidForm"] },
+  { name: "toggle.strict", ids: ["Toggle"] },
+  { name: "numberinput.strict", ids: ["NumberInput"] },
   // Multi-import bundles — import sets users actually ship.
   {
     name: "dropdown-skeleton.strict",
     ids: ["Dropdown", "DropdownSkeleton"],
-    strict: true,
   },
-  {
-    name: "tabs-bundle.strict",
-    ids: ["Tabs", "Tab", "TabContent"],
-    strict: true,
-  },
+  { name: "tabs-bundle.strict", ids: ["Tabs", "Tab", "TabContent"] },
   {
     name: "datatable-overflowmenu.strict",
     ids: ["DataTable", "OverflowMenu", "Link"],
-    strict: true,
   },
   {
     name: "accordion-bundle.strict",
     ids: ["Accordion", "AccordionItem"],
-    strict: true,
   },
   {
     name: "composed-modal-bundle.strict",
     ids: ["ComposedModal", "ModalHeader", "ModalBody", "ModalFooter"],
-    strict: true,
   },
   {
     name: "timepicker-bundle.strict",
     ids: ["TimePicker", "TimePickerSelect"],
-    strict: true,
   },
   // Leaky regression baselines — compound-selector piggybacking.
-  { name: "tabs.strict", ids: ["Tabs"], strict: true },
-  { name: "sidenav.strict", ids: ["SideNav"], strict: true },
-  { name: "header.strict", ids: ["Header"], strict: true },
-  {
-    name: "header-global-action.strict",
-    ids: ["HeaderGlobalAction"],
-    strict: true,
-  },
+  { name: "tabs.strict", ids: ["Tabs"] },
+  { name: "sidenav.strict", ids: ["SideNav"] },
+  { name: "header.strict", ids: ["Header"] },
+  { name: "header-global-action.strict", ids: ["HeaderGlobalAction"] },
   {
     name: "uishell.strict",
     ids: ["Header", "SideNav", "SideNavItems"],
-    strict: true,
   },
-  { name: "tooltip.strict", ids: ["Tooltip"], strict: true },
+  { name: "tooltip.strict", ids: ["Tooltip"] },
   {
     name: "datatable-toolbar.strict",
     ids: ["DataTable", "Toolbar", "ToolbarSearch"],
-    strict: true,
   },
-  { name: "multiselect.strict", ids: ["MultiSelect"], strict: true },
-  { name: "passwordinput.strict", ids: ["PasswordInput"], strict: true },
+  { name: "multiselect.strict", ids: ["MultiSelect"] },
+  { name: "passwordinput.strict", ids: ["PasswordInput"] },
   {
     name: "fileuploader-bundle.strict",
     ids: ["FileUploader", "FileUploaderButton", "FileUploaderItem"],
-    strict: true,
   },
-  {
-    name: "inline-notification.strict",
-    ids: ["InlineNotification"],
-    strict: true,
-  },
+  { name: "inline-notification.strict", ids: ["InlineNotification"] },
 ];
 
 type Report = {
   ids: string[];
-  strict: boolean;
   before_bytes: number;
   after_bytes: number;
   reduction_percent: number;
@@ -204,7 +165,6 @@ for (const scenario of SCENARIOS) {
     const output = createOptimizedCss({
       source,
       ids: scenario.ids,
-      experimental: { strict: scenario.strict },
     });
     const allowlist = buildAllowlist(scenario.ids);
     const outputClasses = carbonClassesOf(output);
@@ -217,7 +177,6 @@ for (const scenario of SCENARIOS) {
     const afterBytes = Buffer.byteLength(output);
     const report: Report = {
       ids: scenario.ids,
-      strict: scenario.strict,
       before_bytes: beforeBytes,
       after_bytes: afterBytes,
       reduction_percent: Number(
@@ -270,9 +229,6 @@ for (const scenario of SCENARIOS) {
       expect(missing).toEqual([]);
     });
 
-    // Strict mode: no output selector should consist only of foreign Carbon classes.
-    // Default mode keeps whole rules when any branch matches; see leaked_classes
-    // and button.default vs button.strict for the gap.
     if (scenario.name === "modal.strict") {
       // Scroll-lock rule stays; tooltip/overflow descendants go.
       test("keeps modal scroll-lock but drops its foreign descendants", () => {
@@ -364,17 +320,15 @@ for (const scenario of SCENARIOS) {
       });
     }
 
-    if (scenario.strict) {
-      test("keeps no selector that is entirely foreign Carbon classes", () => {
-        const offenders = selectorsOf(output).filter((selector) => {
-          const classes = carbonClassesIn(selector);
-          return (
-            classes.length > 0 && !shouldKeepStrictSelector(selector, allowlist)
-          );
-        });
-
-        expect(offenders).toEqual([]);
+    test("keeps no selector that is entirely foreign Carbon classes", () => {
+      const offenders = selectorsOf(output).filter((selector) => {
+        const classes = carbonClassesIn(selector);
+        return (
+          classes.length > 0 && !shouldKeepStrictSelector(selector, allowlist)
+        );
       });
-    }
+
+      expect(offenders).toEqual([]);
+    });
   });
 }

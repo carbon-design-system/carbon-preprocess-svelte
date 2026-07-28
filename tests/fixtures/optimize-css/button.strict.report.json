@@ -2,7 +2,6 @@
   "ids": [
     "Button"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 75973,
   "reduction_percent": 89.48,

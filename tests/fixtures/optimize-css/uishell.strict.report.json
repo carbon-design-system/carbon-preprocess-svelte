@@ -4,7 +4,6 @@
     "SideNav",
     "SideNavItems"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 22211,
   "reduction_percent": 96.92,

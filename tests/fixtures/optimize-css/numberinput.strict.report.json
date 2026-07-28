@@ -2,7 +2,6 @@
   "ids": [
     "NumberInput"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 42080,
   "reduction_percent": 94.17,

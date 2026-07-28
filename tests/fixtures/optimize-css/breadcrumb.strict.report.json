@@ -2,7 +2,6 @@
   "ids": [
     "Breadcrumb"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 19080,
   "reduction_percent": 97.36,

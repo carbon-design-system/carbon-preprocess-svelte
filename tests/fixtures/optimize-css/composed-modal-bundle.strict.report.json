@@ -5,7 +5,6 @@
     "ModalBody",
     "ModalFooter"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 83994,
   "reduction_percent": 88.36,

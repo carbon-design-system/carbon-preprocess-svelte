@@ -164,8 +164,14 @@ The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on produ
 
 1. During `transform`, it collects absolute paths of imported `carbon-components-svelte` sources.
 2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components via an internal index, plus global selectors like `.bx--body`.
-3. A PostCSS plugin removes rules whose selectors are only Carbon (`bx--`) classes outside that allowlist. BEM-style variants are kept when they match a needed base class; selectors without that prefix are left unchanged.
+3. A PostCSS plugin prunes Carbon (`bx--`) selectors outside that allowlist:
+   - Individual selectors are pruned out of comma-separated lists instead of keeping the whole rule when any one branch matches
+   - Every Carbon class in a compound selector (same-element and descendant) must match the allowlist, so importing NumberInput doesn't pull in `.bx--modal .bx--number` context rules, and Button doesn't pull in Tabs skeleton styles via a shared `.bx--skeleton` modifier
+   - Flatpickr and legacy single-hyphen `bx-` rules are dropped unless DatePicker (or another flatpickr-based component) is in the bundle
+   - Selectors are parsed with parenthesis-awareness, so `:is(...)` and `:not(...)` groups are handled instead of naively split on commas
 4. Empty rules are discarded, and the CSS bundles are optimized.
+
+**Risk profile:** this pruning is validated against a fixture suite covering most Carbon components and common multi-component bundles (see [`tests/fixtures/optimize-css`](tests/fixtures/optimize-css)) with zero unexplained survivors on every scenario, but it shares the blind spot described in the warning below — dynamically constructed and hand-written classes the allowlist can't see.
 
 ```mermaid
 flowchart TB
@@ -305,27 +311,7 @@ optimizeCss({
    */
   content: ["src/**/*.{svelte,js,ts}"],
 
-  /**
-   * Experimental. Enables stricter CSS tree-shaking that can drastically
-   * reduce output size compared to the default baseline, depending on which
-   * Carbon components you import. Small bundles that only use a handful of
-   * components tend to see the largest gains.
-   *
-   * Compared to the default matcher, `strict`:
-   * - Prunes individual selectors from comma-separated lists instead of
-   *   keeping the entire rule when any selector matches
-   * - Requires every Carbon class in a compound selector to match when only
-   *   shared modifiers (e.g. `.bx--skeleton`) hit, so importing Button no
-   *   longer pulls in Tabs skeleton styles
-   * - Drops flatpickr and legacy single-hyphen `bx-` rules unless DatePicker
-   *   (or similar) is in the bundle
-   * - Uses parenthesis-aware selector parsing for `:is()` and similar
-   *
-   * @default false
-   */
   experimental: {
-    strict: true,
-
     /**
      * Experimental. Builds the component index from *this project's*
      * installed `carbon-components-svelte` instead of the version bundled
