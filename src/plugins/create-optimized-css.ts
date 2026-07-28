@@ -3,8 +3,8 @@ import type { AcceptedPlugin } from "postcss";
 import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import { getComponents } from "../component-index-registry";
-import { ALWAYS_ON_CLASSES, CARBON_PREFIX } from "../constants";
-import { isSafelisted, type SafelistEntry } from "./safelist";
+import { ALWAYS_ON_CLASSES } from "../constants";
+import type { SafelistEntry } from "./safelist";
 import {
   optimizeStrictAtRule,
   optimizeStrictRule,
@@ -52,9 +52,8 @@ export type OptimizeCssOptions = {
    * - a `RegExp`, tested against the whole selector. `/^\.bx--btn--/` keeps
    *   every `.bx--btn--*` variant
    *
-   * Matching selectors are kept in both default and `experimental.strict`
-   * modes. For ``class={`bx--btn--${x}`}``, a literal string entry is not
-   * enough. Use a `RegExp` entry or the `content` option.
+   * For ``class={`bx--btn--${x}`}``, a literal string entry is not enough.
+   * Use a `RegExp` entry or the `content` option.
    *
    * @example
    * safelist: [".bx--grid", ".bx--aspect-ratio", /^\.bx--btn--/]
@@ -73,27 +72,6 @@ export type OptimizeCssOptions = {
   content?: string[];
 
   experimental?: {
-    /**
-     * Enables stricter CSS tree-shaking. Compared to the default baseline,
-     * this can drastically reduce output size depending on which Carbon
-     * components you import — especially for small bundles that only use a
-     * handful of components.
-     *
-     * Improvements over the default matcher:
-     * - Prunes individual selectors from comma-separated lists instead of
-     *   keeping the entire rule when any selector matches
-     * - Requires every Carbon class in a multi-class selector to match the
-     *   allowlist (descendants and same-element compounds), so importing
-     *   NumberInput no longer pulls in `.bx--modal .bx--number` context rules
-     *   and Button no longer pulls in Tabs skeleton styles via `.bx--skeleton`
-     * - Drops flatpickr and legacy single-hyphen `bx-` rules unless
-     *   DatePicker (or similar) is in the bundle
-     * - Uses parenthesis-aware selector parsing for `:is()` and similar
-     *
-     * @default false
-     */
-    strict?: boolean;
-
     /**
      * Build the component index from *this project's* installed
      * `carbon-components-svelte` instead of using the version bundled with
@@ -114,10 +92,6 @@ export type OptimizeCssOptions = {
 export function isSilent(options?: OptimizeCssOptions): boolean {
   if (options?.silent !== undefined) return options.silent;
   return options?.verbose === false;
-}
-
-function isStrict(options?: OptimizeCssOptions): boolean {
-  return options?.experimental?.strict === true;
 }
 
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
@@ -173,17 +147,6 @@ function buildUsage(
   return { allowlist, preserveFlatpickr };
 }
 
-function shouldKeepRule(selectors: string[], allowlist: Set<string>): boolean {
-  for (const name of selectors) {
-    if (allowlist.has(name)) return true;
-
-    for (const selector of allowlist) {
-      if (name.includes(selector)) return true;
-    }
-  }
-  return false;
-}
-
 /**
  * Creates the PostCSS plugin pipeline for CSS optimization.
  *
@@ -195,7 +158,6 @@ function createPostcssPlugins(
   allowlist: Set<string>,
   preserveAllIBMFonts: boolean,
   preserveFlatpickr: boolean,
-  strict: boolean,
   safelist: readonly SafelistEntry[],
   report: { removed: number },
 ): AcceptedPlugin[] {
@@ -203,40 +165,10 @@ function createPostcssPlugins(
     {
       postcssPlugin: "postcss-plugin:carbon:optimize-css",
       /**
-       * Rule visitor that removes CSS rules for unused Carbon components.
-       *
-       * Only processes selectors containing the Carbon prefix (bx--) to avoid
-       * accidentally removing non-Carbon styles. For multi-selector rules
-       * (e.g., ".bx--btn, .bx--link"), each selector is checked individually.
+       * Rule visitor that removes CSS rules (or individual selectors from a
+       * comma-separated list) for unused Carbon components.
        */
       Rule(node) {
-        if (!strict) {
-          const selector = node.selector;
-
-          if (CARBON_PREFIX.test(selector)) {
-            if (
-              safelist.length > 0 &&
-              selector
-                .split(",")
-                .some((selectee) => isSafelisted(selectee.trim(), safelist))
-            ) {
-              return;
-            }
-
-            const selectors = selector.split(",").filter((selectee) => {
-              const value = selectee.trim() ?? "";
-              const [, rest] = value.split(".");
-              return Boolean(rest);
-            });
-
-            if (!shouldKeepRule(selectors, allowlist)) {
-              node.remove();
-              report.removed++;
-            }
-          }
-          return;
-        }
-
         report.removed += optimizeStrictRule(node, {
           allowlist,
           preserveFlatpickr,
@@ -244,7 +176,8 @@ function createPostcssPlugins(
         });
       },
       /**
-       * AtRule visitor that removes unused IBM Plex @font-face declarations.
+       * AtRule visitor that removes unused flatpickr `@keyframes` and IBM
+       * Plex `@font-face` declarations.
        *
        * Carbon's pre-compiled CSS includes @font-face rules for all IBM Plex
        * variants (weights, styles, languages), but most apps only need a subset.
@@ -253,10 +186,8 @@ function createPostcssPlugins(
        * - IBM Plex Mono: weight 400 in normal style (for code snippets)
        */
       AtRule(node) {
-        if (strict) {
-          report.removed += optimizeStrictAtRule(node, { preserveFlatpickr });
-          if (!node.parent) return;
-        }
+        report.removed += optimizeStrictAtRule(node, { preserveFlatpickr });
+        if (!node.parent) return;
 
         if (!preserveAllIBMFonts && node.name === "font-face") {
           const attributes = {
@@ -316,7 +247,6 @@ export function optimizeCssWithReport(
 ): OptimizedCssReport {
   const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const strict = isStrict(options);
   const safelist = options.safelist ?? [];
   const { allowlist, preserveFlatpickr } = buildUsage(
     ids,
@@ -329,7 +259,6 @@ export function optimizeCssWithReport(
       allowlist,
       preserveAllIBMFonts,
       preserveFlatpickr,
-      strict,
       safelist,
       report,
     ),
@@ -343,7 +272,6 @@ export async function optimizeCssWithReportAsync(
 ): Promise<OptimizedCssReport> {
   const { source, ids } = options;
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const strict = isStrict(options);
   const safelist = options.safelist ?? [];
   const { allowlist, preserveFlatpickr } = buildUsage(
     ids,
@@ -356,7 +284,6 @@ export async function optimizeCssWithReportAsync(
       allowlist,
       preserveAllIBMFonts,
       preserveFlatpickr,
-      strict,
       safelist,
       report,
     ),

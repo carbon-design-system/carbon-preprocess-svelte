@@ -2,7 +2,6 @@
   "ids": [
     "OverflowMenu"
   ],
-  "strict": true,
   "before_bytes": 772119,
   "after_bytes": 25724,
   "reduction_percent": 96.67,

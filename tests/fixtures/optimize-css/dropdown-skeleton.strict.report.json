@@ -3,7 +3,6 @@
     "Dropdown",
     "DropdownSkeleton"
   ],
-  "strict": true,
   "before_bytes": 772119,
   "after_bytes": 57955,
   "reduction_percent": 92.49,

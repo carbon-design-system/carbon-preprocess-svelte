@@ -3,7 +3,6 @@
     "Select",
     "Pagination"
   ],
-  "strict": true,
   "before_bytes": 772119,
   "after_bytes": 118424,
   "reduction_percent": 84.66,
