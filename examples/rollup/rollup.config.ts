@@ -25,6 +25,6 @@ export default {
     commonjs(),
     css({ output: "bundle.css" }),
     production && terser(),
-    production && optimizeCss({ experimental: { strict: true } }),
+    production && optimizeCss(),
   ],
 };

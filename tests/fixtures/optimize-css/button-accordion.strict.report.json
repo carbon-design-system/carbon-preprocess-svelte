@@ -3,7 +3,6 @@
     "Button",
     "Accordion"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 80800,
   "reduction_percent": 88.64,

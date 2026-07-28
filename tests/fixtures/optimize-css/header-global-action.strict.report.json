@@ -2,7 +2,6 @@
   "ids": [
     "HeaderGlobalAction"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 77662,
   "reduction_percent": 89.08,

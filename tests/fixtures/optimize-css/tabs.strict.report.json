@@ -2,7 +2,6 @@
   "ids": [
     "Tabs"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 19077,
   "reduction_percent": 97.32,

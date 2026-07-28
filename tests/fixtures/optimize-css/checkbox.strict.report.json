@@ -2,7 +2,6 @@
   "ids": [
     "Checkbox"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 23736,
   "reduction_percent": 96.66,

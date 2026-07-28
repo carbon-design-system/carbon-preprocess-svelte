@@ -3,7 +3,6 @@
     "TextInput",
     "FluidForm"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 32653,
   "reduction_percent": 95.41,

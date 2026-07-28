@@ -2,7 +2,6 @@
   "ids": [
     "Select"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 38493,
   "reduction_percent": 94.59,

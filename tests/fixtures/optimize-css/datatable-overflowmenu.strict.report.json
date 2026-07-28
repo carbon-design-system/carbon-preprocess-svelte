@@ -4,7 +4,6 @@
     "OverflowMenu",
     "Link"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 61942,
   "reduction_percent": 91.29,

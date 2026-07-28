@@ -4,7 +4,6 @@
     "Tab",
     "TabContent"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 49205,
   "reduction_percent": 93.08,

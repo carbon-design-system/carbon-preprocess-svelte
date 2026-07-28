@@ -2,7 +2,6 @@
   "ids": [
     "ComboBox"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 54008,
   "reduction_percent": 92.41,
