@@ -192,7 +192,7 @@ export async function buildComponentIndex(options?: {
   }
 
   const cssStart = performance.now();
-  const carbon_css = await readFile(resolveCarbonCssPath(), "utf8");
+  const carbon_css = await readFile(resolveCarbonCssPath(carbon_path), "utf8");
   const { context: css_context, orphans: css_orphans } =
     extractCssIndexAdditions({
       componentClasses: markup_only_classes,

@@ -1,5 +1,8 @@
 import { optimizeImports } from "carbon-preprocess-svelte";
+import { getComponents, setComponents } from "carbon-preprocess-svelte/component-index-registry";
+import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
 import type { Preprocessor, Processed } from "svelte/compiler";
+import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
 const preprocess = (options?: Partial<Parameters<Preprocessor>[0]>) => {
   return (
@@ -72,14 +75,12 @@ import filterTreeByText from "carbon-components-svelte/src/utils/filterTreeNodes
 import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";`);
   });
 
-  test("invalid imports should be optimistic", () => {
+  test("un-indexed PascalCase name fails open and is left on the barrel", () => {
     expect(
       preprocess({
         content: "import { NonExistent } from 'carbon-components-svelte'",
       }),
-    ).toEqual(
-      'import NonExistent from "carbon-components-svelte/src/NonExistent/NonExistent.svelte";',
-    );
+    ).toEqual("import { NonExistent } from 'carbon-components-svelte'");
   });
 
   test("un-indexed camelCase utility is left untouched", () => {
@@ -226,6 +227,27 @@ import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedL
 import ContainedListItem from "carbon-components-svelte/src/ContainedList/ContainedListItem.svelte";
 import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";
 import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
-import NewComponent from "carbon-components-svelte/src/NewComponent/NewComponent.svelte";`);
+import { NewComponent } from "carbon-components-svelte";`);
+  });
+
+  test("fails open against a real old-version index (0.85.0), not just a made-up name", async () => {
+    const carbonRoot = resolvePackageRoot("carbon-components-svelte-old");
+    const oldIndex = await buildComponentIndex({ carbonRoot });
+    const currentComponents = getComponents();
+
+    try {
+      setComponents(oldIndex);
+
+      expect(
+        // ContainedList was added to carbon-components-svelte after
+        // 0.85.0, so a real old install's index genuinely lacks it.
+        preprocess({
+          content: `import { Accordion, ContainedList } from "carbon-components-svelte";`,
+        }),
+      ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+import { ContainedList } from "carbon-components-svelte";`);
+    } finally {
+      setComponents(currentComponents);
+    }
   });
 });

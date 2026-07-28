@@ -25,8 +25,11 @@ export const LAYOUT_ANCESTOR_DENYLIST = new Set([
   ".bx--toast-notification",
 ]);
 
-export function resolveCarbonCssPath(theme = "white"): string {
-  return join(resolveCarbonRoot(), "css", `${theme}.css`);
+export function resolveCarbonCssPath(
+  carbonRoot: string = resolveCarbonRoot(),
+  theme = "white",
+): string {
+  return join(carbonRoot, "css", `${theme}.css`);
 }
 
 function walkCarbonRules(
