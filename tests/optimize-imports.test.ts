@@ -78,12 +78,14 @@ import filterTreeByText from "carbon-components-svelte/src/utils/filterTreeNodes
 import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";`);
   });
 
-  test("un-indexed PascalCase name fails open and is left on the barrel", () => {
+  test("invalid imports should be optimistic", () => {
     expect(
       preprocess({
         content: "import { NonExistent } from 'carbon-components-svelte'",
       }),
-    ).toEqual("import { NonExistent } from 'carbon-components-svelte'");
+    ).toEqual(
+      'import NonExistent from "carbon-components-svelte/src/NonExistent/NonExistent.svelte";',
+    );
   });
 
   test("un-indexed camelCase utility is left untouched", () => {
@@ -230,10 +232,10 @@ import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedL
 import ContainedListItem from "carbon-components-svelte/src/ContainedList/ContainedListItem.svelte";
 import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";
 import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
-import { NewComponent } from "carbon-components-svelte";`);
+import NewComponent from "carbon-components-svelte/src/NewComponent/NewComponent.svelte";`);
   });
 
-  test("fails open against a real old-version index (0.85.0), not just a made-up name", async () => {
+  test("optimistic guess resolves correctly against a real old-version index (0.85.0), not just a made-up name", async () => {
     const carbonRoot = resolvePackageRoot("carbon-components-svelte-old");
     const oldIndex = await buildComponentIndex({ carbonRoot });
     const currentComponents = getComponents();
@@ -242,13 +244,14 @@ import { NewComponent } from "carbon-components-svelte";`);
       setComponents(oldIndex);
 
       expect(
-        // ContainedList was added to carbon-components-svelte after
-        // 0.85.0, so a real old install's index genuinely lacks it.
+        // ContainedList was added to carbon-components-svelte after 0.85.0,
+        // so a real old install's index genuinely lacks it -- the guessed
+        // path still has to land on the component's real location (#97).
         preprocess({
           content: `import { Accordion, ContainedList } from "carbon-components-svelte";`,
         }),
       ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
-import { ContainedList } from "carbon-components-svelte";`);
+import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedList.svelte";`);
     } finally {
       setComponents(currentComponents);
     }

@@ -111,7 +111,7 @@ Set `DEBUG_INDEX=1` to print per-stage timings.
 
 - **Fast path.** Bail immediately on `node_modules` files and on any file whose raw source does not contain the substring `"carbon-"`. That skips the parse for almost every file. Do not remove this when changing the module.
 - The Svelte compiler's `parse()` wants a whole component, so the raw script is wrapped in `<script lang="ts">…</script>`, parsed, walked for `ImportDeclaration`s, rewritten with `MagicString`, then the wrapper tags are stripped back off.
-- Carbon component names resolve through the index `path`. Names missing from the index fail open and stay on the barrel import unrewritten — we never guess a `.svelte` path that might not exist. Icons and pictograms map to `lib/Name.svelte`.
+- Carbon component names resolve through the index `path`. Names missing from the index get an _optimistic_ `src/Name/Name.svelte` path **only if PascalCase**. camelCase utilities stay on the barrel so we never point at a `.svelte` file that is not there. Icons and pictograms map to `lib/Name.svelte`.
 - **Type imports stay on the barrel.** `import type { … }` statements are left alone. In `import { type X, Y }`, `X` stays on the barrel and only `Y` is rewritten. Recent fixes ([#138](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/138), [#133](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/133)) live here. Add a fixture in [`tests/optimize-imports.test.ts`](tests/optimize-imports.test.ts) for any import-shape change.
 
 ### `optimizeCss` (Vite/Rollup) and `OptimizeCssPlugin` (Webpack)

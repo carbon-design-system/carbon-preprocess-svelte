@@ -8,6 +8,7 @@ import { CarbonSvelte } from "../constants";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 
 const NODE_MODULES_REGEX = /node_modules/;
+const COMPONENT_NAME_REGEX = /^[A-Z]/;
 const SCRIPT_OPEN_TAG_REGEX = /^<script lang="ts">/;
 const SCRIPT_CLOSE_TAG_REGEX = /<\/script>$/;
 
@@ -71,8 +72,9 @@ function rewriteImport(
  *   import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
  * ```
  *
- * Names missing from the component index fail open: they stay on the
- * barrel import unrewritten, rather than guessing a path that may not exist.
+ * Names missing from the component index: PascalCase gets an optimistic
+ * `src/Name/Name.svelte` path; camelCase stays on the barrel so utilities
+ * don't point at a `.svelte` file that isn't there.
  */
 export type OptimizeImportsOptions = {
   experimental?: {
@@ -107,11 +109,19 @@ function transformScript(raw: string, filename: string) {
         switch (import_name) {
           case CarbonSvelte.Components:
             rewriteImport(s, node, ({ imported, local }) => {
-              // Not in index: fail open, leave unrewritten on the barrel
-              // rather than guessing a path that may not exist.
+              // Prefer indexed path (handles .js and other special cases).
               const import_path = components[imported.name]?.path;
               if (import_path) {
                 return `import ${local.name} from "${import_path}";`;
+              }
+
+              // Not in index: PascalCase gets an optimistic component path;
+              // camelCase stays on the barrel (utility, not a .svelte file).
+              const looks_like_component = COMPONENT_NAME_REGEX.test(
+                imported.name,
+              );
+              if (looks_like_component) {
+                return `import ${local.name} from "${import_name}/src/${imported.name}/${imported.name}.svelte";`;
               }
 
               return "";
