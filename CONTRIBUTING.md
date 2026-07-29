@@ -103,6 +103,8 @@ Set `DEBUG_INDEX=1` to print per-stage timings.
 
 `src/indexer/list-files.ts` (a Node-native recursive walker) is `buildComponentIndex`'s default `listFiles`, used by the live-index path since it can't depend on Bun. It sorts its result for determinism across filesystems, but that order still differs from Bun's `Glob` scan order — harmless for a live index (correctness doesn't depend on it, now that step 4 above is order-independent), but it's why the CLI script injects its own Bun-based lister instead of relying on the default.
 
+`buildComponentIndex()` accepts an explicit `carbonRoot`, which [`tests/build-index-version-compat.test.ts`](tests/build-index-version-compat.test.ts) uses to run the real indexer against a real, `npm:`-aliased pin of an older `carbon-components-svelte` release (`carbon-components-svelte-old` in `devDependencies`) instead of the one bundled devDependency — proving backward-compat behavior against actual package contents rather than a hand-written fake. This is also why `resolveCarbonCssPath()` takes `carbonRoot` as a parameter instead of re-resolving it internally: it used to call `resolveCarbonRoot()` on its own, silently ignoring whatever root `buildComponentIndex()` was given and always reading the real installed package's CSS — harmless when there's only one real install, but it meant an injected `carbonRoot` (a test fixture, an old-version pin) never actually took effect for the CSS-derived half of the index.
+
 ### `optimizeImports`
 
 [`src/preprocessors/optimize-imports.ts`](src/preprocessors/optimize-imports.ts) is a Svelte `script` preprocessor. Per file:

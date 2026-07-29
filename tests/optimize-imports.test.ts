@@ -1,5 +1,11 @@
 import { optimizeImports } from "carbon-preprocess-svelte";
+import {
+  getComponents,
+  setComponents,
+} from "carbon-preprocess-svelte/component-index-registry";
+import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
 import type { Preprocessor, Processed } from "svelte/compiler";
+import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
 const preprocess = (options?: Partial<Parameters<Preprocessor>[0]>) => {
   return (
@@ -227,5 +233,27 @@ import ContainedListItem from "carbon-components-svelte/src/ContainedList/Contai
 import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";
 import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
 import NewComponent from "carbon-components-svelte/src/NewComponent/NewComponent.svelte";`);
+  });
+
+  test("optimistic guess resolves correctly against a real old-version index (0.85.0), not just a made-up name", async () => {
+    const carbonRoot = resolvePackageRoot("carbon-components-svelte-old");
+    const oldIndex = await buildComponentIndex({ carbonRoot });
+    const currentComponents = getComponents();
+
+    try {
+      setComponents(oldIndex);
+
+      expect(
+        // ContainedList was added to carbon-components-svelte after 0.85.0,
+        // so a real old install's index genuinely lacks it -- the guessed
+        // path still has to land on the component's real location (#97).
+        preprocess({
+          content: `import { Accordion, ContainedList } from "carbon-components-svelte";`,
+        }),
+      ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedList.svelte";`);
+    } finally {
+      setComponents(currentComponents);
+    }
   });
 });
