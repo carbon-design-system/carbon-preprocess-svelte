@@ -26,16 +26,14 @@ Review the .report.json diff. Carbon ships minified CSS; the test pretty-prints 
 Each scenario also validates against src/component-index.ts, the same component-to-class map the plugin uses:
 
 - No over-prune: if a source selector would survive strict pruning, its Carbon classes must still appear in the output.
-- No foreign survivor (strict only): no kept selector should fail strict allowlist matching (subject classes must match; context ancestors may be exempt).
+- No foreign survivor: no kept selector should fail strict allowlist matching (subject classes must match; context ancestors may be exempt).
 - Multi-class strict pruning: same-element compounds require every class to match. Descendant selectors require every subject class to match; ancestor classes must match unless listed in `CONTEXT_ANCESTORS`. Classes inside `:not(...)` are exclusions and are not required.
 
-Compare button.default and button.strict for the strict-mode delta. Strict scenarios target `leaked_count: 0`.
+All scenarios target `leaked_count: 0`.
 
 ## How to read leaked_classes
 
-Non-zero `leaked_count` in strict scenarios is not a test failure when it occurs, but all strict fixtures currently target zero. Residual leaks usually come from single-class selectors where BEM prefix matching is broader than carbon-components-svelte markup (for example size tokens the library never renders).
-
-Compare button.default (`leaked_count: 112`) with button.strict (`leaked_count: 0`) for the default-vs-strict gap. Default mode keeps whole comma-list rules when any branch matches.
+Non-zero `leaked_count` is not a test failure when it occurs, but all fixtures currently target zero. Residual leaks usually come from single-class selectors where BEM prefix matching is broader than carbon-components-svelte markup (for example size tokens the library never renders).
 
 `src/indexer/build-index.ts` (invoked by `scripts/index-components.ts`) automates most context classes: import-graph `classList` tracing, slot-wrapper detection, gated Carbon CSS cross-reference, and CSS-orphan SVG classes. `MANUAL_OVERRIDES` is the fallback when automation misses on a Carbon bump.
 
@@ -48,7 +46,6 @@ Bundle pairs that stay strict (import both components): Select + Pagination for 
 | Scenario | ids | Tier | Exercises |
 | --- | --- | --- | --- |
 | button.strict | Button | gold | BEM prefix (.bx--btn--), single component |
-| button.default | Button | default | Non-strict leak delta vs button.strict |
 | button-accordion.strict | Button, Accordion | bundle | Multi-import, zero overlap |
 | datepicker.strict | DatePicker, DatePickerInput | bundle | Flatpickr preservation |
 | modal.strict | Modal | gold | Runtime body class, foreign descendant drop |
@@ -82,12 +79,6 @@ Bundle pairs that stay strict (import both components): Select + Pagination for 
 | datatable-overflowmenu.strict | DataTable, OverflowMenu, Link | Table row actions |
 | fileuploader-bundle.strict | FileUploader, FileUploaderButton, FileUploaderItem | File upload bundle |
 | inline-notification.strict | InlineNotification | Notification namespace |
-
-### Default-mode delta
-
-| Scenario | ids | Exercises |
-| --- | --- | --- |
-| button.default | Button | Non-strict leak delta vs button.strict |
 
 ### Multi-import bundles
 

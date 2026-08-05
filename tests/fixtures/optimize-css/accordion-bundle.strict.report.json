@@ -3,7 +3,6 @@
     "Accordion",
     "AccordionItem"
   ],
-  "strict": true,
   "before_bytes": 772119,
   "after_bytes": 21069,
   "reduction_percent": 97.27,

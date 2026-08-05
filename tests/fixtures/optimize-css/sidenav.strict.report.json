@@ -2,7 +2,6 @@
   "ids": [
     "SideNav"
   ],
-  "strict": true,
   "before_bytes": 772119,
   "after_bytes": 18419,
   "reduction_percent": 97.61,
