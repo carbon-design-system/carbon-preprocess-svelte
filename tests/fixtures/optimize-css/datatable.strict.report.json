@@ -3,10 +3,10 @@
     "DataTable"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 54497,
-  "reduction_percent": 92.94,
-  "kept_rules": 358,
+  "before_bytes": 721836,
+  "after_bytes": 51797,
+  "reduction_percent": 92.82,
+  "kept_rules": 357,
   "leaked_count": 0,
   "leaked_classes": []
 }

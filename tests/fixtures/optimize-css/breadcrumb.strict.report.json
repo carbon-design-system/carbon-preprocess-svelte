@@ -3,10 +3,10 @@
     "Breadcrumb"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 19697,
-  "reduction_percent": 97.45,
-  "kept_rules": 119,
+  "before_bytes": 721836,
+  "after_bytes": 19080,
+  "reduction_percent": 97.36,
+  "kept_rules": 114,
   "leaked_count": 0,
   "leaked_classes": []
 }

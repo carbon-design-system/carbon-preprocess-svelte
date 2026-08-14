@@ -5,10 +5,10 @@
     "Link"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 67174,
-  "reduction_percent": 91.3,
-  "kept_rules": 475,
+  "before_bytes": 721836,
+  "after_bytes": 63284,
+  "reduction_percent": 91.23,
+  "kept_rules": 463,
   "leaked_count": 0,
   "leaked_classes": []
 }

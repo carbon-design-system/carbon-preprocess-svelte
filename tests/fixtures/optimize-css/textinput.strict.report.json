@@ -3,10 +3,10 @@
     "TextInput"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 30608,
-  "reduction_percent": 96.04,
-  "kept_rules": 195,
+  "before_bytes": 721836,
+  "after_bytes": 29627,
+  "reduction_percent": 95.9,
+  "kept_rules": 187,
   "leaked_count": 0,
   "leaked_classes": []
 }
