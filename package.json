@@ -40,9 +40,9 @@
     "magic-string": "^0.30.17",
     "postcss": "^8.5.15",
     "postcss-discard-empty": "^8.0.0",
-    "svelte": "^5.56.2",
-    "vite": "^8.0.16",
-    "webpack": "^5.107.2"
+    "svelte": "^5.56.9",
+    "vite": "^8.2.1",
+    "webpack": "^5.109.2"
   },
   "repository": {
     "type": "git",
