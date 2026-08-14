@@ -5,10 +5,10 @@
     "FileUploaderItem"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 85684,
-  "reduction_percent": 88.9,
-  "kept_rules": 508,
+  "before_bytes": 721836,
+  "after_bytes": 76769,
+  "reduction_percent": 89.36,
+  "kept_rules": 464,
   "leaked_count": 0,
   "leaked_classes": []
 }

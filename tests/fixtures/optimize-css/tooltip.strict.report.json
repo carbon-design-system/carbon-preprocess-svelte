@@ -3,10 +3,10 @@
     "Tooltip"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 61677,
-  "reduction_percent": 92.01,
-  "kept_rules": 394,
+  "before_bytes": 721836,
+  "after_bytes": 50699,
+  "reduction_percent": 92.98,
+  "kept_rules": 313,
   "leaked_count": 0,
   "leaked_classes": []
 }

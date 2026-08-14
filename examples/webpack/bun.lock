@@ -206,7 +206,7 @@
 
     "caniuse-lite": ["caniuse-lite@1.0.30001760", "", {}, "sha512-7AAMPcueWELt1p3mi13HR/LHH0TJLT11cnwDJEs3xA4+CK/PLKeO9Kl1oru24htkyUKtkGCvAx4ohB0Ttry8Dw=="],
 
-    "carbon-components-svelte": ["carbon-components-svelte@0.110.1", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-sxMKbNPMT1y10JT99BbxjdJGEpXE4Na8rIbMoRW9RDiYU25ptgdzTVp6RwAk6CWfu9e8cRsKYiVDkFjTXNPliw=="],
+    "carbon-components-svelte": ["carbon-components-svelte@0.111.0", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-RDIngEsvNWT2CFJyDS4Kg7X8COXd/0PQn6o767wLi2Njrd77NgI94BFhM7Yk1abwM5FcvPy9WWPfwX5wXCY6kw=="],
 
     "carbon-preprocess-svelte": ["carbon-preprocess-svelte@link:carbon-preprocess-svelte", {}],
 

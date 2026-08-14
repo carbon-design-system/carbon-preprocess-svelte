@@ -86,7 +86,7 @@
 
     "axobject-query": ["axobject-query@4.1.0", "", {}, "sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ=="],
 
-    "carbon-components-svelte": ["carbon-components-svelte@0.110.1", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-sxMKbNPMT1y10JT99BbxjdJGEpXE4Na8rIbMoRW9RDiYU25ptgdzTVp6RwAk6CWfu9e8cRsKYiVDkFjTXNPliw=="],
+    "carbon-components-svelte": ["carbon-components-svelte@0.111.0", "", { "dependencies": { "@ibm/telemetry-js": "^1.5.0", "flatpickr": "4.6.9" } }, "sha512-RDIngEsvNWT2CFJyDS4Kg7X8COXd/0PQn6o767wLi2Njrd77NgI94BFhM7Yk1abwM5FcvPy9WWPfwX5wXCY6kw=="],
 
     "carbon-preprocess-svelte": ["carbon-preprocess-svelte@link:carbon-preprocess-svelte", {}],
 

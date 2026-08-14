@@ -3,10 +3,10 @@
     "Search"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 33627,
-  "reduction_percent": 95.64,
-  "kept_rules": 222,
+  "before_bytes": 721836,
+  "after_bytes": 31653,
+  "reduction_percent": 95.61,
+  "kept_rules": 203,
   "leaked_count": 0,
   "leaked_classes": []
 }

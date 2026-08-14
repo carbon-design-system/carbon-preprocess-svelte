@@ -3,10 +3,10 @@
     "Header"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 19068,
-  "reduction_percent": 97.53,
-  "kept_rules": 108,
+  "before_bytes": 721836,
+  "after_bytes": 18976,
+  "reduction_percent": 97.37,
+  "kept_rules": 107,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -5,10 +5,10 @@
     "ToolbarSearch"
   ],
   "strict": true,
-  "before_bytes": 772119,
-  "after_bytes": 82571,
-  "reduction_percent": 89.31,
-  "kept_rules": 555,
+  "before_bytes": 721836,
+  "after_bytes": 78059,
+  "reduction_percent": 89.19,
+  "kept_rules": 538,
   "leaked_count": 0,
   "leaked_classes": []
 }
