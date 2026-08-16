@@ -1,5 +1,4 @@
 import type { ImportDeclaration } from "estree-walker";
-import { walk } from "estree-walker";
 import MagicString from "magic-string";
 import { parse } from "svelte/compiler";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
@@ -101,49 +100,51 @@ function transformScript(raw: string, filename: string) {
   const content = `<script lang="ts">${raw}</script>`;
   const s = new MagicString(content);
 
-  walk(parse(content), {
-    enter(node) {
-      if (node.type === "ImportDeclaration") {
-        const import_name = node.source.value;
+  // Import statements are always top-level, so scanning the script's own
+  // body is equivalent to (and cheaper than) a recursive AST walk.
+  const body: ImportDeclaration[] = parse(content).instance?.content.body ?? [];
 
-        switch (import_name) {
-          case CarbonSvelte.Components:
-            rewriteImport(s, node, ({ imported, local }) => {
-              // Prefer indexed path (handles .js and other special cases).
-              const import_path = components[imported.name]?.path;
-              if (import_path) {
-                return `import ${local.name} from "${import_path}";`;
-              }
+  for (const node of body) {
+    if (node.type !== "ImportDeclaration") continue;
 
-              // Not in index: PascalCase gets an optimistic component path;
-              // camelCase stays on the barrel (utility, not a .svelte file).
-              const looks_like_component = COMPONENT_NAME_REGEX.test(
-                imported.name,
-              );
-              if (looks_like_component) {
-                return `import ${local.name} from "${import_name}/src/${imported.name}/${imported.name}.svelte";`;
-              }
+    const import_name = node.source.value;
 
-              return "";
-            });
-            break;
+    switch (import_name) {
+      case CarbonSvelte.Components:
+        rewriteImport(s, node, ({ imported, local }) => {
+          // Prefer indexed path (handles .js and other special cases).
+          const import_path = components[imported.name]?.path;
+          if (import_path) {
+            return `import ${local.name} from "${import_path}";`;
+          }
 
-          case CarbonSvelte.Icons:
-          case CarbonSvelte.Pictograms:
-            rewriteImport(s, node, ({ imported, local }) => {
-              return `import ${local.name} from "${import_name}/lib/${imported.name}.svelte";`;
-            });
-            break;
-        }
-      }
-    },
-  });
+          // Not in index: PascalCase gets an optimistic component path;
+          // camelCase stays on the barrel (utility, not a .svelte file).
+          const looks_like_component = COMPONENT_NAME_REGEX.test(imported.name);
+          if (looks_like_component) {
+            return `import ${local.name} from "${import_name}/src/${imported.name}/${imported.name}.svelte";`;
+          }
+
+          return "";
+        });
+        break;
+
+      case CarbonSvelte.Icons:
+      case CarbonSvelte.Pictograms:
+        rewriteImport(s, node, ({ imported, local }) => {
+          return `import ${local.name} from "${import_name}/lib/${imported.name}.svelte";`;
+        });
+        break;
+    }
+  }
 
   s.replace(SCRIPT_OPEN_TAG_REGEX, "").replace(SCRIPT_CLOSE_TAG_REGEX, "");
 
   return {
     code: s.toString(),
-    map: s.generateMap({ source: filename, hires: true }),
+    // Edits are whole-statement replacements, so boundary-level mapping
+    // (one segment per edit) is as accurate as char-level and much cheaper.
+    map: s.generateMap({ source: filename, hires: "boundary" }),
   };
 }
 
