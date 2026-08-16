@@ -74,17 +74,32 @@ function importCandidates(spec: string): string[] {
   ];
 }
 
+/**
+ * `existsSync` is a blocking syscall and the same `moduleKey` gets re-resolved
+ * repeatedly: once per BFS queue entry, again inside `ensureModuleLoaded`, and
+ * again from every component whose import graph reaches a shared module (e.g.
+ * a common utility). The filesystem doesn't change mid-build, so cache by
+ * input string across the whole `buildRuntimeClassMap` call.
+ */
 function resolveExistingModuleKey(
   carbonSrcPath: string,
   moduleKey: string,
+  cache: Map<string, string | null>,
 ): string | null {
+  const cached = cache.get(moduleKey);
+  if (cached !== undefined) return cached;
+
+  let resolved: string | null = null;
+
   for (const candidate of importCandidates(moduleKey)) {
     if (existsSync(path.join(carbonSrcPath, candidate))) {
-      return candidate;
+      resolved = candidate;
+      break;
     }
   }
 
-  return null;
+  cache.set(moduleKey, resolved);
+  return resolved;
 }
 
 /**
@@ -98,6 +113,7 @@ export async function buildRuntimeClassMap(
 ): Promise<Map<string, Set<string>>> {
   const { importsByModule, runtimeByModule } = cache;
   const reachableRuntime = new Map<string, Set<string>>();
+  const resolveCache = new Map<string, string | null>();
 
   const missingModules = new Set<string>();
 
@@ -106,7 +122,11 @@ export async function buildRuntimeClassMap(
       return;
     }
 
-    const resolvedKey = resolveExistingModuleKey(carbonSrcPath, moduleKey);
+    const resolvedKey = resolveExistingModuleKey(
+      carbonSrcPath,
+      moduleKey,
+      resolveCache,
+    );
 
     if (!resolvedKey) {
       missingModules.add(moduleKey);
@@ -151,7 +171,11 @@ export async function buildRuntimeClassMap(
         continue;
       }
 
-      const resolvedCurrent = resolveExistingModuleKey(carbonSrcPath, current);
+      const resolvedCurrent = resolveExistingModuleKey(
+        carbonSrcPath,
+        current,
+        resolveCache,
+      );
 
       if (!resolvedCurrent || visited.has(resolvedCurrent)) {
         continue;
