@@ -146,6 +146,7 @@ function buildUsage(
   contentClasses?: Iterable<string>,
 ): {
   allowlist: Set<string>;
+  allowlistPattern: RegExp | null;
   preserveFlatpickr: boolean;
 } {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
@@ -170,16 +171,39 @@ function buildUsage(
     allowlist.add(cls);
   }
 
-  return { allowlist, preserveFlatpickr };
+  return {
+    allowlist,
+    allowlistPattern: buildAllowlistPattern(allowlist),
+    preserveFlatpickr,
+  };
 }
 
-function shouldKeepRule(selectors: string[], allowlist: Set<string>): boolean {
+const REGEXP_SPECIAL_CHARS = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * A single alternation covering every allowlist entry, built once per
+ * optimize call. Replaces scanning the whole allowlist per selector with one
+ * compiled regex test, which is what `shouldKeepRule` needs: "does this
+ * selector name contain any allowlisted class as a substring".
+ */
+function buildAllowlistPattern(allowlist: Set<string>): RegExp | null {
+  if (allowlist.size === 0) return null;
+
+  const pattern = [...allowlist]
+    .map((selector) => selector.replace(REGEXP_SPECIAL_CHARS, "\\$&"))
+    .join("|");
+
+  return new RegExp(pattern);
+}
+
+function shouldKeepRule(
+  selectors: string[],
+  allowlist: Set<string>,
+  allowlistPattern: RegExp | null,
+): boolean {
   for (const name of selectors) {
     if (allowlist.has(name)) return true;
-
-    for (const selector of allowlist) {
-      if (name.includes(selector)) return true;
-    }
+    if (allowlistPattern?.test(name)) return true;
   }
   return false;
 }
@@ -193,6 +217,7 @@ function shouldKeepRule(selectors: string[], allowlist: Set<string>): boolean {
  */
 function createPostcssPlugins(
   allowlist: Set<string>,
+  allowlistPattern: RegExp | null,
   preserveAllIBMFonts: boolean,
   preserveFlatpickr: boolean,
   strict: boolean,
@@ -229,7 +254,7 @@ function createPostcssPlugins(
               return Boolean(rest);
             });
 
-            if (!shouldKeepRule(selectors, allowlist)) {
+            if (!shouldKeepRule(selectors, allowlist, allowlistPattern)) {
               node.remove();
               report.removed++;
             }
@@ -318,7 +343,7 @@ export function optimizeCssWithReport(
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const strict = isStrict(options);
   const safelist = options.safelist ?? [];
-  const { allowlist, preserveFlatpickr } = buildUsage(
+  const { allowlist, allowlistPattern, preserveFlatpickr } = buildUsage(
     ids,
     options.contentClasses,
   );
@@ -327,6 +352,7 @@ export function optimizeCssWithReport(
   const { css } = postcss(
     createPostcssPlugins(
       allowlist,
+      allowlistPattern,
       preserveAllIBMFonts,
       preserveFlatpickr,
       strict,
@@ -345,7 +371,7 @@ export async function optimizeCssWithReportAsync(
   const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
   const strict = isStrict(options);
   const safelist = options.safelist ?? [];
-  const { allowlist, preserveFlatpickr } = buildUsage(
+  const { allowlist, allowlistPattern, preserveFlatpickr } = buildUsage(
     ids,
     options.contentClasses,
   );
@@ -354,6 +380,7 @@ export async function optimizeCssWithReportAsync(
   const { css } = await postcss(
     createPostcssPlugins(
       allowlist,
+      allowlistPattern,
       preserveAllIBMFonts,
       preserveFlatpickr,
       strict,
