@@ -2,6 +2,7 @@ import { join } from "node:path";
 import postcss from "postcss";
 import {
   getCarbonClasses,
+  getCarbonClassesFromNormalized,
   splitSelectorList,
   splitSelectorParts,
 } from "./css-selector-utils";
@@ -153,59 +154,62 @@ export function extractCssIndexAdditions(
     for (const branch of splitSelectorList(selectorList)) {
       const parts = splitSelectorParts(branch);
 
-      if (parts) {
-        const ancestorClasses = parts.ancestors.flatMap((part) =>
-          getCarbonClasses(part),
-        );
-        const subjectClasses = getCarbonClasses(parts.subject);
+      // `parts.subject`/`parts.ancestors` are already `:not(...)`-stripped
+      // substrings of `branch` (see `splitSelectorParts`), so classes can be
+      // read straight off them without re-stripping/re-matching `branch`.
+      const ancestorClasses = parts
+        ? parts.ancestors.flatMap((part) =>
+            getCarbonClassesFromNormalized(part),
+          )
+        : [];
+      const subjectClasses = parts
+        ? getCarbonClassesFromNormalized(parts.subject)
+        : [];
 
-        if (ancestorClasses.length > 0 && subjectClasses.length > 0) {
-          for (const ancestor of ancestorClasses) {
-            if (LAYOUT_ANCESTOR_DENYLIST.has(ancestor)) {
+      if (parts && ancestorClasses.length > 0 && subjectClasses.length > 0) {
+        for (const ancestor of ancestorClasses) {
+          if (LAYOUT_ANCESTOR_DENYLIST.has(ancestor)) {
+            continue;
+          }
+
+          const ancestorOwners = classOwners.get(ancestor) ?? new Set<string>();
+
+          for (const subject of subjectClasses) {
+            const subjectOwners = classOwners.get(subject) ?? new Set<string>();
+
+            if (subjectOwners.size === 0 || ancestorOwners.size === 0) {
               continue;
             }
 
-            const ancestorOwners =
-              classOwners.get(ancestor) ?? new Set<string>();
+            if (!setsDisjoint(ancestorOwners, subjectOwners)) {
+              continue;
+            }
 
-            for (const subject of subjectClasses) {
-              const subjectOwners =
-                classOwners.get(subject) ?? new Set<string>();
+            const gated =
+              isSlotWrapperGate(
+                ancestor,
+                ancestorOwners,
+                slotWrapperComponents,
+                slotWrapperClasses,
+              ) ||
+              isSubComponentGate(ancestorOwners, subjectOwners, subComponents);
 
-              if (subjectOwners.size === 0 || ancestorOwners.size === 0) {
-                continue;
-              }
+            if (!gated) {
+              continue;
+            }
 
-              if (!setsDisjoint(ancestorOwners, subjectOwners)) {
-                continue;
-              }
-
-              const gated =
-                isSlotWrapperGate(
-                  ancestor,
-                  ancestorOwners,
-                  slotWrapperComponents,
-                  slotWrapperClasses,
-                ) ||
-                isSubComponentGate(
-                  ancestorOwners,
-                  subjectOwners,
-                  subComponents,
-                );
-
-              if (!gated) {
-                continue;
-              }
-
-              for (const component of subjectOwners) {
-                addClass(context, component, ancestor);
-              }
+            for (const component of subjectOwners) {
+              addClass(context, component, ancestor);
             }
           }
         }
       }
 
-      const classes = getCarbonClasses(branch);
+      // Reuse the parts above instead of re-deriving classes from `branch`;
+      // ancestors + subject cover the same set of Carbon classes.
+      const classes = parts
+        ? [...new Set([...ancestorClasses, ...subjectClasses])]
+        : getCarbonClasses(branch);
       const branchOrphans = classes.filter((cls) => !markupClasses.has(cls));
 
       if (branchOrphans.length === 0) {

@@ -1,6 +1,19 @@
 const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
 const LEGACY_CARBON_CLASS = /\.bx-(?!-)[A-Za-z0-9_-]+/g;
-const SELECTOR_COMBINATOR = /[\s>+~]/;
+// Matches `/[\s>+~]/`'s practical range for selector text: whitespace plus
+// the three combinator symbols. Checked per-character in a hot loop below,
+// so a Set lookup replaces a regex call.
+const COMBINATOR_CHARS = new Set([
+  " ",
+  "\t",
+  "\n",
+  "\r",
+  "\f",
+  "\v",
+  ">",
+  "+",
+  "~",
+]);
 
 /** Split on commas at parenthesis depth 0. */
 export function splitSelectorList(selector: string): string[] {
@@ -54,14 +67,18 @@ export function stripNotPseudoClasses(selector: string): string {
   return result;
 }
 
-export function getCarbonClasses(selector: string): string[] {
-  const normalized = stripNotPseudoClasses(selector);
+/** `normalized` must already be free of `:not(...)` subtrees. */
+export function getCarbonClassesFromNormalized(normalized: string): string[] {
   const classes = normalized.match(CARBON_CLASS) ?? [];
   const legacyClasses = (normalized.match(LEGACY_CARBON_CLASS) ?? []).map(
     (cls) => cls.replace(".bx-", ".bx--"),
   );
 
   return [...new Set([...classes, ...legacyClasses])];
+}
+
+export function getCarbonClasses(selector: string): string[] {
+  return getCarbonClassesFromNormalized(stripNotPseudoClasses(selector));
 }
 
 /** Split a selector branch into ancestor compounds and the subject compound. */
@@ -80,7 +97,7 @@ export function splitSelectorParts(
       depth++;
     } else if (char === ")") {
       depth = Math.max(0, depth - 1);
-    } else if (depth === 0 && SELECTOR_COMBINATOR.test(char)) {
+    } else if (depth === 0 && COMBINATOR_CHARS.has(char)) {
       if (current.trim()) {
         parts.push(current.trim());
       }
