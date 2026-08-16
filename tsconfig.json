@@ -17,5 +17,5 @@
     },
     "types": ["jest"]
   },
-  "include": ["scripts/**/*", "src/**/*", "tests/**/*"]
+  "include": ["bench/**/*", "scripts/**/*", "src/**/*", "tests/**/*"]
 }
