@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.40](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.40) - 2026-08-15
+
+**Performance**
+
+- `indexer`: cache resolved module paths in runtime-class graph (~10% faster runtime-class phase)
+- `indexer`: cut redundant selector work in CSS context extraction (~38% faster CSS-context phase)
+- `optimizeCss`: compile allowlist to a single regex in default mode (~5-15% faster)
+- `optimizeCss`: cut strict-mode selector matching overhead (~27% faster)
+- `optimizeImports`: scan top-level imports directly (~15-20% faster)
+
 ## [0.11.39](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.39) - 2026-08-14
 
 **Fixes**
