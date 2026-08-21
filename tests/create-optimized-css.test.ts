@@ -6,8 +6,6 @@ import {
 const BTN_VARIANT_RE = /^\.bx--btn--/;
 
 describe("create-optimized-css", () => {
-  const strict = { experimental: { strict: true } } as const;
-
   test("removes unused selectors", () => {
     const result = createOptimizedCss({
       source: `* { box-sizing: border-box }
@@ -166,28 +164,16 @@ button.bx--btn.bx--btn--primary { color: white }`,
 button.bx--btn.bx--btn--primary { color: white }`);
   });
 
-  test("preserves mixed selector lists by default", () => {
+  test("removes unused selectors from mixed selector lists", () => {
     const result = createOptimizedCss({
-      source: ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
-      ids: ["Button"],
-    });
-    expect(result).toEqual(
-      ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
-    );
-  });
-
-  test("removes unused selectors from mixed selector lists in strict mode", () => {
-    const result = createOptimizedCss({
-      ...strict,
       source: ".bx--btn, .bx--btn--primary, .bx--unused { color: white }",
       ids: ["Button"],
     });
     expect(result).toEqual(".bx--btn, .bx--btn--primary { color: white }");
   });
 
-  test("does not preserve unrelated component skeleton styles in strict mode", () => {
+  test("does not preserve unrelated component skeleton styles", () => {
     const result = createOptimizedCss({
-      ...strict,
       source: `.bx--btn.bx--skeleton { width: 9rem }
 .bx--tabs.bx--skeleton { cursor: default }
 .bx--tabs.bx--skeleton .bx--tabs__nav-link span:before { animation: skeleton 3s infinite }
@@ -200,10 +186,9 @@ button.bx--btn.bx--btn--primary { color: white }`);
 .bx--skeleton { position: relative }`);
   });
 
-  test("drops multi-class selectors with a foreign ancestor in strict mode", () => {
+  test("drops multi-class selectors with a foreign ancestor", () => {
     expect(
       createOptimizedCss({
-        ...strict,
         source: ".bx--modal .bx--number { width: 100% }",
         ids: ["NumberInput"],
       }),
@@ -211,7 +196,6 @@ button.bx--btn.bx--btn--primary { color: white }`);
 
     expect(
       createOptimizedCss({
-        ...strict,
         source: ".bx--form--fluid .bx--text-input__field-wrapper { margin: 0 }",
         ids: ["TextInput"],
       }),
@@ -219,16 +203,14 @@ button.bx--btn.bx--btn--primary { color: white }`);
 
     expect(
       createOptimizedCss({
-        ...strict,
         source: ".bx--body--with-modal-open .bx--tooltip { display: none }",
         ids: ["Modal"],
       }),
     ).toEqual("");
   });
 
-  test("does not require classes inside :not() in strict mode", () => {
+  test("does not require classes inside :not()", () => {
     const result = createOptimizedCss({
-      ...strict,
       source:
         ".bx--header__global button.bx--header__action:not(.bx--header-search-button):hover { color: inherit }",
       ids: ["HeaderGlobalAction"],
@@ -238,10 +220,9 @@ button.bx--btn.bx--btn--primary { color: white }`);
     );
   });
 
-  test("exempts context ancestors but drops foreign subjects in strict mode", () => {
+  test("exempts context ancestors but drops foreign subjects", () => {
     expect(
       createOptimizedCss({
-        ...strict,
         source: ".bx--body--with-modal-open .bx--tooltip { display: none }",
         ids: ["Modal"],
       }),
@@ -249,7 +230,6 @@ button.bx--btn.bx--btn--primary { color: white }`);
 
     expect(
       createOptimizedCss({
-        ...strict,
         source: ".bx--form--fluid .bx--text-input { margin: 0 }",
         ids: ["TextInput"],
       }),
@@ -258,7 +238,6 @@ button.bx--btn.bx--btn--primary { color: white }`);
 
   test("keeps descendant selectors when context ancestor is exempt", () => {
     const result = createOptimizedCss({
-      ...strict,
       source:
         ".bx--header__global button.bx--header__action { color: inherit }",
       ids: ["HeaderGlobalAction"],
@@ -268,9 +247,8 @@ button.bx--btn.bx--btn--primary { color: white }`);
     );
   });
 
-  test("keeps header global action button hover styles in strict mode", () => {
+  test("keeps header global action button hover styles", () => {
     const result = createOptimizedCss({
-      ...strict,
       source: `.bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button) { color: inherit }
 .bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button):hover { background-color: #e5e5e5 }`,
       ids: ["HeaderGlobalAction"],
@@ -281,9 +259,8 @@ button.bx--btn.bx--btn--primary { color: white }`);
 .bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button):hover { background-color: #e5e5e5 }`);
   });
 
-  test("keeps multi-class selectors when every class matches in strict mode", () => {
+  test("keeps multi-class selectors when every class matches", () => {
     const result = createOptimizedCss({
-      ...strict,
       source: `.bx--modal .bx--number { width: 100% }
 .bx--btn.bx--btn--primary { color: white }`,
       ids: ["Modal", "NumberInput", "Button"],
@@ -294,7 +271,6 @@ button.bx--btn.bx--btn--primary { color: white }`);
 
   test("preserves selectors for explicit skeleton components", () => {
     const result = createOptimizedCss({
-      ...strict,
       source: `.bx--skeleton__text { height: 1rem }
 .bx--skeleton__heading { height: 1.5rem }
 .bx--skeleton__placeholder { width: 100% }
@@ -307,23 +283,14 @@ button.bx--btn.bx--btn--primary { color: white }`);
 
   test("keeps non-Carbon selectors when pruning mixed selector lists", () => {
     const result = createOptimizedCss({
-      ...strict,
       source: "button, .bx--unused { color: red }",
       ids: ["Button"],
     });
     expect(result).toEqual("button { color: red }");
   });
 
-  test("preserves flatpickr selectors by default", () => {
-    const source = `.flatpickr-calendar { visibility: hidden }
-.numInputWrapper:hover { background-color: #353535 }`;
-
-    expect(createOptimizedCss({ source, ids: ["Button"] })).toEqual(source);
-  });
-
-  test("removes flatpickr selectors unless DatePicker is used in strict mode", () => {
+  test("removes flatpickr selectors unless DatePicker is used", () => {
     const result = createOptimizedCss({
-      ...strict,
       source: `@keyframes fpFadeInDown { from { opacity: 0 } to { opacity: 1 } }
 .flatpickr-calendar { visibility: hidden }
 .flatpickr-calendar.open, .flatpickr-calendar.inline { visibility: inherit }
@@ -337,7 +304,6 @@ button, .flatpickr-day.selected { color: red }`,
 
   test("preserves flatpickr selectors when DatePicker is used", () => {
     const result = createOptimizedCss({
-      ...strict,
       source: `@keyframes fpFadeInDown { from { opacity: 0 } to { opacity: 1 } }
 .flatpickr-calendar { visibility: hidden }
 .numInputWrapper:hover { background-color: #353535 }
@@ -357,13 +323,8 @@ button, .flatpickr-day.selected { color: red }`,
 .bx-slider-text-input::-webkit-outer-spin-button { display: none }
 .bx-slider-text-input::-webkit-inner-spin-button { display: none }`;
 
-    expect(createOptimizedCss({ source, ids: ["Button"] })).toEqual(source);
-    expect(createOptimizedCss({ ...strict, source, ids: ["Button"] })).toEqual(
-      "",
-    );
-    expect(createOptimizedCss({ ...strict, source, ids: ["Slider"] })).toEqual(
-      source,
-    );
+    expect(createOptimizedCss({ source, ids: ["Button"] })).toEqual("");
+    expect(createOptimizedCss({ source, ids: ["Slider"] })).toEqual(source);
   });
 
   test("ignores non-Carbon prefixed rules", () => {
@@ -379,9 +340,6 @@ button, .flatpickr-day.selected { color: red }`,
 
     test("prunes a hand-written bx--grid rule when not safelisted", () => {
       expect(createOptimizedCss({ source: grid, ids: ["Button"] })).toEqual("");
-      expect(
-        createOptimizedCss({ ...strict, source: grid, ids: ["Button"] }),
-      ).toEqual("");
     });
 
     test("keeps a safelisted bx--grid rule (string entry)", () => {
@@ -389,21 +347,12 @@ button, .flatpickr-day.selected { color: red }`,
       expect(
         createOptimizedCss({ source: grid, ids: ["Button"], safelist }),
       ).toEqual(grid);
-      expect(
-        createOptimizedCss({
-          ...strict,
-          source: grid,
-          ids: ["Button"],
-          safelist,
-        }),
-      ).toEqual(grid);
     });
 
     test("string entry matches a class token, not a prefix", () => {
       const source = ".bx--grid { display: grid }\n.bx--grid-narrow { gap: 0 }";
       expect(
         createOptimizedCss({
-          ...strict,
           source,
           ids: ["Button"],
           safelist: [".bx--grid"],
@@ -416,7 +365,6 @@ button, .flatpickr-day.selected { color: red }`,
         ".bx--btn--primary { color: white }\n.bx--btn--secondary { color: gray }";
       expect(
         createOptimizedCss({
-          ...strict,
           source,
           ids: ["Accordion"],
           safelist: [BTN_VARIANT_RE],
@@ -424,22 +372,10 @@ button, .flatpickr-day.selected { color: red }`,
       ).toEqual(source);
     });
 
-    test("keeps the whole rule in default mode when any selector matches", () => {
+    test("keeps only the matching selector in a comma list", () => {
       const source = ".bx--grid, .bx--unused { display: grid }";
       expect(
         createOptimizedCss({
-          source,
-          ids: ["Button"],
-          safelist: [".bx--grid"],
-        }),
-      ).toEqual(source);
-    });
-
-    test("keeps only the matching selector in strict mode", () => {
-      const source = ".bx--grid, .bx--unused { display: grid }";
-      expect(
-        createOptimizedCss({
-          ...strict,
           source,
           ids: ["Button"],
           safelist: [".bx--grid"],
@@ -447,11 +383,10 @@ button, .flatpickr-day.selected { color: red }`,
       ).toEqual(".bx--grid { display: grid }");
     });
 
-    test("keeps a safelisted flatpickr selector in strict mode", () => {
+    test("keeps a safelisted flatpickr selector", () => {
       const source = ".flatpickr-calendar { visibility: hidden }";
       expect(
         createOptimizedCss({
-          ...strict,
           source,
           ids: ["Button"],
           safelist: [".flatpickr-calendar"],
@@ -466,7 +401,6 @@ button, .flatpickr-day.selected { color: red }`,
       expect(createOptimizedCss({ source, ids: ["Accordion"] })).toEqual("");
       expect(
         createOptimizedCss({
-          ...strict,
           source,
           ids: ["Accordion"],
           contentClasses: [".bx--btn--"],
@@ -508,9 +442,8 @@ button, .flatpickr-day.selected { color: red }`,
       expect(removed).toBe(1);
     });
 
-    test("counts selectors pruned from a comma list in strict mode", () => {
+    test("counts selectors pruned from a comma list", () => {
       const { css, removed } = optimizeCssWithReport({
-        ...strict,
         source: ".bx--btn, .bx--accordion { color: white }",
         ids: ["Button"],
       });

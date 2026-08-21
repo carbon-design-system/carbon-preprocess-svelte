@@ -2,7 +2,6 @@
   "ids": [
     "TextInput"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 29627,
   "reduction_percent": 95.9,

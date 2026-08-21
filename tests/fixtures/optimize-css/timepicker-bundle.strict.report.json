@@ -3,7 +3,6 @@
     "TimePicker",
     "TimePickerSelect"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 51407,
   "reduction_percent": 92.88,

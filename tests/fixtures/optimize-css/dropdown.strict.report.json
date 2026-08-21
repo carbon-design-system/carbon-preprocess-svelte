@@ -2,7 +2,6 @@
   "ids": [
     "Dropdown"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 50263,
   "reduction_percent": 93.04,

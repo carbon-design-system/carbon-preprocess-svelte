@@ -2,7 +2,6 @@
   "ids": [
     "MultiSelect"
   ],
-  "strict": true,
   "before_bytes": 721836,
   "after_bytes": 73523,
   "reduction_percent": 89.81,
