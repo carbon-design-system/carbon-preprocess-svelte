@@ -3,10 +3,10 @@
     "Slider"
   ],
   "strict": true,
-  "before_bytes": 721836,
-  "after_bytes": 28388,
-  "reduction_percent": 96.07,
-  "kept_rules": 184,
+  "before_bytes": 711133,
+  "after_bytes": 28177,
+  "reduction_percent": 96.04,
+  "kept_rules": 181,
   "leaked_count": 0,
   "leaked_classes": []
 }

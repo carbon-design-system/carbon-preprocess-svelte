@@ -4,10 +4,10 @@
     "FluidForm"
   ],
   "strict": true,
-  "before_bytes": 721836,
-  "after_bytes": 31587,
-  "reduction_percent": 95.62,
-  "kept_rules": 204,
+  "before_bytes": 711133,
+  "after_bytes": 32653,
+  "reduction_percent": 95.41,
+  "kept_rules": 207,
   "leaked_count": 0,
   "leaked_classes": []
 }
