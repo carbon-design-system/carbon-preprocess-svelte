@@ -4,9 +4,9 @@
     "AccordionItem"
   ],
   "strict": true,
-  "before_bytes": 721836,
-  "after_bytes": 22111,
-  "reduction_percent": 96.94,
+  "before_bytes": 711133,
+  "after_bytes": 22017,
+  "reduction_percent": 96.9,
   "kept_rules": 135,
   "leaked_count": 0,
   "leaked_classes": []

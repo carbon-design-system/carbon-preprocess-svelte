@@ -4,10 +4,10 @@
     "Pagination"
   ],
   "strict": true,
-  "before_bytes": 721836,
-  "after_bytes": 106430,
-  "reduction_percent": 85.26,
-  "kept_rules": 653,
+  "before_bytes": 711133,
+  "after_bytes": 105233,
+  "reduction_percent": 85.2,
+  "kept_rules": 642,
   "leaked_count": 0,
   "leaked_classes": []
 }

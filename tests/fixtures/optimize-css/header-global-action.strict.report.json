@@ -3,10 +3,10 @@
     "HeaderGlobalAction"
   ],
   "strict": true,
-  "before_bytes": 721836,
-  "after_bytes": 78754,
-  "reduction_percent": 89.09,
-  "kept_rules": 451,
+  "before_bytes": 711133,
+  "after_bytes": 77662,
+  "reduction_percent": 89.08,
+  "kept_rules": 441,
   "leaked_count": 0,
   "leaked_classes": []
 }

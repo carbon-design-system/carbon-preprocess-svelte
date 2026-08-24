@@ -3,10 +3,10 @@
     "SideNav"
   ],
   "strict": true,
-  "before_bytes": 721836,
-  "after_bytes": 18401,
-  "reduction_percent": 97.45,
-  "kept_rules": 102,
+  "before_bytes": 711133,
+  "after_bytes": 17815,
+  "reduction_percent": 97.49,
+  "kept_rules": 96,
   "leaked_count": 0,
   "leaked_classes": []
 }
