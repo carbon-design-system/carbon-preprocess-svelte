@@ -24,20 +24,11 @@ for (const scenario of SCENARIOS) {
   group(scenario.name, () => {
     summary(() => {
       barplot(() => {
-        bench("default", () => {
+        bench("optimizeCssWithReport", () => {
           optimizeCssWithReport({
             source,
             ids: scenario.ids,
             silent: true,
-          });
-        });
-
-        bench("strict", () => {
-          optimizeCssWithReport({
-            source,
-            ids: scenario.ids,
-            silent: true,
-            experimental: { strict: true },
           });
         });
       });

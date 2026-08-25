@@ -4,7 +4,6 @@
     "Toolbar",
     "ToolbarSearch"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 77021,
   "reduction_percent": 89.17,

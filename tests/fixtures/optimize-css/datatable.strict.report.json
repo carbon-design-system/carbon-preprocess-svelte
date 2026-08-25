@@ -2,7 +2,6 @@
   "ids": [
     "DataTable"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 50352,
   "reduction_percent": 92.92,

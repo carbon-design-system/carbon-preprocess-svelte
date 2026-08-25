@@ -4,7 +4,6 @@
     "FileUploaderButton",
     "FileUploaderItem"
   ],
-  "strict": true,
   "before_bytes": 711133,
   "after_bytes": 75297,
   "reduction_percent": 89.41,

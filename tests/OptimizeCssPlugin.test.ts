@@ -75,13 +75,13 @@ describe("OptimizeCssPlugin", () => {
     const plugin = new OptimizeCssPlugin({
       silent: true,
       preserveAllIBMFonts: true,
-      experimental: { strict: true },
+      experimental: { liveIndex: true },
     });
     // @ts-expect-error – options is private
     expect(plugin.options).toEqual({
       silent: true,
       preserveAllIBMFonts: true,
-      experimental: { strict: true },
+      experimental: { liveIndex: true },
     });
   });
 
@@ -196,11 +196,8 @@ describe("OptimizeCssPlugin", () => {
     consoleSpy.mockRestore();
   });
 
-  test("passes experimental strict option to CSS optimization", async () => {
-    const plugin = new OptimizeCssPlugin({
-      silent: true,
-      experimental: { strict: true },
-    });
+  test("prunes legacy single-hyphen Carbon selectors by default", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
     const cssContent = `.bx--btn { color: blue }
 .bx-slider-text-input { appearance: textfield }`;
