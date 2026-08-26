@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { walk } from "estree-walker";
 import { parse } from "svelte/compiler";
+import { RE_EXT_SVELTE } from "../constants";
+import { isSvelteFile } from "../utils";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;
 const JS_EXT = /\.js$/;
-const SVELTE_EXT = /\.svelte$/;
 
 export function extractRuntimeClassesFromSource(code: string): string[] {
   const classes = new Set<string>();
@@ -19,13 +20,15 @@ export function extractRuntimeClassesFromSource(code: string): string[] {
   return [...classes];
 }
 
-function resolveRelativeImport(from: string, spec: string): string | null {
+export function resolveRelativeImport(
+  from: string,
+  spec: string,
+): string | null {
   if (!spec.startsWith(".")) {
     return null;
   }
 
-  const base = path.posix.dirname(from);
-  const joined = path.posix.normalize(path.posix.join(base, spec));
+  const joined = path.posix.join(path.posix.dirname(from), spec);
 
   if (joined.endsWith(".js") || joined.endsWith(".svelte")) {
     return joined;
@@ -70,7 +73,7 @@ function importCandidates(spec: string): string[] {
   return [
     spec,
     spec.replace(JS_EXT, ".svelte"),
-    spec.replace(SVELTE_EXT, ".js"),
+    spec.replace(RE_EXT_SVELTE, ".js"),
   ];
 }
 
@@ -114,7 +117,7 @@ export async function buildRuntimeClassMap(
   const { importsByModule, runtimeByModule } = cache;
   const reachableRuntime = new Map<string, Set<string>>();
   const resolveCache = new Map<string, string | null>();
-
+  const loadPromises = new Map<string, Promise<void>>();
   const missingModules = new Set<string>();
 
   async function ensureModuleLoaded(moduleKey: string): Promise<void> {
@@ -137,22 +140,30 @@ export async function buildRuntimeClassMap(
       return;
     }
 
-    const filePath = path.join(carbonSrcPath, resolvedKey);
-    const code = await readFile(filePath, "utf8");
-    const runtime = extractRuntimeClassesFromSource(code);
-
-    if (runtime.length > 0) {
-      runtimeByModule.set(resolvedKey, new Set(runtime));
+    const pending = loadPromises.get(resolvedKey);
+    if (pending) {
+      await pending;
+      return;
     }
 
-    importsByModule.set(
+    loadPromises.set(
       resolvedKey,
-      collectImportsFromCode(
-        code,
-        resolvedKey,
-        resolvedKey.endsWith(".svelte"),
-      ),
+      (async () => {
+        const filePath = path.join(carbonSrcPath, resolvedKey);
+        const code = await readFile(filePath, "utf8");
+        const runtime = extractRuntimeClassesFromSource(code);
+
+        if (runtime.length > 0) {
+          runtimeByModule.set(resolvedKey, new Set(runtime));
+        }
+
+        importsByModule.set(
+          resolvedKey,
+          collectImportsFromCode(code, resolvedKey, isSvelteFile(resolvedKey)),
+        );
+      })(),
     );
+    await loadPromises.get(resolvedKey);
   }
 
   async function collectRuntime(start: string): Promise<Set<string>> {
@@ -182,7 +193,6 @@ export async function buildRuntimeClassMap(
       }
 
       visited.add(resolvedCurrent);
-      // BFS loads modules on demand along import edges.
       // biome-ignore lint/performance/noAwaitInLoops: graph walk is intentionally sequential
       await ensureModuleLoaded(resolvedCurrent);
 

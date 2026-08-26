@@ -82,9 +82,10 @@ export function getCarbonClasses(selector: string): string[] {
 }
 
 /** Split a selector branch into ancestor compounds and the subject compound. */
-export function splitSelectorParts(
-  selector: string,
-): { ancestors: string[]; subject: string } | null {
+export function splitSelectorParts(selector: string): {
+  ancestors: string[];
+  subject: string;
+} {
   const normalized = stripNotPseudoClasses(selector);
   const parts: string[] = [];
   let current = "";
@@ -113,7 +114,10 @@ export function splitSelectorParts(
   }
 
   if (parts.length <= 1) {
-    return null;
+    return {
+      ancestors: [],
+      subject: parts[0] ?? normalized,
+    };
   }
 
   return {
