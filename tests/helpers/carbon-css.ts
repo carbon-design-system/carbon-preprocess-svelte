@@ -7,13 +7,12 @@ import {
   CONTEXT_ANCESTORS,
 } from "carbon-preprocess-svelte/constants";
 import postcss from "postcss";
+import { splitSelectorParts } from "../../src/indexer/css-selector-utils";
 
 const require = createRequire(import.meta.url);
 
 const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
-const SELECTOR_COMBINATOR = /[\s>+~]/;
 const LEGACY_CARBON_CLASS = /\.bx-(?!-)[A-Za-z0-9_-]+/g;
-const BEM_PREFIXES = ["--", "__"];
 const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
 const CONTEXT_ANCESTOR_SET = new Set<string>(CONTEXT_ANCESTORS);
 
@@ -107,47 +106,6 @@ export function carbonClassesIn(selector: string): string[] {
   return [...new Set([...classes, ...legacy])];
 }
 
-/** Matches `splitSelectorParts` in `strict-css-optimizer.ts`. */
-function splitSelectorParts(
-  selector: string,
-): { ancestors: string[]; subject: string } | null {
-  const normalized = stripNotPseudoClasses(selector);
-  const parts: string[] = [];
-  let current = "";
-  let depth = 0;
-
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized[i];
-
-    if (char === "(") {
-      depth++;
-    } else if (char === ")") {
-      depth = Math.max(0, depth - 1);
-    } else if (depth === 0 && SELECTOR_COMBINATOR.test(char)) {
-      if (current.trim()) {
-        parts.push(current.trim());
-      }
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current.trim()) {
-    parts.push(current.trim());
-  }
-
-  if (parts.length <= 1) {
-    return null;
-  }
-
-  return {
-    ancestors: parts.slice(0, -1),
-    subject: parts[parts.length - 1],
-  };
-}
-
 function classMatchesAllowlist(name: string, allowlist: Set<string>): boolean {
   return CONTEXT_ANCESTOR_SET.has(name) || matchesAllowlist(name, allowlist);
 }
@@ -159,21 +117,19 @@ export function shouldKeepStrictSelector(
   selector: string,
   allowlist: Set<string>,
 ): boolean {
-  const classes = carbonClassesIn(selector);
-  if (classes.length === 0) {
-    return true;
-  }
-
   const parts = splitSelectorParts(selector);
-
-  if (!parts) {
-    return classes.every((name) => matchesAllowlist(name, allowlist));
-  }
-
   const subjectClasses = carbonClassesIn(parts.subject);
   const ancestorClasses = parts.ancestors.flatMap((part) =>
     carbonClassesIn(part),
   );
+
+  if (subjectClasses.length === 0 && ancestorClasses.length === 0) {
+    return true;
+  }
+
+  if (ancestorClasses.length === 0) {
+    return subjectClasses.every((name) => matchesAllowlist(name, allowlist));
+  }
 
   if (
     subjectClasses.length > 0 &&
@@ -235,9 +191,18 @@ export function matchesAllowlist(
   for (const selector of allowlist) {
     if (EXACT_ONLY_CLASSES.has(selector)) continue;
     if (selector.endsWith("-") && name.startsWith(selector)) return true;
-    if (sharedClasses.has(selector)) continue;
+  }
+
+  for (let i = 1; i < name.length - 1; i++) {
+    const a = name[i];
+    const b = name[i + 1];
+    if (!((a === "-" && b === "-") || (a === "_" && b === "_"))) continue;
+
+    const parent = name.slice(0, i);
     if (
-      BEM_PREFIXES.some((prefix) => name.startsWith(`${selector}${prefix}`))
+      !EXACT_ONLY_CLASSES.has(parent) &&
+      allowlist.has(parent) &&
+      !sharedClasses.has(parent)
     ) {
       return true;
     }

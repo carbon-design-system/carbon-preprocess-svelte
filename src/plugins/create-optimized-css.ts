@@ -242,62 +242,43 @@ export type OptimizedCssReport = {
   removed: number;
 };
 
+export function createCssOptimizer(
+  options: Omit<CreateOptimizedCssOptions, "source" | "from">,
+) {
+  const preserveAllIBMFonts = options.preserveAllIBMFonts === true;
+  const safelist = options.safelist ?? [];
+  const { allowlist, preserveFlatpickr } = buildUsage(
+    options.ids,
+    options.contentClasses,
+  );
+
+  return {
+    run(
+      source: CreateOptimizedCssOptions["source"],
+      from?: string,
+    ): OptimizedCssReport {
+      const report = { removed: 0 };
+      const { css } = postcss(
+        createPostcssPlugins(
+          allowlist,
+          preserveAllIBMFonts,
+          preserveFlatpickr,
+          safelist,
+          report,
+        ),
+      ).process(source, { from });
+      return { css, removed: report.removed };
+    },
+  };
+}
+
 export function optimizeCssWithReport(
   options: CreateOptimizedCssOptions,
 ): OptimizedCssReport {
-  const { source, ids } = options;
-  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const safelist = options.safelist ?? [];
-  const { allowlist, preserveFlatpickr } = buildUsage(
-    ids,
-    options.contentClasses,
-  );
-  const report = { removed: 0 };
-
-  const { css } = postcss(
-    createPostcssPlugins(
-      allowlist,
-      preserveAllIBMFonts,
-      preserveFlatpickr,
-      safelist,
-      report,
-    ),
-  ).process(source, { from: options.from });
-
-  return { css, removed: report.removed };
-}
-
-export async function optimizeCssWithReportAsync(
-  options: CreateOptimizedCssOptions,
-): Promise<OptimizedCssReport> {
-  const { source, ids } = options;
-  const preserveAllIBMFonts = options?.preserveAllIBMFonts === true;
-  const safelist = options.safelist ?? [];
-  const { allowlist, preserveFlatpickr } = buildUsage(
-    ids,
-    options.contentClasses,
-  );
-  const report = { removed: 0 };
-
-  const { css } = await postcss(
-    createPostcssPlugins(
-      allowlist,
-      preserveAllIBMFonts,
-      preserveFlatpickr,
-      safelist,
-      report,
-    ),
-  ).process(source, { from: options.from });
-
-  return { css, removed: report.removed };
+  const { source, from, ...rest } = options;
+  return createCssOptimizer(rest).run(source, from);
 }
 
 export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
   return optimizeCssWithReport(options).css;
-}
-
-export async function createOptimizedCssAsync(
-  options: CreateOptimizedCssOptions,
-): Promise<string> {
-  return (await optimizeCssWithReportAsync(options)).css;
 }

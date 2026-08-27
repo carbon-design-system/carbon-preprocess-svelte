@@ -3,7 +3,7 @@ import { setComponents } from "../component-index-registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { isSilent, optimizeCssWithReport } from "./create-optimized-css";
+import { createCssOptimizer, isSilent } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
 import { scanContentClasses } from "./scan-content";
 
@@ -68,18 +68,21 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         contentClasses = scanContentClasses(options?.content);
       }
 
+      const optimizer = createCssOptimizer({
+        ...options,
+        ids,
+        contentClasses,
+      });
+
       for (const id in bundle) {
         const file = bundle[id];
 
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
-          const { css: optimized_css, removed } = optimizeCssWithReport({
-            ...options,
-            source: original_css,
-            ids,
-            from: id,
-            contentClasses,
-          });
+          const { css: optimized_css, removed } = optimizer.run(
+            original_css,
+            id,
+          );
 
           file.source = optimized_css;
 

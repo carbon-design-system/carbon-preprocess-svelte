@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import postcss from "postcss";
 import {
-  getCarbonClasses,
   getCarbonClassesFromNormalized,
   splitSelectorList,
   splitSelectorParts,
@@ -71,15 +70,10 @@ function setsDisjoint(a: Set<string>, b: Set<string>): boolean {
 function isSlotWrapperGate(
   ancestor: string,
   ancestorOwners: Set<string>,
-  slotWrapperComponents: Set<string>,
   slotWrapperClasses: Map<string, string[]>,
 ): boolean {
   for (const owner of ancestorOwners) {
-    if (!slotWrapperComponents.has(owner)) {
-      continue;
-    }
-    const wrappers = slotWrapperClasses.get(owner) ?? [];
-    if (wrappers.includes(ancestor)) {
+    if (slotWrapperClasses.get(owner)?.includes(ancestor)) {
       return true;
     }
   }
@@ -100,18 +94,6 @@ function isSubComponentGate(
     }
   }
   return false;
-}
-
-function collectAllMarkupClasses(
-  componentClasses: Map<string, Set<string>>,
-): Set<string> {
-  const all = new Set<string>();
-  for (const classes of componentClasses.values()) {
-    for (const cls of classes) {
-      all.add(cls);
-    }
-  }
-  return all;
 }
 
 export type CssContextOptions = {
@@ -145,8 +127,7 @@ export function extractCssIndexAdditions(
   const { componentClasses, slotWrapperClasses, subComponents, css } = options;
 
   const classOwners = buildClassOwners(componentClasses);
-  const markupClasses = collectAllMarkupClasses(componentClasses);
-  const slotWrapperComponents = new Set(slotWrapperClasses.keys());
+  const markupClasses = new Set(classOwners.keys());
   const context = new Map<string, Set<string>>();
   const orphans = new Map<string, Set<string>>();
 
@@ -157,27 +138,25 @@ export function extractCssIndexAdditions(
       // `parts.subject`/`parts.ancestors` are already `:not(...)`-stripped
       // substrings of `branch` (see `splitSelectorParts`), so classes can be
       // read straight off them without re-stripping/re-matching `branch`.
-      const ancestorClasses = parts
-        ? parts.ancestors.flatMap((part) =>
-            getCarbonClassesFromNormalized(part),
-          )
-        : [];
-      const subjectClasses = parts
-        ? getCarbonClassesFromNormalized(parts.subject)
-        : [];
+      const ancestorClasses = parts.ancestors.flatMap((part) =>
+        getCarbonClassesFromNormalized(part),
+      );
+      const subjectClasses = getCarbonClassesFromNormalized(parts.subject);
 
-      if (parts && ancestorClasses.length > 0 && subjectClasses.length > 0) {
+      if (ancestorClasses.length > 0 && subjectClasses.length > 0) {
         for (const ancestor of ancestorClasses) {
           if (LAYOUT_ANCESTOR_DENYLIST.has(ancestor)) {
             continue;
           }
 
-          const ancestorOwners = classOwners.get(ancestor) ?? new Set<string>();
+          const ancestorOwners = classOwners.get(ancestor);
+          if (!ancestorOwners || ancestorOwners.size === 0) {
+            continue;
+          }
 
           for (const subject of subjectClasses) {
-            const subjectOwners = classOwners.get(subject) ?? new Set<string>();
-
-            if (subjectOwners.size === 0 || ancestorOwners.size === 0) {
+            const subjectOwners = classOwners.get(subject);
+            if (!subjectOwners || subjectOwners.size === 0) {
               continue;
             }
 
@@ -186,12 +165,7 @@ export function extractCssIndexAdditions(
             }
 
             const gated =
-              isSlotWrapperGate(
-                ancestor,
-                ancestorOwners,
-                slotWrapperComponents,
-                slotWrapperClasses,
-              ) ||
+              isSlotWrapperGate(ancestor, ancestorOwners, slotWrapperClasses) ||
               isSubComponentGate(ancestorOwners, subjectOwners, subComponents);
 
             if (!gated) {
@@ -207,31 +181,29 @@ export function extractCssIndexAdditions(
 
       // Reuse the parts above instead of re-deriving classes from `branch`;
       // ancestors + subject cover the same set of Carbon classes.
-      const classes = parts
-        ? [...new Set([...ancestorClasses, ...subjectClasses])]
-        : getCarbonClasses(branch);
+      const classes = [...new Set([...ancestorClasses, ...subjectClasses])];
       const branchOrphans = classes.filter((cls) => !markupClasses.has(cls));
 
       if (branchOrphans.length === 0) {
         continue;
       }
 
-      const known = classes.filter((cls) => markupClasses.has(cls));
-
-      for (const orphan of branchOrphans) {
-        let owners = new Set<string>();
-
-        for (const parent of known) {
-          const parentOwners = classOwners.get(parent);
-          if (parentOwners) {
-            owners = new Set([...owners, ...parentOwners]);
+      const owners = new Set<string>();
+      for (const parent of classes) {
+        if (!markupClasses.has(parent)) continue;
+        const parentOwners = classOwners.get(parent);
+        if (parentOwners) {
+          for (const owner of parentOwners) {
+            owners.add(owner);
           }
         }
+      }
 
-        if (owners.size === 0) {
-          continue;
-        }
+      if (owners.size === 0) {
+        continue;
+      }
 
+      for (const orphan of branchOrphans) {
         for (const component of owners) {
           addClass(orphans, component, orphan);
         }
@@ -240,18 +212,4 @@ export function extractCssIndexAdditions(
   });
 
   return { context, orphans };
-}
-
-/** @deprecated Use `extractCssIndexAdditions`. */
-export function extractCssContextClasses(
-  options: CssContextOptions,
-): Map<string, Set<string>> {
-  return extractCssIndexAdditions(options).context;
-}
-
-/** @deprecated Use `extractCssIndexAdditions`. */
-export function extractCssOrphanClasses(
-  options: CssContextOptions,
-): Map<string, Set<string>> {
-  return extractCssIndexAdditions(options).orphans;
 }

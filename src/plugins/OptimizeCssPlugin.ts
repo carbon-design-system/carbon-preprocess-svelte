@@ -3,7 +3,7 @@ import { setComponents } from "../component-index-registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { isSilent, optimizeCssWithReportAsync } from "./create-optimized-css";
+import { createCssOptimizer, isSilent } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
 import { scanContentClasses } from "./scan-content";
 
@@ -82,32 +82,22 @@ export default class OptimizeCssPlugin {
               setComponents(await ensureLiveComponentIndex());
             }
 
-            const cssAssetIds = Object.keys(assets).filter(isCssFile);
             const contentClasses = scanContentClasses(this.options.content);
+            const optimizer = createCssOptimizer({
+              ...this.options,
+              ids,
+              contentClasses,
+            });
 
-            const results = await Promise.all(
-              cssAssetIds.map(async (id) => {
-                const original_css = assets[id].source();
-                const { css: optimized_css, removed } =
-                  await optimizeCssWithReportAsync({
-                    ...this.options,
-                    source: Buffer.isBuffer(original_css)
-                      ? original_css.toString()
-                      : original_css,
-                    ids,
-                    from: id,
-                    contentClasses,
-                  });
-                return { id, original_css, optimized_css, removed };
-              }),
-            );
+            for (const id of Object.keys(assets).filter(isCssFile)) {
+              const original_css = assets[id].source();
+              const { css: optimized_css, removed } = optimizer.run(
+                Buffer.isBuffer(original_css)
+                  ? original_css.toString()
+                  : original_css,
+                id,
+              );
 
-            for (const {
-              id,
-              original_css,
-              optimized_css,
-              removed,
-            } of results) {
               compilation.updateAsset(id, new RawSource(optimized_css));
 
               if (!isSilent(this.options) && removed > 0) {

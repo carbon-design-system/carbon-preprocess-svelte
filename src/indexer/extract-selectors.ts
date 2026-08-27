@@ -1,8 +1,10 @@
-import path from "node:path";
 import { walk } from "estree-walker";
 import { parse } from "svelte/compiler";
 import { CARBON_PREFIX } from "../constants";
-import { extractRuntimeClassesFromSource } from "./extract-runtime-classes";
+import {
+  extractRuntimeClassesFromSource,
+  resolveRelativeImport,
+} from "./extract-runtime-classes";
 
 const WHITESPACE_REGEX = /\s+/;
 const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
@@ -19,21 +21,6 @@ export type ExtractFromSvelteResult = {
   imports: string[];
   runtimeClasses: string[];
 };
-
-function resolveRelativeImport(from: string, spec: string): string | null {
-  if (!spec.startsWith(".")) {
-    return null;
-  }
-
-  const base = path.posix.dirname(from);
-  const joined = path.posix.normalize(path.posix.join(base, spec));
-
-  if (joined.endsWith(".js") || joined.endsWith(".svelte")) {
-    return joined;
-  }
-
-  return `${joined}.js`;
-}
 
 function nodeContainsDefaultSlot(node: {
   type?: string;
@@ -64,16 +51,13 @@ function nodeContainsDefaultSlot(node: {
   return false;
 }
 
-/**
- * Single-pass Svelte extraction: classes, sub-components, slot wrappers, imports.
- */
 export function extractFromSvelte(
   props: ExtractSelectorsProps,
 ): ExtractFromSvelteResult {
   const { code, filename } = props;
   const moduleKey = filename.replace(/\\/g, "/");
   const ast = parse(code, { filename });
-  const selectors: Map<string, { type: string; name?: string }> = new Map();
+  const selectors = new Set<string>();
   const components = new Set<string>();
   const slotWrappers: string[] = [];
   const imports: string[] = [];
@@ -105,7 +89,7 @@ export function extractFromSvelte(
               for (const selector of value.data
                 .split(WHITESPACE_REGEX)
                 .filter(Boolean)) {
-                selectors.set(selector, { type: node.type });
+                selectors.add(selector);
               }
             }
           }
@@ -113,24 +97,28 @@ export function extractFromSvelte(
       }
 
       if (node.type === "Class") {
-        selectors.set(node.name, { type: node.type });
+        selectors.add(node.name);
       }
 
       if (node.type === "PseudoClassSelector" && node.name === "global") {
         const selector = code.slice(node.start, node.end);
         const cleanSelector = selector.replace(GLOBAL_SELECTOR_REGEX, "$1");
-        selectors.set(cleanSelector, { type: node.type, name: node.name });
+        selectors.add(cleanSelector);
       }
 
-      if (node.type === "Literal" && CARBON_PREFIX.test(node.value)) {
-        selectors.set(node.value, { type: "Class" });
+      if (
+        node.type === "Literal" &&
+        typeof node.value === "string" &&
+        CARBON_PREFIX.test(node.value)
+      ) {
+        selectors.add(node.value);
       }
 
       if (
         node.type === "TemplateElement" &&
         CARBON_PREFIX.test(node.value.raw)
       ) {
-        selectors.set(node.value.raw, { type: "Class" });
+        selectors.add(node.value.raw);
       }
 
       if (node.type === "Element") {
@@ -151,18 +139,9 @@ export function extractFromSvelte(
 
   const classes: string[] = [];
 
-  for (const [v = ""] of selectors) {
-    if (typeof v === "string") {
-      const value = v.trim();
-
-      if (value.startsWith("bx--") && !value.startsWith(".")) {
-        classes.push(`.${value}`);
-      } else if (value.startsWith(".")) {
-        classes.push(value);
-      } else {
-        classes.push(`.${value}`);
-      }
-    }
+  for (const raw of selectors) {
+    const value = raw.trim();
+    classes.push(value.startsWith(".") ? value : `.${value}`);
   }
 
   return {
@@ -177,9 +156,4 @@ export function extractFromSvelte(
 export function extractSelectors(props: ExtractSelectorsProps) {
   const { classes, components } = extractFromSvelte(props);
   return { classes, components };
-}
-
-/** @deprecated Use `extractFromSvelte`. */
-export function extractSlotWrappers(props: ExtractSelectorsProps): string[] {
-  return extractFromSvelte(props).slotWrappers;
 }

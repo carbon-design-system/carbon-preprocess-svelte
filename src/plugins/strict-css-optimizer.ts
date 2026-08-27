@@ -5,26 +5,14 @@ import {
   CARBON_PREFIX,
   CONTEXT_ANCESTORS,
 } from "../constants";
+import {
+  getCarbonClassesFromNormalized,
+  splitSelectorList,
+  splitSelectorParts,
+} from "../indexer/css-selector-utils";
 import { isSafelisted, type SafelistEntry } from "./safelist";
 
-const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
-// Matches `/[\s>+~]/`'s practical range for selector text: whitespace plus
-// the three combinator symbols. Checked per-character in a hot loop below,
-// so a Set lookup replaces a regex call.
-const COMBINATOR_CHARS = new Set([
-  " ",
-  "\t",
-  "\n",
-  "\r",
-  "\f",
-  "\v",
-  ">",
-  "+",
-  "~",
-]);
-const LEGACY_CARBON_CLASS = /\.bx-(?!-)[A-Za-z0-9_-]+/g;
 const LEGACY_CARBON_PREFIX = /bx-(?!-)/;
-const BEM_PREFIXES = ["--", "__"];
 const FLATPICKR_CLASS_NAMES = [
   "dayContainer",
   "numInputWrapper",
@@ -59,23 +47,24 @@ export type StrictCssOptimizerOptions = {
   safelist: readonly SafelistEntry[];
 };
 
-// Lazily computed (and memoized) on first use rather than at module load, so
-// it reflects a `liveIndex` swap of the active component index. Safe only
-// because `setComponents` always runs before strict-mode optimization starts
-// (see `optimizeCss`'s `buildStart`/`OptimizeCssPlugin`'s pre-asset hook).
+let sharedClassesFor: ReturnType<typeof getComponents> | undefined;
 let sharedClassesCache: Set<string> | undefined;
 
 function getSharedClasses(): Set<string> {
-  if (sharedClassesCache) return sharedClassesCache;
+  const components = getComponents();
+  if (sharedClassesCache && sharedClassesFor === components) {
+    return sharedClassesCache;
+  }
 
   const counts = new Map<string, number>();
 
-  for (const component of Object.values(getComponents())) {
-    for (const cls of new Set(component.classes)) {
+  for (const component of Object.values(components)) {
+    for (const cls of component.classes) {
       counts.set(cls, (counts.get(cls) ?? 0) + 1);
     }
   }
 
+  sharedClassesFor = components;
   sharedClassesCache = new Set(
     [...counts].filter(([, count]) => count > 1).map(([cls]) => cls),
   );
@@ -83,151 +72,60 @@ function getSharedClasses(): Set<string> {
   return sharedClassesCache;
 }
 
-/**
- * Split on commas at parenthesis depth 0 so `:is(.a, .b)` stays one selector.
- */
-function splitSelectorList(selector: string): string[] {
-  const selectors: string[] = [];
-  let depth = 0;
-  let start = 0;
+type AllowlistIndex = {
+  exact: Set<string>;
+  hyphenPrefixes: string[];
+  shared: Set<string>;
+};
 
-  for (let i = 0; i < selector.length; i++) {
-    const char = selector[i];
+const allowlistIndexCache = new WeakMap<Set<string>, AllowlistIndex>();
 
-    if (char === "(") {
-      depth++;
-    } else if (char === ")") {
-      depth = Math.max(0, depth - 1);
-    } else if (char === "," && depth === 0) {
-      selectors.push(selector.slice(start, i).trim());
-      start = i + 1;
-    }
-  }
+function getAllowlistIndex(allowlist: Set<string>): AllowlistIndex {
+  const cached = allowlistIndexCache.get(allowlist);
+  if (cached) return cached;
 
-  selectors.push(selector.slice(start).trim());
-
-  return selectors.filter(Boolean);
-}
-
-/**
- * Drop `:not(...)` subtrees before class extraction. Negated classes are
- * exclusions, not part of the positive match (e.g. header global buttons
- * vs `.bx--header-search-button`).
- */
-function stripNotPseudoClasses(selector: string): string {
-  let result = "";
-  let notDepth = 0;
-
-  for (let i = 0; i < selector.length; i++) {
-    if (
-      notDepth === 0 &&
-      selector[i] === ":" &&
-      selector.startsWith(":not(", i)
-    ) {
-      notDepth = 1;
-      i += 4;
-      continue;
-    }
-
-    if (notDepth > 0) {
-      if (selector[i] === "(") notDepth++;
-      else if (selector[i] === ")") notDepth--;
-      continue;
-    }
-
-    result += selector[i];
-  }
-
-  return result;
-}
-
-/**
- * Split a selector branch into ancestor compounds and the subject compound.
- */
-function splitSelectorParts(
-  selector: string,
-): { ancestors: string[]; subject: string } | null {
-  const normalized = stripNotPseudoClasses(selector);
-  const parts: string[] = [];
-  let current = "";
-  let depth = 0;
-
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized[i];
-
-    if (char === "(") {
-      depth++;
-    } else if (char === ")") {
-      depth = Math.max(0, depth - 1);
-    } else if (depth === 0 && COMBINATOR_CHARS.has(char)) {
-      if (current.trim()) {
-        parts.push(current.trim());
-      }
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current.trim()) {
-    parts.push(current.trim());
-  }
-
-  if (parts.length <= 1) {
-    return null;
-  }
-
-  return {
-    ancestors: parts.slice(0, -1),
-    subject: parts[parts.length - 1],
-  };
-}
-
-/** `selector` must already be free of `:not(...)` subtrees (see `stripNotPseudoClasses`). */
-function getCarbonClassesFromNormalized(normalized: string): string[] {
-  const classes = normalized.match(CARBON_CLASS) ?? [];
-  const legacyClasses = (normalized.match(LEGACY_CARBON_CLASS) ?? []).map(
-    (cls) => cls.replace(".bx-", ".bx--"),
-  );
-
-  return [...new Set([...classes, ...legacyClasses])];
-}
-
-type AllowlistMatch = { matched: true; shared: boolean } | { matched: false };
-
-function matchesAllowlist(
-  name: string,
-  allowlist: Set<string>,
-): AllowlistMatch {
-  if (allowlist.has(name)) {
-    return { matched: true, shared: getSharedClasses().has(name) };
-  }
+  const shared = getSharedClasses();
+  const hyphenPrefixes: string[] = [];
 
   for (const selector of allowlist) {
     if (EXACT_ONLY_CLASSES.has(selector)) continue;
-
-    const shared = getSharedClasses().has(selector);
-    if (selector.endsWith("-") && name.startsWith(selector)) {
-      return { matched: true, shared };
-    }
-
-    if (shared) continue;
-
-    if (
-      BEM_PREFIXES.some((prefix) => name.startsWith(`${selector}${prefix}`))
-    ) {
-      return { matched: true, shared: false };
+    if (selector.endsWith("-")) {
+      hyphenPrefixes.push(selector);
     }
   }
 
-  return { matched: false };
+  const index = { exact: allowlist, hyphenPrefixes, shared };
+  allowlistIndexCache.set(allowlist, index);
+  return index;
 }
 
-function classMatchesAllowlist(name: string, allowlist: Set<string>): boolean {
-  return (
-    CONTEXT_ANCESTOR_SET.has(name) || matchesAllowlist(name, allowlist).matched
-  );
+function matchesAllowlist(name: string, index: AllowlistIndex): boolean {
+  if (index.exact.has(name)) return true;
+
+  for (const prefix of index.hyphenPrefixes) {
+    if (name.startsWith(prefix)) return true;
+  }
+
+  for (let i = 1; i < name.length - 1; i++) {
+    const a = name[i];
+    const b = name[i + 1];
+    if (!((a === "-" && b === "-") || (a === "_" && b === "_"))) continue;
+
+    const parent = name.slice(0, i);
+    if (
+      !EXACT_ONLY_CLASSES.has(parent) &&
+      index.exact.has(parent) &&
+      !index.shared.has(parent)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function classMatchesAllowlist(name: string, index: AllowlistIndex): boolean {
+  return CONTEXT_ANCESTOR_SET.has(name) || matchesAllowlist(name, index);
 }
 
 /**
@@ -240,39 +138,29 @@ function classMatchesAllowlist(name: string, allowlist: Set<string>): boolean {
  * may match CONTEXT_ANCESTORS without being imported. Same-element compounds
  * still require every class to match.
  */
-function shouldKeepSelector(selector: string, allowlist: Set<string>): boolean {
+function shouldKeepSelector(selector: string, index: AllowlistIndex): boolean {
   const parts = splitSelectorParts(selector);
-
-  // `parts.subject`/`parts.ancestors` are already `:not(...)`-stripped
-  // substrings of `selector` (see `splitSelectorParts`), so classes can be
-  // read straight off them instead of re-stripping the full selector too.
-  const subjectClasses = getCarbonClassesFromNormalized(
-    parts ? parts.subject : stripNotPseudoClasses(selector),
+  const subjectClasses = getCarbonClassesFromNormalized(parts.subject);
+  const ancestorClasses = parts.ancestors.flatMap((part) =>
+    getCarbonClassesFromNormalized(part),
   );
-  const ancestorClasses = parts
-    ? parts.ancestors.flatMap((part) => getCarbonClassesFromNormalized(part))
-    : [];
 
   if (subjectClasses.length === 0 && ancestorClasses.length === 0) {
     return true;
   }
 
-  if (!parts) {
-    return subjectClasses.every(
-      (name) => matchesAllowlist(name, allowlist).matched,
-    );
+  if (ancestorClasses.length === 0) {
+    return subjectClasses.every((name) => matchesAllowlist(name, index));
   }
 
   if (
     subjectClasses.length > 0 &&
-    !subjectClasses.every((name) => matchesAllowlist(name, allowlist).matched)
+    !subjectClasses.every((name) => matchesAllowlist(name, index))
   ) {
     return false;
   }
 
-  return ancestorClasses.every((name) =>
-    classMatchesAllowlist(name, allowlist),
-  );
+  return ancestorClasses.every((name) => classMatchesAllowlist(name, index));
 }
 
 /**
@@ -285,6 +173,7 @@ export function optimizeStrictRule(
   options: StrictCssOptimizerOptions,
 ): number {
   const { allowlist, preserveFlatpickr, safelist } = options;
+  const index = getAllowlistIndex(allowlist);
   const selector = node.selector;
 
   if (
@@ -309,7 +198,7 @@ export function optimizeStrictRule(
 
     return (
       !(CARBON_PREFIX.test(selectee) || LEGACY_CARBON_PREFIX.test(selectee)) ||
-      shouldKeepSelector(selectee, allowlist)
+      shouldKeepSelector(selectee, index)
     );
   });
 

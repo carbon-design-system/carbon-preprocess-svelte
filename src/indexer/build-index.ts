@@ -93,6 +93,23 @@ export async function buildComponentIndex(options?: {
   const scanStart = performance.now();
   const files = await listFiles(carbon_src);
 
+  const extractedByFile = new Map<string, ReturnType<typeof extractFromSvelte>>(
+    (
+      await Promise.all(
+        files.map(async (file) => {
+          if (file.startsWith("icons/") || !isSvelteFile(file)) {
+            return null;
+          }
+          const file_text = await readFile(path.join(carbon_src, file), "utf8");
+          return [
+            file,
+            extractFromSvelte({ code: file_text, filename: file }),
+          ] as const;
+        }),
+      )
+    ).filter((entry) => entry !== null),
+  );
+
   for (const file of files) {
     if (file.startsWith("icons/")) {
       continue;
@@ -108,12 +125,8 @@ export async function buildComponentIndex(options?: {
 
     file_entries.set(moduleKey, map);
 
-    if (isSvelteFile(file)) {
-      const file_path = path.join(carbon_src, file);
-      // biome-ignore lint/performance/noAwaitInLoops: shared maps below are keyed by scan order (duplicate "index" module names across directories resolve last-write-wins); parallelizing would make that racy.
-      const file_text = await readFile(file_path, "utf8");
-      const extracted = extractFromSvelte({ code: file_text, filename: file });
-
+    const extracted = extractedByFile.get(file);
+    if (extracted) {
       map.classes = extracted.classes;
 
       if (extracted.components.length > 0) {
@@ -191,24 +204,34 @@ export async function buildComponentIndex(options?: {
     }
   }
 
-  const cssStart = performance.now();
-  const carbon_css = await readFile(resolveCarbonCssPath(carbon_path), "utf8");
-  const { context: css_context, orphans: css_orphans } =
-    extractCssIndexAdditions({
-      componentClasses: markup_only_classes,
-      slotWrapperClasses: slot_wrapper_classes,
-      subComponents: sub_components,
-      css: carbon_css,
-    });
-  emit("css index", performance.now() - cssStart);
-
-  const runtimeStart = performance.now();
-  const runtime_classes = await buildRuntimeClassMap(
-    carbon_src,
-    module_to_component,
-    moduleGraph,
-  );
-  emit("runtime graph", performance.now() - runtimeStart);
+  const [{ context: css_context, orphans: css_orphans }, runtime_classes] =
+    await Promise.all([
+      (async () => {
+        const cssStart = performance.now();
+        const carbon_css = await readFile(
+          resolveCarbonCssPath(carbon_path),
+          "utf8",
+        );
+        const additions = extractCssIndexAdditions({
+          componentClasses: markup_only_classes,
+          slotWrapperClasses: slot_wrapper_classes,
+          subComponents: sub_components,
+          css: carbon_css,
+        });
+        emit("css index", performance.now() - cssStart);
+        return additions;
+      })(),
+      (async () => {
+        const runtimeStart = performance.now();
+        const runtime = await buildRuntimeClassMap(
+          carbon_src,
+          module_to_component,
+          moduleGraph,
+        );
+        emit("runtime graph", performance.now() - runtimeStart);
+        return runtime;
+      })(),
+    ]);
 
   function mergeClasses(component: string, classes: Iterable<string>): void {
     const entry = exports_map.get(component);
@@ -237,13 +260,11 @@ export async function buildComponentIndex(options?: {
   }
 
   const components: ComponentIndex = Object.fromEntries(
-    new Map(
-      [...exports_map.entries()]
-        .sort((a, b) => a.toLocaleString().localeCompare(b.toLocaleString()))
-        .filter(
-          (entry): entry is [Identifier, IdentifierValue] => entry[1] !== null,
-        ),
-    ),
+    [...exports_map.entries()]
+      .sort((a, b) => a.toLocaleString().localeCompare(b.toLocaleString()))
+      .filter(
+        (entry): entry is [Identifier, IdentifierValue] => entry[1] !== null,
+      ),
   );
 
   emit("total", performance.now() - scanStart);
