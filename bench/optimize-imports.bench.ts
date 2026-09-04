@@ -1,4 +1,4 @@
-import { bench, group, run, summary } from "mitata";
+import { group, task } from "ostia";
 import type { Processed } from "svelte/compiler";
 import { optimizeImports } from "../src/preprocessors/optimize-imports";
 
@@ -104,23 +104,19 @@ import {
 import { Airplane, Analytics } from "carbon-pictograms-svelte";`;
 
 group("optimizeImports script preprocessor", () => {
-  summary(() => {
-    bench("no carbon- substring (skip fast path)", () => {
-      preprocess(NO_CARBON);
-    });
+  task("no carbon- substring (skip fast path)", () => {
+    preprocess(NO_CARBON);
+  });
 
-    bench("small (2 imports)", () => {
-      preprocess(SMALL);
-    });
+  task("small (2 imports)", () => {
+    preprocess(SMALL);
+  });
 
-    bench("medium (11 imports)", () => {
-      preprocess(MEDIUM);
-    });
+  task("medium (11 imports)", () => {
+    preprocess(MEDIUM);
+  });
 
-    bench("large (60+ imports)", () => {
-      preprocess(LARGE);
-    });
+  task("large (60+ imports)", () => {
+    preprocess(LARGE);
   });
 });
-
-await run();

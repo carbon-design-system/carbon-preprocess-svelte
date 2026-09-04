@@ -1,4 +1,4 @@
-import { bench, group, run, summary } from "mitata";
+import { group, task } from "ostia";
 import { buildComponentIndex } from "../src/indexer/build-index";
 
 // Rebuilds the full component index from the installed `carbon-components-svelte`
@@ -6,17 +6,15 @@ import { buildComponentIndex } from "../src/indexer/build-index";
 // or once per dev-server start with `experimental.liveIndex`, so this is a coarser
 // end-to-end benchmark rather than a tight microbenchmark.
 group("buildComponentIndex (full scan)", () => {
-  summary(() => {
-    bench("cold-ish rebuild", async () => {
-      await buildComponentIndex();
-    });
+  task("cold-ish rebuild", async () => {
+    await buildComponentIndex();
   });
 });
 
-await run();
-
 // Bonus: one-off phase breakdown (scan / css index / runtime graph / total) to
 // help point at *where* time goes, not just the aggregate.
+// Note: ostia has no in-suite run(), so this block executes during suite import
+// (before the benchmark table below is printed), not after like it did with mitata.
 const timings: Record<string, number> = {};
 await buildComponentIndex({
   onTiming: (label, ms) => {

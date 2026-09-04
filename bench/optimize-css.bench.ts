@@ -1,4 +1,4 @@
-import { barplot, bench, group, run, summary } from "mitata";
+import { group, task } from "ostia";
 import { optimizeCssWithReport } from "../src/plugins/create-optimized-css";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
 
@@ -22,18 +22,12 @@ const SCENARIOS: Scenario[] = [
 
 for (const scenario of SCENARIOS) {
   group(scenario.name, () => {
-    summary(() => {
-      barplot(() => {
-        bench("optimizeCssWithReport", () => {
-          optimizeCssWithReport({
-            source,
-            ids: scenario.ids,
-            silent: true,
-          });
-        });
+    task("optimizeCssWithReport", () => {
+      optimizeCssWithReport({
+        source,
+        ids: scenario.ids,
+        silent: true,
       });
     });
   });
 }
-
-await run();
