@@ -42,7 +42,7 @@
     "culls": "^0.2.0",
     "estree-walker": "^2.0.2",
     "magic-string": "^0.30.17",
-    "ostia": "^0.1.7",
+    "ostia": "^0.2.0",
     "postcss": "^8.5.15",
     "postcss-discard-empty": "^8.0.5",
     "svelte": "^5.56.10",
