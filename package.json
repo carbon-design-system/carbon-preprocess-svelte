@@ -30,6 +30,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "lint:fix": "biome check --write --unsafe .",
+    "lint:fix:changed": "biome check --write --unsafe --changed --no-errors-on-unmatched .",
     "upgrade-examples": "bun scripts/upgrade-examples.ts"
   },
   "devDependencies": {
