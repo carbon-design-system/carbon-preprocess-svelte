@@ -1,6 +1,4 @@
-import type { ImportDeclaration } from "estree-walker";
 import MagicString from "magic-string";
-import { parse } from "svelte/compiler";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { getComponents, setComponents } from "../component-index-registry";
 import { CarbonSvelte } from "../constants";
@@ -8,20 +6,87 @@ import { ensureLiveComponentIndex } from "../indexer/live-index";
 
 const NODE_MODULES_REGEX = /node_modules/;
 const COMPONENT_NAME_REGEX = /^[A-Z]/;
-const SCRIPT_OPEN_TAG_REGEX = /^<script lang="ts">/;
-const SCRIPT_CLOSE_TAG_REGEX = /<\/script>$/;
+
+type ImportSpecifier = {
+  imported: { name: string };
+  local: { name: string };
+  importKind?: "type" | "value";
+};
+
+type ImportStatement = {
+  start: number;
+  end: number;
+  importKind?: "type" | "value";
+  source: { value: string };
+  specifiers: ImportSpecifier[];
+};
+
+// Import specifiers can't contain a semicolon, so bounding the clause with
+// `[^;]` keeps the lazy match from ever crossing into a later statement,
+// without needing a stateful parser to find each declaration's extent.
+const IMPORT_DECLARATION_REGEX =
+  /^([ \t]*)import\s+(type\s+)?(?:([^;]*?)\s+from\s+)?["']([^"']+)["']\s*;?/gm;
+const NAMED_SPECIFIERS_REGEX = /\{([^}]*)\}/;
+const TYPE_SPECIFIER_PREFIX_REGEX = /^type\s+/;
+const AS_ALIAS_REGEX = /\s+as\s+/;
+
+function parseSpecifiers(clause: string | undefined): ImportSpecifier[] {
+  const namedClause = clause && NAMED_SPECIFIERS_REGEX.exec(clause)?.[1];
+  if (!namedClause?.trim()) return [];
+
+  return namedClause
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const isType = TYPE_SPECIFIER_PREFIX_REGEX.test(entry);
+      const [imported, local] = entry
+        .replace(TYPE_SPECIFIER_PREFIX_REGEX, "")
+        .split(AS_ALIAS_REGEX);
+      return {
+        imported: { name: imported.trim() },
+        local: { name: (local ?? imported).trim() },
+        importKind: isType ? "type" : "value",
+      } satisfies ImportSpecifier;
+    });
+}
+
+/**
+ * `optimizeImports` only ever rewrites named specifiers from three known
+ * barrel sources (see the `switch` in `transformScript`), so this only needs
+ * to recover exactly what `rewriteImport` reads: each statement's source,
+ * span, and named specifiers. Default/namespace specifiers are never
+ * rewritten, so they're intentionally left out of the parsed shape.
+ */
+function parseImportDeclarations(code: string): ImportStatement[] {
+  const statements: ImportStatement[] = [];
+
+  for (const match of code.matchAll(IMPORT_DECLARATION_REGEX)) {
+    const [full, leadingWhitespace, typeKeyword, clause, source] = match;
+    const start = match.index + leadingWhitespace.length;
+    statements.push({
+      start,
+      end: match.index + full.length,
+      importKind: typeKeyword ? "type" : "value",
+      source: { value: source },
+      specifiers: parseSpecifiers(clause),
+    });
+  }
+
+  return statements;
+}
 
 function rewriteImport(
   s: MagicString,
-  node: ImportDeclaration,
-  map: (specifier: ImportDeclaration["specifiers"][0]) => string,
+  node: ImportStatement,
+  map: (specifier: ImportSpecifier) => string,
 ) {
   // Type-only statements (`import type { ... }`) never reference a real
   // `.svelte` file, so leave them entirely untouched.
   if (node.importKind === "type") return;
 
   const rewritten: string[] = [];
-  const preserved: ImportDeclaration["specifiers"] = [];
+  const preserved: ImportSpecifier[] = [];
 
   for (const specifier of node.specifiers) {
     // Per-specifier type imports (`import { type X, Y }`) stay on the barrel.
@@ -91,22 +156,9 @@ export type OptimizeImportsOptions = {
 
 function transformScript(raw: string, filename: string) {
   const components = getComponents();
+  const s = new MagicString(raw);
 
-  /**
-   * The Svelte compiler's parse() function expects a full Svelte component,
-   * not just a script fragment. Wrap the raw script content in script tags
-   * to make it parseable, then strip the tags from output after transformation.
-   */
-  const content = `<script lang="ts">${raw}</script>`;
-  const s = new MagicString(content);
-
-  // Import statements are always top-level, so scanning the script's own
-  // body is equivalent to (and cheaper than) a recursive AST walk.
-  const body: ImportDeclaration[] = parse(content).instance?.content.body ?? [];
-
-  for (const node of body) {
-    if (node.type !== "ImportDeclaration") continue;
-
+  for (const node of parseImportDeclarations(raw)) {
     const import_name = node.source.value;
 
     switch (import_name) {
@@ -138,8 +190,6 @@ function transformScript(raw: string, filename: string) {
     }
   }
 
-  s.replace(SCRIPT_OPEN_TAG_REGEX, "").replace(SCRIPT_CLOSE_TAG_REGEX, "");
-
   return {
     code: s.toString(),
     // Edits are whole-statement replacements, so boundary-level mapping
@@ -166,7 +216,7 @@ export const optimizeImports: SveltePreprocessor<"script"> = (
       if (NODE_MODULES_REGEX.test(filename)) return;
 
       // Fast path: the only rewritable import sources contain "carbon-".
-      // Skip MagicString + svelte parse for the common no-Carbon file.
+      // Skip MagicString + import scanning for the common no-Carbon file.
       if (!raw.includes("carbon-")) return;
 
       if (options?.experimental?.liveIndex) {
