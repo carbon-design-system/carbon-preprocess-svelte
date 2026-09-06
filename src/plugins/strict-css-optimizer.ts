@@ -38,8 +38,20 @@ const FLATPICKR_SELECTOR = new RegExp(
   `\\.(?:flatpickr-[A-Za-z0-9_-]+|${FLATPICKR_CLASS_NAMES.join("|")})(?![A-Za-z0-9_-])`,
 );
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
+/**
+ * Anything the optimizer could remove: Carbon (`bx-`) selectors, flatpickr
+ * selectors and keyframes, and IBM Plex `@font-face` rules. A stylesheet
+ * with none of these is returned untouched without a PostCSS round-trip.
+ */
+const OPTIMIZABLE_CSS = new RegExp(
+  `bx-|flatpickr|IBM Plex|${[...FLATPICKR_KEYFRAMES, ...FLATPICKR_CLASS_NAMES].join("|")}`,
+);
 const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
 const CONTEXT_ANCESTOR_SET = new Set<string>(CONTEXT_ANCESTORS);
+
+export function hasOptimizableCss(css: string): boolean {
+  return OPTIMIZABLE_CSS.test(css);
+}
 
 export type StrictCssOptimizerOptions = {
   allowlist: Set<string>;

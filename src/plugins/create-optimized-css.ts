@@ -6,6 +6,7 @@ import { getComponents } from "../component-index-registry";
 import { ALWAYS_ON_CLASSES } from "../constants";
 import type { SafelistEntry } from "./safelist";
 import {
+  hasOptimizableCss,
   optimizeStrictAtRule,
   optimizeStrictRule,
 } from "./strict-css-optimizer";
@@ -242,6 +243,16 @@ export type OptimizedCssReport = {
   removed: number;
 };
 
+function toCssString(source: CreateOptimizedCssOptions["source"]): string {
+  if (typeof source === "string") return source;
+  // Same decoding PostCSS applies to a Buffer, without copying the bytes.
+  return Buffer.from(
+    source.buffer,
+    source.byteOffset,
+    source.byteLength,
+  ).toString();
+}
+
 export function createCssOptimizer(
   options: Omit<CreateOptimizedCssOptions, "source" | "from">,
 ) {
@@ -257,6 +268,15 @@ export function createCssOptimizer(
       source: CreateOptimizedCssOptions["source"],
       from?: string,
     ): OptimizedCssReport {
+      // Bundlers hand every CSS asset to the plugin, including per-route
+      // chunks with no Carbon styles at all. Parsing and re-serializing
+      // those is pure overhead, so skip PostCSS unless something removable
+      // could be present.
+      const input = toCssString(source);
+      if (!hasOptimizableCss(input)) {
+        return { css: input, removed: 0 };
+      }
+
       const report = { removed: 0 };
       const { css } = postcss(
         createPostcssPlugins(
@@ -266,7 +286,7 @@ export function createCssOptimizer(
           safelist,
           report,
         ),
-      ).process(source, { from });
+      ).process(input, { from });
       return { css, removed: report.removed };
     },
   };
