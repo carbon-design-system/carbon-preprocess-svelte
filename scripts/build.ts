@@ -32,6 +32,10 @@ async function buildProject() {
     format: "esm",
     target: "node",
     minify: true,
+    // Every consumer already has svelte installed to run its own compiler,
+    // so resolve it at runtime instead of bundling svelte/compiler (and its
+    // acorn dependency) into dist.
+    external: ["svelte", "svelte/*"],
   });
 
   if (!result.success) {
