@@ -40,7 +40,7 @@ export function splitSelectorList(selector: string): string[] {
 }
 
 /** Drop `:not(...)` subtrees before class extraction. */
-export function stripNotPseudoClasses(selector: string): string {
+function stripNotPseudoClasses(selector: string): string {
   let result = "";
   let notDepth = 0;
 
@@ -75,10 +75,6 @@ export function getCarbonClassesFromNormalized(normalized: string): string[] {
   );
 
   return [...new Set([...classes, ...legacyClasses])];
-}
-
-export function getCarbonClasses(selector: string): string[] {
-  return getCarbonClassesFromNormalized(stripNotPseudoClasses(selector));
 }
 
 /** Split a selector branch into ancestor compounds and the subject compound. */

@@ -94,7 +94,8 @@ function stripNotPseudoClasses(selector: string): string {
 
 /**
  * Pull `.bx--*` tokens from a selector. Normalizes legacy `.bx-` to `.bx--`.
- * Matches `getCarbonClasses` in the source so drift shows up in tests.
+ * Matches the source's `:not()` stripping + `getCarbonClassesFromNormalized`
+ * so drift shows up in tests.
  */
 export function carbonClassesIn(selector: string): string[] {
   const normalized = stripNotPseudoClasses(selector);

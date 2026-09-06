@@ -30,7 +30,7 @@ function stringSizeInKB(str: string) {
 }
 
 function padIfNeeded(a: string, b: string) {
-  return a.length > b.length ? a : a.padStart(b.length, " ");
+  return a.padStart(b.length, " ");
 }
 
 /**
