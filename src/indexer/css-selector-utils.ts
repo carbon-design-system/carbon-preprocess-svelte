@@ -17,6 +17,10 @@ const COMBINATOR_CHARS = new Set([
 
 /** Split on commas at parenthesis depth 0. */
 export function splitSelectorList(selector: string): string[] {
+  if (!selector.includes(",")) {
+    return [selector.trim()].filter(Boolean);
+  }
+
   const selectors: string[] = [];
   let depth = 0;
   let start = 0;
@@ -41,34 +45,34 @@ export function splitSelectorList(selector: string): string[] {
 
 /** Drop `:not(...)` subtrees before class extraction. */
 function stripNotPseudoClasses(selector: string): string {
+  let index = selector.indexOf(":not(");
+  if (index === -1) return selector;
+
   let result = "";
-  let notDepth = 0;
+  let start = 0;
 
-  for (let i = 0; i < selector.length; i++) {
-    if (
-      notDepth === 0 &&
-      selector[i] === ":" &&
-      selector.startsWith(":not(", i)
-    ) {
-      notDepth = 1;
-      i += 4;
-      continue;
+  while (index !== -1) {
+    result += selector.slice(start, index);
+
+    // Skip to just past the parenthesis that closes this `:not(`.
+    let depth = 1;
+    let i = index + 5;
+    for (; i < selector.length && depth > 0; i++) {
+      if (selector[i] === "(") depth++;
+      else if (selector[i] === ")") depth--;
     }
 
-    if (notDepth > 0) {
-      if (selector[i] === "(") notDepth++;
-      else if (selector[i] === ")") notDepth--;
-      continue;
-    }
-
-    result += selector[i];
+    start = i;
+    index = selector.indexOf(":not(", start);
   }
 
-  return result;
+  return result + selector.slice(start);
 }
 
 /** `normalized` must already be free of `:not(...)` subtrees. */
 export function getCarbonClassesFromNormalized(normalized: string): string[] {
+  if (!normalized.includes(".bx-")) return [];
+
   const classes = normalized.match(CARBON_CLASS) ?? [];
   const legacyClasses = (normalized.match(LEGACY_CARBON_CLASS) ?? []).map(
     (cls) => cls.replace(".bx-", ".bx--"),
@@ -84,8 +88,13 @@ export function splitSelectorParts(selector: string): {
 } {
   const normalized = stripNotPseudoClasses(selector);
   const parts: string[] = [];
-  let current = "";
   let depth = 0;
+  let start = 0;
+
+  const pushPart = (end: number) => {
+    const part = normalized.slice(start, end).trim();
+    if (part) parts.push(part);
+  };
 
   for (let i = 0; i < normalized.length; i++) {
     const char = normalized[i];
@@ -95,19 +104,12 @@ export function splitSelectorParts(selector: string): {
     } else if (char === ")") {
       depth = Math.max(0, depth - 1);
     } else if (depth === 0 && COMBINATOR_CHARS.has(char)) {
-      if (current.trim()) {
-        parts.push(current.trim());
-      }
-      current = "";
-      continue;
+      pushPart(i);
+      start = i + 1;
     }
-
-    current += char;
   }
 
-  if (current.trim()) {
-    parts.push(current.trim());
-  }
+  pushPart(normalized.length);
 
   if (parts.length <= 1) {
     return {
