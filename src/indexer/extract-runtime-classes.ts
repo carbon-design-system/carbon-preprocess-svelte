@@ -37,26 +37,39 @@ export function resolveRelativeImport(
   return `${joined}.js`;
 }
 
+/**
+ * `import … from "…"` / `import "…"` sources in a plain JS module. Carbon's
+ * utilities are simple enough that this matches a full Svelte-parser walk
+ * exactly (checked against every module in carbon-components-svelte) at
+ * ~1% of the cost. `.svelte` modules still go through the parser.
+ */
+const JS_IMPORT_SOURCE =
+  /\bimport\s*(?:[\w$*{}\s,]+?\s*from\s*)?["']([^"']+)["']/g;
+
 function collectImportsFromCode(
   code: string,
   moduleKey: string,
   isSvelte: boolean,
 ): string[] {
-  const ast = isSvelte
-    ? parse(code, { filename: moduleKey })
-    : parse(`<script>${code}</script>`, { filename: moduleKey });
   const imports: string[] = [];
+  const add = (spec: string) => {
+    const resolved = resolveRelativeImport(moduleKey, spec);
+    if (resolved) {
+      imports.push(resolved);
+    }
+  };
 
-  walk(ast, {
+  if (!isSvelte) {
+    for (const match of code.matchAll(JS_IMPORT_SOURCE)) {
+      add(match[1]);
+    }
+    return imports;
+  }
+
+  walk(parse(code, { filename: moduleKey }), {
     enter(node) {
       if (node.type === "ImportDeclaration" && node.source?.value) {
-        const resolved = resolveRelativeImport(
-          moduleKey,
-          String(node.source.value),
-        );
-        if (resolved) {
-          imports.push(resolved);
-        }
+        add(String(node.source.value));
       }
     },
   });
