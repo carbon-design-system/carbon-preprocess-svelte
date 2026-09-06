@@ -82,16 +82,13 @@ export function extractFromSvelte(
         }
       }
 
-      if (node.type === "Attribute" && node.name === "class") {
-        if (node.value) {
-          for (const value of node.value) {
-            if (value.type === "Text") {
-              for (const selector of value.data
-                .split(WHITESPACE_REGEX)
-                .filter(Boolean)) {
-                selectors.add(selector);
-              }
-            }
+      if (node.type === "Attribute" && node.name === "class" && node.value) {
+        for (const value of node.value) {
+          if (value.type !== "Text") continue;
+          for (const selector of value.data
+            .split(WHITESPACE_REGEX)
+            .filter(Boolean)) {
+            selectors.add(selector);
           }
         }
       }

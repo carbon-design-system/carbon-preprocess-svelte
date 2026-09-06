@@ -146,24 +146,22 @@ export async function buildRuntimeClassMap(
       return;
     }
 
-    loadPromises.set(
-      resolvedKey,
-      (async () => {
-        const filePath = path.join(carbonSrcPath, resolvedKey);
-        const code = await readFile(filePath, "utf8");
-        const runtime = extractRuntimeClassesFromSource(code);
+    const load = (async () => {
+      const filePath = path.join(carbonSrcPath, resolvedKey);
+      const code = await readFile(filePath, "utf8");
+      const runtime = extractRuntimeClassesFromSource(code);
 
-        if (runtime.length > 0) {
-          runtimeByModule.set(resolvedKey, new Set(runtime));
-        }
+      if (runtime.length > 0) {
+        runtimeByModule.set(resolvedKey, new Set(runtime));
+      }
 
-        importsByModule.set(
-          resolvedKey,
-          collectImportsFromCode(code, resolvedKey, isSvelteFile(resolvedKey)),
-        );
-      })(),
-    );
-    await loadPromises.get(resolvedKey);
+      importsByModule.set(
+        resolvedKey,
+        collectImportsFromCode(code, resolvedKey, isSvelteFile(resolvedKey)),
+      );
+    })();
+    loadPromises.set(resolvedKey, load);
+    await load;
   }
 
   async function collectRuntime(start: string): Promise<Set<string>> {

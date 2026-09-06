@@ -537,10 +537,27 @@ function getLeadingComment(stmt: ts.Statement, sf: ts.SourceFile): string {
   return `${ranges.map((r) => fullText.slice(r.pos, r.end)).join("\n")}\n`;
 }
 
+/** Keyed on the per-build `emitted` map so caches never outlive a build. */
+const parsedDts = new WeakMap<
+  Map<string, string>,
+  Map<string, ts.SourceFile>
+>();
+
 function parseDts(file: string, emitted: Map<string, string>): ts.SourceFile {
+  let cache = parsedDts.get(emitted);
+  if (!cache) {
+    cache = new Map();
+    parsedDts.set(emitted, cache);
+  }
+
+  const cached = cache.get(file);
+  if (cached) return cached;
+
   const text = emitted.get(file);
   if (text === undefined) throw new Error(`missing emit for ${file}`);
-  return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  cache.set(file, sf);
+  return sf;
 }
 
 function isRelative(spec: string): boolean {

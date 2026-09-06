@@ -8,7 +8,7 @@ import {
 import { resolveCarbonRoot } from "./resolve-carbon-root";
 
 /** Ancestors we must never auto-propagate (strict bundle pairs stay manual). */
-export const LAYOUT_ANCESTOR_DENYLIST = new Set([
+const LAYOUT_ANCESTOR_DENYLIST = new Set([
   ".bx--modal",
   ".bx--form--fluid",
   ".bx--pagination",
@@ -42,6 +42,16 @@ function walkCarbonRules(
   });
 }
 
+function addToSet(
+  map: Map<string, Set<string>>,
+  key: string,
+  value: string,
+): void {
+  const set = map.get(key) ?? new Set<string>();
+  set.add(value);
+  map.set(key, set);
+}
+
 function buildClassOwners(
   componentClasses: Map<string, Set<string>>,
 ): Map<string, Set<string>> {
@@ -49,9 +59,7 @@ function buildClassOwners(
 
   for (const [component, classes] of componentClasses.entries()) {
     for (const cls of classes) {
-      const set = owners.get(cls) ?? new Set<string>();
-      set.add(component);
-      owners.set(cls, set);
+      addToSet(owners, cls, component);
     }
   }
 
@@ -108,16 +116,6 @@ export type CssIndexAdditions = {
   orphans: Map<string, Set<string>>;
 };
 
-function addClass(
-  additions: Map<string, Set<string>>,
-  component: string,
-  cls: string,
-): void {
-  const set = additions.get(component) ?? new Set<string>();
-  set.add(cls);
-  additions.set(component, set);
-}
-
 /**
  * Walk Carbon CSS once and infer context ancestors plus CSS-orphan classes.
  */
@@ -173,7 +171,7 @@ export function extractCssIndexAdditions(
             }
 
             for (const component of subjectOwners) {
-              addClass(context, component, ancestor);
+              addToSet(context, component, ancestor);
             }
           }
         }
@@ -205,7 +203,7 @@ export function extractCssIndexAdditions(
 
       for (const orphan of branchOrphans) {
         for (const component of owners) {
-          addClass(orphans, component, orphan);
+          addToSet(orphans, component, orphan);
         }
       }
     }

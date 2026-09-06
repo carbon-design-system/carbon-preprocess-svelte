@@ -47,7 +47,7 @@ async function writeCache(
  * keyed by the installed version so a Carbon bump invalidates the cache
  * automatically (a new version simply misses and rebuilds).
  */
-export async function resolveLiveComponentIndex(): Promise<ComponentIndex> {
+async function resolveLiveComponentIndex(): Promise<ComponentIndex> {
   const carbonRoot = resolveCarbonRoot();
   const version = await readCarbonVersion(carbonRoot);
   const cacheDir = path.join(path.dirname(carbonRoot), CACHE_DIRNAME);

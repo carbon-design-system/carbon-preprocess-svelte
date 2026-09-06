@@ -261,7 +261,7 @@ export async function buildComponentIndex(options?: {
 
   const components: ComponentIndex = Object.fromEntries(
     [...exports_map.entries()]
-      .sort((a, b) => a.toLocaleString().localeCompare(b.toLocaleString()))
+      .sort((a, b) => a[0].localeCompare(b[0]))
       .filter(
         (entry): entry is [Identifier, IdentifierValue] => entry[1] !== null,
       ),
