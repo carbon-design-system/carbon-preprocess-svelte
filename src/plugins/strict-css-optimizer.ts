@@ -76,6 +76,12 @@ type AllowlistIndex = {
   exact: Set<string>;
   hyphenPrefixes: string[];
   shared: Set<string>;
+  /**
+   * Per-class verdicts. Carbon's stylesheet repeats the same ~1.3k class
+   * names across ~14k selector positions, so the prefix/parent walk in
+   * `matchesAllowlist` only needs to run once per distinct class.
+   */
+  verdicts: Map<string, boolean>;
 };
 
 const allowlistIndexCache = new WeakMap<Set<string>, AllowlistIndex>();
@@ -94,12 +100,26 @@ function getAllowlistIndex(allowlist: Set<string>): AllowlistIndex {
     }
   }
 
-  const index = { exact: allowlist, hyphenPrefixes, shared };
+  const index = {
+    exact: allowlist,
+    hyphenPrefixes,
+    shared,
+    verdicts: new Map<string, boolean>(),
+  };
   allowlistIndexCache.set(allowlist, index);
   return index;
 }
 
 function matchesAllowlist(name: string, index: AllowlistIndex): boolean {
+  const cached = index.verdicts.get(name);
+  if (cached !== undefined) return cached;
+
+  const verdict = computeAllowlistMatch(name, index);
+  index.verdicts.set(name, verdict);
+  return verdict;
+}
+
+function computeAllowlistMatch(name: string, index: AllowlistIndex): boolean {
   if (index.exact.has(name)) return true;
 
   for (const prefix of index.hyphenPrefixes) {
