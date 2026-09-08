@@ -13,8 +13,9 @@ group("buildComponentIndex (full scan)", () => {
 
 // Bonus: one-off phase breakdown (scan / css index / runtime graph / total) to
 // help point at *where* time goes, not just the aggregate.
-// Note: ostia has no in-suite run(), so this block executes during suite import
-// (before the benchmark table below is printed), not after like it did with mitata.
+// Note: this suite runs via the `ostia bench` CLI (not ostia's in-file run()),
+// so this block executes during suite import, before the benchmark table below
+// is printed, not after like it did with mitata.
 const timings: Record<string, number> = {};
 await buildComponentIndex({
   onTiming: (label, ms) => {
