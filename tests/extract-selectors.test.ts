@@ -1,4 +1,8 @@
-import { extractSelectors } from "../src/indexer/extract-selectors";
+import { parse } from "svelte/compiler";
+import { extractSelectors as extract } from "../src/indexer/extract-selectors";
+
+const extractSelectors = (props: { code: string; filename: string }) =>
+  extract({ ...props, parse });
 
 describe("extractSelectors", () => {
   test("extracts single class from class attribute", () => {

@@ -17,6 +17,7 @@ import {
 } from "../src/indexer/extract-runtime-classes";
 import { extractFromSvelte } from "../src/indexer/extract-selectors";
 import { listJsAndSvelteFiles } from "../src/indexer/list-files";
+import { loadSvelteParser } from "../src/indexer/svelte-parser";
 import { isSvelteFile } from "../src/utils";
 
 const carbonRoot = resolveCarbonRoot();
@@ -60,6 +61,7 @@ for (const [name, entry] of Object.entries(components)) {
 // The full build hands `buildRuntimeClassMap` the import graph of every
 // `.svelte` module it already parsed, so only `.js` utilities get loaded
 // on demand. Reproduce that once here; each trial starts from a copy.
+const parse = await loadSvelteParser();
 const files = await listJsAndSvelteFiles(carbonSrc);
 const scanned: ModuleGraphCache = {
   importsByModule: new Map(),
@@ -71,6 +73,7 @@ for (const file of files) {
   const extracted = extractFromSvelte({
     code: readFileSync(path.join(carbonSrc, file), "utf8"),
     filename: file,
+    parse,
   });
   scanned.importsByModule.set(file, extracted.imports);
   if (extracted.runtimeClasses.length > 0) {
@@ -84,13 +87,18 @@ group("buildComponentIndex phases", () => {
   });
 
   task("extractFromSvelte (Button.svelte)", () => {
-    extractFromSvelte({ code: BUTTON, filename: "Button/Button.svelte" });
+    extractFromSvelte({
+      code: BUTTON,
+      filename: "Button/Button.svelte",
+      parse,
+    });
   });
 
   task("extractFromSvelte (DataTable.svelte)", () => {
     extractFromSvelte({
       code: DATA_TABLE,
       filename: "DataTable/DataTable.svelte",
+      parse,
     });
   });
 
@@ -104,11 +112,16 @@ group("buildComponentIndex phases", () => {
   });
 
   task("buildRuntimeClassMap (svelte graph pre-scanned)", async () => {
-    await buildRuntimeClassMap(carbonSrc, moduleToComponent, {
-      importsByModule: new Map(scanned.importsByModule),
-      runtimeByModule: new Map(scanned.runtimeByModule),
-      files: scanned.files,
-    });
+    await buildRuntimeClassMap(
+      carbonSrc,
+      moduleToComponent,
+      {
+        importsByModule: new Map(scanned.importsByModule),
+        runtimeByModule: new Map(scanned.runtimeByModule),
+        files: scanned.files,
+      },
+      parse,
+    );
   });
 });
 

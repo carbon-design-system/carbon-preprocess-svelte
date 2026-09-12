@@ -13,7 +13,7 @@ If you're not sure what to build or how to approach a change, [file an issue](ht
 
 [Bun](https://bun.sh/) is the package manager, test runner, and bundler. There is no separate Node toolchain for development. Run package scripts with `bun run <script>` and one-off binaries with `bunx <bin>`.
 
-The package has no runtime dependencies. Everything it needs (`postcss`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. `carbon-components-svelte` is _also_ a `devDependency`. The index generator reads it (see below); the published package does not.
+The package has no runtime dependencies. Everything it needs (`postcss`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. The one thing that is neither bundled nor declared is `svelte/compiler`: the live index parses Carbon's source with it, so [`src/indexer/svelte-parser.ts`](src/indexer/svelte-parser.ts) loads it through a dynamic `import()` that runs only when `experimental.liveIndex` is on, resolved from the consumer's own `svelte` install. `scripts/build.ts` fails the build if a static `from "svelte…"` import ever lands in `dist/index.js`. `carbon-components-svelte` is _also_ a `devDependency`. The index generator reads it (see below); the published package does not.
 
 ## Project set-up
 

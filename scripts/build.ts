@@ -1,7 +1,10 @@
 import { watch } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { $, build } from "bun";
 import { bundleDts } from "./bundle-dts";
+
+const STATIC_SVELTE_IMPORT = /\bfrom\s*["']svelte/;
 
 const isWatchMode =
   process.argv.includes("-w") || process.argv.includes("--watch");
@@ -43,6 +46,20 @@ async function buildProject() {
     for (const log of result.logs) {
       console.error(log);
     }
+    if (!isWatchMode) {
+      process.exit(1);
+    }
+    return;
+  }
+
+  // `svelte/compiler` must only ever be reached through the live index's
+  // dynamic import (see src/indexer/svelte-parser.ts). A static import here
+  // would make every consumer pay for it at module load.
+  const bundle = await readFile("./dist/index.js", "utf8");
+  if (STATIC_SVELTE_IMPORT.test(bundle)) {
+    console.error(
+      "Build failed: dist/index.js statically imports svelte. Import it lazily via loadSvelteParser() instead.",
+    );
     if (!isWatchMode) {
       process.exit(1);
     }
