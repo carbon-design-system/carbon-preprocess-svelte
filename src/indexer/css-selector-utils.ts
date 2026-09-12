@@ -3,7 +3,7 @@ const OPEN_PAREN = 40;
 const CLOSE_PAREN = 41;
 
 /** `[A-Za-z0-9_-]`: the characters that continue a class token. */
-function isClassTokenChar(code: number): boolean {
+export function isClassTokenChar(code: number): boolean {
   return (
     (code >= 97 && code <= 122) ||
     (code >= 65 && code <= 90) ||
@@ -49,7 +49,7 @@ export function splitSelectorList(selector: string): string[] {
 }
 
 /** Drop `:not(...)` subtrees before class extraction. */
-function stripNotPseudoClasses(selector: string): string {
+export function stripNotPseudoClasses(selector: string): string {
   let index = selector.indexOf(":not(");
   if (index === -1) return selector;
 
@@ -120,6 +120,38 @@ export function getCarbonClassesFromNormalized(normalized: string): string[] {
   }
 
   return classes;
+}
+
+/**
+ * Offset where the subject compound starts in a `:not(...)`-free selector:
+ * the last compound after a depth-0 combinator, skipping empty compounds
+ * (runs of combinator characters), exactly as `splitSelectorParts` picks its
+ * `subject`. Everything before it is the ancestor compounds and the
+ * combinators between them; `0` when the selector is a single compound.
+ */
+export function findSubjectStart(normalized: string): number {
+  const length = normalized.length;
+  let subjectStart = 0;
+  let depth = 0;
+  let start = 0;
+
+  for (let i = 0; i <= length; i++) {
+    const code = i < length ? normalized.charCodeAt(i) : -1;
+
+    if (code === OPEN_PAREN) {
+      depth++;
+    } else if (code === CLOSE_PAREN) {
+      if (depth > 0) depth--;
+    } else if (
+      i === length ||
+      (depth === 0 && code < 128 && COMBINATOR_CHARS[code] === 1)
+    ) {
+      if (i > start) subjectStart = start;
+      start = i + 1;
+    }
+  }
+
+  return subjectStart;
 }
 
 /** Split a selector branch into ancestor compounds and the subject compound. */
