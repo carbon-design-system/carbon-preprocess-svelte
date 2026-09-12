@@ -80,6 +80,13 @@ function collectImportsFromCode(
 export type ModuleGraphCache = {
   importsByModule: Map<string, string[]>;
   runtimeByModule: Map<string, Set<string>>;
+  /**
+   * Every `.js`/`.svelte` module key under the Carbon `src` directory, when
+   * the caller has already listed them. Import resolution then never touches
+   * the filesystem; without it, each candidate path is checked with
+   * `existsSync`.
+   */
+  files?: Set<string>;
 };
 
 function importCandidates(spec: string): string[] {
@@ -101,6 +108,7 @@ function resolveExistingModuleKey(
   carbonSrcPath: string,
   moduleKey: string,
   cache: Map<string, string | null>,
+  files: Set<string> | undefined,
 ): string | null {
   const cached = cache.get(moduleKey);
   if (cached !== undefined) return cached;
@@ -108,7 +116,10 @@ function resolveExistingModuleKey(
   let resolved: string | null = null;
 
   for (const candidate of importCandidates(moduleKey)) {
-    if (existsSync(path.join(carbonSrcPath, candidate))) {
+    const exists = files
+      ? files.has(candidate)
+      : existsSync(path.join(carbonSrcPath, candidate));
+    if (exists) {
       resolved = candidate;
       break;
     }
@@ -127,7 +138,7 @@ export async function buildRuntimeClassMap(
   moduleToComponent: Map<string, string>,
   cache: ModuleGraphCache,
 ): Promise<Map<string, Set<string>>> {
-  const { importsByModule, runtimeByModule } = cache;
+  const { importsByModule, runtimeByModule, files } = cache;
   const reachableRuntime = new Map<string, Set<string>>();
   const resolveCache = new Map<string, string | null>();
   const loadPromises = new Map<string, Promise<void>>();
@@ -142,6 +153,7 @@ export async function buildRuntimeClassMap(
       carbonSrcPath,
       moduleKey,
       resolveCache,
+      files,
     );
 
     if (!resolvedKey) {
@@ -187,16 +199,14 @@ export async function buildRuntimeClassMap(
     const visited = new Set<string>();
     const queue = [start];
 
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current) {
-        continue;
-      }
+    for (let head = 0; head < queue.length; head++) {
+      const current = queue[head];
 
       const resolvedCurrent = resolveExistingModuleKey(
         carbonSrcPath,
         current,
         resolveCache,
+        files,
       );
 
       if (!resolvedCurrent || visited.has(resolvedCurrent)) {

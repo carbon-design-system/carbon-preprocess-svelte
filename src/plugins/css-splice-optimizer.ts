@@ -1196,3 +1196,40 @@ export function spliceOptimizeCss(
     removed: optimizer.removed,
   };
 }
+
+/**
+ * Calls `onRule` with every rule's selector in document order (the order
+ * `Root#walkRules` visits them), parsing with the splice tokenizer instead
+ * of building a PostCSS AST. Returns `false` without calling `onRule` when
+ * the stylesheet falls outside the modeled shape, so the caller can fall
+ * back to PostCSS.
+ */
+export function forEachRuleSelector(
+  css: string,
+  onRule: (selector: string) => void,
+): boolean {
+  const first = css.charCodeAt(0);
+  if (first === BOM || first === BOM_REVERSED) return false;
+
+  let root: CssNode;
+  try {
+    root = new Parser(css).parse();
+  } catch (error) {
+    if (error === BAIL) return false;
+    throw error;
+  }
+
+  const stack: CssNode[] = [root];
+  while (stack.length > 0) {
+    const node = stack.pop() as CssNode;
+    if (node.type === N_RULE) onRule(css.slice(node.a, node.b));
+    const nodes = node.nodes;
+    if (!nodes) continue;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const child = nodes[i];
+      if (typeof child !== "number") stack.push(child);
+    }
+  }
+
+  return true;
+}
