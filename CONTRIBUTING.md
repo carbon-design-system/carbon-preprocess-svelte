@@ -3,7 +3,7 @@
 `carbon-preprocess-svelte` ships Svelte preprocessors and build plugins that make [Carbon Design System](https://github.com/carbon-design-system/carbon-components-svelte) apps smaller and faster. Two separate problems:
 
 - **`optimizeImports`**, a Svelte _script_ preprocessor that rewrites barrel imports (`import { Button } from "carbon-components-svelte"`) into direct path imports (`import Button from "carbon-components-svelte/src/Button/Button.svelte"`) so bundlers tree-shake and HMR stays fast.
-- **`optimizeCss` / `OptimizeCssPlugin`**, build plugins (Vite/Rollup and Webpack) that strip unused Carbon CSS rules from production output.
+- **`optimizeCss` / `OptimizeCssPlugin`**, build plugins (Vite/Rollup and Webpack/Rspack) that strip unused Carbon CSS rules from production output.
 
 Option shapes, usage per bundler, and what each export does are in [README.md](README.md). That file is the source of truth for what the package supports. This file is how the code is built and changed.
 
@@ -53,14 +53,14 @@ bun install
 | `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
 | `bun run upgrade-examples` | `bun update` inside each `examples/*` project. |
 
-Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds six real apps.
+Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds seven real apps.
 
 ## How it works
 
 The package has two entry points, exported from [`src/index.ts`](src/index.ts):
 
 ```ts
-export { default as OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin"; // Webpack
+export { default as OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin"; // Webpack/Rspack
 export { optimizeCss } from "./plugins/optimize-css";                       // Vite/Rollup
 export { optimizeImports } from "./preprocessors/optimize-imports";         // Svelte preprocessor
 ```
@@ -114,12 +114,12 @@ Set `DEBUG_INDEX=1` to print per-stage timings.
 - Carbon component names resolve through the index `path`. Names missing from the index get an _optimistic_ `src/Name/Name.svelte` path **only if PascalCase**. camelCase utilities stay on the barrel so we never point at a `.svelte` file that is not there. Icons and pictograms map to `lib/Name.svelte`.
 - **Type imports stay on the barrel.** `import type { … }` statements are left alone. In `import { type X, Y }`, `X` stays on the barrel and only `Y` is rewritten. Recent fixes ([#138](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/138), [#133](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/133)) live here. Add a fixture in [`tests/optimize-imports.test.ts`](tests/optimize-imports.test.ts) for any import-shape change.
 
-### `optimizeCss` (Vite/Rollup) and `OptimizeCssPlugin` (Webpack)
+### `optimizeCss` (Vite/Rollup) and `OptimizeCssPlugin` (Webpack/Rspack)
 
 Both plugins do the same job through different bundler hooks, then call the same optimizer.
 
 - [`src/plugins/optimize-css.ts`](src/plugins/optimize-css.ts) is the Vite plugin (`apply: "build"`, `enforce: "post"`). It collects Carbon component ids in the `transform` hook (it transforms nothing, just records ids), then rewrites CSS assets in `generateBundle` by mutating `file.source` in place. Synchronous PostCSS.
-- [`src/plugins/OptimizeCssPlugin.ts`](src/plugins/OptimizeCssPlugin.ts) is the Webpack plugin, production-only. It collects ids from `NormalModule` `beforeSnapshot` `fileDependencies`, processes CSS assets at `PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE` (before minification). Async PostCSS, all assets in parallel via `Promise.all`.
+- [`src/plugins/OptimizeCssPlugin.ts`](src/plugins/OptimizeCssPlugin.ts) is the Webpack plugin, production-only. It collects ids by reading each module's `resource` in the `finishModules` hook (fires once the whole module graph has resolved, so every Carbon Svelte component already exists as its own module), then processes CSS assets at `PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE` (before minification). Async PostCSS, all assets in parallel via `Promise.all`. It is typed against a minimal structural subset of the `Compiler`/`Compilation` API (not imported from the `webpack` package) so the same plugin instance also works unchanged with Rspack, which implements that same `compiler.webpack` namespace for plugin compatibility but does not implement webpack's `NormalModule.getCompilationHooks().beforeSnapshot` hook that an earlier version of this plugin relied on.
 
 The shared core is [`src/plugins/create-optimized-css.ts`](src/plugins/create-optimized-css.ts). It builds an **allowlist** of `.bx--*` classes from the bundled components' index entries, plus `ALWAYS_ON_CLASSES` and any `content`-scanned tokens, then runs a PostCSS pipeline (the Carbon rule/at-rule visitor + `postcss-discard-empty`). It exposes sync (`optimizeCssWithReport`) and async (`…Async`) variants because Vite and Webpack differ. Keep the two in lockstep when you change behavior. The `report.removed` count suppresses the size-diff log when nothing was pruned ([#131](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/131)).
 
@@ -180,12 +180,13 @@ Shared helpers (`buildAllowlist`, `matchesAllowlist`, `shouldKeepStrictSelector`
 
 ### End-to-end tests
 
-[`tests/test-e2e.ts`](tests/test-e2e.ts) (`bun run test:e2e`) builds the package, `bun link`s it into each project under [`examples/`](examples), builds every example, parses the `printDiff` output, and compares CSS reduction to [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json) within 0.01 tolerance. Unit tests will not catch a plugin that silently no-ops inside a real Vite or Webpack build. This suite will.
+[`tests/test-e2e.ts`](tests/test-e2e.ts) (`bun run test:e2e`) builds the package, `bun link`s it into each project under [`examples/`](examples), builds every example, parses the `printDiff` output, and compares CSS reduction to [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json) within 0.01 tolerance. Unit tests will not catch a plugin that silently no-ops inside a real Vite, Webpack, or Rspack build. This suite will — it's how the `finishModules`/`resource` rewrite of `OptimizeCssPlugin` was validated against real Webpack and Rspack builds, since the unit test mock alone could not have caught the timing bug where `buildInfo.fileDependencies` isn't populated yet at `finishModules`.
 
 The examples are real downstream consumers, each linking the package via `"carbon-preprocess-svelte": "link:carbon-preprocess-svelte"`:
 
 - `examples/rollup`, `examples/vite`, `examples/vite@svelte-5`, `examples/sveltekit`: Vite/Rollup plugin path
 - `examples/webpack`, `examples/webpack@svelte-5`: Webpack plugin path
+- `examples/rspack`: Rspack plugin path, using the same `OptimizeCssPlugin` export as Webpack
 
 Other Svelte frameworks (Astro, Routify, …) run Vite under the hood, so the Vite examples cover them. When you change output shape or reduction behavior, update snapshots and read the diff:
 

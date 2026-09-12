@@ -1,4 +1,3 @@
-import type { Compiler } from "webpack";
 import { setComponents } from "../component-index-registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile } from "../utils";
@@ -8,11 +7,58 @@ import { printDiff } from "./print-diff";
 import { scanContentClasses } from "./scan-content";
 
 /**
- * Webpack plugin that removes unused Carbon CSS classes from production builds.
+ * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
+ * used by this plugin. Rspack's compiler exposes the same `compiler.webpack`
+ * namespace (`Compilation`, `sources`, etc.) for plugin compatibility, so
+ * typing against this shape—rather than importing from the `webpack`
+ * package—lets the same plugin instance be used with either bundler without
+ * adding a dependency on either one.
+ */
+type WebpackAssetSource = {
+  source(): string | Buffer;
+};
+
+type WebpackCompilation = {
+  hooks: {
+    finishModules: {
+      tap(name: string, callback: (modules: Iterable<unknown>) => void): void;
+    };
+    processAssets: {
+      tapPromise(
+        options: { name: string; stage: number },
+        callback: (assets: Record<string, WebpackAssetSource>) => Promise<void>,
+      ): void;
+    };
+  };
+  updateAsset(name: string, source: unknown): void;
+};
+
+type WebpackCompiler = {
+  options: { mode?: string };
+  webpack: {
+    Compilation: { PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE: number };
+    sources: { RawSource: new (source: string) => unknown };
+  };
+  hooks: {
+    thisCompilation: {
+      tap(
+        name: string,
+        callback: (compilation: WebpackCompilation) => void,
+      ): void;
+    };
+  };
+};
+
+/**
+ * Webpack/Rspack plugin that removes unused Carbon CSS classes from production builds.
+ *
+ * Rspack aims for webpack plugin API compatibility, so this single plugin works
+ * with both bundlers unchanged.
  *
  * The plugin operates in two phases:
  * 1. During module processing, it collects all Carbon Svelte component file paths
- *    by inspecting each module's file dependencies in the `beforeSnapshot` hook.
+ *    by inspecting each module's `resource` in the `finishModules` hook, which
+ *    fires once every module in the graph has resolved.
  * 2. During asset processing, it uses PostCSS to strip CSS rules that don't match
  *    any classes used by the collected components.
  *
@@ -29,7 +75,7 @@ export default class OptimizeCssPlugin {
     };
   }
 
-  public apply(compiler: Compiler) {
+  public apply(compiler: WebpackCompiler) {
     if (compiler.options.mode !== "production") {
       return;
     }
@@ -37,7 +83,6 @@ export default class OptimizeCssPlugin {
     const {
       webpack: {
         Compilation,
-        NormalModule,
         sources: { RawSource },
       },
     } = compiler;
@@ -45,24 +90,27 @@ export default class OptimizeCssPlugin {
     compiler.hooks.thisCompilation.tap(
       OptimizeCssPlugin.name,
       (compilation) => {
-        const hooks = NormalModule.getCompilationHooks(compilation);
         const ids = new Set<string>();
 
         /**
-         * The `beforeSnapshot` hook fires after a module is built but before
-         * its snapshot is taken for caching. At this point, `buildInfo.fileDependencies`
-         * contains all files the module depends on, which includes imported Svelte components.
-         * Filter these to find Carbon component paths for the allowlist.
+         * `finishModules` fires once every module in the graph has resolved,
+         * so each imported Carbon Svelte component already exists as its own
+         * module with a `resource` (its resolved file path) set.
          */
-        hooks.beforeSnapshot.tap(OptimizeCssPlugin.name, ({ buildInfo }) => {
-          if (buildInfo?.fileDependencies) {
-            for (const id of buildInfo.fileDependencies) {
-              if (isCarbonSvelteImport(id)) {
-                ids.add(id);
+        compilation.hooks.finishModules.tap(
+          OptimizeCssPlugin.name,
+          (modules) => {
+            for (const module of modules) {
+              const resource = (module as { resource?: unknown }).resource;
+              if (
+                typeof resource === "string" &&
+                isCarbonSvelteImport(resource)
+              ) {
+                ids.add(resource);
               }
             }
-          }
-        });
+          },
+        );
 
         /**
          * Process assets at OPTIMIZE_SIZE stage, which runs after the CSS has been

@@ -27,7 +27,7 @@ bun add -D carbon-preprocess-svelte
 
 - [**optimizeImports**](#optimizeimports): Svelte preprocessor that rewrites Carbon Svelte imports to their source path in the `script` block, making development compile times dramatically faster.
 - [**optimizeCss**](#optimizecss): Vite/Rollup plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
-- [**OptimizeCssPlugin**](#optimizecssplugin): The corresponding `optimizeCss` plugin for Webpack that removes unused Carbon styles.
+- [**OptimizeCssPlugin**](#optimizecssplugin): The corresponding `optimizeCss` plugin for Webpack and Rspack that removes unused Carbon styles.
 
 ### `optimizeImports`
 
@@ -132,6 +132,33 @@ This code is abridged; see [examples/webpack](examples/webpack) for a full set-u
 
 ```js
 // webpack.config.mjs
+import { optimizeImports } from "carbon-preprocess-svelte";
+
+export default {
+  module: {
+    rules: [
+      {
+        test: /\.svelte$/,
+        use: {
+          loader: "svelte-loader",
+          options: {
+            hotReload: !PROD,
+            preprocess: [optimizeImports()],
+            compilerOptions: { dev: !PROD },
+          },
+        },
+      },
+    ],
+  },
+};
+```
+
+#### Rspack
+
+[Rspack](https://rspack.rs) implements webpack's plugin and loader APIs, so the set-up is the same as [Webpack](#webpack) above (`svelte-loader` works unchanged). This code is abridged; see [examples/rspack](examples/rspack) for a full set-up.
+
+```js
+// rspack.config.mjs
 import { optimizeImports } from "carbon-preprocess-svelte";
 
 export default {
@@ -354,12 +381,12 @@ optimizeCss({
 
 ### `OptimizeCssPlugin`
 
-For Webpack users, `OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`. The plugin API is identical to that of `optimizeCss`. Similarly, the plugin only runs in production mode.
+For Webpack and [Rspack](https://rspack.rs) users, `OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`. The plugin API is identical to that of `optimizeCss`. Similarly, the plugin only runs in production mode. The same `OptimizeCssPlugin` instance works unchanged with both bundlers since Rspack implements webpack's plugin API.
 
-This code is abridged; see [examples/webpack](examples/webpack) or [examples/webpack@svelte-5](examples/webpack@svelte-5) for a full set-up.
+This code is abridged; see [examples/webpack](examples/webpack), [examples/webpack@svelte-5](examples/webpack@svelte-5), or [examples/rspack](examples/rspack) for a full set-up.
 
 ```js
-// webpack.config.mjs
+// webpack.config.mjs (or rspack.config.mjs)
 import { OptimizeCssPlugin } from "carbon-preprocess-svelte";
 
 export default {

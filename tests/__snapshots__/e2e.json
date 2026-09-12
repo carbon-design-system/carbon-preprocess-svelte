@@ -5,6 +5,12 @@
     "after_kb": 49.42,
     "reduction_percent": 93.04
   },
+  "rspack": {
+    "file": "build/bundle.*.css",
+    "before_kb": 831.66,
+    "after_kb": 53.09,
+    "reduction_percent": 93.62
+  },
   "sveltekit": {
     "file": "_app/immutable/assets/2.*.css",
     "before_kb": 695.03,

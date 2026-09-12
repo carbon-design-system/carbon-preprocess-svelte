@@ -6,16 +6,21 @@ import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
 const createMockCompiler = (
   options: {
     assets?: Record<string, unknown>;
-    fileDependencies?: string[];
+    moduleResources?: string[];
     mode?: "production" | "development" | "none";
   } = {},
 ) => {
-  const { assets = {}, fileDependencies = [], mode = "production" } = options;
+  const { assets = {}, moduleResources = [], mode = "production" } = options;
 
   let processAssetsPromise: Promise<void> | null = null;
 
   const compilation = {
     hooks: {
+      finishModules: {
+        tap: jest.fn((_, callback) => {
+          callback(moduleResources.map((resource) => ({ resource })));
+        }),
+      },
       processAssets: {
         tapPromise: jest.fn((_, callback) => {
           processAssetsPromise = callback(assets);
@@ -23,14 +28,6 @@ const createMockCompiler = (
       },
     },
     updateAsset: jest.fn(),
-  };
-
-  const normalModuleHooks = {
-    beforeSnapshot: {
-      tap: jest.fn((_, callback) => {
-        callback({ buildInfo: { fileDependencies } });
-      }),
-    },
   };
 
   return {
@@ -45,15 +42,11 @@ const createMockCompiler = (
         PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE:
           "PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE",
       },
-      NormalModule: {
-        getCompilationHooks: () => normalModuleHooks,
-      },
       sources: {
         RawSource: jest.fn((content) => ({ source: () => content })),
       },
     },
     compilation,
-    normalModuleHooks,
     waitForProcessAssets: () => processAssetsPromise,
   };
 };
@@ -89,7 +82,7 @@ describe("OptimizeCssPlugin", () => {
     const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => ".bx--btn { color: blue; }" } },
-      fileDependencies: ["node_modules/carbon-components-svelte/Button.svelte"],
+      moduleResources: ["node_modules/carbon-components-svelte/Button.svelte"],
       mode: "development",
     });
 
@@ -101,7 +94,7 @@ describe("OptimizeCssPlugin", () => {
     const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => "body { color: red; }" } },
-      fileDependencies: ["regular-component.svelte"],
+      moduleResources: ["regular-component.svelte"],
     });
 
     plugin.apply(asCompiler(mockCompiler));
@@ -117,7 +110,7 @@ describe("OptimizeCssPlugin", () => {
       assets: {
         "styles.css": { source: () => cssContent },
       },
-      fileDependencies: [carbonComponent],
+      moduleResources: [carbonComponent],
     });
 
     plugin.apply(asCompiler(mockCompiler));
@@ -138,7 +131,7 @@ describe("OptimizeCssPlugin", () => {
       assets: {
         "styles.css": { source: () => cssContent },
       },
-      fileDependencies: [carbonComponent],
+      moduleResources: [carbonComponent],
     });
 
     plugin.apply(asCompiler(mockCompiler));
@@ -163,7 +156,7 @@ describe("OptimizeCssPlugin", () => {
       assets: {
         "styles.css": { source: () => cssWithUnusedCarbon },
       },
-      fileDependencies: [carbonComponent],
+      moduleResources: [carbonComponent],
     });
 
     plugin.apply(asCompiler(mockCompiler));
@@ -186,7 +179,7 @@ describe("OptimizeCssPlugin", () => {
       assets: {
         "styles.css": { source: () => cssWithOnlyUsedCarbon },
       },
-      fileDependencies: [carbonComponent],
+      moduleResources: [carbonComponent],
     });
 
     plugin.apply(asCompiler(mockCompiler));
@@ -206,7 +199,7 @@ describe("OptimizeCssPlugin", () => {
       assets: {
         "styles.css": { source: () => cssContent },
       },
-      fileDependencies: [carbonComponent],
+      moduleResources: [carbonComponent],
     });
 
     plugin.apply(asCompiler(mockCompiler));
