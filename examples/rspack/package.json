@@ -15,6 +15,6 @@
     "svelte": "^5.57.0",
     "svelte-loader": "latest",
     "svelte-preprocess": "latest",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }
