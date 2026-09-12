@@ -447,7 +447,7 @@ function writeVlq(buffer: Uint8Array, out: number, value: number): number {
  * `src/Name/Name.svelte` path; camelCase stays on the barrel so utilities
  * don't point at a `.svelte` file that isn't there.
  */
-export type OptimizeImportsOptions = {
+type OptimizeImportsOptions = {
   experimental?: {
     /**
      * Build the component index from *this project's* installed
