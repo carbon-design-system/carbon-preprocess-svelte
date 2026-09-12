@@ -2,10 +2,10 @@
   "ids": [
     "Toggle"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 22969,
-  "reduction_percent": 96.77,
-  "kept_rules": 124,
+  "before_bytes": 709971,
+  "after_bytes": 22823,
+  "reduction_percent": 96.79,
+  "kept_rules": 122,
   "leaked_count": 0,
   "leaked_classes": []
 }

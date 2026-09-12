@@ -4,10 +4,10 @@
     "Tab",
     "TabContent"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 49205,
-  "reduction_percent": 93.08,
-  "kept_rules": 295,
+  "before_bytes": 709971,
+  "after_bytes": 52237,
+  "reduction_percent": 92.64,
+  "kept_rules": 294,
   "leaked_count": 0,
   "leaked_classes": []
 }

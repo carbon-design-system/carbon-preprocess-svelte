@@ -2,10 +2,10 @@
   "ids": [
     "Modal"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 81860,
-  "reduction_percent": 88.49,
-  "kept_rules": 488,
+  "before_bytes": 709971,
+  "after_bytes": 77816,
+  "reduction_percent": 89.04,
+  "kept_rules": 468,
   "leaked_count": 0,
   "leaked_classes": []
 }

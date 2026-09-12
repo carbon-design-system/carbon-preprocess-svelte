@@ -2,10 +2,10 @@
   "ids": [
     "Header"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 18904,
-  "reduction_percent": 97.34,
-  "kept_rules": 106,
+  "before_bytes": 709971,
+  "after_bytes": 17725,
+  "reduction_percent": 97.5,
+  "kept_rules": 95,
   "leaked_count": 0,
   "leaked_classes": []
 }
