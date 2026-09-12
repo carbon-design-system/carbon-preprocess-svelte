@@ -48,7 +48,7 @@
     "carbon-components-svelte": "latest",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
     "svelte": "^5.57.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "latest"
   }
 }
