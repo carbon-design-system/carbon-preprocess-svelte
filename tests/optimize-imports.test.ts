@@ -235,6 +235,22 @@ import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
 import NewComponent from "carbon-components-svelte/src/NewComponent/NewComponent.svelte";`);
   });
 
+  test("experimental.liveIndex: returns a promise that resolves to the rewritten script", async () => {
+    const result = optimizeImports({
+      experimental: { liveIndex: true },
+    }).script({
+      attributes: {},
+      filename: "test.svelte",
+      content: `import { Button } from "carbon-components-svelte";`,
+      markup: "",
+    });
+
+    expect(result).toBeInstanceOf(Promise);
+    expect((await result)?.code).toEqual(
+      `import Button from "carbon-components-svelte/src/Button/Button.svelte";`,
+    );
+  });
+
   test("optimistic guess resolves correctly against a real old-version index (0.85.0), not just a made-up name", async () => {
     const carbonRoot = resolvePackageRoot("carbon-components-svelte-old");
     const oldIndex = await buildComponentIndex({ carbonRoot });
