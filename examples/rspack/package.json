@@ -1,0 +1,20 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rspack dev",
+    "build": "NODE_ENV=production rspack build"
+  },
+  "devDependencies": {
+    "@rspack/cli": "latest",
+    "@rspack/core": "latest",
+    "@rspack/dev-server": "latest",
+    "carbon-components-svelte": "latest",
+    "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "css-loader": "latest",
+    "svelte": "^5.57.0",
+    "svelte-loader": "latest",
+    "svelte-preprocess": "latest",
+    "typescript": "^6.0.3"
+  }
+}

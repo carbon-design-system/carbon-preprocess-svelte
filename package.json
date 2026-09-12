@@ -64,7 +64,8 @@
     "optimize CSS",
     "vite",
     "rollup",
-    "webpack"
+    "webpack",
+    "rspack"
   ],
   "files": [
     "dist"
