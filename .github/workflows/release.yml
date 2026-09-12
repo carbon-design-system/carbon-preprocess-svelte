@@ -21,9 +21,7 @@ jobs:
         run: bun ci
 
       - name: Build package
-        run: |
-          bun run build
-          bun run build:prune-package
+        run: bun run build
 
       - name: Publish to NPM
         env:
