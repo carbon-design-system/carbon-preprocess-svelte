@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { walk } from "estree-walker";
-import { parse } from "svelte/compiler";
 import { CarbonSvelte } from "../constants";
 import { isSvelteFile } from "../utils";
 import {
@@ -16,6 +15,7 @@ import { extractFromSvelte } from "./extract-selectors";
 import { listJsAndSvelteFiles } from "./list-files";
 import { mergeSubComponentClasses } from "./merge-sub-component-classes";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
+import { loadSvelteParser } from "./svelte-parser";
 
 export { resolveCarbonRoot } from "./resolve-carbon-root";
 
@@ -41,7 +41,10 @@ export async function buildComponentIndex(options?: {
   const carbon_path = options?.carbonRoot ?? resolveCarbonRoot();
   const carbon_src = path.join(carbon_path, "src");
   const index_js = path.join(carbon_src, "index.js");
-  const index_file = await readFile(index_js, "utf8");
+  const [index_file, parse] = await Promise.all([
+    readFile(index_js, "utf8"),
+    loadSvelteParser(),
+  ]);
 
   type Identifier = string;
   type IdentifierValue = { path: string; classes: string[] };
@@ -89,7 +92,7 @@ export async function buildComponentIndex(options?: {
           const file_text = await readFile(path.join(carbon_src, file), "utf8");
           return [
             file,
-            extractFromSvelte({ code: file_text, filename: file }),
+            extractFromSvelte({ code: file_text, filename: file, parse }),
           ] as const;
         }),
       )
@@ -213,6 +216,7 @@ export async function buildComponentIndex(options?: {
           carbon_src,
           module_to_component,
           moduleGraph,
+          parse,
         );
         emit("runtime graph", performance.now() - runtimeStart);
         return runtime;

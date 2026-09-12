@@ -1,10 +1,10 @@
 import { walk } from "estree-walker";
-import { parse } from "svelte/compiler";
 import { CARBON_PREFIX } from "../constants";
 import {
   extractRuntimeClassesFromSource,
   resolveRelativeImport,
 } from "./extract-runtime-classes";
+import type { SvelteParser } from "./svelte-parser";
 
 const WHITESPACE_REGEX = /\s+/;
 const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
@@ -12,6 +12,7 @@ const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
 type ExtractSelectorsProps = {
   code: string;
   filename: string;
+  parse: SvelteParser;
 };
 
 export type ExtractFromSvelteResult = {
@@ -54,7 +55,7 @@ function nodeContainsDefaultSlot(node: {
 export function extractFromSvelte(
   props: ExtractSelectorsProps,
 ): ExtractFromSvelteResult {
-  const { code, filename } = props;
+  const { code, filename, parse } = props;
   const moduleKey = filename.replace(/\\/g, "/");
   const ast = parse(code, { filename });
   const selectors = new Set<string>();

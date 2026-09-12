@@ -2,9 +2,9 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { walk } from "estree-walker";
-import { parse } from "svelte/compiler";
 import { RE_EXT_SVELTE } from "../constants";
 import { isSvelteFile } from "../utils";
+import type { SvelteParser } from "./svelte-parser";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;
@@ -50,6 +50,7 @@ function collectImportsFromCode(
   code: string,
   moduleKey: string,
   isSvelte: boolean,
+  parse: SvelteParser,
 ): string[] {
   const imports: string[] = [];
   const add = (spec: string) => {
@@ -137,6 +138,7 @@ export async function buildRuntimeClassMap(
   carbonSrcPath: string,
   moduleToComponent: Map<string, string>,
   cache: ModuleGraphCache,
+  parse: SvelteParser,
 ): Promise<Map<string, Set<string>>> {
   const { importsByModule, runtimeByModule, files } = cache;
   const reachableRuntime = new Map<string, Set<string>>();
@@ -182,7 +184,12 @@ export async function buildRuntimeClassMap(
 
       importsByModule.set(
         resolvedKey,
-        collectImportsFromCode(code, resolvedKey, isSvelteFile(resolvedKey)),
+        collectImportsFromCode(
+          code,
+          resolvedKey,
+          isSvelteFile(resolvedKey),
+          parse,
+        ),
       );
     })();
     loadPromises.set(resolvedKey, load);
