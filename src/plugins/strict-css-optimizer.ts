@@ -1,10 +1,6 @@
 import type { AtRule, Rule } from "postcss";
 import { getComponents } from "../component-index-registry";
-import {
-  ALWAYS_ON_CLASSES,
-  CARBON_PREFIX,
-  CONTEXT_ANCESTORS,
-} from "../constants";
+import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import {
   getCarbonClassesFromNormalized,
   splitSelectorList,
@@ -12,7 +8,6 @@ import {
 } from "../indexer/css-selector-utils";
 import { isSafelisted, type SafelistEntry } from "./safelist";
 
-const LEGACY_CARBON_PREFIX = /bx-(?!-)/;
 const FLATPICKR_CLASS_NAMES = [
   "dayContainer",
   "numInputWrapper",
@@ -173,18 +168,9 @@ function classMatchesAllowlist(name: string, index: AllowlistIndex): boolean {
 function shouldKeepSelector(selector: string, index: AllowlistIndex): boolean {
   const parts = splitSelectorParts(selector);
   const subjectClasses = getCarbonClassesFromNormalized(parts.subject);
-  const ancestorClasses = parts.ancestors.flatMap((part) =>
-    getCarbonClassesFromNormalized(part),
-  );
 
-  if (subjectClasses.length === 0 && ancestorClasses.length === 0) {
-    return true;
-  }
-
-  if (ancestorClasses.length === 0) {
-    return subjectClasses.every((name) => matchesAllowlist(name, index));
-  }
-
+  // Most pruned rules fail on their subject, so ancestor classes are only
+  // extracted once the subject has passed (or has no Carbon class at all).
   if (
     subjectClasses.length > 0 &&
     !subjectClasses.every((name) => matchesAllowlist(name, index))
@@ -192,7 +178,76 @@ function shouldKeepSelector(selector: string, index: AllowlistIndex): boolean {
     return false;
   }
 
+  if (parts.ancestors.length === 0) {
+    return true;
+  }
+
+  const ancestorClasses = parts.ancestors.flatMap((part) =>
+    getCarbonClassesFromNormalized(part),
+  );
+
   return ancestorClasses.every((name) => classMatchesAllowlist(name, index));
+}
+
+export type PrunedSelector = {
+  /** Selectors removed from the list. */
+  removed: number;
+  /** The trimmed selector list, or `null` when the whole rule goes. */
+  selector: string | null;
+};
+
+/**
+ * Decides what strict mode does to a rule's selector list: `undefined` when
+ * nothing changes, otherwise the pruned list (or `null` to drop the rule)
+ * with the number of Carbon selectors removed.
+ */
+export function pruneRuleSelector(
+  selector: string,
+  options: StrictCssOptimizerOptions,
+): PrunedSelector | undefined {
+  const { allowlist, preserveFlatpickr, safelist } = options;
+  const index = getAllowlistIndex(allowlist);
+
+  // `bx-` is either followed by another hyphen (Carbon) or not (legacy), so
+  // one substring check covers both prefixes. A flatpickr match inside any
+  // selectee is also a match on the whole list, so one test on the list rules
+  // it out for every selectee.
+  const hasCarbon = selector.includes("bx-");
+  const hasFlatpickr = FLATPICKR_SELECTOR.test(selector);
+
+  if (!(hasCarbon || hasFlatpickr)) {
+    return undefined;
+  }
+
+  const selectors = splitSelectorList(selector);
+  const keptSelectors = selectors.filter((selectee) => {
+    if (isSafelisted(selectee, safelist)) {
+      return true;
+    }
+
+    if (
+      hasFlatpickr &&
+      !preserveFlatpickr &&
+      FLATPICKR_SELECTOR.test(selectee)
+    ) {
+      return false;
+    }
+
+    return !selectee.includes("bx-") || shouldKeepSelector(selectee, index);
+  });
+
+  if (keptSelectors.length === 0) {
+    return { removed: selectors.length, selector: null };
+  }
+
+  if (keptSelectors.length < selectors.length) {
+    return {
+      removed: selectors.length - keptSelectors.length,
+      selector: keptSelectors.join(", "),
+    };
+  }
+
+  return undefined;
 }
 
 /**
@@ -204,47 +259,29 @@ export function optimizeStrictRule(
   node: Rule,
   options: StrictCssOptimizerOptions,
 ): number {
-  const { allowlist, preserveFlatpickr, safelist } = options;
-  const index = getAllowlistIndex(allowlist);
-  const selector = node.selector;
+  const pruned = pruneRuleSelector(node.selector, options);
+  if (!pruned) return 0;
 
-  if (
-    !(
-      CARBON_PREFIX.test(selector) ||
-      LEGACY_CARBON_PREFIX.test(selector) ||
-      FLATPICKR_SELECTOR.test(selector)
-    )
-  ) {
-    return 0;
-  }
-
-  const selectors = splitSelectorList(selector);
-  const keptSelectors = selectors.filter((selectee) => {
-    if (isSafelisted(selectee, safelist)) {
-      return true;
-    }
-
-    if (FLATPICKR_SELECTOR.test(selectee) && !preserveFlatpickr) {
-      return false;
-    }
-
-    return (
-      !(CARBON_PREFIX.test(selectee) || LEGACY_CARBON_PREFIX.test(selectee)) ||
-      shouldKeepSelector(selectee, index)
-    );
-  });
-
-  if (keptSelectors.length === 0) {
+  if (pruned.selector === null) {
     node.remove();
-    return selectors.length;
+  } else {
+    node.selector = pruned.selector;
   }
 
-  if (keptSelectors.length < selectors.length) {
-    node.selector = keptSelectors.join(", ");
-    return selectors.length - keptSelectors.length;
-  }
+  return pruned.removed;
+}
 
-  return 0;
+/** Whether an at-rule is the flatpickr `@keyframes` block to drop. */
+export function isFlatpickrKeyframes(
+  name: string,
+  params: string,
+  options: Pick<StrictCssOptimizerOptions, "preserveFlatpickr">,
+): boolean {
+  return (
+    !options.preserveFlatpickr &&
+    name === "keyframes" &&
+    FLATPICKR_KEYFRAMES.has(params)
+  );
 }
 
 /**
@@ -254,14 +291,40 @@ export function optimizeStrictAtRule(
   node: AtRule,
   options: Pick<StrictCssOptimizerOptions, "preserveFlatpickr">,
 ): number {
-  if (
-    !options.preserveFlatpickr &&
-    node.name === "keyframes" &&
-    FLATPICKR_KEYFRAMES.has(node.params)
-  ) {
+  if (isFlatpickrKeyframes(node.name, node.params, options)) {
     node.remove();
     return 1;
   }
 
   return 0;
+}
+
+const IBM_PLEX_SANS_WEIGHTS = ["300", "400", "600"];
+
+/**
+ * Whether an IBM Plex `@font-face` rule is one no Carbon Svelte component
+ * uses. Only these faces are kept:
+ * - IBM Plex Sans: weights 300/400/600 in normal style
+ * - IBM Plex Mono: weight 400 in normal style (for code snippets)
+ *
+ * Non-IBM Plex faces are never dropped.
+ */
+export function isUnusedIbmPlexFontFace(
+  family: string,
+  style: string,
+  weight: string,
+): boolean {
+  if (!family.startsWith("IBM Plex")) {
+    return false;
+  }
+
+  const is_mono =
+    style === "normal" && family === "IBM Plex Mono" && weight === "400";
+
+  const is_sans =
+    style === "normal" &&
+    family === "IBM Plex Sans" &&
+    IBM_PLEX_SANS_WEIGHTS.includes(weight);
+
+  return !(is_sans || is_mono);
 }

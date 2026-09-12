@@ -4,9 +4,14 @@ import postcss from "postcss";
 import discardEmpty from "postcss-discard-empty";
 import { getComponents } from "../component-index-registry";
 import { ALWAYS_ON_CLASSES } from "../constants";
+import {
+  type SpliceOptimizerOptions,
+  spliceOptimizeCss,
+} from "./css-splice-optimizer";
 import type { SafelistEntry } from "./safelist";
 import {
   hasOptimizableCss,
+  isUnusedIbmPlexFontFace,
   optimizeStrictAtRule,
   optimizeStrictRule,
 } from "./strict-css-optimizer";
@@ -207,21 +212,13 @@ function createPostcssPlugins(
             }
           });
 
-          if (!attributes["font-family"].startsWith("IBM Plex")) {
-            return;
-          }
-
-          const is_mono =
-            attributes["font-style"] === "normal" &&
-            attributes["font-family"] === "IBM Plex Mono" &&
-            attributes["font-weight"] === "400";
-
-          const is_sans =
-            attributes["font-style"] === "normal" &&
-            attributes["font-family"] === "IBM Plex Sans" &&
-            ["300", "400", "600"].includes(attributes["font-weight"]);
-
-          if (!(is_sans || is_mono)) {
+          if (
+            isUnusedIbmPlexFontFace(
+              attributes["font-family"],
+              attributes["font-style"],
+              attributes["font-weight"],
+            )
+          ) {
             node.remove();
             report.removed++;
           }
@@ -253,15 +250,41 @@ function toCssString(source: CreateOptimizedCssOptions["source"]): string {
   ).toString();
 }
 
+/**
+ * The PostCSS pipeline: the reference implementation, and the fallback for
+ * stylesheets `spliceOptimizeCss` does not model.
+ */
+export function optimizeCssWithPostcss(
+  input: string,
+  options: SpliceOptimizerOptions,
+  from?: string,
+): OptimizedCssReport {
+  const report = { removed: 0 };
+  const { css } = postcss(
+    createPostcssPlugins(
+      options.allowlist,
+      options.preserveAllIBMFonts,
+      options.preserveFlatpickr,
+      options.safelist,
+      report,
+    ),
+  ).process(input, { from });
+  return { css, removed: report.removed };
+}
+
 export function createCssOptimizer(
   options: Omit<CreateOptimizedCssOptions, "source" | "from">,
 ) {
-  const preserveAllIBMFonts = options.preserveAllIBMFonts === true;
-  const safelist = options.safelist ?? [];
   const { allowlist, preserveFlatpickr } = buildUsage(
     options.ids,
     options.contentClasses,
   );
+  const optimizerOptions: SpliceOptimizerOptions = {
+    allowlist,
+    preserveAllIBMFonts: options.preserveAllIBMFonts === true,
+    preserveFlatpickr,
+    safelist: options.safelist ?? [],
+  };
 
   return {
     run(
@@ -277,17 +300,13 @@ export function createCssOptimizer(
         return { css: input, removed: 0 };
       }
 
-      const report = { removed: 0 };
-      const { css } = postcss(
-        createPostcssPlugins(
-          allowlist,
-          preserveAllIBMFonts,
-          preserveFlatpickr,
-          safelist,
-          report,
-        ),
-      ).process(input, { from });
-      return { css, removed: report.removed };
+      // Compiled Carbon themes have a plain enough shape that the removals
+      // can be spliced straight out of the source text. The scanner bails on
+      // anything it does not model exactly, and PostCSS takes over.
+      return (
+        spliceOptimizeCss(input, optimizerOptions) ??
+        optimizeCssWithPostcss(input, optimizerOptions, from)
+      );
     },
   };
 }
