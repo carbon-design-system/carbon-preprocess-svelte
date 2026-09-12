@@ -14,7 +14,7 @@
     "svelte": "^5.57.0",
     "svelte-loader": "latest",
     "svelte-preprocess": "latest",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "webpack": "latest",
     "webpack-cli": "latest",
     "webpack-dev-server": "latest"
