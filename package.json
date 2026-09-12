@@ -42,7 +42,6 @@
     "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
     "culls": "^0.2.0",
     "estree-walker": "^2.0.2",
-    "magic-string": "^0.30.17",
     "ostia": "^0.2.4",
     "postcss": "^8.5.28",
     "postcss-discard-empty": "^8.0.5",
