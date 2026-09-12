@@ -1,4 +1,3 @@
-import type { AtRule, Rule } from "postcss";
 import { getComponents } from "../component-index-registry";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import {
@@ -336,27 +335,6 @@ function keepSelectee(
   return !selectee.includes("bx-") || shouldKeepSelector(selectee, index);
 }
 
-/**
- * Returns the number of Carbon selectors removed: the full selector count when
- * the whole rule is dropped, the pruned count when a comma list is trimmed, or
- * `0` when nothing changed.
- */
-export function optimizeStrictRule(
-  node: Rule,
-  options: StrictCssOptimizerOptions,
-): number {
-  const pruned = pruneRuleSelector(node.selector, options);
-  if (!pruned) return 0;
-
-  if (pruned.selector === null) {
-    node.remove();
-  } else {
-    node.selector = pruned.selector;
-  }
-
-  return pruned.removed;
-}
-
 /** Whether an at-rule is the flatpickr `@keyframes` block to drop. */
 export function isFlatpickrKeyframes(
   name: string,
@@ -368,21 +346,6 @@ export function isFlatpickrKeyframes(
     name === "keyframes" &&
     FLATPICKR_KEYFRAMES.has(params)
   );
-}
-
-/**
- * Returns `1` when the flatpickr keyframes node is removed, otherwise `0`.
- */
-export function optimizeStrictAtRule(
-  node: AtRule,
-  options: Pick<StrictCssOptimizerOptions, "preserveFlatpickr">,
-): number {
-  if (isFlatpickrKeyframes(node.name, node.params, options)) {
-    node.remove();
-    return 1;
-  }
-
-  return 0;
 }
 
 const IBM_PLEX_SANS_WEIGHTS = ["300", "400", "600"];
