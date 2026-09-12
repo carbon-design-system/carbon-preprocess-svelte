@@ -75,12 +75,15 @@ const N_ROOT = 0;
 const N_RULE = 1;
 const N_AT_BLOCK = 2;
 const N_AT_STATEMENT = 3;
-const N_DECL = 4;
-const N_COMMENT = 5;
+const N_COMMENT = 4;
 
-/** `RE_WORD_END` minus the `/(?=*)` alternative, which needs a lookahead. */
+/**
+ * `RE_WORD_END`: `1` ends a word outright; `2` (`/`) ends it only when a
+ * `*` follows, i.e. the `/(?=*)` alternative that needs a lookahead.
+ */
 const WORD_END = new Uint8Array(128);
 for (const ch of "\t\n\f\r !\"#'():;@[\\]{}") WORD_END[ch.charCodeAt(0)] = 1;
+WORD_END[SLASH] = 2;
 /** `RE_AT_END`. */
 const AT_END = new Uint8Array(128);
 for (const ch of "\t\n\f\r \"#'()/;[\\]{}") AT_END[ch.charCodeAt(0)] = 1;
@@ -120,34 +123,41 @@ function isLineTerminator(code: number): boolean {
   return code === NEWLINE || code === CR || code === 0x2028 || code === 0x2029;
 }
 
+/**
+ * A container's children, in source order. Declarations are stored as
+ * non-negative indices into the parser's flat `Decls` arrays instead of as
+ * `CssNode`s: they outnumber every other node three to one in a compiled
+ * Carbon theme, are never removed on their own, and only ever need their
+ * offsets read back.
+ */
+type Child = CssNode | number;
+
 class CssNode {
   type: number;
   parent: CssNode | null;
-  nodes: CssNode[] | null;
+  nodes: Child[] | null;
   /** Offset where `raws.before` starts. */
   before: number;
   /** Offset of the first token. */
   start: number;
   /**
-   * Exclusive end. Containers: after `}`. Declarations and at-rule
-   * statements: before the `;` (if any). Comments: after `*​/`.
+   * Exclusive end. Containers: after `}`. At-rule statements: before the
+   * `;` (if any). Comments: after `*​/`.
    */
   end: number;
-  /** Declaration / at-rule statement ended with `;` in the source. */
+  /** At-rule statement ended with `;` in the source. */
   semi: boolean;
-  /** Declaration whose property starts with `--`. */
-  custom: boolean;
-  /** Rule: selector range. At-rule: params range. Declaration: value range. */
+  /** Rule: selector range. At-rule: params range. */
   a: number;
   b: number;
-  /** Declaration: property is `[start, propEnd)`. */
-  propEnd: number;
   /** At-rule name. */
   name: string;
   /** Rule: rewritten selector, or `null` when untouched. */
   selector: string | null;
   /** Container `raws.semicolon`. */
   semicolon: boolean;
+  /** Container is (or is nested in) a `@font-face` block. */
+  fontFace: boolean;
   removed: boolean;
   dirty: boolean;
 
@@ -160,16 +170,82 @@ class CssNode {
     this.start = before;
     this.end = before;
     this.semi = false;
-    this.custom = false;
     this.a = 0;
     this.b = 0;
-    this.propEnd = 0;
     this.name = "";
     this.selector = null;
     this.semicolon = false;
+    this.fontFace = parent?.fontFace === true;
     this.removed = false;
     this.dirty = false;
   }
+}
+
+const D_SEMI = 1;
+const D_CUSTOM = 2;
+
+/**
+ * Struct-of-arrays store for declarations. Per declaration: property
+ * `[start, propEnd)`, value `[a, b)`, exclusive `end` (before the `;` if
+ * any), and `D_SEMI` / `D_CUSTOM` flags. No `raws.before`: a declaration is
+ * never removed on its own, so its leading whitespace is never spliced.
+ */
+class Decls {
+  start: Int32Array;
+  propEnd: Int32Array;
+  a: Int32Array;
+  b: Int32Array;
+  end: Int32Array;
+  flags: Uint8Array;
+  count: number;
+
+  constructor(capacity: number) {
+    this.start = new Int32Array(capacity);
+    this.propEnd = new Int32Array(capacity);
+    this.a = new Int32Array(capacity);
+    this.b = new Int32Array(capacity);
+    this.end = new Int32Array(capacity);
+    this.flags = new Uint8Array(capacity);
+    this.count = 0;
+  }
+
+  push(
+    start: number,
+    propEnd: number,
+    a: number,
+    b: number,
+    end: number,
+    flags: number,
+  ): number {
+    const i = this.count;
+    if (i === this.start.length) this.grow();
+    this.start[i] = start;
+    this.propEnd[i] = propEnd;
+    this.a[i] = a;
+    this.b[i] = b;
+    this.end[i] = end;
+    this.flags[i] = flags;
+    this.count = i + 1;
+    return i;
+  }
+
+  private grow(): void {
+    const size = this.start.length * 2;
+    this.start = growInt32(this.start, size);
+    this.propEnd = growInt32(this.propEnd, size);
+    this.a = growInt32(this.a, size);
+    this.b = growInt32(this.b, size);
+    this.end = growInt32(this.end, size);
+    const flags = new Uint8Array(size);
+    flags.set(this.flags);
+    this.flags = flags;
+  }
+}
+
+function growInt32(array: Int32Array, size: number): Int32Array {
+  const next = new Int32Array(size);
+  next.set(array);
+  return next;
 }
 
 /**
@@ -398,8 +474,11 @@ class Tokenizer {
           next = pos + 1;
           while (next < length) {
             const c = css.charCodeAt(next);
-            if (c < 128 && WORD_END[c] === 1) break;
-            if (c === SLASH && css.charCodeAt(next + 1) === ASTERISK) break;
+            if (c < 128) {
+              const kind = WORD_END[c];
+              if (kind === 1) break;
+              if (kind === 2 && css.charCodeAt(next + 1) === ASTERISK) break;
+            }
             next += 1;
           }
           this.type = T_WORD;
@@ -446,6 +525,7 @@ class Parser {
   tokStarts: Int32Array;
   tokEnds: Int32Array;
   tokCount: number;
+  decls: Decls;
 
   constructor(css: string) {
     this.css = css;
@@ -458,6 +538,8 @@ class Parser {
     this.tokStarts = new Int32Array(64);
     this.tokEnds = new Int32Array(64);
     this.tokCount = 0;
+    // Compiled Carbon themes run about one declaration per 50 bytes.
+    this.decls = new Decls(Math.max(64, (css.length / 48) | 0));
   }
 
   parse(): CssNode {
@@ -532,6 +614,7 @@ class Parser {
     this.init(node);
     node.start = t.start;
     node.name = name;
+    if (name === "font-face") node.fontFace = true;
 
     const brackets: number[] = [];
     let open = false;
@@ -774,26 +857,21 @@ class Parser {
       // a bare `!important` is an empty value, and `@font-face` descriptors
       // are compared verbatim.
       if (IMPORTANT_ONLY.test(css.slice(valueFrom, valueTo))) bail();
-      for (let p: CssNode | null = this.current; p; p = p.parent) {
-        if (p.type === N_AT_BLOCK && p.name === "font-face") bail();
-      }
+      if (this.current.fontFace) bail();
     }
 
-    const node = new CssNode(N_DECL, this.current, this.spaces);
-    this.init(node);
-    node.start = starts[0];
-    node.propEnd = ends[0];
-    node.custom = customProperty;
-    node.a = valueFrom === -1 ? valueTo : valueFrom;
-    node.b = valueTo;
-    node.end = ends[count - 1];
-    node.semi = semi;
-    if (semi) {
-      this.semicolon = true;
-      this.spaces = semiEnd;
-    } else {
-      this.spaces = node.end;
-    }
+    const end = ends[count - 1];
+    const index = this.decls.push(
+      starts[0],
+      ends[0],
+      valueFrom === -1 ? valueTo : valueFrom,
+      valueTo,
+      end,
+      (semi ? D_SEMI : 0) | (customProperty ? D_CUSTOM : 0),
+    );
+    this.current.nodes?.push(index);
+    this.semicolon = semi;
+    this.spaces = semi ? semiEnd : end;
   }
 
   private end(closeEnd: number): void {
@@ -824,11 +902,13 @@ function markDirty(node: CssNode | null): void {
 
 class Optimizer {
   css: string;
+  decls: Decls;
   options: SpliceOptimizerOptions;
   removed: number;
 
-  constructor(css: string, options: SpliceOptimizerOptions) {
+  constructor(css: string, decls: Decls, options: SpliceOptimizerOptions) {
     this.css = css;
+    this.decls = decls;
     this.options = options;
     this.removed = 0;
   }
@@ -844,7 +924,7 @@ class Optimizer {
     const nodes = node.nodes;
     if (!nodes) return;
     for (const child of nodes) {
-      if (child.removed) continue;
+      if (typeof child === "number" || child.removed) continue;
       if (all || child.dirty) {
         child.dirty = false;
         this.visit(child, all);
@@ -881,24 +961,25 @@ class Optimizer {
       let family = "";
       let style = "";
       let weight = "";
-      const stack: CssNode[] = [];
+      const decls = this.decls;
+      const stack: Child[] = [];
       if (node.nodes) {
         for (let i = node.nodes.length - 1; i >= 0; i--) {
           stack.push(node.nodes[i]);
         }
       }
       while (stack.length > 0) {
-        const child = stack.pop() as CssNode;
-        if (child.removed) continue;
-        if (child.type === N_DECL) {
-          const prop = css.slice(child.start, child.propEnd);
+        const child = stack.pop() as Child;
+        if (typeof child === "number") {
+          const prop = css.slice(decls.start[child], decls.propEnd[child]);
           if (prop === "font-family") {
-            family = css.slice(child.a, child.b);
+            family = css.slice(decls.a[child], decls.b[child]);
           } else if (prop === "font-style") {
-            style = css.slice(child.a, child.b);
+            style = css.slice(decls.a[child], decls.b[child]);
           } else if (prop === "font-weight") {
-            weight = css.slice(child.a, child.b);
+            weight = css.slice(decls.a[child], decls.b[child]);
           }
+        } else if (child.removed) {
         } else if (child.nodes) {
           for (let i = child.nodes.length - 1; i >= 0; i--) {
             stack.push(child.nodes[i]);
@@ -933,6 +1014,10 @@ function discardEmpty(node: CssNode): void {
   if (!nodes) return;
   let kept = 0;
   for (const child of nodes) {
+    if (typeof child === "number") {
+      kept++;
+      continue;
+    }
     if (child.removed) continue;
     discardEmpty(child);
     if (!child.removed) kept++;
@@ -944,11 +1029,13 @@ function discardEmpty(node: CssNode): void {
 
 class Emitter {
   css: string;
+  decls: Decls;
   out: string[];
   cursor: number;
 
-  constructor(css: string) {
+  constructor(css: string, decls: Decls) {
     this.css = css;
+    this.decls = decls;
     this.out = [];
     this.cursor = 0;
   }
@@ -966,25 +1053,52 @@ class Emitter {
 
   /** Mirror of the stringifier's `pushBody` semicolon rules. */
   private body(container: CssNode): void {
-    const nodes = container.nodes as CssNode[];
+    const nodes = container.nodes as Child[];
+    const decls = this.decls;
     let keptCount = 0;
     let last = -1;
     for (const node of nodes) {
-      if (node.removed) continue;
-      if (node.type !== N_COMMENT) last = keptCount;
+      if (typeof node === "number") {
+        last = keptCount;
+      } else {
+        if (node.removed) continue;
+        if (node.type !== N_COMMENT) last = keptCount;
+      }
       keptCount++;
     }
 
     // `Root#removeChild` hands a removed first child's `raws.before` to the
     // node that takes its place, so the first surviving root node keeps the
     // stylesheet's original leading whitespace.
+    const first = nodes[0];
     const inherited =
-      container.type === N_ROOT && nodes.length > 1 && nodes[0].removed
-        ? nodes[0]
+      container.type === N_ROOT &&
+      nodes.length > 1 &&
+      typeof first !== "number" &&
+      first.removed
+        ? first
         : null;
 
     let i = 0;
     for (const node of nodes) {
+      if (typeof node === "number") {
+        if (inherited !== null && i === 0) {
+          this.out.push(this.css.slice(inherited.before, inherited.start));
+          this.cursor = decls.start[node];
+        }
+        this.statement(
+          i,
+          last,
+          keptCount,
+          container.semicolon,
+          decls.end[node],
+          (decls.flags[node] & D_SEMI) !== 0,
+          (decls.flags[node] & D_CUSTOM) !== 0,
+        );
+        i++;
+        continue;
+      }
+
       if (node.removed) {
         this.flush(node.before);
         this.cursor = node.semi ? node.end + 1 : node.end;
@@ -1005,25 +1119,46 @@ class Emitter {
         this.body(node);
       } else if (node.type === N_AT_BLOCK) {
         this.body(node);
-      } else if (node.type === N_DECL || node.type === N_AT_STATEMENT) {
-        let semicolon = i !== last || container.semicolon;
-        if (
-          !semicolon &&
-          i < keptCount - 1 &&
-          (node.type === N_AT_STATEMENT || node.custom)
-        ) {
-          semicolon = true;
-        }
-        if (semicolon !== node.semi) {
-          this.flush(node.end);
-          if (semicolon) {
-            this.out.push(";");
-          } else {
-            this.cursor = node.end + 1;
-          }
-        }
+      } else if (node.type === N_AT_STATEMENT) {
+        this.statement(
+          i,
+          last,
+          keptCount,
+          container.semicolon,
+          node.end,
+          node.semi,
+          true,
+        );
       }
       i++;
+    }
+  }
+
+  /**
+   * Semicolon after a declaration or at-rule statement. `forced` is true for
+   * at-rule statements and custom properties, which always get one when a
+   * sibling follows.
+   */
+  private statement(
+    i: number,
+    last: number,
+    keptCount: number,
+    containerSemicolon: boolean,
+    end: number,
+    semi: boolean,
+    forced: boolean,
+  ): void {
+    let semicolon = i !== last || containerSemicolon;
+    if (!semicolon && i < keptCount - 1 && forced) {
+      semicolon = true;
+    }
+    if (semicolon !== semi) {
+      this.flush(end);
+      if (semicolon) {
+        this.out.push(";");
+      } else {
+        this.cursor = end + 1;
+      }
     }
   }
 }
@@ -1044,15 +1179,20 @@ export function spliceOptimizeCss(
   // makes PostCSS strip it and emit a source map.
   if (css.includes("<") || css.includes("sourceMappingURL")) return undefined;
 
+  const parser = new Parser(css);
   let root: CssNode;
   try {
-    root = new Parser(css).parse();
+    root = parser.parse();
   } catch (error) {
     if (error === BAIL) return undefined;
     throw error;
   }
 
-  const optimizer = new Optimizer(css, options);
+  const decls = parser.decls;
+  const optimizer = new Optimizer(css, decls, options);
   optimizer.run(root);
-  return { css: new Emitter(css).emit(root), removed: optimizer.removed };
+  return {
+    css: new Emitter(css, decls).emit(root),
+    removed: optimizer.removed,
+  };
 }

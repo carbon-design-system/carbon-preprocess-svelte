@@ -2,9 +2,10 @@ import type { AtRule, Rule } from "postcss";
 import { getComponents } from "../component-index-registry";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import {
-  getCarbonClassesFromNormalized,
+  findSubjectStart,
+  isClassTokenChar,
   splitSelectorList,
-  splitSelectorParts,
+  stripNotPseudoClasses,
 } from "../indexer/css-selector-utils";
 import { isSafelisted, type SafelistEntry } from "./safelist";
 
@@ -33,6 +34,20 @@ const FLATPICKR_SELECTOR = new RegExp(
   `\\.(?:flatpickr-[A-Za-z0-9_-]+|${FLATPICKR_CLASS_NAMES.join("|")})(?![A-Za-z0-9_-])`,
 );
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
+
+/**
+ * Cheap necessary condition for `FLATPICKR_SELECTOR`: every class name it
+ * matches contains an uppercase letter, except `flatpickr-*` and
+ * `cur-month`. Carbon's own selectors are lowercase, so this skips the
+ * alternation regex for nearly every rule in a Carbon theme.
+ */
+function mayHaveFlatpickr(selector: string): boolean {
+  for (let i = 0; i < selector.length; i++) {
+    const code = selector.charCodeAt(i);
+    if (code >= 65 && code <= 90) return true;
+  }
+  return selector.includes("flatpickr") || selector.includes("cur-month");
+}
 /**
  * Anything the optimizer could remove: Carbon (`bx-`) selectors, flatpickr
  * selectors and keyframes, and IBM Plex `@font-face` rules. A stylesheet
@@ -155,6 +170,56 @@ function classMatchesAllowlist(name: string, index: AllowlistIndex): boolean {
   return CONTEXT_ANCESTOR_SET.has(name) || matchesAllowlist(name, index);
 }
 
+const HYPHEN = 45;
+
+const CLASSES_NONE = 0;
+const CLASSES_MATCH = 1;
+const CLASSES_MISS = 2;
+
+/**
+ * Runs the allowlist over every Carbon class token in
+ * `normalized[from, to)` (legacy `.bx-x` read as `.bx--x`), stopping at the
+ * first miss. Same tokens `getCarbonClassesFromNormalized` yields for the
+ * compounds in that range, without materializing them: a class token never
+ * spans a combinator, so a range of whole compounds scans the same.
+ */
+function scanCarbonClasses(
+  normalized: string,
+  from: number,
+  to: number,
+  index: AllowlistIndex,
+  ancestor: boolean,
+): number {
+  let start = normalized.indexOf(".bx-", from);
+  if (start === -1 || start >= to) return CLASSES_NONE;
+
+  let result = CLASSES_NONE;
+
+  while (start !== -1 && start < to) {
+    const isCarbon = normalized.charCodeAt(start + 4) === HYPHEN;
+    const tokenStart = isCarbon ? start + 5 : start + 4;
+    let end = tokenStart;
+    while (end < to && isClassTokenChar(normalized.charCodeAt(end))) {
+      end++;
+    }
+
+    if (end > tokenStart) {
+      const name = isCarbon
+        ? normalized.slice(start, end)
+        : `.bx--${normalized.slice(tokenStart, end)}`;
+      const matched = ancestor
+        ? classMatchesAllowlist(name, index)
+        : matchesAllowlist(name, index);
+      if (!matched) return CLASSES_MISS;
+      result = CLASSES_MATCH;
+    }
+
+    start = normalized.indexOf(".bx-", end);
+  }
+
+  return result;
+}
+
 /**
  * Whether to keep this selector in strict mode.
  *
@@ -166,27 +231,27 @@ function classMatchesAllowlist(name: string, index: AllowlistIndex): boolean {
  * still require every class to match.
  */
 function shouldKeepSelector(selector: string, index: AllowlistIndex): boolean {
-  const parts = splitSelectorParts(selector);
-  const subjectClasses = getCarbonClassesFromNormalized(parts.subject);
+  const normalized = stripNotPseudoClasses(selector);
+  const subjectStart = findSubjectStart(normalized);
 
   // Most pruned rules fail on their subject, so ancestor classes are only
-  // extracted once the subject has passed (or has no Carbon class at all).
+  // checked once the subject has passed (or has no Carbon class at all).
   if (
-    subjectClasses.length > 0 &&
-    !subjectClasses.every((name) => matchesAllowlist(name, index))
+    scanCarbonClasses(
+      normalized,
+      subjectStart,
+      normalized.length,
+      index,
+      false,
+    ) === CLASSES_MISS
   ) {
     return false;
   }
 
-  if (parts.ancestors.length === 0) {
-    return true;
-  }
-
-  const ancestorClasses = parts.ancestors.flatMap((part) =>
-    getCarbonClassesFromNormalized(part),
+  return (
+    subjectStart === 0 ||
+    scanCarbonClasses(normalized, 0, subjectStart, index, true) !== CLASSES_MISS
   );
-
-  return ancestorClasses.every((name) => classMatchesAllowlist(name, index));
 }
 
 export type PrunedSelector = {
@@ -213,28 +278,32 @@ export function pruneRuleSelector(
   // selectee is also a match on the whole list, so one test on the list rules
   // it out for every selectee.
   const hasCarbon = selector.includes("bx-");
-  const hasFlatpickr = FLATPICKR_SELECTOR.test(selector);
+  const hasFlatpickr =
+    mayHaveFlatpickr(selector) && FLATPICKR_SELECTOR.test(selector);
 
   if (!(hasCarbon || hasFlatpickr)) {
     return undefined;
   }
 
+  const dropFlatpickr = hasFlatpickr && !preserveFlatpickr;
+
+  // Single selectee (the common case): no list to split or rebuild.
+  if (!selector.includes(",")) {
+    const selectee = selector.trim();
+    if (selectee === "") return { removed: 0, selector: null };
+    return keepSelectee(selectee, safelist, dropFlatpickr, index)
+      ? undefined
+      : { removed: 1, selector: null };
+  }
+
   const selectors = splitSelectorList(selector);
-  const keptSelectors = selectors.filter((selectee) => {
-    if (isSafelisted(selectee, safelist)) {
-      return true;
-    }
+  const keptSelectors: string[] = [];
 
-    if (
-      hasFlatpickr &&
-      !preserveFlatpickr &&
-      FLATPICKR_SELECTOR.test(selectee)
-    ) {
-      return false;
+  for (const selectee of selectors) {
+    if (keepSelectee(selectee, safelist, dropFlatpickr, index)) {
+      keptSelectors.push(selectee);
     }
-
-    return !selectee.includes("bx-") || shouldKeepSelector(selectee, index);
-  });
+  }
 
   if (keptSelectors.length === 0) {
     return { removed: selectors.length, selector: null };
@@ -248,6 +317,23 @@ export function pruneRuleSelector(
   }
 
   return undefined;
+}
+
+function keepSelectee(
+  selectee: string,
+  safelist: readonly SafelistEntry[],
+  dropFlatpickr: boolean,
+  index: AllowlistIndex,
+): boolean {
+  if (isSafelisted(selectee, safelist)) {
+    return true;
+  }
+
+  if (dropFlatpickr && FLATPICKR_SELECTOR.test(selectee)) {
+    return false;
+  }
+
+  return !selectee.includes("bx-") || shouldKeepSelector(selectee, index);
 }
 
 /**
