@@ -34,13 +34,18 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     apply: "build",
     enforce: "post",
     /**
-     * Runs once before any module is transformed. When
-     * `experimental.liveIndex` is set, this is where the component index
-     * gets rebuilt from the project's installed `carbon-components-svelte`
-     * (or read from cache), so it's ready before `transform`/`generateBundle`
-     * ever consult it.
+     * Runs once before any module is transformed. Resets state tracked from
+     * a prior build so `vite build --watch` rebuilds (which reuse this same
+     * plugin instance) don't leak component ids or a stale content scan into
+     * the next build. When `experimental.liveIndex` is set, this is also
+     * where the component index gets rebuilt from the project's installed
+     * `carbon-components-svelte` (or read from cache), so it's ready before
+     * `transform`/`generateBundle` ever consult it.
      */
     async buildStart() {
+      ids.clear();
+      contentClasses = undefined;
+
       if (options?.experimental?.liveIndex) {
         setComponents(await ensureLiveComponentIndex());
       }
