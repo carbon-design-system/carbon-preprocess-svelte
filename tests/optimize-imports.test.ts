@@ -274,15 +274,13 @@ import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedL
     }
   });
 
-  // Hypothetical: a barrel-re-exported util drops its default export in
-  // favor of a named export only. `resolvePath` has no notion of export
-  // style -- it always emits `import X from` for an indexed path -- so if
-  // the index ever picks up a path like that, this default import would
-  // resolve to `undefined` at runtime instead of the util. This test pins
-  // today's (wrong, for that scenario) output so it fails loudly and forces
-  // `resolvePath`/`rewriteImport` to be taught about named-only exports
-  // before such an index is ever shipped.
-  test("SPECULATIVE: named-only-export util is still rewritten as a default import", async () => {
+  // `resolvePath` has no notion of export style -- it always emits
+  // `import X from` for an indexed path. For a util whose module only has a
+  // named export (no default), that import resolves to `undefined` at
+  // runtime instead of the util. This test pins that output so it fails
+  // loudly if `resolvePath`/`rewriteImport` needs to be taught about
+  // named-only exports.
+  test("named-only-export util is rewritten as a default import", async () => {
     const fixture = createFakeCarbonPackage({
       "index.js": `export { fuzzyMatch } from "./utils/fuzzy-match.js";`,
       "utils/fuzzy-match.js": `export function fuzzyMatch() {}`,

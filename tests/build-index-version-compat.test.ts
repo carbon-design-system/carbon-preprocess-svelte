@@ -19,13 +19,11 @@ describe("buildComponentIndex against a real historical carbon-components-svelte
   });
 });
 
-describe("buildComponentIndex if a helper file were renamed to kebab-case", () => {
+describe("buildComponentIndex for a kebab-case util re-exported under a different name", () => {
   test("resolves a kebab-case util file re-exported under its original camelCase name", async () => {
-    // Hypothetical: a util file gets renamed to kebab-case, but `index.js`
-    // keeps re-exporting it under its original camelCase name. Resolution is
-    // driven off `index.js`'s re-export source, not off matching the file's
-    // basename to the exported name, so this must keep finding the file
-    // under its new name.
+    // Resolution is driven off `index.js`'s re-export source, not off
+    // matching the file's basename to the exported name, so a util file
+    // whose name doesn't match its export must still resolve correctly.
     const fixture = createFakeCarbonPackage({
       "index.js": `export { fuzzyMatch } from "./utils/fuzzy-match.js";`,
       "utils/fuzzy-match.js": `export function fuzzyMatch() {}`,
