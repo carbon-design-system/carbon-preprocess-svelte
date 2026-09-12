@@ -8,8 +8,48 @@ const NODE_MODULES_REGEX = /node_modules/;
 // Import specifiers can't contain a semicolon, so bounding the clause with
 // `[^;]` keeps the lazy match from ever crossing into a later statement,
 // without needing a stateful parser to find each declaration's extent.
+//
+// Sticky rather than global: `nextImportDeclaration` jumps to each `import`
+// occurrence with `indexOf` and matches at that line's start only, instead of
+// letting the regex crawl the whole script body after the last import.
 const IMPORT_DECLARATION_REGEX =
-  /^([ \t]*)import\s+(type\s+)?(?:([^;]*?)\s+from\s+)?["']([^"']+)["']\s*;?/gm;
+  /^([ \t]*)import\s+(type\s+)?(?:([^;]*?)\s+from\s+)?["']([^"']+)["']\s*;?/my;
+
+/** Where multiline `^` matches: after `\n`, `\r`, U+2028, U+2029. */
+function isLineTerminator(code: number): boolean {
+  return code === 10 || code === 13 || code === 0x2028 || code === 0x2029;
+}
+
+/**
+ * The next import declaration starting at or after `from`, in the same
+ * order a global `^[ \t]*import…` regex would find them: an `import` keyword
+ * preceded only by spaces/tabs since its line start.
+ */
+function nextImportDeclaration(
+  raw: string,
+  from: number,
+): RegExpExecArray | null {
+  let index = raw.indexOf("import", from);
+
+  while (index !== -1) {
+    let lineStart = index;
+    while (lineStart > from) {
+      const code = raw.charCodeAt(lineStart - 1);
+      if (code !== 32 && code !== 9) break;
+      lineStart--;
+    }
+
+    if (lineStart === 0 || isLineTerminator(raw.charCodeAt(lineStart - 1))) {
+      IMPORT_DECLARATION_REGEX.lastIndex = lineStart;
+      const match = IMPORT_DECLARATION_REGEX.exec(raw);
+      if (match !== null) return match;
+    }
+
+    index = raw.indexOf("import", index + 6);
+  }
+
+  return null;
+}
 const TYPE_SPECIFIER_PREFIX_REGEX = /^type\s+/;
 const AS_ALIAS_REGEX = /\s+as\s+/;
 const WHITESPACE_REGEX = /\s/;
@@ -146,36 +186,39 @@ function rewriteImport(
 const BASE64_CHARS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-function encodeVlq(value: number): string {
-  let vlq = value < 0 ? (-value << 1) | 1 : value << 1;
-  let encoded = "";
-  do {
-    let digit = vlq & 31;
-    vlq >>>= 5;
-    if (vlq > 0) digit |= 32;
-    encoded += BASE64_CHARS[digit];
-  } while (vlq > 0);
-  return encoded;
+const COMMA = 44;
+const SEMICOLON = 59;
+const BASE64_A = 65;
+
+/** Base64 digit of a one-digit VLQ (`value < 16`, non-negative). */
+const VLQ_DIGIT = new Uint8Array(16);
+for (let value = 0; value < 16; value++) {
+  VLQ_DIGIT[value] = BASE64_CHARS.charCodeAt(value << 1);
 }
 
-// Inside an untouched run of text, generated and original columns advance in
-// lockstep, so every segment after the first on a line is a delta `d` on both:
-// `,<vlq(d)>A A <vlq(d)>` (source index 0, same source line). Precomputing
-// those for realistic word/punctuation gaps turns the hot path into one
-// string append.
-const SAME_LINE_SEGMENTS = Array.from(
-  { length: 128 },
-  (_, delta) => `,${encodeVlq(delta)}AA${encodeVlq(delta)}`,
-);
-
-function isWordChar(code: number): boolean {
-  return (
+/** `[A-Za-z0-9_]`, indexed by char code. */
+const WORD_CHAR = new Uint8Array(128);
+for (let code = 0; code < 128; code++) {
+  WORD_CHAR[code] =
     (code >= 97 && code <= 122) || // a-z
     (code >= 65 && code <= 90) || // A-Z
     (code >= 48 && code <= 57) || // 0-9
     code === 95 // _
-  );
+      ? 1
+      : 0;
 }
+
+const ascii = new TextDecoder("latin1");
+
+/**
+ * Shared output buffer. `transformScript` is synchronous and never nested,
+ * so one buffer serves every call; it grows to the largest mapping built so
+ * far and is dropped back to its initial size past `SCRATCH_RETAIN_LIMIT`
+ * so one huge file doesn't pin memory for the rest of the build.
+ */
+const SCRATCH_INITIAL = 4096;
+const SCRATCH_RETAIN_LIMIT = 1 << 20;
+let scratch = new Uint8Array(SCRATCH_INITIAL);
 
 /**
  * Builds a v3 source map while the transformed code is emitted, tracking the
@@ -186,9 +229,15 @@ function isWordChar(code: number): boolean {
  * text gets a segment at the start of every word and at each non-word
  * character; each line of replacement text maps back to the start of the
  * statement it replaced.
+ *
+ * `mappings` is pure ASCII, so it is written a byte at a time into a
+ * growable buffer and decoded once at the end. Untouched text produces a
+ * segment every few characters, and appending each as a string spends most
+ * of the time building rope strings.
  */
 class MappingsBuilder {
-  private mappings = "";
+  private buffer = scratch;
+  private length = 0;
   // Original cursor (position in the input the next copy/replace consumes).
   private line = 0;
   private column = 0;
@@ -205,19 +254,30 @@ class MappingsBuilder {
     const length = text.length;
     if (length === 0) return;
 
+    // Worst case is a segment per character: `,` + digit + `AA` + digit.
+    // Longer segments (a delta of 16+) only follow a word of 16+ characters
+    // that wrote nothing, so they stay under that bound too.
+    this.reserve(length * 5 + 64);
+    const buffer = this.buffer;
+    let out = this.length;
+
+    // Generated and original columns advance in lockstep while copying, so
+    // only the original column is tracked; the generated one is `column +
+    // offset` until a newline resets both.
+    let column = this.column;
+    let offset = this.genColumn - column;
+    let prevColumn = this.prevColumn;
     let inWord = false;
     let sameLine = false;
-    let mappings = this.mappings;
-    let { column, genColumn } = this;
 
     for (let i = 0; i < length; i++) {
       const code = text.charCodeAt(i);
 
       if (code === 10) {
-        mappings += ";";
+        buffer[out++] = SEMICOLON;
         this.line++;
         column = 0;
-        genColumn = 0;
+        offset = 0;
         this.prevGenColumn = 0;
         this.lineHasSegments = false;
         inWord = false;
@@ -225,34 +285,46 @@ class MappingsBuilder {
         continue;
       }
 
-      const word = isWordChar(code);
+      const word = code < 128 && WORD_CHAR[code] === 1;
       if (!word || !inWord) {
         if (sameLine) {
-          const delta = column - this.prevColumn;
-          mappings +=
-            delta < 128
-              ? SAME_LINE_SEGMENTS[delta]
-              : `,${encodeVlq(delta)}AA${encodeVlq(delta)}`;
-          this.prevGenColumn = genColumn;
-          this.prevColumn = column;
+          // Every segment after the first on a line is a delta `d` on both
+          // columns: `,<vlq(d)>AA<vlq(d)>` (source index 0, same line).
+          const delta = column - prevColumn;
+          buffer[out++] = COMMA;
+          if (delta < 16) {
+            const digit = VLQ_DIGIT[delta];
+            buffer[out++] = digit;
+            buffer[out++] = BASE64_A;
+            buffer[out++] = BASE64_A;
+            buffer[out++] = digit;
+          } else {
+            out = writeVlq(buffer, out, delta);
+            buffer[out++] = BASE64_A;
+            buffer[out++] = BASE64_A;
+            out = writeVlq(buffer, out, delta);
+          }
+          prevColumn = column;
         } else {
-          this.mappings = mappings;
+          this.length = out;
           this.column = column;
-          this.genColumn = genColumn;
+          this.genColumn = column + offset;
+          this.prevColumn = prevColumn;
           this.addSegment();
-          mappings = this.mappings;
+          out = this.length;
+          prevColumn = column;
           sameLine = true;
         }
       }
       inWord = word;
-
       column++;
-      genColumn++;
     }
 
-    this.mappings = mappings;
+    this.length = out;
     this.column = column;
-    this.genColumn = genColumn;
+    this.genColumn = column + offset;
+    this.prevColumn = prevColumn;
+    if (sameLine) this.prevGenColumn = prevColumn + offset;
   }
 
   /**
@@ -269,7 +341,15 @@ class MappingsBuilder {
       // Each further line starts at generated column 0 and maps to the same
       // original position, so all four deltas are zero. A trailing newline
       // leaves an empty last line with no segment.
-      this.mappings += lineStart < content.length ? ";AAAA" : ";";
+      this.reserve(5);
+      const buffer = this.buffer;
+      buffer[this.length++] = SEMICOLON;
+      if (lineStart < content.length) {
+        buffer[this.length++] = BASE64_A;
+        buffer[this.length++] = BASE64_A;
+        buffer[this.length++] = BASE64_A;
+        buffer[this.length++] = BASE64_A;
+      }
       newline = content.indexOf("\n", lineStart);
     }
 
@@ -300,21 +380,48 @@ class MappingsBuilder {
   /** Adds a segment mapping the generated cursor to the original cursor. */
   private addSegment(): void {
     const { genColumn, line, column } = this;
-    this.mappings +=
-      (this.lineHasSegments ? "," : "") +
-      encodeVlq(genColumn - this.prevGenColumn) +
-      "A" +
-      encodeVlq(line - this.prevLine) +
-      encodeVlq(column - this.prevColumn);
+    // Up to three VLQs of at most 6 digits, plus separators.
+    this.reserve(25);
+    const buffer = this.buffer;
+    let out = this.length;
+    if (this.lineHasSegments) buffer[out++] = COMMA;
+    out = writeVlq(buffer, out, genColumn - this.prevGenColumn);
+    buffer[out++] = BASE64_A;
+    out = writeVlq(buffer, out, line - this.prevLine);
+    out = writeVlq(buffer, out, column - this.prevColumn);
+    this.length = out;
     this.lineHasSegments = true;
     this.prevGenColumn = genColumn;
     this.prevLine = line;
     this.prevColumn = column;
   }
 
-  toString(): string {
-    return this.mappings;
+  private reserve(bytes: number): void {
+    const needed = this.length + bytes;
+    if (needed <= this.buffer.length) return;
+    let size = this.buffer.length * 2;
+    while (size < needed) size *= 2;
+    const next = new Uint8Array(size);
+    next.set(this.buffer.subarray(0, this.length));
+    this.buffer = next;
+    if (size <= SCRATCH_RETAIN_LIMIT) scratch = next;
   }
+
+  toString(): string {
+    return ascii.decode(this.buffer.subarray(0, this.length));
+  }
+}
+
+/** Writes the base64 VLQ of `value` at `out`; returns the new offset. */
+function writeVlq(buffer: Uint8Array, out: number, value: number): number {
+  let vlq = value < 0 ? (-value << 1) | 1 : value << 1;
+  do {
+    let digit = vlq & 31;
+    vlq >>>= 5;
+    if (vlq > 0) digit |= 32;
+    buffer[out++] = BASE64_CHARS.charCodeAt(digit);
+  } while (vlq > 0);
+  return out;
 }
 
 /**
@@ -360,8 +467,7 @@ function transformScript(raw: string, filename: string) {
   let mappings: MappingsBuilder | undefined;
   let lastIndex = 0;
 
-  IMPORT_DECLARATION_REGEX.lastIndex = 0;
-  let match = IMPORT_DECLARATION_REGEX.exec(raw);
+  let match = nextImportDeclaration(raw, 0);
   while (match !== null) {
     const index = match.index;
     // `match[2]` is the `type` keyword: type-only statements
@@ -384,7 +490,7 @@ function transformScript(raw: string, filename: string) {
       lastIndex = end;
     }
 
-    match = IMPORT_DECLARATION_REGEX.exec(raw);
+    match = nextImportDeclaration(raw, index + match[0].length);
   }
 
   // Nothing rewritten: hand the content back as-is. Svelte treats a missing
