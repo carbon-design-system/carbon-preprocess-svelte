@@ -138,11 +138,9 @@ export default class OptimizeCssPlugin {
             });
 
             for (const id of Object.keys(assets).filter(isCssFile)) {
-              const original_css = assets[id].source();
+              const original_css = assets[id].source().toString();
               const { css: optimized_css, removed } = optimizer.run(
-                Buffer.isBuffer(original_css)
-                  ? original_css.toString()
-                  : original_css,
+                original_css,
                 id,
               );
 
