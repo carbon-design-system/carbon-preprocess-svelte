@@ -1,106 +1,106 @@
 {
   "rollup": {
     "file": "bundle.css",
-    "before_kb": 711.04,
-    "after_kb": 50.38,
-    "reduction_percent": 92.91
+    "before_kb": 709.84,
+    "after_kb": 49.42,
+    "reduction_percent": 93.04
   },
   "sveltekit": {
     "file": "_app/immutable/assets/2.*.css",
-    "before_kb": 696.48,
-    "after_kb": 50.3,
-    "reduction_percent": 92.78
+    "before_kb": 695.03,
+    "after_kb": 49.32,
+    "reduction_percent": 92.9
   },
   "vite": {
     "file": "assets/index-*.css",
-    "before_kb": 711.6,
-    "after_kb": 50.39,
-    "reduction_percent": 92.92
+    "before_kb": 710.39,
+    "after_kb": 49.43,
+    "reduction_percent": 93.04
   },
   "vite@svelte-5": {
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 82.39,
-      "reduction_percent": 88.17
+      "before_kb": 695.03,
+      "after_kb": 78.22,
+      "reduction_percent": 88.75
     },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
-      "before_kb": 696.58,
-      "after_kb": 65.17,
-      "reduction_percent": 90.64
+      "before_kb": 695.12,
+      "after_kb": 64.45,
+      "reduction_percent": 90.73
     },
     "datatable-toolbar": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 76.95,
-      "reduction_percent": 88.95
+      "before_kb": 695.03,
+      "after_kb": 75.96,
+      "reduction_percent": 89.07
     },
     "datepicker": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 37.33,
-      "reduction_percent": 94.64
+      "before_kb": 695.03,
+      "after_kb": 37.47,
+      "reduction_percent": 94.61
     },
     "dropdown": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 47.55,
-      "reduction_percent": 93.17
+      "before_kb": 695.03,
+      "after_kb": 47.88,
+      "reduction_percent": 93.11
     },
     "modal": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 81.73,
-      "reduction_percent": 88.27
+      "before_kb": 695.03,
+      "after_kb": 77.56,
+      "reduction_percent": 88.84
     },
     "multiselect": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 69.86,
-      "reduction_percent": 89.97
+      "before_kb": 695.03,
+      "after_kb": 70.28,
+      "reduction_percent": 89.89
     },
     "select-pagination": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 103.14,
-      "reduction_percent": 85.19
+      "before_kb": 695.03,
+      "after_kb": 98.72,
+      "reduction_percent": 85.8
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 49.11,
-      "reduction_percent": 92.95
+      "before_kb": 695.03,
+      "after_kb": 52.07,
+      "reduction_percent": 92.51
     },
     "textinput": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 29.87,
-      "reduction_percent": 95.71
+      "before_kb": 695.03,
+      "after_kb": 29.7,
+      "reduction_percent": 95.73
     },
     "timepicker-bundle": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 48.71,
-      "reduction_percent": 93.01
+      "before_kb": 695.03,
+      "after_kb": 48.45,
+      "reduction_percent": 93.03
     },
     "uishell": {
       "file": "assets/index-*.css",
-      "before_kb": 696.48,
-      "after_kb": 29.38,
-      "reduction_percent": 95.78
+      "before_kb": 695.03,
+      "after_kb": 23.1,
+      "reduction_percent": 96.68
     }
   },
   "webpack": {
     "file": "build/bundle.*.css",
-    "before_kb": 711.04,
-    "after_kb": 50.38,
-    "reduction_percent": 92.91
+    "before_kb": 709.84,
+    "after_kb": 49.42,
+    "reduction_percent": 93.04
   },
   "webpack@svelte-5": {
     "file": "build/bundle.*.css",
-    "before_kb": 711.04,
-    "after_kb": 50.38,
-    "reduction_percent": 92.91
+    "before_kb": 709.84,
+    "after_kb": 49.42,
+    "reduction_percent": 93.04
   }
 }

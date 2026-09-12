@@ -256,11 +256,9 @@ for (const scenario of SCENARIOS) {
     if (scenario.name === "header-global-action.strict") {
       test("keeps header global button hover styles for icon fill", () => {
         expect(output).toContain(
-          ".bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button)",
+          ".bx--header__global .bx--header__action:not(.bx--header-search-button)",
         );
-        expect(output).toContain(
-          ".bx--header__action.bx--header__action:hover>svg",
-        );
+        expect(output).toContain(".bx--header__action>svg");
       });
     }
 

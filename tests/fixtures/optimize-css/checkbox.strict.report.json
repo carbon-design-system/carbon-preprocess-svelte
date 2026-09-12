@@ -2,10 +2,10 @@
   "ids": [
     "Checkbox"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 23736,
-  "reduction_percent": 96.66,
-  "kept_rules": 134,
+  "before_bytes": 709971,
+  "after_bytes": 23590,
+  "reduction_percent": 96.68,
+  "kept_rules": 132,
   "leaked_count": 0,
   "leaked_classes": []
 }

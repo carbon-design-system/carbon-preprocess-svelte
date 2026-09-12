@@ -3,10 +3,10 @@
     "Accordion",
     "AccordionItem"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 22017,
-  "reduction_percent": 96.9,
-  "kept_rules": 135,
+  "before_bytes": 709971,
+  "after_bytes": 21869,
+  "reduction_percent": 96.92,
+  "kept_rules": 133,
   "leaked_count": 0,
   "leaked_classes": []
 }

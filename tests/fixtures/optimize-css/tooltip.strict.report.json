@@ -2,10 +2,10 @@
   "ids": [
     "Tooltip"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 49448,
-  "reduction_percent": 93.05,
-  "kept_rules": 301,
+  "before_bytes": 709971,
+  "after_bytes": 34380,
+  "reduction_percent": 95.16,
+  "kept_rules": 221,
   "leaked_count": 0,
   "leaked_classes": []
 }

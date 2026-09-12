@@ -2,10 +2,10 @@
   "ids": [
     "NumberInput"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 41552,
-  "reduction_percent": 94.16,
-  "kept_rules": 247,
+  "before_bytes": 709971,
+  "after_bytes": 40033,
+  "reduction_percent": 94.36,
+  "kept_rules": 220,
   "leaked_count": 0,
   "leaked_classes": []
 }

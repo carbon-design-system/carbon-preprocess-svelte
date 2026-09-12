@@ -2,10 +2,10 @@
   "ids": [
     "SideNav"
   ],
-  "before_bytes": 711133,
-  "after_bytes": 17815,
-  "reduction_percent": 97.49,
-  "kept_rules": 96,
+  "before_bytes": 709971,
+  "after_bytes": 17335,
+  "reduction_percent": 97.56,
+  "kept_rules": 92,
   "leaked_count": 0,
   "leaked_classes": []
 }
