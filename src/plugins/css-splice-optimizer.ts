@@ -10,18 +10,25 @@ import {
  * into a PostCSS AST and re-serializing. PostCSS is lossless, so for a
  * stylesheet whose shape this module models exactly (the shape every
  * compiled Carbon theme has), removing a node or rewriting a selector is a
- * pure text edit. Anything outside that shape returns `undefined` and the
- * caller falls back to PostCSS; the scanner never guesses.
+ * pure text edit.
  *
  * Fidelity is by construction: the tokenizer and statement parser below
  * mirror `postcss/lib/tokenize` and `postcss/lib/parser` case by case
  * (including their quirks, e.g. the `url(` lookbehind buffer and
  * `RE_BAD_BRACKET`), the visitor pass replays PostCSS's dirty-node re-walk,
  * and the emitter reproduces `postcss/lib/stringifier`'s semicolon rules.
- * Constructs where PostCSS output is not a plain splice of the input
- * (comments inside a selector/declaration, empty declarations, free
- * semicolons, BOMs, `<` escaping, source-map annotations, `@layer`, ...)
- * bail.
+ *
+ * A few PostCSS behaviors are deliberately not reproduced, since they are
+ * quirks of round-tripping through an AST rather than anything a bundler
+ * asset depends on: `<` is never escaped, a byte-order mark and a
+ * `sourceMappingURL` comment are left exactly as they appear in the source,
+ * and `postcss-discard-empty`'s deletion of empty declarations, empty-
+ * selector rules, paramless at-rule statements, and a duplicate/empty
+ * named `@layer` is not replicated (only containers left with no
+ * surviving children are still dropped). Anything this scanner cannot
+ * classify — a genuine syntax error, or a construct too ambiguous to
+ * compute an allowlist decision for — returns the input unchanged
+ * (`removed: 0`) instead of guessing.
  */
 
 export type SpliceOptimizerOptions = StrictCssOptimizerOptions & {
@@ -91,13 +98,94 @@ for (const ch of "\t\n\f\r \"#'()/;[\\]{}") AT_END[ch.charCodeAt(0)] = 1;
 const BAD_BRACKET = new Uint8Array(128);
 for (const ch of "\r\n\"'(/\\") BAD_BRACKET[ch.charCodeAt(0)] = 1;
 
-const IMPORTANT_ONLY = /^![\t\n\f\r ]*important$/i;
-
 /** Thrown to abandon the splice path; never escapes `spliceOptimizeCss`. */
 const BAIL = Symbol("bail");
 
 function bail(): never {
   throw BAIL;
+}
+
+/**
+ * `1` when the source starts with a byte-order mark (correct or reversed),
+ * else `0`. PostCSS strips this before tokenizing and always re-emits the
+ * correct `﻿`, "fixing" a reversed one; this scanner instead leaves the
+ * source's first character exactly as it is and only skips it when
+ * tokenizing, so `this.spaces`/`Tokenizer#pos` start one past it.
+ */
+function bomLength(css: string): number {
+  const first = css.charCodeAt(0);
+  return first === BOM || first === BOM_REVERSED ? 1 : 0;
+}
+
+/**
+ * Mirror of `postcss/lib/parser`'s `raw()` comment handling: a comment with a
+ * space/boundary neighbor on either side is dropped (as is one that directly
+ * follows a bare `,`, an edge that only matters for comma-separated lists
+ * such as selectors); everything else, including a comment with no safe
+ * neighbor, is kept verbatim. Never used for the common case (no comment in
+ * range): callers only invoke this once a comment has already been spotted.
+ */
+function hasCommentToken(types: Uint8Array, from: number, to: number): boolean {
+  for (let i = from; i < to; i++) {
+    if (types[i] === T_COMMENT) return true;
+  }
+  return false;
+}
+
+function rawClean(
+  css: string,
+  types: Uint8Array,
+  starts: Int32Array,
+  ends: Int32Array,
+  from: number,
+  to: number,
+): string {
+  let value = "";
+  for (let i = from; i < to; i++) {
+    if (types[i] === T_COMMENT) {
+      const prevSafe = i === from || types[i - 1] === T_SPACE;
+      const nextSafe = i === to - 1 || types[i + 1] === T_SPACE;
+      if (prevSafe || nextSafe) continue;
+      if (value.endsWith(",")) continue;
+    }
+    value += css.slice(starts[i], ends[i]);
+  }
+  return value;
+}
+
+/**
+ * Mirror of `postcss/lib/parser`'s bareword-`important` detection (a value
+ * ending in `important` with no leading `!` glued to it, e.g. `x ! y
+ * important`): PostCSS re-walks its own value tokens from the end,
+ * treating them as a shrinking buffer it only ever pops from the tail, and
+ * accepts the run back to (but never including) the first real token if
+ * the accumulated text ends up starting with `!`. Since popping only
+ * happens from the tail, the survivors are always exactly the prefix
+ * `[from, from + len)` for some `len`, so this tracks `len` instead of a
+ * real buffer. `[from, to)` is the value's real (non-trivia) token range;
+ * `important` is the index of the trailing `important` word within it.
+ * Returns the new exclusive end when it triggers, else `null` (leaves the
+ * value as plain text, exactly like PostCSS's decl() does when the `!`
+ * never gets consumed into the run).
+ */
+function findBarewordImportantEnd(
+  css: string,
+  types: Uint8Array,
+  starts: Int32Array,
+  ends: Int32Array,
+  from: number,
+  to: number,
+  important: number,
+): number | null {
+  let len = to - from;
+  let str = "";
+  for (let j = important - from; j > 0; j--) {
+    const idx = from + len - 1;
+    if (str.trim().startsWith("!") && types[idx] !== T_SPACE) break;
+    str = css.slice(starts[idx], ends[idx]) + str;
+    len--;
+  }
+  return str.trim().startsWith("!") ? from + len : null;
 }
 
 function isWhitespace(code: number): boolean {
@@ -154,6 +242,18 @@ class CssNode {
   name: string;
   /** Rule: rewritten selector, or `null` when untouched. */
   selector: string | null;
+  /**
+   * The `raw()`-clean text (comments dropped per neighbor-safety, `!important`
+   * suffix stripped) when it differs from `css.slice(a, b)`; `null` when the
+   * raw slice already equals it. Rule: clean selector, used by
+   * `pruneRuleSelector` in place of the raw slice. At-rule: clean params,
+   * used for `isFlatpickrKeyframes` and a named `@layer`'s emptiness check.
+   * (Declarations have the same idea in `Decls#clean`, since they are not
+   * `CssNode`s.) Never used for output: nodes are only ever kept verbatim
+   * or removed wholesale, never individually rewritten from this text
+   * (rules are the one exception, via `selector`).
+   */
+  clean: string | null;
   /** Container `raws.semicolon`. */
   semicolon: boolean;
   /** Container is (or is nested in) a `@font-face` block. */
@@ -174,6 +274,7 @@ class CssNode {
     this.b = 0;
     this.name = "";
     this.selector = null;
+    this.clean = null;
     this.semicolon = false;
     this.fontFace = parent?.fontFace === true;
     this.removed = false;
@@ -189,6 +290,10 @@ const D_CUSTOM = 2;
  * `[start, propEnd)`, value `[a, b)`, exclusive `end` (before the `;` if
  * any), and `D_SEMI` / `D_CUSTOM` flags. No `raws.before`: a declaration is
  * never removed on its own, so its leading whitespace is never spliced.
+ * `clean` holds the `raw()`-clean value (comments dropped, `!important`
+ * suffix stripped) for the rare declaration where it differs from
+ * `css.slice(a, b)` — only `@font-face` descriptor comparison ever reads
+ * it, so a sparse map beats a slot per declaration.
  */
 class Decls {
   start: Int32Array;
@@ -197,6 +302,7 @@ class Decls {
   b: Int32Array;
   end: Int32Array;
   flags: Uint8Array;
+  clean: Map<number, string>;
   count: number;
 
   constructor(capacity: number) {
@@ -206,6 +312,7 @@ class Decls {
     this.b = new Int32Array(capacity);
     this.end = new Int32Array(capacity);
     this.flags = new Uint8Array(capacity);
+    this.clean = new Map();
     this.count = 0;
   }
 
@@ -272,7 +379,7 @@ class Tokenizer {
   constructor(css: string) {
     this.css = css;
     this.length = css.length;
-    this.pos = 0;
+    this.pos = bomLength(css);
     this.type = 0;
     this.start = 0;
     this.end = 0;
@@ -532,7 +639,7 @@ class Parser {
     this.tokenizer = new Tokenizer(css);
     this.root = new CssNode(N_ROOT, null, 0);
     this.current = this.root;
-    this.spaces = 0;
+    this.spaces = bomLength(css);
     this.semicolon = false;
     this.tokTypes = new Uint8Array(64);
     this.tokStarts = new Int32Array(64);
@@ -553,11 +660,10 @@ class Parser {
         this.comment();
       } else if (type === T_AT_WORD) {
         this.atrule();
-      } else if (type === T_SEMICOLON || type === T_OPEN_CURLY) {
-        // A free semicolon lands in `raws.ownSemicolon` or the next node's
-        // `before`; a bare `{` is a rule with an empty selector that
-        // `postcss-discard-empty` drops. Neither is a plain splice.
-        bail();
+      } else if (type === T_SEMICOLON) {
+        this.freeSemicolon(tokenizer.end);
+      } else if (type === T_OPEN_CURLY) {
+        this.emptyRule();
       } else {
         this.other();
       }
@@ -607,8 +713,7 @@ class Parser {
     const css = this.css;
     const name = css.slice(t.start + 1, t.end);
     if (name === "") bail();
-    // `postcss-discard-empty` has layer-specific rules.
-    if (name === "layer") bail();
+    const nameEnd = t.end;
 
     const node = new CssNode(N_AT_BLOCK, this.current, this.spaces);
     this.init(node);
@@ -620,10 +725,7 @@ class Parser {
     let open = false;
     let semi = false;
     let closedByParent = false;
-    let paramsFrom = -1;
-    let paramsTo = -1;
-    let commentInside = false;
-    let pendingComment = false;
+    this.tokCount = 0;
 
     while (t.next()) {
       const type = t.type;
@@ -651,21 +753,35 @@ class Parser {
       }
 
       // Params token. Leading and trailing space/comment tokens become
-      // `afterName` / `between`; a comment between two params tokens would
-      // be stripped from `node.params`, which is not modeled.
-      if (type === T_SPACE || type === T_COMMENT) {
-        if (type === T_COMMENT && paramsFrom !== -1) pendingComment = true;
-      } else {
-        if (paramsFrom === -1) paramsFrom = t.start;
-        if (pendingComment) commentInside = true;
-        paramsTo = t.end;
-      }
+      // `afterName` / `between`, verbatim (never touched by the emitter);
+      // a comment between two params tokens is stripped from `node.clean`
+      // via the same `raw()` neighbor rule as a selector's.
+      this.pushToken();
     }
 
-    if (commentInside) bail();
-    if (paramsFrom !== -1) {
-      node.a = paramsFrom;
-      node.b = paramsTo;
+    const types = this.tokTypes;
+    const starts = this.tokStarts;
+    const ends = this.tokEnds;
+    let paramsFrom = 0;
+    let paramsTo = this.tokCount;
+    while (paramsFrom < paramsTo) {
+      const type = types[paramsFrom];
+      if (type !== T_SPACE && type !== T_COMMENT) break;
+      paramsFrom++;
+    }
+    while (paramsTo > paramsFrom) {
+      const type = types[paramsTo - 1];
+      if (type !== T_SPACE && type !== T_COMMENT) break;
+      paramsTo--;
+    }
+
+    const hasParams = paramsTo > paramsFrom;
+    if (hasParams) {
+      node.a = starts[paramsFrom];
+      node.b = ends[paramsTo - 1];
+      node.clean = hasCommentToken(types, paramsFrom, paramsTo)
+        ? rawClean(css, types, starts, ends, paramsFrom, paramsTo)
+        : null;
     }
 
     if (open) {
@@ -676,8 +792,6 @@ class Parser {
 
     node.type = N_AT_STATEMENT;
     node.nodes = null;
-    // `@foo;` with no params is dropped by `postcss-discard-empty`.
-    if (paramsFrom === -1) bail();
 
     if (semi) {
       node.semi = true;
@@ -689,9 +803,11 @@ class Parser {
       this.spaces = t.start;
       this.end(t.end);
     } else {
-      // EOF: trailing whitespace moves to `root.raws.after`.
-      node.end = paramsTo;
-      this.spaces = paramsTo;
+      // EOF: trailing whitespace moves to `root.raws.after`. `@foo;` with
+      // no params is kept (unlike `postcss-discard-empty`), so `node.b` is
+      // only meaningful when params were actually found.
+      node.end = hasParams ? node.b : nameEnd;
+      this.spaces = node.end;
     }
   }
 
@@ -765,8 +881,25 @@ class Parser {
     }
   }
 
+  /**
+   * A bare `{`: a rule with an empty selector. PostCSS keeps these (they are
+   * only dropped by `postcss-discard-empty`'s own empty-selector rule, which
+   * this scanner does not replicate).
+   */
+  private emptyRule(): void {
+    const t = this.tokenizer;
+    const node = new CssNode(N_RULE, this.current, this.spaces);
+    this.init(node);
+    node.start = t.start;
+    node.a = t.start;
+    node.b = t.start;
+    this.current = node;
+    this.spaces = t.end;
+  }
+
   private rule(): void {
     const types = this.tokTypes;
+    const starts = this.tokStarts;
     const ends = this.tokEnds;
     // Drop the `{`.
     let count = this.tokCount - 1;
@@ -776,16 +909,14 @@ class Parser {
       if (last !== T_SPACE && last !== T_COMMENT) break;
       count--;
     }
-    for (let i = 0; i < count; i++) {
-      // A comment inside the selector is stripped from `node.selector`.
-      if (types[i] === T_COMMENT) bail();
-    }
-
     const node = new CssNode(N_RULE, this.current, this.spaces);
     this.init(node);
-    node.start = this.tokStarts[0];
+    node.start = starts[0];
     node.a = node.start;
     node.b = ends[count - 1];
+    node.clean = hasCommentToken(types, 0, count)
+      ? rawClean(this.css, types, starts, ends, 0, count)
+      : null;
     this.current = node;
     this.spaces = bodyStart;
   }
@@ -805,14 +936,15 @@ class Parser {
       count--;
     }
 
-    // PostCSS moves leading non-word tokens into `raws.before` and applies
-    // the `*`/`_` hack; neither shape is modeled.
+    // PostCSS moves a leading `*`/`_` hack char into `raws.before`; the rest
+    // of the property must be a word.
     if (types[0] !== T_WORD) bail();
-    const first = css.charCodeAt(starts[0]);
-    if (first === UNDERSCORE || first === ASTERISK) bail();
+    let propStart = starts[0];
+    const first = css.charCodeAt(propStart);
+    if (first === UNDERSCORE || first === ASTERISK) propStart++;
 
-    // Only whitespace may separate the property from its colon; anything
-    // else lands in `raws.between` or throws.
+    // Only whitespace or a comment may separate the property from its
+    // colon; anything else lands in `raws.between` or throws.
     let i = 1;
     let sawColon = false;
     for (; i < count; i++) {
@@ -822,56 +954,155 @@ class Parser {
         i++;
         break;
       }
-      if (type !== T_SPACE) bail();
+      if (type !== T_SPACE && type !== T_COMMENT) bail();
     }
     if (!sawColon) bail();
 
+    const valueStart = i;
     let valueFrom = -1;
     let valueTo = -1;
+    let firstRealIndex = -1;
     let hasBang = false;
+    let hasComment = false;
     let parens = 0;
-    for (; i < count; i++) {
-      const type = types[i];
-      if (type === T_COMMENT) bail();
+    for (let j = valueStart; j < count; j++) {
+      const type = types[j];
       if (type === T_SPACE) continue;
-      if (valueFrom === -1) valueFrom = starts[i];
-      valueTo = ends[i];
+      if (type === T_COMMENT) {
+        hasComment = true;
+        continue;
+      }
+      if (valueFrom === -1) {
+        valueFrom = starts[j];
+        firstRealIndex = j;
+      }
+      valueTo = ends[j];
       if (type === T_OPEN_PAREN) parens++;
       else if (type === T_CLOSE_PAREN) parens--;
       else if (type === T_COLON && parens === 0 && !customProperty) {
-        // "Missed semicolon" / "Double colon" errors, or the `progid:` hack.
-        bail();
-      } else if (type === T_WORD && css.charCodeAt(starts[i]) === BANG) {
+        // A depth-0 colon is a "Missed semicolon" / "Double colon" error,
+        // unless it is the `progid:` hack (the colon right after the word
+        // `progid`, which PostCSS's `colon()` skips over).
+        const prevType = types[j - 1];
+        const isProgid =
+          prevType === T_WORD &&
+          ends[j - 1] - starts[j - 1] === 6 &&
+          css.startsWith("progid", starts[j - 1]);
+        if (!isProgid) bail();
+      } else if (type === T_WORD && css.charCodeAt(starts[j]) === BANG) {
         hasBang = true;
       }
     }
 
+    // Exclusive end of the token range that still counts as the value, once
+    // a trailing `!important` (and the whitespace right before it) is cut.
+    let cleanEnd = count;
     if (customProperty) {
       // Trailing whitespace is part of a custom property's value.
       valueTo = ends[count - 1];
     } else if (valueFrom === -1) {
-      // Empty value: dropped by `postcss-discard-empty`.
-      bail();
+      // Empty value. Unlike `postcss-discard-empty`, this is kept, not
+      // dropped; give it an empty (but valid) range right after the colon.
+      valueTo = ends[valueStart - 1];
     } else if (hasBang) {
-      // `!important` handling rewrites the value; only bail where it matters:
-      // a bare `!important` is an empty value, and `@font-face` descriptors
-      // are compared verbatim.
-      if (IMPORTANT_ONLY.test(css.slice(valueFrom, valueTo))) bail();
-      if (this.current.fontFace) bail();
+      let k = count - 1;
+      while (
+        k >= valueStart &&
+        (types[k] === T_SPACE || types[k] === T_COMMENT)
+      ) {
+        k--;
+      }
+      const isTrailingImportant =
+        k >= valueStart &&
+        types[k] === T_WORD &&
+        ends[k] - starts[k] === 10 &&
+        css.slice(starts[k], ends[k]).toLowerCase() === "!important";
+
+      const isBarewordImportant =
+        !isTrailingImportant &&
+        k >= valueStart &&
+        types[k] === T_WORD &&
+        ends[k] - starts[k] === 9 &&
+        css.slice(starts[k], ends[k]).toLowerCase() === "important";
+      const barewordEnd = isBarewordImportant
+        ? findBarewordImportantEnd(
+            css,
+            types,
+            starts,
+            ends,
+            firstRealIndex,
+            k + 1,
+            k,
+          )
+        : null;
+
+      if (isTrailingImportant) {
+        cleanEnd = k;
+        while (cleanEnd - 1 > valueStart && types[cleanEnd - 1] === T_SPACE) {
+          cleanEnd--;
+        }
+        // A bare `!important` strips down to an empty `[valueStart,
+        // cleanEnd)`; the clean value below then correctly reads as "".
+        // Unlike `postcss-discard-empty`, it is kept, not dropped.
+      } else if (barewordEnd !== null) {
+        cleanEnd = barewordEnd;
+      } else if (this.current.fontFace) {
+        // Not a recognized `!important` form; `@font-face` descriptors are
+        // compared verbatim, so this scanner cannot classify them.
+        bail();
+      }
     }
 
     const end = ends[count - 1];
     const index = this.decls.push(
-      starts[0],
+      propStart,
       ends[0],
       valueFrom === -1 ? valueTo : valueFrom,
       valueTo,
       end,
       (semi ? D_SEMI : 0) | (customProperty ? D_CUSTOM : 0),
     );
+    if (hasComment || cleanEnd !== count) {
+      // A non-empty value's leading trivia is promoted to `raws.between`
+      // (not part of `value`) once PostCSS finds a real token later on;
+      // only the truly-empty case keeps it as part of the (also empty)
+      // value.
+      const cleanStart = valueFrom === -1 ? valueStart : firstRealIndex;
+      this.decls.clean.set(
+        index,
+        rawClean(css, types, starts, ends, cleanStart, cleanEnd),
+      );
+    }
     this.current.nodes?.push(index);
     this.semicolon = semi;
     this.spaces = semi ? semiEnd : end;
+  }
+
+  /**
+   * A `;` with no preceding statement. If the previous sibling is a rule
+   * without one already, it becomes that rule's own trailing semicolon
+   * (`raws.ownSemicolon`, reusing `CssNode#semi`) and is removed along with
+   * it; otherwise it is just more `before` text for whatever comes next.
+   */
+  private freeSemicolon(end: number): void {
+    const nodes = this.current.nodes;
+    if (nodes && nodes.length > 0) {
+      const prev = nodes[nodes.length - 1];
+      if (typeof prev !== "number" && prev.type === N_RULE && !prev.semi) {
+        prev.semi = true;
+        prev.end = end;
+        // The rule's own span now reaches past the `;`, so the next node's
+        // leading trivia must start fresh from there.
+        this.spaces = end;
+        return;
+      }
+    }
+    // Not attached: the `;` is just more pending trivia for whatever comes
+    // next. `this.spaces` already marks where that trivia run started
+    // (unlike PostCSS's string accumulator, an offset doesn't need to grow
+    // to "include" it) — touching it here would make it start later than
+    // the previous structural boundary, and a since-removed node ahead
+    // would then wrongly flush the gap in between as kept text.
   }
 
   private end(closeEnd: number): void {
@@ -933,7 +1164,11 @@ class Optimizer {
   }
 
   private visitRule(node: CssNode): void {
-    const selector = node.selector ?? this.css.slice(node.a, node.b);
+    // `node.selector` wins on a re-visit (triggered by `markDirty` on a
+    // rewrite): the rewritten text is what a dirtied re-walk re-evaluates,
+    // matching PostCSS's `walkRules` seeing the same mutated node again.
+    const selector =
+      node.selector ?? node.clean ?? this.css.slice(node.a, node.b);
     const pruned = pruneRuleSelector(selector, this.options);
     if (!pruned) return;
     this.removed += pruned.removed;
@@ -949,7 +1184,11 @@ class Optimizer {
   private visitAtRule(node: CssNode): void {
     const css = this.css;
     if (
-      isFlatpickrKeyframes(node.name, css.slice(node.a, node.b), this.options)
+      isFlatpickrKeyframes(
+        node.name,
+        node.clean ?? css.slice(node.a, node.b),
+        this.options,
+      )
     ) {
       node.removed = true;
       markDirty(node.parent);
@@ -972,15 +1211,19 @@ class Optimizer {
         const child = stack.pop() as Child;
         if (typeof child === "number") {
           const prop = css.slice(decls.start[child], decls.propEnd[child]);
-          if (prop === "font-family") {
-            family = css.slice(decls.a[child], decls.b[child]);
-          } else if (prop === "font-style") {
-            style = css.slice(decls.a[child], decls.b[child]);
-          } else if (prop === "font-weight") {
-            weight = css.slice(decls.a[child], decls.b[child]);
+          if (
+            prop === "font-family" ||
+            prop === "font-style" ||
+            prop === "font-weight"
+          ) {
+            const value =
+              decls.clean.get(child) ??
+              css.slice(decls.a[child], decls.b[child]);
+            if (prop === "font-family") family = value;
+            else if (prop === "font-style") style = value;
+            else weight = value;
           }
-        } else if (child.removed) {
-        } else if (child.nodes) {
+        } else if (!child.removed && child.nodes) {
           for (let i = child.nodes.length - 1; i >= 0; i--) {
             stack.push(child.nodes[i]);
           }
@@ -1004,12 +1247,20 @@ class Optimizer {
       root.dirty = false;
       this.visit(root, false);
     }
-    discardEmpty(root);
+    discardEmpty(root, this.css);
   }
 }
 
-/** `postcss-discard-empty`, restricted to the cases the parser lets through. */
-function discardEmpty(node: CssNode): void {
+/**
+ * `postcss-discard-empty`, restricted to the cases the parser lets through.
+ * A *named* `@layer` is never removed for being empty: real
+ * `postcss-discard-empty` only drops it when an earlier sibling with the
+ * same name already has content (order-establishing de-duplication), which
+ * this scanner does not model (Group B: keep a duplicate/empty `@layer`
+ * rather than replicate that). An anonymous `@layer {}` has no such
+ * exemption and falls through to the ordinary empty-container rule below.
+ */
+function discardEmpty(node: CssNode, css: string): void {
   const nodes = node.nodes;
   if (!nodes) return;
   let kept = 0;
@@ -1019,10 +1270,14 @@ function discardEmpty(node: CssNode): void {
       continue;
     }
     if (child.removed) continue;
-    discardEmpty(child);
+    discardEmpty(child, css);
     if (!child.removed) kept++;
   }
-  if (kept === 0 && node.type !== N_ROOT) {
+  const isNamedLayer =
+    node.type === N_AT_BLOCK &&
+    node.name === "layer" &&
+    (node.clean ?? css.slice(node.a, node.b)).trim() !== "";
+  if (kept === 0 && node.type !== N_ROOT && !isNamedLayer) {
     node.removed = true;
   }
 }
@@ -1101,7 +1356,11 @@ class Emitter {
 
       if (node.removed) {
         this.flush(node.before);
-        this.cursor = node.semi ? node.end + 1 : node.end;
+        // A decl/at-statement's own `;` sits right after `end` (excluded
+        // from it); a rule's own semicolon is already folded into `end`
+        // (`Parser#freeSemicolon`), since it may not be adjacent to `}`.
+        this.cursor =
+          node.semi && node.type !== N_RULE ? node.end + 1 : node.end;
         continue;
       }
 
@@ -1164,28 +1423,29 @@ class Emitter {
 }
 
 /**
- * Returns the optimized stylesheet, or `undefined` when the input falls
- * outside the modeled shape and must go through PostCSS instead. All shape
+ * Returns the optimized stylesheet, or the input unchanged (`removed: 0`)
+ * when it is not the shape this scanner models: a syntax error, or a
+ * construct whose effect on the allowlist it cannot compute. All shape
  * checks happen before any allowlist/safelist logic runs, so a bail leaves
  * caller-provided `RegExp` safelist entries untouched.
  */
 export function spliceOptimizeCss(
   css: string,
   options: SpliceOptimizerOptions,
-): { css: string; removed: number } | undefined {
-  const first = css.charCodeAt(0);
-  if (first === BOM || first === BOM_REVERSED) return undefined;
-  // The stringifier escapes `<` in `</style` and `<!--`; a map annotation
-  // makes PostCSS strip it and emit a source map.
-  if (css.includes("<") || css.includes("sourceMappingURL")) return undefined;
-
+): { css: string; removed: number } {
   const parser = new Parser(css);
   let root: CssNode;
   try {
     root = parser.parse();
   } catch (error) {
-    if (error === BAIL) return undefined;
-    throw error;
+    if (error !== BAIL) throw error;
+    // A syntax error (PostCSS would throw `CssSyntaxError`), or a construct
+    // whose effect on the Carbon allowlist this scanner cannot compute
+    // (an ambiguous `@font-face` descriptor). Bundlers have already parsed
+    // this asset before it reaches here, so a hard failure adds nothing;
+    // returning it unchanged is the same contract `run()` already has for
+    // assets with nothing optimizable.
+    return { css, removed: 0 };
   }
 
   const decls = parser.decls;
@@ -1198,31 +1458,36 @@ export function spliceOptimizeCss(
 }
 
 /**
- * Calls `onRule` with every rule's selector in document order (the order
- * `Root#walkRules` visits them), parsing with the splice tokenizer instead
- * of building a PostCSS AST. Returns `false` without calling `onRule` when
- * the stylesheet falls outside the modeled shape, so the caller can fall
- * back to PostCSS.
+ * Calls `onRule` with each rule's selector, in pre-order document order
+ * (matching PostCSS's `root.walkRules()`, the reference this replaces).
+ * The selector is PostCSS's clean value (comments dropped per the same
+ * `raw()` rule used everywhere else in this module), not a raw splice of
+ * the source. Unlike `spliceOptimizeCss`, there is no passthrough for a
+ * bail: a build-time indexing pass has no "unchanged" to fall back to, so
+ * an input outside this scanner's modeled shape is a hard error here.
  */
 export function forEachRuleSelector(
   css: string,
   onRule: (selector: string) => void,
-): boolean {
-  const first = css.charCodeAt(0);
-  if (first === BOM || first === BOM_REVERSED) return false;
-
+): void {
   let root: CssNode;
   try {
     root = new Parser(css).parse();
   } catch (error) {
-    if (error === BAIL) return false;
+    if (error === BAIL) {
+      throw new Error(
+        "forEachRuleSelector: input is outside the shape this scanner models",
+      );
+    }
     throw error;
   }
 
   const stack: CssNode[] = [root];
   while (stack.length > 0) {
     const node = stack.pop() as CssNode;
-    if (node.type === N_RULE) onRule(css.slice(node.a, node.b));
+    if (node.type === N_RULE) {
+      onRule(node.clean ?? css.slice(node.a, node.b));
+    }
     const nodes = node.nodes;
     if (!nodes) continue;
     for (let i = nodes.length - 1; i >= 0; i--) {
@@ -1230,6 +1495,4 @@ export function forEachRuleSelector(
       if (typeof child !== "number") stack.push(child);
     }
   }
-
-  return true;
 }

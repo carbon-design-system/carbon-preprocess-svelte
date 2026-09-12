@@ -36,8 +36,7 @@ const APP_CHUNK_ROUTE_3 = appCss(40, "widget");
 // One bundled asset: Carbon theme followed by the app's own styles. Vite
 // concatenates imported stylesheets in import order.
 const CARBON_PLUS_APP = `${source}\n${APP_CHUNK}`;
-// `@layer` (e.g. from Tailwind v4) is outside the splice optimizer's modeled
-// shape, so the whole asset goes through the PostCSS reference pipeline.
+// `@layer` (e.g. from Tailwind v4) is modeled like any other at-rule.
 const CARBON_PLUS_LAYER = `${source}\n@layer base{${APP_CHUNK}}`;
 const SOURCE_BYTES = new TextEncoder().encode(source);
 
@@ -72,8 +71,8 @@ const SAFELIST_REGEXPS = [/^\.bx--btn--/, /bx--tag/];
 
 // Every CSS asset in a build goes through `run`, not just the Carbon theme.
 // These cover each branch of that call: the no-Carbon skip, the splice path
-// on a mixed asset, the PostCSS fallback, and the raw-bytes input Vite hands
-// over for emitted assets.
+// on a mixed asset, the splice path on an asset with `@layer`, and the
+// raw-bytes input Vite hands over for emitted assets.
 group("per-asset paths (small bundle)", () => {
   const optimizer = createCssOptimizer({ ids: BUNDLE_IDS, silent: true });
 
@@ -85,7 +84,7 @@ group("per-asset paths (small bundle)", () => {
     optimizer.run(CARBON_PLUS_APP, "index.css");
   });
 
-  task("Carbon + @layer (PostCSS fallback)", () => {
+  task("Carbon + @layer (splice)", () => {
     optimizer.run(CARBON_PLUS_LAYER, "index.css");
   });
 

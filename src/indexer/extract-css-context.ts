@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import postcss from "postcss";
 import { forEachRuleSelector } from "../plugins/css-splice-optimizer";
 import {
   getCarbonClassesFromNormalized,
@@ -31,21 +30,6 @@ export function resolveCarbonCssPath(
   theme = "white",
 ): string {
   return join(carbonRoot, "css", `${theme}.css`);
-}
-
-function walkCarbonRules(
-  css: string,
-  onRule: (selector: string) => void,
-): void {
-  // Compiled Carbon themes fit the splice parser's shape, which enumerates
-  // rules several times faster than a PostCSS AST; anything else parses
-  // with PostCSS.
-  if (forEachRuleSelector(css, onRule)) return;
-
-  const root = postcss.parse(css);
-  root.walkRules((rule) => {
-    onRule(rule.selector);
-  });
 }
 
 function addToSet(
@@ -135,7 +119,7 @@ export function extractCssIndexAdditions(
   const context = new Map<string, Set<string>>();
   const orphans = new Map<string, Set<string>>();
 
-  walkCarbonRules(css, (selectorList) => {
+  forEachRuleSelector(css, (selectorList) => {
     for (const branch of splitSelectorList(selectorList)) {
       const parts = splitSelectorParts(branch);
 

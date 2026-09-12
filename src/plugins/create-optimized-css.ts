@@ -1,7 +1,4 @@
 import path from "node:path";
-import type { AcceptedPlugin } from "postcss";
-import postcss from "postcss";
-import discardEmpty from "postcss-discard-empty";
 import { getComponents } from "../component-index-registry";
 import { ALWAYS_ON_CLASSES } from "../constants";
 import {
@@ -9,12 +6,7 @@ import {
   spliceOptimizeCss,
 } from "./css-splice-optimizer";
 import type { SafelistEntry } from "./safelist";
-import {
-  hasOptimizableCss,
-  isUnusedIbmPlexFontFace,
-  optimizeStrictAtRule,
-  optimizeStrictRule,
-} from "./strict-css-optimizer";
+import { hasOptimizableCss } from "./strict-css-optimizer";
 
 export type OptimizeCssOptions = {
   /**
@@ -103,8 +95,6 @@ export function isSilent(options?: OptimizeCssOptions): boolean {
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;
   ids: Iterable<string>;
-  /** PostCSS `from` option. Pass asset/chunk path when available, or omit for `undefined`. */
-  from?: string | undefined;
   /**
    * Class selectors (`.bx--*`) from scanning `content` globs. Pre-scanned by
    * the plugin so the per-asset optimizer does no filesystem I/O. Merged into
@@ -154,86 +144,9 @@ function buildUsage(
 }
 
 /**
- * Creates the PostCSS plugin pipeline for CSS optimization.
- *
- * The pipeline consists of two plugins:
- * 1. Custom Carbon optimizer - removes unused rules and font-faces
- * 2. postcss-discard-empty - cleans up any empty rule blocks left behind
- */
-function createPostcssPlugins(
-  allowlist: Set<string>,
-  preserveAllIBMFonts: boolean,
-  preserveFlatpickr: boolean,
-  safelist: readonly SafelistEntry[],
-  report: { removed: number },
-): AcceptedPlugin[] {
-  return [
-    {
-      postcssPlugin: "postcss-plugin:carbon:optimize-css",
-      /**
-       * Rule visitor that removes CSS rules (or individual selectors from a
-       * comma-separated list) for unused Carbon components.
-       */
-      Rule(node) {
-        report.removed += optimizeStrictRule(node, {
-          allowlist,
-          preserveFlatpickr,
-          safelist,
-        });
-      },
-      /**
-       * AtRule visitor that removes unused flatpickr `@keyframes` and IBM
-       * Plex `@font-face` declarations.
-       *
-       * Carbon's pre-compiled CSS includes @font-face rules for all IBM Plex
-       * variants (weights, styles, languages), but most apps only need a subset.
-       * By default, we preserve only the fonts actually used by Carbon components:
-       * - IBM Plex Sans: weights 300/400/600 in normal style
-       * - IBM Plex Mono: weight 400 in normal style (for code snippets)
-       */
-      AtRule(node) {
-        report.removed += optimizeStrictAtRule(node, { preserveFlatpickr });
-        if (!node.parent) return;
-
-        if (!preserveAllIBMFonts && node.name === "font-face") {
-          const attributes = {
-            "font-family": "",
-            "font-style": "",
-            "font-weight": "",
-          };
-
-          node.walkDecls((decl) => {
-            switch (decl.prop) {
-              case "font-family":
-              case "font-style":
-              case "font-weight":
-                attributes[decl.prop] = decl.value;
-                break;
-            }
-          });
-
-          if (
-            isUnusedIbmPlexFontFace(
-              attributes["font-family"],
-              attributes["font-style"],
-              attributes["font-weight"],
-            )
-          ) {
-            node.remove();
-            report.removed++;
-          }
-        }
-      },
-    },
-    discardEmpty(),
-  ];
-}
-
-/**
  * The optimized CSS plus a count of how many Carbon rules/selectors/font-faces
  * were removed. Callers use `removed` to suppress the size diff log when nothing
- * was actually pruned (a size change alone can be misleading — e.g. PostCSS
- * re-serialization on a stylesheet with no Carbon styles to remove).
+ * was actually pruned.
  */
 export type OptimizedCssReport = {
   css: string;
@@ -250,30 +163,8 @@ function toCssString(source: CreateOptimizedCssOptions["source"]): string {
   ).toString();
 }
 
-/**
- * The PostCSS pipeline: the reference implementation, and the fallback for
- * stylesheets `spliceOptimizeCss` does not model.
- */
-export function optimizeCssWithPostcss(
-  input: string,
-  options: SpliceOptimizerOptions,
-  from?: string,
-): OptimizedCssReport {
-  const report = { removed: 0 };
-  const { css } = postcss(
-    createPostcssPlugins(
-      options.allowlist,
-      options.preserveAllIBMFonts,
-      options.preserveFlatpickr,
-      options.safelist,
-      report,
-    ),
-  ).process(input, { from });
-  return { css, removed: report.removed };
-}
-
 export function createCssOptimizer(
-  options: Omit<CreateOptimizedCssOptions, "source" | "from">,
+  options: Omit<CreateOptimizedCssOptions, "source">,
 ) {
   const { allowlist, preserveFlatpickr } = buildUsage(
     options.ids,
@@ -287,26 +178,24 @@ export function createCssOptimizer(
   };
 
   return {
+    // Second argument is unused now that the scanner never falls back to
+    // PostCSS (it only ever needed `from` for PostCSS's own `Input`
+    // bookkeeping); kept in the signature since the Vite/webpack plugins
+    // still pass the asset id.
     run(
       source: CreateOptimizedCssOptions["source"],
-      from?: string,
+      _from?: string,
     ): OptimizedCssReport {
       // Bundlers hand every CSS asset to the plugin, including per-route
       // chunks with no Carbon styles at all. Parsing and re-serializing
-      // those is pure overhead, so skip PostCSS unless something removable
-      // could be present.
+      // those is pure overhead, so skip the scanner unless something
+      // removable could be present.
       const input = toCssString(source);
       if (!hasOptimizableCss(input)) {
         return { css: input, removed: 0 };
       }
 
-      // Compiled Carbon themes have a plain enough shape that the removals
-      // can be spliced straight out of the source text. The scanner bails on
-      // anything it does not model exactly, and PostCSS takes over.
-      return (
-        spliceOptimizeCss(input, optimizerOptions) ??
-        optimizeCssWithPostcss(input, optimizerOptions, from)
-      );
+      return spliceOptimizeCss(input, optimizerOptions);
     },
   };
 }
@@ -314,8 +203,8 @@ export function createCssOptimizer(
 export function optimizeCssWithReport(
   options: CreateOptimizedCssOptions,
 ): OptimizedCssReport {
-  const { source, from, ...rest } = options;
-  return createCssOptimizer(rest).run(source, from);
+  const { source, ...rest } = options;
+  return createCssOptimizer(rest).run(source);
 }
 
 export function createOptimizedCss(options: CreateOptimizedCssOptions): string {
