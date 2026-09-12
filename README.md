@@ -347,9 +347,9 @@ optimizeCss({
      * new/renamed components and classes are picked up without waiting on a
      * `carbon-preprocess-svelte` release.
      *
-     * Resolved once per build and cached on disk at
-     * `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>.json`,
-     * so a Carbon bump invalidates the cache automatically. Falls back to
+     * Resolved once per build and cached on disk in your project at
+     * `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`,
+     * so bumping either package invalidates the cache automatically. Falls back to
      * the bundled static index if the live build fails for any reason
      * (unresolvable `carbon-components-svelte`, unexpected `src` layout,
      * etc.), so enabling it can't turn a working build into a broken one.

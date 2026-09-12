@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { version as OWN_VERSION } from "../../package.json";
 import type { ComponentIndex } from "./build-index";
 import { buildComponentIndex, resolveCarbonRoot } from "./build-index";
 
@@ -14,27 +15,82 @@ async function readCarbonVersion(carbonRoot: string): Promise<string> {
   return typeof pkg.version === "string" ? pkg.version : "unknown";
 }
 
+/**
+ * Structural check on whatever came off disk. `JSON.parse` succeeding is not
+ * enough: an empty object or a differently-shaped file would be handed to
+ * `optimizeCss` as an empty allowlist and silently prune every Carbon rule.
+ */
+export function isComponentIndex(value: unknown): value is ComponentIndex {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const entries = Object.values(value);
+  if (entries.length === 0) return false;
+
+  return entries.every(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as { path?: unknown }).path === "string" &&
+      Array.isArray((entry as { classes?: unknown }).classes) &&
+      (entry as { classes: unknown[] }).classes.every(
+        (cls) => typeof cls === "string",
+      ),
+  );
+}
+
 async function readCache(
   cacheFile: string,
 ): Promise<ComponentIndex | undefined> {
   try {
-    return JSON.parse(await readFile(cacheFile, "utf8"));
+    const parsed = JSON.parse(await readFile(cacheFile, "utf8"));
+    return isComponentIndex(parsed) ? parsed : undefined;
   } catch {
     return undefined;
   }
 }
 
+/**
+ * Best-effort, atomic: a sibling temp file is renamed into place so a
+ * concurrent build (e.g. parallel client/server builds sharing one
+ * `node_modules`) never observes a half-written file. A failed write just
+ * means the next build re-indexes.
+ */
 async function writeCache(
-  cacheDir: string,
   cacheFile: string,
   index: ComponentIndex,
 ): Promise<void> {
+  const tmpFile = `${cacheFile}.${process.pid}.${Date.now()}.tmp`;
   try {
-    await mkdir(cacheDir, { recursive: true });
-    await writeFile(cacheFile, JSON.stringify(index));
+    await mkdir(path.dirname(cacheFile), { recursive: true });
+    await writeFile(tmpFile, JSON.stringify(index));
+    await rename(tmpFile, cacheFile);
   } catch {
-    // Best-effort: a stale/missing cache just means the next build re-indexes.
+    await rm(tmpFile, { force: true }).catch(() => {});
   }
+}
+
+export type LiveIndexOptions = {
+  /** Directory the installed `carbon-components-svelte` is resolved from. */
+  projectRoot?: string;
+};
+
+/**
+ * Cache file for one (Carbon version, preprocessor version) pair under the
+ * consuming project's `node_modules/.cache/carbon-preprocess-svelte/`.
+ * Keyed by both so a bump on either side misses and rebuilds: a new Carbon
+ * changes the input, a new preprocessor may change the extraction.
+ */
+export function liveIndexCacheFile(
+  carbonRoot: string,
+  carbonVersion: string,
+): string {
+  return path.join(
+    path.dirname(carbonRoot),
+    CACHE_DIRNAME,
+    `${carbonVersion}_${OWN_VERSION}.json`,
+  );
 }
 
 /**
@@ -42,23 +98,47 @@ async function writeCache(
  * `carbon-components-svelte` is actually installed in the consuming project
  * -- no waiting on this library to re-publish its frozen index after a
  * Carbon bump.
- *
- * Cached at `node_modules/.cache/carbon-preprocess-svelte/<version>.json`,
- * keyed by the installed version so a Carbon bump invalidates the cache
- * automatically (a new version simply misses and rebuilds).
  */
-async function resolveLiveComponentIndex(): Promise<ComponentIndex> {
-  const carbonRoot = resolveCarbonRoot();
+export async function resolveLiveComponentIndex(
+  options?: LiveIndexOptions,
+): Promise<ComponentIndex> {
+  const carbonRoot = resolveCarbonRoot(options?.projectRoot);
   const version = await readCarbonVersion(carbonRoot);
-  const cacheDir = path.join(path.dirname(carbonRoot), CACHE_DIRNAME);
-  const cacheFile = path.join(cacheDir, `${version}.json`);
+  const cacheFile = liveIndexCacheFile(carbonRoot, version);
 
   const cached = await readCache(cacheFile);
   if (cached) return cached;
 
   const index = await buildComponentIndex({ carbonRoot });
-  await writeCache(cacheDir, cacheFile, index);
+
+  if (!isComponentIndex(index)) {
+    throw new Error(
+      `Indexed "${carbonRoot}" but found no exported components; unexpected package layout.`,
+    );
+  }
+
+  await writeCache(cacheFile, index);
   return index;
+}
+
+/**
+ * Un-memoized `ensureLiveComponentIndex`: resolves the live index, falling
+ * back to the bundled static `component-index.ts` on any failure
+ * (unresolvable `carbon-components-svelte`, unexpected Carbon `src` layout,
+ * etc.) so opting in can't turn a working build into a broken one.
+ */
+export async function loadLiveComponentIndex(
+  options?: LiveIndexOptions,
+): Promise<ComponentIndex> {
+  try {
+    return await resolveLiveComponentIndex(options);
+  } catch (error) {
+    console.warn(
+      `${LOG_PREFIX} experimental.liveIndex: falling back to the bundled static component index (${(error as Error)?.message ?? error}).`,
+    );
+    const { components } = await import("../component-index");
+    return components;
+  }
 }
 
 let memoized: Promise<ComponentIndex> | undefined;
@@ -68,20 +148,8 @@ let memoized: Promise<ComponentIndex> | undefined;
  * `experimental.liveIndex: true` triggers at most one indexing pass (or
  * cache read), no matter how many `optimizeImports`/`optimizeCss` instances
  * request it.
- *
- * Falls back to the bundled static `component-index.ts` on any failure
- * (unresolvable `carbon-components-svelte`, unexpected Carbon `src` layout,
- * etc.) so opting in can't turn a working build into a broken one.
  */
 export function ensureLiveComponentIndex(): Promise<ComponentIndex> {
-  if (!memoized) {
-    memoized = resolveLiveComponentIndex().catch(async (error) => {
-      console.warn(
-        `${LOG_PREFIX} experimental.liveIndex: falling back to the bundled static component index (${(error as Error)?.message ?? error}).`,
-      );
-      const { components } = await import("../component-index");
-      return components;
-    });
-  }
+  memoized ??= loadLiveComponentIndex();
   return memoized;
 }

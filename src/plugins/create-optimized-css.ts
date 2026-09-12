@@ -82,7 +82,7 @@ export type OptimizeCssOptions = {
      * Build the component index from *this project's* installed
      * `carbon-components-svelte` instead of using the version bundled with
      * `carbon-preprocess-svelte`. Resolved once per build (cached on disk,
-     * keyed by the installed Carbon version) and falls back to the bundled
+     * keyed by the Carbon and preprocessor versions) and falls back to the bundled
      * index if anything about the live build fails.
      * @default false
      */
