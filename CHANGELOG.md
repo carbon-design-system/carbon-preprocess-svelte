@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.45](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.45) - 2026-09-12
+
+**Features**
+
+- `OptimizeCssPlugin`: add Rspack support
+
+**Fixes**
+
+- re-index exports using `carbon-components-svelte@0.112.0`
+- `optimizeCss`: reset tracked ids/content cache per Vite build
+- `optimizeImports`: use file basename for source map `sources`
+- unexport `OptimizeImportsOptions`
+- `indexer`: resolve `carbon-components-svelte` from the project first
+- `liveIndex`: key the cache by both versions and validate its shape
+- `indexer`: load `svelte/compiler` lazily instead of at module scope
+
+**Performance**
+
+- `optimizeCss`: splice unused rules out of the source text (~31ms → ~8ms)
+- `optimizeCss`: flat declaration storage, range-based selector scan (~1.2x)
+- `optimizeCss`: drop PostCSS (~36% smaller dist)
+- `optimizeImports`: emit source map inline, drop magic-string
+- `optimizeImports`: byte-buffer mappings, indexOf-driven import scan (~1.9x)
+- `index`: enumerate rules with the splice parser (~1.1x full rebuild)
+
 ## [0.11.44](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.44) - 2026-09-06
 
 **Performance**
