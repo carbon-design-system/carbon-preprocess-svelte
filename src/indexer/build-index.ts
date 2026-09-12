@@ -35,24 +35,9 @@ export type ComponentIndex = Record<
  */
 export async function buildComponentIndex(options?: {
   carbonRoot?: string;
-  /**
-   * Lists `.js`/`.svelte` files under the Carbon `src` directory (relative,
-   * posix-separated paths). Defaults to a Node-native recursive walk.
-   *
-   * Multi-level sub-component class merging below is a single pass keyed off
-   * this scan order, so a different (but still valid) traversal order can
-   * surface a slightly different, but not less correct, set of transitively
-   * inherited classes than another traversal would. The CLI regeneration
-   * script (`scripts/index-components.ts`) injects a Bun `Glob`-based lister
-   * to keep the committed `component-index.ts` reproducible; this only
-   * matters for byte-for-byte comparison against that frozen file, not for
-   * correctness of a freshly computed live index.
-   */
-  listFiles?: (carbonSrc: string) => Promise<string[]>;
   onTiming?: (label: string, ms: number) => void;
 }): Promise<ComponentIndex> {
   const emit = options?.onTiming ?? (() => {});
-  const listFiles = options?.listFiles ?? listJsAndSvelteFiles;
   const carbon_path = options?.carbonRoot ?? resolveCarbonRoot();
   const carbon_src = path.join(carbon_path, "src");
   const index_js = path.join(carbon_src, "index.js");
@@ -91,7 +76,7 @@ export async function buildComponentIndex(options?: {
   });
 
   const scanStart = performance.now();
-  const files = await listFiles(carbon_src);
+  const files = await listJsAndSvelteFiles(carbon_src);
   moduleGraph.files = new Set(files);
 
   const extractedByFile = new Map<string, ReturnType<typeof extractFromSvelte>>(

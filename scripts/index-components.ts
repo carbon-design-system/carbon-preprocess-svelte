@@ -1,4 +1,3 @@
-import { Glob } from "bun";
 import { buildComponentIndex } from "../src/indexer/build-index";
 
 /**
@@ -9,24 +8,7 @@ const MANUAL_OVERRIDES: Record<string, string[]> = {};
 
 const debugIndex = process.env.DEBUG_INDEX === "1";
 
-/**
- * Bun's `Glob` scan order is what the committed `component-index.ts` was
- * generated with -- the multi-level sub-component class merge in
- * `buildComponentIndex` is scan-order sensitive, so keeping this the same
- * lister keeps regeneration reproducible. See the `listFiles` doc comment
- * on `buildComponentIndex` for why the live-index runtime path (which can't
- * depend on Bun) uses a different, Node-native lister instead.
- */
-async function listFilesViaBunGlob(carbonSrc: string): Promise<string[]> {
-  const files: string[] = [];
-  for await (const file of new Glob("**/*.{js,svelte}").scan(carbonSrc)) {
-    files.push(file);
-  }
-  return files;
-}
-
 const components = await buildComponentIndex({
-  listFiles: listFilesViaBunGlob,
   onTiming: debugIndex
     ? (label, ms) => console.log(`[index] ${label}: ${ms.toFixed(0)}ms`)
     : undefined,
