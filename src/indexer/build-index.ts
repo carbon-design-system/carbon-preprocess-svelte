@@ -92,6 +92,7 @@ export async function buildComponentIndex(options?: {
 
   const scanStart = performance.now();
   const files = await listFiles(carbon_src);
+  moduleGraph.files = new Set(files);
 
   const extractedByFile = new Map<string, ReturnType<typeof extractFromSvelte>>(
     (
