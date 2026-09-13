@@ -5,6 +5,7 @@ import {
 } from "carbon-preprocess-svelte/component-index-registry";
 import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
 import type { Preprocessor, Processed } from "svelte/compiler";
+import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
 const preprocess = (options?: Partial<Parameters<Preprocessor>[0]>) => {
@@ -270,6 +271,32 @@ import NewComponent from "carbon-components-svelte/src/NewComponent/NewComponent
 import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedList.svelte";`);
     } finally {
       setComponents(currentComponents);
+    }
+  });
+
+  // resolvePath always emits a default import for an indexed path, even
+  // when the target module only has a named export.
+  test("named-only-export util is rewritten as a default import", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { fuzzyMatch } from "./utils/fuzzy-match.js";`,
+      "utils/fuzzy-match.js": `export function fuzzyMatch() {}`,
+    });
+    const currentComponents = getComponents();
+
+    try {
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+      setComponents(index);
+
+      expect(
+        preprocess({
+          content: `import { fuzzyMatch } from "carbon-components-svelte";`,
+        }),
+      ).toEqual(
+        `import fuzzyMatch from "carbon-components-svelte/src/utils/fuzzy-match.js";`,
+      );
+    } finally {
+      setComponents(currentComponents);
+      fixture.dispose();
     }
   });
 });
