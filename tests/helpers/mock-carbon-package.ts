@@ -2,15 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-/**
- * Minimal on-disk `carbon-components-svelte` layout for exercising
- * `buildComponentIndex` against an arbitrary file layout without needing a
- * real npm install. Only `src/index.js`, `src/**\/*.{js,svelte}`, and
- * `css/white.css` are read by the indexer, so that's all this fixture
- * provides.
- */
-export function createFakeCarbonPackage(files: Record<string, string>) {
-  const root = mkdtempSync(path.join(tmpdir(), "fake-carbon-"));
+/** Minimal on-disk `carbon-components-svelte` layout for `buildComponentIndex`, without a real npm install. */
+export function createMockCarbonPackage(files: Record<string, string>) {
+  const root = mkdtempSync(path.join(tmpdir(), "mock-carbon-"));
 
   mkdirSync(path.join(root, "css"), { recursive: true });
   writeFileSync(path.join(root, "css", "white.css"), "");

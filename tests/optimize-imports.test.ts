@@ -5,7 +5,7 @@ import {
 } from "carbon-preprocess-svelte/component-index-registry";
 import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
 import type { Preprocessor, Processed } from "svelte/compiler";
-import { createFakeCarbonPackage } from "./helpers/fake-carbon-package";
+import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
 const preprocess = (options?: Partial<Parameters<Preprocessor>[0]>) => {
@@ -274,14 +274,10 @@ import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedL
     }
   });
 
-  // `resolvePath` has no notion of export style -- it always emits
-  // `import X from` for an indexed path. For a util whose module only has a
-  // named export (no default), that import resolves to `undefined` at
-  // runtime instead of the util. This test pins that output so it fails
-  // loudly if `resolvePath`/`rewriteImport` needs to be taught about
-  // named-only exports.
+  // resolvePath always emits a default import for an indexed path, even
+  // when the target module only has a named export.
   test("named-only-export util is rewritten as a default import", async () => {
-    const fixture = createFakeCarbonPackage({
+    const fixture = createMockCarbonPackage({
       "index.js": `export { fuzzyMatch } from "./utils/fuzzy-match.js";`,
       "utils/fuzzy-match.js": `export function fuzzyMatch() {}`,
     });

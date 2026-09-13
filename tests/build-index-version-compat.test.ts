@@ -1,5 +1,5 @@
 import { buildComponentIndex } from "../src/indexer/build-index";
-import { createFakeCarbonPackage } from "./helpers/fake-carbon-package";
+import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
 describe("buildComponentIndex against a real historical carbon-components-svelte version", () => {
@@ -21,10 +21,8 @@ describe("buildComponentIndex against a real historical carbon-components-svelte
 
 describe("buildComponentIndex for a kebab-case util re-exported under a different name", () => {
   test("resolves a kebab-case util file re-exported under its original camelCase name", async () => {
-    // Resolution is driven off `index.js`'s re-export source, not off
-    // matching the file's basename to the exported name, so a util file
-    // whose name doesn't match its export must still resolve correctly.
-    const fixture = createFakeCarbonPackage({
+    // Resolution follows index.js's re-export source, not the file basename.
+    const fixture = createMockCarbonPackage({
       "index.js": `export { fuzzyMatch } from "./utils/fuzzy-match.js";`,
       "utils/fuzzy-match.js": `export function fuzzyMatch() {}`,
     });
