@@ -2,14 +2,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "rollup -cw",
-    "build": "rollup -c"
+    "dev": "mkdir -p public && (rollup -cw & deserved public --watch --open)",
+    "build": "rollup -c",
+    "preview": "deserved public --open"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "latest",
     "@rollup/plugin-node-resolve": "latest",
     "carbon-components-svelte": "latest",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "deserved": "latest",
     "rollup": "latest",
     "rollup-plugin-css-only": "latest",
     "rollup-plugin-svelte": "latest",
