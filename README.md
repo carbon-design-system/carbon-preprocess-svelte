@@ -345,6 +345,14 @@ optimizeCss({
   silent: true,
 
   /**
+   * Run the whole pipeline and print the size log, but leave every CSS
+   * asset unchanged. Use it to preview the reduction and check the output
+   * before enabling pruning in a production build.
+   * @default false
+   */
+  dryRun: true,
+
+  /**
    * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
    * for all available IBM Plex fonts, many of which are not actually
    * used in Carbon Svelte components.

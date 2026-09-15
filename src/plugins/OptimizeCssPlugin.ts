@@ -213,9 +213,14 @@ export default class OptimizeCssPlugin {
                 id,
               );
 
-              compilation.updateAsset(id, new RawSource(optimized_css));
+              if (!this.options.dryRun) {
+                compilation.updateAsset(id, new RawSource(optimized_css));
+              }
 
               if (!isSilent(this.options) && removed > 0) {
+                if (this.options.dryRun) {
+                  console.log(`Dry run: ${id} left unchanged`);
+                }
                 printDiff({ original_css, optimized_css, id });
               }
             }

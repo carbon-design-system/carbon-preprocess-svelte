@@ -123,9 +123,14 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
             id,
           );
 
-          file.source = optimized_css;
+          if (!options?.dryRun) {
+            file.source = optimized_css;
+          }
 
           if (!silent && removed > 0) {
+            if (options?.dryRun) {
+              console.log(`Dry run: ${id} left unchanged`);
+            }
             printDiff({ original_css, optimized_css, id });
           }
         }
