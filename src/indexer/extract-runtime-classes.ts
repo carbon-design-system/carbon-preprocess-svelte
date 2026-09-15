@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { walk } from "estree-walker";
 import { RE_EXT_SVELTE } from "../constants";
 import { isSvelteFile } from "../utils";
 import type { SvelteParser } from "./svelte-parser";
+import { walk } from "./walk";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;

@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { walk } from "estree-walker";
 import { CarbonSvelte } from "../constants";
 import { isSvelteFile } from "../utils";
 import {
@@ -16,6 +15,7 @@ import { listJsAndSvelteFiles } from "./list-files";
 import { mergeSubComponentClasses } from "./merge-sub-component-classes";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
 import { loadSvelteParser } from "./svelte-parser";
+import { walk } from "./walk";
 
 export { resolveCarbonRoot } from "./resolve-carbon-root";
 
