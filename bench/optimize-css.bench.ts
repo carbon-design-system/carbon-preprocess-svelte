@@ -10,6 +10,7 @@ import {
   collectCarbonTokens,
   scanContentClasses,
 } from "../src/plugins/scan-content";
+import { collectCarbonImports } from "../src/plugins/scan-imports";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
 
 // Real Carbon theme CSS (~700kb minified), same source the plugin optimizes
@@ -230,5 +231,60 @@ group("module scan", () => {
 
   task("collectCarbonTokens (300 kB vendor module, fast path)", () => {
     collectCarbonTokens(VENDOR_MODULE, new Set<string>());
+  });
+});
+
+function importScanMarkup(i: number): string {
+  return Array.from(
+    { length: 40 },
+    (_, line) =>
+      `<div class="bx--grid bx--row-${line % 7} app-${i}-${line}">${"x".repeat(60)}</div>`,
+  ).join("\n");
+}
+
+/** 200 Svelte sources, each with a 6-name barrel import. */
+const BARREL_IMPORT_MODULES: string[] = Array.from({ length: 200 }, (_, i) =>
+  [
+    "<script>",
+    '  import { Button, Modal, TextInput, Accordion, DataTable, Toggle } from "carbon-components-svelte";',
+    "</script>",
+    importScanMarkup(i),
+  ].join("\n"),
+);
+
+/** The same 200 sources rewritten to direct-path imports. */
+const DIRECT_PATH_IMPORT_MODULES: string[] = Array.from(
+  { length: 200 },
+  (_, i) =>
+    [
+      "<script>",
+      '  import Button from "carbon-components-svelte/src/Button/Button.svelte";',
+      '  import Modal from "carbon-components-svelte/src/Modal/Modal.svelte";',
+      '  import TextInput from "carbon-components-svelte/src/TextInput/TextInput.svelte";',
+      '  import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";',
+      '  import DataTable from "carbon-components-svelte/src/DataTable/DataTable.svelte";',
+      '  import Toggle from "carbon-components-svelte/src/Toggle/Toggle.svelte";',
+      "</script>",
+      importScanMarkup(i),
+    ].join("\n"),
+);
+
+group("import scan", () => {
+  task("collectCarbonImports (200 files, barrel imports)", () => {
+    const names = new Set<string>();
+    for (const source of BARREL_IMPORT_MODULES) {
+      collectCarbonImports(source, names);
+    }
+  });
+
+  task("collectCarbonImports (200 files, direct paths)", () => {
+    const names = new Set<string>();
+    for (const source of DIRECT_PATH_IMPORT_MODULES) {
+      collectCarbonImports(source, names);
+    }
+  });
+
+  task("collectCarbonImports (300 kB file, fast path)", () => {
+    collectCarbonImports(VENDOR_MODULE, new Set<string>());
   });
 });
