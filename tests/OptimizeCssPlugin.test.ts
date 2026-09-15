@@ -88,11 +88,16 @@ const asCompiler = (mock: ReturnType<typeof createMockCompiler>): Compiler => {
   return mock as unknown as Compiler;
 };
 
+// `options` is a private field on OptimizeCssPlugin; tests read it directly
+// to assert defaults, so the private modifier is bypassed via an unknown cast
+// rather than `@ts-expect-error` on every access.
+const getOptions = (plugin: OptimizeCssPlugin): unknown =>
+  (plugin as unknown as { options: unknown }).options;
+
 describe("OptimizeCssPlugin", () => {
   test("constructor sets default options correctly", () => {
     const plugin = new OptimizeCssPlugin();
-    // @ts-expect-error – options is private
-    expect(plugin.options).toEqual({
+    expect(getOptions(plugin)).toEqual({
       preserveAllIBMFonts: false,
     } as const);
   });
@@ -103,8 +108,7 @@ describe("OptimizeCssPlugin", () => {
       preserveAllIBMFonts: true,
       experimental: { liveIndex: true },
     });
-    // @ts-expect-error – options is private
-    expect(plugin.options).toEqual({
+    expect(getOptions(plugin)).toEqual({
       silent: true,
       preserveAllIBMFonts: true,
       experimental: { liveIndex: true },
