@@ -26,6 +26,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
    * Populated during the transform phase, consumed during generateBundle.
    */
   const ids = new Set<string>();
+  let root = process.cwd();
   /** Classes from `content` globs. Cached after first scan. */
   let contentClasses: string[] | undefined;
   /** Literal `bx--` classes found while scanning bundled module code. */
@@ -35,6 +36,13 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     name: "vite:carbon:optimize-css",
     apply: "build",
     enforce: "post",
+    /**
+     * Vite calls this with the resolved project root; plain Rollup never
+     * calls it, so `root` stays at `process.cwd()`.
+     */
+    configResolved(config) {
+      root = config.root;
+    },
     /**
      * Runs once before any module is transformed. Resets state tracked from
      * a prior build so `vite build --watch` rebuilds (which reuse this same
@@ -77,7 +85,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       if (ids.size === 0) return;
 
       if (contentClasses === undefined) {
-        contentClasses = scanContentClasses(options?.content);
+        contentClasses = scanContentClasses(options?.content, root);
       }
 
       const optimizer = createCssOptimizer({

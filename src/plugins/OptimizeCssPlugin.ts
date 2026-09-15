@@ -44,6 +44,7 @@ type WebpackCompilation = {
 
 type WebpackCompiler = {
   options: { mode?: string };
+  context: string;
   webpack: {
     Compilation: { PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE: number };
     sources: { RawSource: new (source: string) => unknown };
@@ -155,7 +156,10 @@ export default class OptimizeCssPlugin {
               setComponents(await ensureLiveComponentIndex());
             }
 
-            const contentClasses = scanContentClasses(this.options.content);
+            const contentClasses = scanContentClasses(
+              this.options.content,
+              compiler.context,
+            );
             const optimizer = createCssOptimizer({
               ...this.options,
               ids,
