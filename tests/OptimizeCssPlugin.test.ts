@@ -416,6 +416,24 @@ describe("OptimizeCssPlugin", () => {
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalled();
   });
 
+  test("dryRun does not call updateAsset", async () => {
+    const plugin = new OptimizeCssPlugin({ dryRun: true, silent: true });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
+
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => cssContent } },
+      moduleResources: [carbonComponent],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
+
+    expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
+  });
+
   test("warns when content globs match nothing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
     try {

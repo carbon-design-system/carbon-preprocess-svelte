@@ -348,6 +348,55 @@ describe("optimizeCss (Vite plugin)", () => {
     }
   });
 
+  test("dryRun leaves the asset untouched", async () => {
+    const plugin = optimizeCss({ dryRun: true, silent: true });
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
+
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+
+    const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
+    // @ts-expect-error
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+  });
+
+  test("dryRun still logs the size diff and a dry-run line", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = optimizeCss({ dryRun: true, silent: false });
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
+
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+
+    const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
+    // @ts-expect-error
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+    expect(consoleSpy.mock.calls).toContainEqual([
+      "Dry run: styles.css left unchanged",
+    ]);
+    expect(consoleSpy.mock.calls).toContainEqual(["Optimized", "styles.css"]);
+    expect(consoleSpy.mock.calls.some((call) => call[0] === "Before:")).toEqual(
+      true,
+    );
+    expect(consoleSpy.mock.calls.some((call) => call[0] === "After: ")).toEqual(
+      true,
+    );
+
+    consoleSpy.mockRestore();
+  });
+
   test("does not warn when content globs match", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
     try {
