@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Rollup } from "vite";
 import { CarbonSvelte } from "../src/constants";
-import { NO_CARBON_IMPORTS } from "../src/plugins/messages";
+import {
+  contentMatchedNothing,
+  NO_CARBON_IMPORTS,
+} from "../src/plugins/messages";
 import { optimizeCss } from "../src/plugins/optimize-css";
 
 type OutputAsset = Rollup.OutputAsset;
@@ -285,5 +288,94 @@ describe("optimizeCss (Vite plugin)", () => {
     await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect(ctx.warn).not.toHaveBeenCalled();
+  });
+
+  test("warns when content globs match nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
+    try {
+      const plugin = optimizeCss({ content: ["nope/**/*.svelte"] });
+      const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+      const ctx = { warn: jest.fn() };
+
+      // @ts-expect-error
+      await plugin.buildStart();
+      // @ts-expect-error
+      plugin.configResolved({ root: dir });
+      // @ts-expect-error
+      plugin.transform("", carbonComponent);
+
+      const bundle = makeCssBundle(cssContent);
+      // @ts-expect-error
+      await plugin.generateBundle.call(ctx, {}, bundle);
+
+      expect(ctx.warn).toHaveBeenCalledTimes(1);
+      expect(ctx.warn).toHaveBeenCalledWith(
+        contentMatchedNothing(["nope/**/*.svelte"], dir),
+      );
+      expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+        ".bx--btn { color: blue }",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("silent suppresses the content-globs-matched-nothing warning", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
+    try {
+      const plugin = optimizeCss({
+        silent: true,
+        content: ["nope/**/*.svelte"],
+      });
+      const cssContent = ".bx--btn { color: blue }";
+      const ctx = { warn: jest.fn() };
+
+      // @ts-expect-error
+      await plugin.buildStart();
+      // @ts-expect-error
+      plugin.configResolved({ root: dir });
+      // @ts-expect-error
+      plugin.transform("", carbonComponent);
+
+      const bundle = makeCssBundle(cssContent);
+      // @ts-expect-error
+      await plugin.generateBundle.call(ctx, {}, bundle);
+
+      expect(ctx.warn).not.toHaveBeenCalled();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("does not warn when content globs match", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
+    try {
+      mkdirSync(join(dir, "src"));
+      writeFileSync(
+        join(dir, "src", "App.svelte"),
+        '<div class="bx--accordion"></div>',
+      );
+
+      const plugin = optimizeCss({ content: ["src/**/*.svelte"] });
+      const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+      const ctx = { warn: jest.fn() };
+
+      // @ts-expect-error
+      await plugin.buildStart();
+      // @ts-expect-error
+      plugin.configResolved({ root: dir });
+      // @ts-expect-error
+      plugin.transform("", carbonComponent);
+
+      const bundle = makeCssBundle(cssContent);
+      // @ts-expect-error
+      await plugin.generateBundle.call(ctx, {}, bundle);
+
+      expect(ctx.warn).not.toHaveBeenCalled();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

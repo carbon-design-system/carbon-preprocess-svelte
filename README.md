@@ -381,6 +381,9 @@ optimizeCss({
    * to scan for literal `bx--`-prefixed tokens. Every token found is kept.
    * Use when class names are built at runtime. See the warning below.
    *
+   * A pattern that matches no files raises a bundler warning naming the root
+   * it was resolved from.
+   *
    * @default undefined
    */
   content: ["src/**/*.{svelte,js,ts}"],
