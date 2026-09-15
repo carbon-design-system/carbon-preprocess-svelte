@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Rollup } from "vite";
 import { CarbonSvelte } from "../src/constants";
+import { NO_CARBON_IMPORTS } from "../src/plugins/messages";
 import { optimizeCss } from "../src/plugins/optimize-css";
 
 type OutputAsset = Rollup.OutputAsset;
@@ -24,6 +25,7 @@ describe("optimizeCss (Vite plugin)", () => {
     const plugin = optimizeCss({ silent: true });
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
+    const ctx = { warn: jest.fn() };
 
     // @ts-expect-error - hooks are plain functions on this plugin
     await plugin.buildStart();
@@ -32,11 +34,12 @@ describe("optimizeCss (Vite plugin)", () => {
 
     const bundle = makeCssBundle(cssContent);
     // @ts-expect-error
-    await plugin.generateBundle({}, bundle);
+    await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
     );
+    expect(ctx.warn).not.toHaveBeenCalled();
   });
 
   test("does not leak imported component ids into the next build", async () => {
@@ -44,36 +47,40 @@ describe("optimizeCss (Vite plugin)", () => {
     // same plugin instance across rebuilds. If tracked ids aren't reset, a
     // component removed from the app in a later rebuild still keeps its CSS
     // classes alive, silently degrading optimization over time.
-    const plugin = optimizeCss({ silent: true });
+    const plugin = optimizeCss();
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
 
     // First build: Button is imported.
+    const firstCtx = { warn: jest.fn() };
     // @ts-expect-error
     await plugin.buildStart();
     // @ts-expect-error
     plugin.transform("", carbonComponent);
     const firstBundle = makeCssBundle(cssContent);
     // @ts-expect-error
-    await plugin.generateBundle({}, firstBundle);
+    await plugin.generateBundle.call(firstCtx, {}, firstBundle);
     expect((firstBundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
     );
+    expect(firstCtx.warn).not.toHaveBeenCalled();
 
     // Second build (rebuild): Button is no longer imported, so `transform`
     // never fires for it this time around.
+    const secondCtx = { warn: jest.fn() };
     // @ts-expect-error
     await plugin.buildStart();
     const secondBundle = makeCssBundle(cssContent);
     // @ts-expect-error
-    await plugin.generateBundle({}, secondBundle);
+    await plugin.generateBundle.call(secondCtx, {}, secondBundle);
 
-    // No Carbon components are tracked anymore, so the plugin should skip
-    // optimization entirely and leave the CSS untouched (per the "Skip
-    // processing if no Carbon Svelte imports are found" early return).
+    // No Carbon components are tracked anymore, so the plugin should warn
+    // and skip optimization, leaving the CSS untouched.
     expect((secondBundle["styles.css"] as OutputAsset).source).toEqual(
       cssContent,
     );
+    expect(secondCtx.warn).toHaveBeenCalledTimes(1);
+    expect(secondCtx.warn).toHaveBeenCalledWith(NO_CARBON_IMPORTS);
   });
 
   test("keeps literal bx-- classes found in app modules", async () => {
@@ -90,8 +97,9 @@ describe("optimizeCss (Vite plugin)", () => {
     plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
 
     const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
     // @ts-expect-error
-    await plugin.generateBundle({}, bundle);
+    await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(
       `.bx--btn { color: blue }
@@ -112,8 +120,9 @@ describe("optimizeCss (Vite plugin)", () => {
     plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
 
     const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
     // @ts-expect-error
-    await plugin.generateBundle({}, bundle);
+    await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
@@ -138,8 +147,9 @@ describe("optimizeCss (Vite plugin)", () => {
     plugin.transform("bx--accordion", "\0virtual:thing");
 
     const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
     // @ts-expect-error
-    await plugin.generateBundle({}, bundle);
+    await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
@@ -162,8 +172,9 @@ describe("optimizeCss (Vite plugin)", () => {
     );
 
     const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
     // @ts-expect-error
-    await plugin.generateBundle({}, bundle);
+    await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
@@ -183,8 +194,9 @@ describe("optimizeCss (Vite plugin)", () => {
     // @ts-expect-error
     plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
     const firstBundle = makeCssBundle(cssContent);
+    const firstCtx = { warn: jest.fn() };
     // @ts-expect-error
-    await plugin.generateBundle({}, firstBundle);
+    await plugin.generateBundle.call(firstCtx, {}, firstBundle);
     expect((firstBundle["styles.css"] as OutputAsset).source).toEqual(
       cssContent,
     );
@@ -196,8 +208,9 @@ describe("optimizeCss (Vite plugin)", () => {
     // @ts-expect-error
     plugin.transform("", carbonComponent);
     const secondBundle = makeCssBundle(cssContent);
+    const secondCtx = { warn: jest.fn() };
     // @ts-expect-error
-    await plugin.generateBundle({}, secondBundle);
+    await plugin.generateBundle.call(secondCtx, {}, secondBundle);
 
     expect((secondBundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
@@ -229,8 +242,9 @@ describe("optimizeCss (Vite plugin)", () => {
       plugin.transform("", carbonComponent);
 
       const bundle = makeCssBundle(cssContent);
+      const ctx = { warn: jest.fn() };
       // @ts-expect-error
-      await plugin.generateBundle({}, bundle);
+      await plugin.generateBundle.call(ctx, {}, bundle);
 
       expect((bundle["styles.css"] as OutputAsset).source).toEqual(
         `.bx--btn { color: blue }
@@ -239,5 +253,37 @@ describe("optimizeCss (Vite plugin)", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("warns when no Carbon component was imported", async () => {
+    const plugin = optimizeCss();
+    const cssContent = ".bx--btn { color: blue }";
+    const ctx = { warn: jest.fn() };
+
+    // @ts-expect-error
+    await plugin.buildStart();
+
+    const bundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(ctx.warn).toHaveBeenCalledTimes(1);
+    expect(ctx.warn).toHaveBeenCalledWith(NO_CARBON_IMPORTS);
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+  });
+
+  test("silent suppresses the no-imports warning", async () => {
+    const plugin = optimizeCss({ silent: true });
+    const cssContent = ".bx--btn { color: blue }";
+    const ctx = { warn: jest.fn() };
+
+    // @ts-expect-error
+    await plugin.buildStart();
+
+    const bundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(ctx.warn).not.toHaveBeenCalled();
   });
 });

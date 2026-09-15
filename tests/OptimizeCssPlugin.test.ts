@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Compiler } from "webpack";
 import { CarbonSvelte } from "../src/constants";
+import { NO_CARBON_IMPORTS } from "../src/plugins/messages";
 import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
 
 type ModuleResource =
@@ -54,6 +55,7 @@ const createMockCompiler = (
       },
     },
     updateAsset: jest.fn(),
+    warnings: [] as Error[],
   };
 
   return {
@@ -72,6 +74,7 @@ const createMockCompiler = (
       sources: {
         RawSource: jest.fn((content) => ({ source: () => content })),
       },
+      WebpackError: class extends Error {},
     },
     compilation,
     waitForProcessAssets: () => processAssetsPromise,
@@ -128,6 +131,36 @@ describe("OptimizeCssPlugin", () => {
     expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
   });
 
+  test("warns when no Carbon component was imported", async () => {
+    const plugin = new OptimizeCssPlugin();
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => "body { color: red; }" } },
+      moduleResources: [],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    expect(mockCompiler.compilation.warnings).toHaveLength(1);
+    const [warning] = mockCompiler.compilation.warnings;
+    expect(warning).toBeInstanceOf(mockCompiler.webpack.WebpackError);
+    expect(warning.message).toEqual(NO_CARBON_IMPORTS);
+    expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
+  });
+
+  test("silent suppresses the no-imports warning", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => "body { color: red; }" } },
+      moduleResources: [],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    expect(mockCompiler.compilation.warnings).toEqual([]);
+  });
+
   test("processes CSS files when Carbon Svelte imports are found", async () => {
     const plugin = new OptimizeCssPlugin();
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
@@ -142,6 +175,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledWith(
       "styles.css",
@@ -163,6 +197,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledWith(
       "styles.css",
@@ -188,6 +223,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
@@ -211,6 +247,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     expect(consoleSpy).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
@@ -231,6 +268,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
     expect(asset.source()).toEqual(".bx--btn { color: blue }");
@@ -256,6 +294,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
     expect(asset.source()).toEqual(
@@ -290,6 +329,7 @@ describe("OptimizeCssPlugin", () => {
 
       plugin.apply(asCompiler(mockCompiler));
       await mockCompiler.waitForProcessAssets();
+      expect(mockCompiler.compilation.warnings).toEqual([]);
 
       const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
       expect(asset.source()).toEqual(
@@ -320,6 +360,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
     expect(asset.source()).toEqual(".bx--btn { color: blue }");
@@ -346,6 +387,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await mockCompiler.waitForProcessAssets();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
     expect(asset.source()).toEqual(".bx--btn { color: blue }");
@@ -366,6 +408,7 @@ describe("OptimizeCssPlugin", () => {
 
     plugin.apply(asCompiler(mockCompiler));
     await expect(mockCompiler.waitForProcessAssets()).resolves.toBeUndefined();
+    expect(mockCompiler.compilation.warnings).toEqual([]);
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalled();
   });
