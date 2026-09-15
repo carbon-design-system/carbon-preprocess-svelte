@@ -29,6 +29,7 @@ bun add -D carbon-preprocess-svelte
 - [**optimizeCss**](#optimizecss): Vite/Rollup/Rolldown plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
 - [**OptimizeCssPlugin**](#optimizecssplugin): The corresponding `optimizeCss` plugin for Webpack and Rspack that removes unused Carbon styles.
 - [**optimizeCarbonCss**](#optimizecarboncss): Programmatic version of the CSS optimizer for esbuild, Bun.build, or any post-build script.
+- [**CLI**](#cli): `npx carbon-preprocess-svelte optimize-css dist/**/*.css` for esbuild, Bun, or any pipeline without a plugin hook.
 
 ### `optimizeImports`
 
@@ -483,6 +484,9 @@ export default {
 
 `optimizeCarbonCss` is the same CSS optimization engine behind `optimizeCss` and `OptimizeCssPlugin`, exposed as a plain async function for bundlers without a plugin API, such as esbuild, `Bun.build`, or any post-build script. It is `async` because `experimental.liveIndex` may build a component index. Unlike the plugins, it has no way to discover which Carbon components your app imports, so the caller passes them explicitly via `components`.
 
+> [!TIP]
+> If your pipeline can run a shell command after the build instead of calling a function, the [CLI](#cli) does the component/import detection for you and needs no code changes.
+
 ```js
 // esbuild
 import { writeFileSync } from "node:fs";
@@ -585,6 +589,42 @@ optimizeCarbonCss(css, {
     liveIndex: false,
   },
 });
+```
+
+### CLI
+
+The CLI wraps `optimizeCarbonCss` for build pipelines that produce plain CSS files on disk but have no plugin hook to call it from, such as esbuild or `Bun.build`. It detects components by scanning `--content` files (default `src/**/*.{svelte,js,ts,mjs}`) for `carbon-components-svelte` imports, both the barrel form (`import { Button } from "carbon-components-svelte"`) and the direct-path form `optimizeImports` rewrites them to; literal `bx--` tokens in those same files are kept too, the same as `optimizeCss`'s `content` option. It rewrites every matched CSS file in place.
+
+```
+Usage: carbon-preprocess-svelte optimize-css [options] <css-file-or-glob>...
+
+Removes unused Carbon styles from built CSS files, in place.
+Carbon components are detected from imports in the files matched by --content.
+
+Options:
+  --content <glob>        Source files to scan for Carbon imports and literal
+                          bx-- classes. Repeatable. Default: src/**/*.{svelte,js,ts,mjs}
+  --components <a,b,c>    Component names to keep in addition to detected ones.
+  --safelist <selector>   Class selector to always keep. Repeatable. Wrap in
+                          slashes for a RegExp: --safelist "/^\.bx--btn--/"
+  --preserve-all-ibm-fonts  Keep every IBM Plex @font-face rule.
+  --live-index              Build the component index from the installed
+                          carbon-components-svelte (experimental).
+  --cwd <dir>             Directory globs resolve from. Default: process.cwd()
+  --dry-run               Print sizes, write nothing.
+  --report                Print detected components and allowlist summary.
+  --silent                Suppress the per-file size log.
+  -h, --help              Show this help.
+```
+
+```json
+// package.json (esbuild)
+"build": "esbuild src/main.ts --bundle --outdir=dist && carbon-preprocess-svelte optimize-css \"dist/**/*.css\""
+```
+
+```json
+// package.json (Bun)
+"build": "bun build src/main.ts --outdir dist && carbon-preprocess-svelte optimize-css \"dist/**/*.css\""
 ```
 
 ## Examples

@@ -1,10 +1,12 @@
 import { watch } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { chmod, readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { $, build } from "bun";
 import { bundleDts } from "./bundle-dts";
 
 const STATIC_SVELTE_IMPORT = /\bfrom\s*["']svelte/;
+const SHEBANG = "#!/usr/bin/env node\n";
+const JS_FILE = /\.js$/;
 
 const isWatchMode =
   process.argv.includes("-w") || process.argv.includes("--watch");
@@ -29,11 +31,12 @@ async function emitTypeDeclarations() {
 
 async function buildProject() {
   const result = await build({
-    entrypoints: ["./src/index.ts"],
+    entrypoints: ["./src/index.ts", "./src/cli.ts"],
     outdir: "./dist",
     format: "esm",
     target: "node",
     minify: true,
+    splitting: true,
     // Every consumer already has svelte installed to run its own compiler,
     // so resolve it at runtime instead of bundling svelte/compiler (and its
     // acorn dependency) into dist.
@@ -53,17 +56,32 @@ async function buildProject() {
 
   // `svelte/compiler` must only ever be reached through the live index's
   // dynamic import (see src/indexer/svelte-parser.ts). A static import here
-  // would make every consumer pay for it at module load.
-  const bundle = await readFile("./dist/index.js", "utf8");
-  if (STATIC_SVELTE_IMPORT.test(bundle)) {
+  // would make every consumer pay for it at module load. Checks every
+  // emitted file since splitting can move code into shared chunks.
+  const distFiles = await readdir("./dist");
+  const jsFiles = distFiles.filter((file) => JS_FILE.test(file));
+  const bundles = await Promise.all(
+    jsFiles.map(async (file) => ({
+      file,
+      text: await readFile(resolve("./dist", file), "utf8"),
+    })),
+  );
+  const offender = bundles.find(({ text }) => STATIC_SVELTE_IMPORT.test(text));
+  if (offender) {
     console.error(
-      "Build failed: dist/index.js statically imports svelte. Import it lazily via loadSvelteParser() instead.",
+      `Build failed: dist/${offender.file} statically imports svelte. Import it lazily via loadSvelteParser() instead.`,
     );
     if (!isWatchMode) {
       process.exit(1);
     }
     return;
   }
+
+  // Bun.build strips the shebang, so it's re-added and the file made executable.
+  const cliPath = resolve("./dist/cli.js");
+  const cli = await readFile(cliPath, "utf8");
+  await writeFile(cliPath, SHEBANG + cli);
+  await chmod(cliPath, 0o755);
 
   await emitTypeDeclarations();
   console.log("✓ Build completed");
