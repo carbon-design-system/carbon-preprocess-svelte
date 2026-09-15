@@ -1,10 +1,10 @@
-import { walk } from "estree-walker";
 import { CARBON_PREFIX } from "../constants";
 import {
   extractRuntimeClassesFromSource,
   resolveRelativeImport,
 } from "./extract-runtime-classes";
 import type { SvelteParser } from "./svelte-parser";
+import { walk } from "./walk";
 
 const WHITESPACE_REGEX = /\s+/;
 const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;

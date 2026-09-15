@@ -17,7 +17,6 @@ async function emitTypeDeclarations() {
     await bundleDts({
       root,
       source: resolve(root, "src/index.ts"),
-      ambientRoots: [resolve(root, "src/global.d.ts")],
       outFile: resolve(root, "dist/index.d.ts"),
     });
   } catch (error) {

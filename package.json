@@ -39,7 +39,6 @@
     "@typescript/typescript6": "^6.0.2",
     "carbon-components-svelte": "0.112.0",
     "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
-    "estree-walker": "^2.0.2",
     "ostia": "^0.2.4",
     "postcss": "^8.5.28",
     "postcss-discard-empty": "^8.0.5",
