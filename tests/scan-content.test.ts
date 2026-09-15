@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   collectCarbonTokens,
+  scanContent,
   scanContentClasses,
 } from "carbon-preprocess-svelte/plugins/scan-content";
 
@@ -96,5 +97,47 @@ describe("scanContentClasses", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("scanContent", () => {
+  test("reports matchedFiles on a hit", () => {
+    const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
+    try {
+      writeFileSync(join(dir, "App.svelte"), '<div class="bx--grid"></div>');
+      writeFileSync(join(dir, "Other.svelte"), '<div class="bx--row"></div>');
+
+      const scan = scanContent([join(dir, "*.svelte")]);
+      expect(scan.matchedFiles).toBe(2);
+      expect(scan.classes.sort()).toEqual([".bx--grid", ".bx--row"]);
+      expect(scan.error).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("reports matchedFiles: 0 on a miss", () => {
+    const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
+    try {
+      const scan = scanContent([join(dir, "*.svelte")]);
+      expect(scan.matchedFiles).toBe(0);
+      expect(scan.classes).toEqual([]);
+      expect(scan.error).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("populates error when a glob pattern is invalid", () => {
+    // `globSync` requires every pattern to be a string and throws a
+    // TypeError otherwise; there's no string glob syntax that Bun's
+    // globSync rejects, so this exercises the error branch via a
+    // type-violating element instead.
+    const invalidContent = [null] as unknown as string[];
+
+    const scan = scanContent(invalidContent);
+    expect(scan.classes).toEqual([]);
+    expect(scan.matchedFiles).toBe(0);
+    expect(scan.error).toBeDefined();
   });
 });

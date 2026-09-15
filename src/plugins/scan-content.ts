@@ -19,29 +19,42 @@ export function collectCarbonTokens(source: string, into: Set<string>): void {
   }
 }
 
+/** Result of scanning `content` globs. */
+export type ContentScan = {
+  /** Class selectors found (`.bx--grid`). */
+  classes: string[];
+  /** Files the globs matched (readable or not). */
+  matchedFiles: number;
+  /** Message from a glob failure, if any. Undefined when the globs ran. */
+  error?: string;
+};
+
 /**
  * Scan files matched by `content` globs for literal `bx--`-prefixed tokens.
- * Returns them as class selectors (`.bx--token`).
+ * Returns them as class selectors (`.bx--token`), plus how many files the
+ * globs matched and any glob failure, so callers can warn on a
+ * misconfigured `content` option.
  *
  * For ``class={`bx--btn--${kind}`}``, the importer-based allowlist only sees
  * the prefix in your source (`bx--btn--`). Prefix matching then keeps
  * `.bx--btn--primary` and similar at runtime.
  *
  * Globs resolve relative to `cwd` (the bundler's project root;
- * `process.cwd()` when not provided). Returns an empty array when `content`
- * is omitted or globbing fails.
+ * `process.cwd()` when not provided). Returns no classes when `content` is
+ * omitted or globbing fails.
  */
-export function scanContentClasses(
+export function scanContent(
   content?: readonly string[],
   cwd: string = process.cwd(),
-): string[] {
-  if (!content || content.length === 0) return [];
+): ContentScan {
+  if (!content || content.length === 0) return { classes: [], matchedFiles: 0 };
 
   let files: string[];
   try {
     files = globSync([...content], { cwd });
-  } catch {
-    return [];
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    return { classes: [], matchedFiles: 0, error };
   }
 
   const classes = new Set<string>();
@@ -58,5 +71,17 @@ export function scanContentClasses(
     collectCarbonTokens(source, classes);
   }
 
-  return [...classes];
+  return { classes: [...classes], matchedFiles: files.length };
+}
+
+/**
+ * Scan files matched by `content` globs for literal `bx--`-prefixed tokens.
+ * Returns them as class selectors (`.bx--token`). See `scanContent` for the
+ * full result including match counts and glob errors.
+ */
+export function scanContentClasses(
+  content?: readonly string[],
+  cwd: string = process.cwd(),
+): string[] {
+  return scanContent(content, cwd).classes;
 }

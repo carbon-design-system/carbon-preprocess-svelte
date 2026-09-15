@@ -3,9 +3,13 @@ import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
-import { NO_CARBON_IMPORTS } from "./messages";
+import {
+  contentGlobFailed,
+  contentMatchedNothing,
+  NO_CARBON_IMPORTS,
+} from "./messages";
 import { printDiff } from "./print-diff";
-import { collectCarbonTokens, scanContentClasses } from "./scan-content";
+import { collectCarbonTokens, scanContent } from "./scan-content";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
@@ -166,10 +170,36 @@ export default class OptimizeCssPlugin {
               setComponents(await ensureLiveComponentIndex());
             }
 
-            const contentClasses = scanContentClasses(
-              this.options.content,
-              compiler.context,
-            );
+            const scan = scanContent(this.options.content, compiler.context);
+
+            if (
+              !isSilent(this.options) &&
+              this.options.content &&
+              this.options.content.length > 0
+            ) {
+              if (scan.error !== undefined) {
+                compilation.warnings.push(
+                  new WebpackError(
+                    contentGlobFailed(
+                      this.options.content,
+                      compiler.context,
+                      scan.error,
+                    ),
+                  ),
+                );
+              } else if (scan.matchedFiles === 0) {
+                compilation.warnings.push(
+                  new WebpackError(
+                    contentMatchedNothing(
+                      this.options.content,
+                      compiler.context,
+                    ),
+                  ),
+                );
+              }
+            }
+
+            const contentClasses = scan.classes;
             const optimizer = createCssOptimizer({
               ...this.options,
               ids,

@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Compiler } from "webpack";
 import { CarbonSvelte } from "../src/constants";
-import { NO_CARBON_IMPORTS } from "../src/plugins/messages";
+import {
+  contentMatchedNothing,
+  NO_CARBON_IMPORTS,
+} from "../src/plugins/messages";
 import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
 
 type ModuleResource =
@@ -411,5 +414,90 @@ describe("OptimizeCssPlugin", () => {
     expect(mockCompiler.compilation.warnings).toEqual([]);
 
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalled();
+  });
+
+  test("warns when content globs match nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
+    try {
+      const plugin = new OptimizeCssPlugin({ content: ["nope/**/*.svelte"] });
+      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+      const mockCompiler = createMockCompiler({
+        assets: { "styles.css": { source: () => cssContent } },
+        moduleResources: [carbonComponent],
+        context: dir,
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      expect(mockCompiler.compilation.warnings).toHaveLength(1);
+      const [warning] = mockCompiler.compilation.warnings;
+      expect(warning).toBeInstanceOf(mockCompiler.webpack.WebpackError);
+      expect(warning.message).toEqual(
+        contentMatchedNothing(["nope/**/*.svelte"], dir),
+      );
+
+      const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
+      expect(asset.source()).toEqual(".bx--btn { color: blue }");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("silent suppresses the content-globs-matched-nothing warning", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
+    try {
+      const plugin = new OptimizeCssPlugin({
+        silent: true,
+        content: ["nope/**/*.svelte"],
+      });
+      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const cssContent = ".bx--btn { color: blue }";
+
+      const mockCompiler = createMockCompiler({
+        assets: { "styles.css": { source: () => cssContent } },
+        moduleResources: [carbonComponent],
+        context: dir,
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      expect(mockCompiler.compilation.warnings).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("does not warn when content globs match", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
+    try {
+      mkdirSync(join(dir, "src"));
+      writeFileSync(
+        join(dir, "src", "App.svelte"),
+        '<div class="bx--accordion"></div>',
+      );
+
+      const plugin = new OptimizeCssPlugin({ content: ["src/**/*.svelte"] });
+      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+      const mockCompiler = createMockCompiler({
+        assets: { "styles.css": { source: () => cssContent } },
+        moduleResources: [carbonComponent],
+        context: dir,
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      expect(mockCompiler.compilation.warnings).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

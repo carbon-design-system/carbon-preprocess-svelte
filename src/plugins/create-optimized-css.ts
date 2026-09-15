@@ -65,6 +65,9 @@ export type OptimizeCssOptions = {
    * For ``class={`bx--btn--${kind}`}``, the prefix `bx--btn--` in source
    * keeps runtime variants like `.bx--btn--primary`.
    *
+   * A pattern that matches no files raises a bundler warning naming the root
+   * it was resolved from.
+   *
    * @example
    * content: ["src/**\/*.{svelte,js,ts}"]
    */

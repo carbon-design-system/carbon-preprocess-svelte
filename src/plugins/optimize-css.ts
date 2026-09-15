@@ -4,9 +4,13 @@ import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
-import { NO_CARBON_IMPORTS } from "./messages";
+import {
+  contentGlobFailed,
+  contentMatchedNothing,
+  NO_CARBON_IMPORTS,
+} from "./messages";
 import { printDiff } from "./print-diff";
-import { collectCarbonTokens, scanContentClasses } from "./scan-content";
+import { collectCarbonTokens, scanContent } from "./scan-content";
 
 /**
  * Vite/Rollup plugin that removes unused Carbon CSS classes from production builds.
@@ -90,7 +94,17 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       }
 
       if (contentClasses === undefined) {
-        contentClasses = scanContentClasses(options?.content, root);
+        const scan = scanContent(options?.content, root);
+
+        if (!silent && options?.content && options.content.length > 0) {
+          if (scan.error !== undefined) {
+            this.warn(contentGlobFailed(options.content, root, scan.error));
+          } else if (scan.matchedFiles === 0) {
+            this.warn(contentMatchedNothing(options.content, root));
+          }
+        }
+
+        contentClasses = scan.classes;
       }
 
       const optimizer = createCssOptimizer({
