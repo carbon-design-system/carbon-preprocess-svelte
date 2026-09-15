@@ -15,8 +15,21 @@ export function isCssFile(id: string): id is `${string}.css` {
   return RE_EXT_CSS.test(id);
 }
 
+/**
+ * Matches `carbon-components-svelte` as a whole path segment, not a
+ * substring. `id.includes(CarbonSvelte.Components)` would also match a
+ * consumer's own path (a fork, a monorepo folder named after the package).
+ */
+const RE_CARBON_COMPONENTS_SVELTE_SEGMENT = new RegExp(
+  `(^|/)${CarbonSvelte.Components}(/|$)`,
+);
+
+function hasCarbonComponentsSvelteSegment(id: string): boolean {
+  return RE_CARBON_COMPONENTS_SVELTE_SEGMENT.test(id);
+}
+
 export function isCarbonSvelteImport(id: string) {
-  return isSvelteFile(id) && id.includes(CarbonSvelte.Components);
+  return isSvelteFile(id) && hasCarbonComponentsSvelteSegment(id);
 }
 
 /** Strip a bundler query/hash suffix: `App.svelte?svelte&type=style&lang.css` -> `App.svelte`. */
@@ -36,5 +49,5 @@ export function isScannableModule(id: string): boolean {
   if (RE_EXT_STYLESHEET.test(stripQuery(id)) || RE_STYLE_QUERY.test(id)) {
     return false;
   }
-  return !id.includes(CarbonSvelte.Components);
+  return !hasCarbonComponentsSvelteSegment(id);
 }

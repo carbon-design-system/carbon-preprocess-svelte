@@ -59,6 +59,17 @@ describe("isCarbonSvelteImport", () => {
     );
     expect(isCarbonSvelteImport("other-lib/Button.svelte")).toBe(false);
   });
+
+  test("returns false when the package name is only a substring of a path segment", () => {
+    expect(
+      isCarbonSvelteImport(`my-${CarbonSvelte.Components}-fork/Button.svelte`),
+    ).toBe(false);
+    expect(
+      isCarbonSvelteImport(
+        `apps/${CarbonSvelte.Components}-clone/Button.svelte`,
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("stripQuery", () => {
@@ -117,5 +128,18 @@ describe("isScannableModule", () => {
     expect(isScannableModule("/n/node_modules/some-lib/dist/index.js")).toBe(
       true,
     );
+  });
+
+  test("returns true when the package name is only a substring of a path segment", () => {
+    expect(
+      isScannableModule(
+        `/n/node_modules/my-${CarbonSvelte.Components}-fork/Button.js`,
+      ),
+    ).toBe(true);
+    expect(
+      isScannableModule(
+        `/repo/apps/${CarbonSvelte.Components}-clone/src/App.svelte`,
+      ),
+    ).toBe(true);
   });
 });
