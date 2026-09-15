@@ -1,4 +1,10 @@
 {
+  "rolldown": {
+    "file": "bundle.css",
+    "before_kb": 709.84,
+    "after_kb": 49.42,
+    "reduction_percent": 93.04
+  },
   "rollup": {
     "file": "bundle.css",
     "before_kb": 709.84,

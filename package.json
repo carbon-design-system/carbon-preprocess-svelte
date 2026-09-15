@@ -64,6 +64,7 @@
     "optimize CSS",
     "vite",
     "rollup",
+    "rolldown",
     "webpack",
     "rspack"
   ],
