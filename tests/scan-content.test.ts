@@ -4,7 +4,6 @@ import { join } from "node:path";
 import {
   collectCarbonTokens,
   scanContent,
-  scanContentClasses,
 } from "carbon-preprocess-svelte/plugins/scan-content";
 
 describe("collectCarbonTokens", () => {
@@ -34,10 +33,10 @@ describe("collectCarbonTokens", () => {
   });
 });
 
-describe("scanContentClasses", () => {
+describe("scanContent().classes", () => {
   test("returns an empty array when no content is provided", () => {
-    expect(scanContentClasses()).toEqual([]);
-    expect(scanContentClasses([])).toEqual([]);
+    expect(scanContent().classes).toEqual([]);
+    expect(scanContent([]).classes).toEqual([]);
   });
 
   test("extracts literal bx-- tokens from matched files", () => {
@@ -49,7 +48,7 @@ describe("scanContentClasses", () => {
       );
       writeFileSync(join(dir, "ignore.txt"), "no carbon here");
 
-      const classes = scanContentClasses([join(dir, "*.svelte")]).sort();
+      const classes = scanContent([join(dir, "*.svelte")]).classes.sort();
       expect(classes).toEqual([".bx--btn--", ".bx--grid"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -59,7 +58,7 @@ describe("scanContentClasses", () => {
   test("returns an empty array when globs match nothing", () => {
     const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
     try {
-      expect(scanContentClasses([join(dir, "*.svelte")])).toEqual([]);
+      expect(scanContent([join(dir, "*.svelte")]).classes).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -74,9 +73,9 @@ describe("scanContentClasses", () => {
         '<div class="bx--grid"></div>',
       );
 
-      expect(scanContentClasses(["src/*.svelte"], dir)).toEqual([".bx--grid"]);
+      expect(scanContent(["src/*.svelte"], dir).classes).toEqual([".bx--grid"]);
       // Proves the old cwd-less behavior would have missed it.
-      expect(scanContentClasses(["src/*.svelte"])).toEqual([]);
+      expect(scanContent(["src/*.svelte"]).classes).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -92,7 +91,7 @@ describe("scanContentClasses", () => {
       );
 
       expect(
-        scanContentClasses([join(dir, "src/*.svelte")], "/nonexistent"),
+        scanContent([join(dir, "src/*.svelte")], "/nonexistent").classes,
       ).toEqual([".bx--grid"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });

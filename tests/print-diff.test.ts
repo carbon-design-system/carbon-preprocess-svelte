@@ -3,6 +3,15 @@ import {
   printDiff,
 } from "carbon-preprocess-svelte/plugins/print-diff";
 
+/** Everything `printDiff` wrote to `console.log`, as one string. */
+function printDiffOutput(props: Parameters<typeof printDiff>[0]): string {
+  const log = jest.spyOn(console, "log").mockImplementation(() => {});
+  printDiff(props);
+  const output = log.mock.calls.map((args) => `${args.join(" ")}\n`).join("");
+  log.mockRestore();
+  return output;
+}
+
 describe("print-diff", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -98,22 +107,22 @@ describe("print-diff", () => {
     ]);
   });
 
-  test("handles Uint8Array input", () => {
-    const log = jest.spyOn(console, "log");
-    const uint8Array = new TextEncoder().encode("body { color: red; }");
-
-    printDiff({
-      original_css: uint8Array,
-      optimized_css: "body{color:red}",
-      id: "uint8array-input",
+  test("measures a Uint8Array source as bytes, not as a joined array", () => {
+    const original = "body { color: red; } .bx--btn {}";
+    const optimized_css = "body { color: red; }";
+    const asBytes = printDiffOutput({
+      original_css: new TextEncoder().encode(original),
+      optimized_css,
+      id: "id",
+    });
+    const asString = printDiffOutput({
+      original_css: original,
+      optimized_css,
+      id: "id",
     });
 
-    expect(log.mock.calls).toEqual([
-      ["\n"],
-      ["Optimized", "uint8array-input"],
-      ["Before:", "0.07 kB"],
-      ["After: ", "0.02 kB", "(-78.87%)\n"],
-    ]);
+    expect(asBytes).toContain("Before: 0.03 kB");
+    expect(asBytes).toEqual(asString);
   });
 
   test("formatDiff matches printDiff byte for byte", () => {

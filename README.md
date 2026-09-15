@@ -200,7 +200,7 @@ The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on produ
    - Selectors are parsed with parenthesis-awareness, so `:is(...)` and `:not(...)` groups are handled instead of naively split on commas
 4. Empty rules are discarded, and the CSS bundles are optimized.
 
-**Risk profile:** this pruning is validated against a fixture suite covering most Carbon components and common multi-component bundles (see [`tests/fixtures/optimize-css`](tests/fixtures/optimize-css)) with zero unexplained survivors on every scenario, but it shares the blind spot described in the warning below — dynamically constructed and hand-written classes the allowlist can't see.
+**Risk profile:** this pruning is validated against a fixture suite covering most Carbon components and common multi-component bundles (see [`tests/fixtures/optimize-css`](tests/fixtures/optimize-css)) with zero unexplained survivors on every scenario, but it shares the blind spot described in the warning below — class names that never appear as a literal `bx--` token in bundled code.
 
 ```mermaid
 flowchart TB
@@ -607,8 +607,9 @@ Options:
   --components <a,b,c>    Component names to keep in addition to detected ones.
   --safelist <selector>   Class selector to always keep. Repeatable. Wrap in
                           slashes for a RegExp: --safelist "/^\.bx--btn--/"
-  --preserve-all-ibm-fonts  Keep every IBM Plex @font-face rule.
-  --live-index              Build the component index from the installed
+  --preserve-all-ibm-fonts
+                          Keep every IBM Plex @font-face rule.
+  --live-index            Build the component index from the installed
                           carbon-components-svelte (experimental).
   --cwd <dir>             Directory globs resolve from. Default: process.cwd()
   --dry-run               Print sizes, write nothing.

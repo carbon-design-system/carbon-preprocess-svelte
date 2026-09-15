@@ -14,6 +14,8 @@ type OutputBundle = Rollup.OutputBundle;
 
 const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
 const SIZE_BLOCK_HEADER = /^\n\nOptimized styles\.css\nBefore: /;
+/** No-op Vite logger for tests that ignore log output. */
+const quietLogger = { info: () => {} };
 
 function makeCssBundle(source: string): OutputBundle {
   return {
@@ -27,7 +29,7 @@ function makeCssBundle(source: string): OutputBundle {
 type ResolvedPlugin = {
   configResolved: (config: {
     root: string;
-    logger?: { info: (message: string) => void };
+    logger: { info: (message: string) => void };
   }) => void;
   buildStart: () => Promise<void>;
   transform: (code: string, id: string) => void;
@@ -233,7 +235,7 @@ describe("optimizeCss (Vite plugin)", () => {
 .bx--modal { background: red }`;
 
       await plugin.buildStart();
-      plugin.configResolved({ root: dir });
+      plugin.configResolved({ root: dir, logger: quietLogger });
       plugin.transform("", carbonComponent);
 
       const bundle = makeCssBundle(cssContent);
@@ -277,6 +279,22 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(ctx.warn).not.toHaveBeenCalled();
   });
 
+  test("does not warn when no asset contains Carbon CSS", async () => {
+    // A secondary build (a second webpack config, a worker entry) that never
+    // imports Carbon should not warn.
+    const plugin = resolvePlugin(optimizeCss());
+    const cssContent = "body { color: red }";
+    const ctx = { warn: jest.fn() };
+
+    await plugin.buildStart();
+
+    const bundle = makeCssBundle(cssContent);
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(ctx.warn).not.toHaveBeenCalled();
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+  });
+
   test("warns when content globs match nothing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
     try {
@@ -288,7 +306,7 @@ describe("optimizeCss (Vite plugin)", () => {
       // @ts-expect-error
       await plugin.buildStart();
       // @ts-expect-error
-      plugin.configResolved({ root: dir });
+      plugin.configResolved({ root: dir, logger: quietLogger });
       // @ts-expect-error
       plugin.transform("", carbonComponent);
 
@@ -311,22 +329,17 @@ describe("optimizeCss (Vite plugin)", () => {
   test("silent suppresses the content-globs-matched-nothing warning", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
     try {
-      const plugin = optimizeCss({
-        silent: true,
-        content: ["nope/**/*.svelte"],
-      });
+      const plugin = resolvePlugin(
+        optimizeCss({ silent: true, content: ["nope/**/*.svelte"] }),
+      );
       const cssContent = ".bx--btn { color: blue }";
       const ctx = { warn: jest.fn() };
 
-      // @ts-expect-error
       await plugin.buildStart();
-      // @ts-expect-error
-      plugin.configResolved({ root: dir });
-      // @ts-expect-error
+      plugin.configResolved({ root: dir, logger: quietLogger });
       plugin.transform("", carbonComponent);
 
       const bundle = makeCssBundle(cssContent);
-      // @ts-expect-error
       await plugin.generateBundle.call(ctx, {}, bundle);
 
       expect(ctx.warn).not.toHaveBeenCalled();
@@ -438,7 +451,7 @@ describe("optimizeCss (Vite plugin)", () => {
       // @ts-expect-error
       await plugin.buildStart();
       // @ts-expect-error
-      plugin.configResolved({ root: dir });
+      plugin.configResolved({ root: dir, logger: quietLogger });
       // @ts-expect-error
       plugin.transform("", carbonComponent);
 

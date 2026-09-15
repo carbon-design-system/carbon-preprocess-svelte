@@ -23,6 +23,15 @@ export const RE_EXT_SVELTE = /\.svelte$/;
 
 export const RE_EXT_CSS = /\.css$/;
 
+/**
+ * `.css` and preprocessor files Vite compiles to CSS. Their `bx--`
+ * selectors are what the optimizer prunes, not proof of use. A user
+ * stylesheet that `@import`s Carbon's theme would otherwise put the
+ * whole theme on the allowlist.
+ */
+export const RE_EXT_STYLESHEET =
+  /\.(css|scss|sass|less|styl|stylus|pcss|postcss)$/;
+
 /** Splits a bundler module id into its path and its `?query#hash` suffix. */
 export const RE_MODULE_QUERY = /[?#].*$/;
 

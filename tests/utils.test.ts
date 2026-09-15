@@ -90,8 +90,15 @@ describe("isScannableModule", () => {
     ).toBe(false);
   });
 
-  test("returns false for CSS files", () => {
+  test("returns false for stylesheets of any flavor", () => {
     expect(isScannableModule("/app/styles.css")).toBe(false);
+    expect(isScannableModule("/app/styles.css?inline")).toBe(false);
+    // A preprocessor entry reaches `transform` as compiled CSS with
+    // `@import`s inlined, so scanning it would allowlist the whole theme.
+    expect(isScannableModule("/app/src/app.scss")).toBe(false);
+    expect(isScannableModule("/app/src/app.less")).toBe(false);
+    expect(isScannableModule("/app/src/app.styl")).toBe(false);
+    expect(isScannableModule("/app/src/app.pcss")).toBe(false);
   });
 
   test("returns false for carbon-components-svelte sources", () => {

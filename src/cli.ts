@@ -1,11 +1,12 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { setComponents } from "./component-index-registry";
+import { ensureLiveComponentIndex } from "./indexer/live-index";
 import { createCssOptimizer } from "./plugins/create-optimized-css";
-import { optimizeCarbonCss } from "./plugins/optimize-carbon-css";
-import { printDiff } from "./plugins/print-diff";
+import { logAssetDiff } from "./plugins/print-diff";
 import type { AssetReport } from "./plugins/print-report";
-import { printReport } from "./plugins/print-report";
+import { printReport, toAssetReport } from "./plugins/print-report";
 import type { SafelistEntry } from "./plugins/safelist";
 import { collectCarbonTokens } from "./plugins/scan-content";
 import { collectCarbonImports } from "./plugins/scan-imports";
@@ -25,8 +26,9 @@ Options:
   --components <a,b,c>    Component names to keep in addition to detected ones.
   --safelist <selector>   Class selector to always keep. Repeatable. Wrap in
                           slashes for a RegExp: --safelist "/^\\.bx--btn--/"
-  --preserve-all-ibm-fonts  Keep every IBM Plex @font-face rule.
-  --live-index              Build the component index from the installed
+  --preserve-all-ibm-fonts
+                          Keep every IBM Plex @font-face rule.
+  --live-index            Build the component index from the installed
                           carbon-components-svelte (experimental).
   --cwd <dir>             Directory globs resolve from. Default: process.cwd()
   --dry-run               Print sizes, write nothing.
@@ -62,15 +64,13 @@ async function main() {
   if (values.help) {
     console.log(USAGE);
     process.exit(0);
-    return;
   }
 
   const [subcommand, ...cssPatterns] = positionals;
 
-  if (subcommand === undefined || subcommand !== "optimize-css") {
+  if (subcommand !== "optimize-css") {
     console.log(USAGE);
     process.exit(1);
-    return;
   }
 
   const cwd = path.resolve(values.cwd ?? process.cwd());
@@ -90,19 +90,20 @@ async function main() {
       ? values.content
       : DEFAULT_CONTENT_GLOBS;
 
-  const contentFiles = globSync(contentGlobs, { cwd });
+  // Scan sources once for Carbon imports and literal `bx--` tokens, the
+  // same allowlist inputs the plugins collect from bundler hooks.
   const components = new Set<string>();
-  const contentTexts: string[] = [];
+  const contentClasses = new Set<string>();
 
-  for (const file of contentFiles) {
+  for (const file of globSync(contentGlobs, { cwd })) {
     let text: string;
     try {
       text = readFileSync(path.resolve(cwd, file), "utf-8");
     } catch {
       continue;
     }
-    contentTexts.push(text);
     collectCarbonImports(text, components);
+    collectCarbonTokens(text, contentClasses);
   }
 
   for (const name of (values.components ?? "").split(",")) {
@@ -116,66 +117,44 @@ async function main() {
     );
   }
 
+  if (values["live-index"]) {
+    setComponents(await ensureLiveComponentIndex());
+  }
+
   const safelist = parseSafelist(values.safelist ?? []);
   const dryRun = values["dry-run"] === true;
   const silent = values.silent === true;
-
-  const results = await Promise.all(
-    cssFiles.map(async (id) => {
-      const css = readFileSync(path.resolve(cwd, id), "utf-8");
-      const { css: optimized, removed } = await optimizeCarbonCss(css, {
-        components,
-        sources: contentTexts,
-        safelist,
-        preserveAllIBMFonts: values["preserve-all-ibm-fonts"] === true,
-        experimental: { liveIndex: values["live-index"] === true },
-      });
-      return { id, css, optimized, removed };
-    }),
-  );
-
+  const optimizer = createCssOptimizer({
+    ids: components,
+    contentClasses,
+    safelist,
+    preserveAllIBMFonts: values["preserve-all-ibm-fonts"] === true,
+  });
   const assetReports: AssetReport[] = [];
 
-  for (const { id, css, optimized, removed } of results) {
+  for (const id of cssFiles) {
+    const css = readFileSync(path.resolve(cwd, id), "utf-8");
+    const { css: optimized, removed } = optimizer.run(css);
+
     if (!dryRun && removed > 0) {
       writeFileSync(path.resolve(cwd, id), optimized);
     }
 
     if (!silent && removed > 0) {
-      if (dryRun) {
-        console.log(`Dry run: ${id} left unchanged`);
-      }
-      printDiff({ original_css: css, optimized_css: optimized, id });
+      logAssetDiff({ original_css: css, optimized_css: optimized, id, dryRun });
     }
 
     if (values.report) {
-      assetReports.push({
-        id,
-        removed,
-        beforeBytes: Buffer.byteLength(css),
-        afterBytes: Buffer.byteLength(optimized),
-      });
+      assetReports.push(toAssetReport(id, css, optimized, removed));
     }
   }
 
   if (values.report) {
-    const moduleClasses = new Set<string>();
-    for (const text of contentTexts) {
-      collectCarbonTokens(text, moduleClasses);
-    }
-
-    const optimizer = createCssOptimizer({
-      ids: components,
-      contentClasses: moduleClasses,
-      safelist,
-      preserveAllIBMFonts: values["preserve-all-ibm-fonts"] === true,
-    });
-
     printReport({
       components: optimizer.usage.components,
       allowlistSize: optimizer.usage.allowlistSize,
-      moduleTokens: moduleClasses.size,
-      contentTokens: 0,
+      moduleTokens: 0,
+      contentTokens: contentClasses.size,
       safelistEntries: safelist.length,
       assets: assetReports,
       dryRun,

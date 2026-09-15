@@ -73,15 +73,3 @@ export function scanContent(
 
   return { classes: [...classes], matchedFiles: files.length };
 }
-
-/**
- * Scan files matched by `content` globs for literal `bx--`-prefixed tokens.
- * Returns them as class selectors (`.bx--token`). See `scanContent` for the
- * full result including match counts and glob errors.
- */
-export function scanContentClasses(
-  content?: readonly string[],
-  cwd: string = process.cwd(),
-): string[] {
-  return scanContent(content, cwd).classes;
-}

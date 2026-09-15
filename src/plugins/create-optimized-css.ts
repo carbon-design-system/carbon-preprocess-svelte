@@ -221,14 +221,7 @@ export function createCssOptimizer(
 
   return {
     usage: { components, allowlistSize: allowlist.size },
-    // Second argument is unused now that the scanner never falls back to
-    // PostCSS (it only ever needed `from` for PostCSS's own `Input`
-    // bookkeeping); kept in the signature since the Vite/webpack plugins
-    // still pass the asset id.
-    run(
-      source: CreateOptimizedCssOptions["source"],
-      _from?: string,
-    ): OptimizedCssReport {
+    run(source: CreateOptimizedCssOptions["source"]): OptimizedCssReport {
       // Bundlers hand every CSS asset to the plugin, including per-route
       // chunks with no Carbon styles at all. Parsing and re-serializing
       // those is pure overhead, so skip the scanner unless something
