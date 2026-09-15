@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
+import { components as staticComponentIndex } from "../component-index";
 import type { ComponentIndex } from "./build-index";
 import { buildComponentIndex, resolveCarbonRoot } from "./build-index";
 
@@ -136,8 +137,7 @@ export async function loadLiveComponentIndex(
     console.warn(
       `${LOG_PREFIX} experimental.liveIndex: falling back to the bundled static component index (${(error as Error)?.message ?? error}).`,
     );
-    const { components } = await import("../component-index");
-    return components;
+    return staticComponentIndex;
   }
 }
 
