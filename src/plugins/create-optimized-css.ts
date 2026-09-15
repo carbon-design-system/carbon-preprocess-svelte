@@ -12,6 +12,8 @@ export type OptimizeCssOptions = {
   /**
    * Set to `true` to suppress the size difference
    * logging between original and optimized CSS.
+   * Under Vite the size log also follows `logLevel` and `customLogger`,
+   * so `--logLevel warn` hides it without setting `silent`.
    * @default false
    */
   silent?: boolean;

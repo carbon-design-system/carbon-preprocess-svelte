@@ -1,4 +1,7 @@
-import { printDiff } from "carbon-preprocess-svelte/plugins/print-diff";
+import {
+  formatDiff,
+  printDiff,
+} from "carbon-preprocess-svelte/plugins/print-diff";
 
 describe("print-diff", () => {
   beforeEach(() => {
@@ -111,5 +114,32 @@ describe("print-diff", () => {
       ["Before:", "0.07 kB"],
       ["After: ", "0.02 kB", "(-78.87%)\n"],
     ]);
+  });
+
+  test("formatDiff matches printDiff byte for byte", () => {
+    const log = jest.spyOn(console, "log");
+    const props = {
+      original_css: "body { color: red; } .bx--btn {}",
+      optimized_css: "body { color: red; }",
+      id: "id",
+    };
+
+    printDiff(props);
+
+    const fromConsole = log.mock.calls
+      .map((args) => `${args.join(" ")}\n`)
+      .join("");
+
+    expect(`${formatDiff(props)}\n`).toEqual(fromConsole);
+  });
+
+  test("formatDiff returns null when nothing changed", () => {
+    expect(
+      formatDiff({
+        original_css: "body { color: red; }",
+        optimized_css: "body { color: red; }",
+        id: "id",
+      }),
+    ).toBeNull();
   });
 });

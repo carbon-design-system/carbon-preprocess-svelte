@@ -34,6 +34,33 @@ function padIfNeeded(a: string, b: string) {
 }
 
 /**
+ * Computes the display strings shared by `printDiff` and `formatDiff`.
+ * Returns `null` when sizes are equal—this indicates either no Carbon CSS
+ * was present, or all detected components' styles were preserved.
+ */
+function measure(props: {
+  original_css: Uint8Array | Buffer | string;
+  optimized_css: string;
+}) {
+  const { original_css, optimized_css } = props;
+
+  const original_size = stringSizeInKB(original_css.toString());
+  const optimized_size = stringSizeInKB(optimized_css);
+
+  if (original_size === optimized_size) {
+    return null;
+  }
+
+  const original = toHumanReadableSize(original_size);
+  const optimized = toHumanReadableSize(optimized_size);
+  const original_display = padIfNeeded(original, optimized);
+  const optimized_display = padIfNeeded(optimized, original);
+  const diff = percentageDiff(original_size, optimized_size);
+
+  return { original_display, optimized_display, diff };
+}
+
+/**
  * Prints a formatted summary of CSS optimization results to the console.
  *
  * Shows the original and optimized file sizes with percentage reduction.
@@ -45,27 +72,40 @@ export function printDiff(props: {
   optimized_css: string;
   id: string;
 }) {
-  const { original_css, optimized_css, id } = props;
+  const { id } = props;
+  const result = measure(props);
 
-  const original_size = stringSizeInKB(original_css.toString());
-  const optimized_size = stringSizeInKB(optimized_css);
-
-  /**
-   * Skip output when sizes are equal—this indicates either no Carbon CSS
-   * was present, or all detected components' styles were preserved.
-   */
-  if (original_size === optimized_size) {
+  if (result === null) {
     return;
   }
 
-  const original = toHumanReadableSize(original_size);
-  const optimized = toHumanReadableSize(optimized_size);
-  const original_display = padIfNeeded(original, optimized);
-  const optimized_display = padIfNeeded(optimized, original);
-  const diff = percentageDiff(original_size, optimized_size);
+  const { original_display, optimized_display, diff } = result;
 
   console.log("\n");
   console.log("Optimized", id);
   console.log("Before:", original_display);
   console.log("After: ", optimized_display, `(-${diff})\n`);
+}
+
+/**
+ * The size block as one string, identical to what `printDiff` writes with
+ * four `console.log` calls. Returns `null` when nothing changed. One string
+ * lets a host logger (Vite's `config.logger`) emit it as a single message,
+ * which keeps the block intact for anything parsing the output.
+ */
+export function formatDiff(props: {
+  original_css: Uint8Array | Buffer | string;
+  optimized_css: string;
+  id: string;
+}): string | null {
+  const { id } = props;
+  const result = measure(props);
+
+  if (result === null) {
+    return null;
+  }
+
+  const { original_display, optimized_display, diff } = result;
+
+  return `\n\nOptimized ${id}\nBefore: ${original_display}\nAfter:  ${optimized_display} (-${diff})\n`;
 }
