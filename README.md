@@ -28,6 +28,7 @@ bun add -D carbon-preprocess-svelte
 - [**optimizeImports**](#optimizeimports): Svelte preprocessor that rewrites Carbon Svelte imports to their source path in the `script` block, making development compile times dramatically faster.
 - [**optimizeCss**](#optimizecss): Vite/Rollup/Rolldown plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
 - [**OptimizeCssPlugin**](#optimizecssplugin): The corresponding `optimizeCss` plugin for Webpack and Rspack that removes unused Carbon styles.
+- [**optimizeCarbonCss**](#optimizecarboncss): Programmatic version of the CSS optimizer for esbuild, Bun.build, or any post-build script.
 
 ### `optimizeImports`
 
@@ -465,6 +466,114 @@ import { OptimizeCssPlugin } from "carbon-preprocess-svelte";
 export default {
   plugins: [new OptimizeCssPlugin()],
 };
+```
+
+### `optimizeCarbonCss`
+
+`optimizeCarbonCss` is the same CSS optimization engine behind `optimizeCss` and `OptimizeCssPlugin`, exposed as a plain async function for bundlers without a plugin API, such as esbuild, `Bun.build`, or any post-build script. It is `async` because `experimental.liveIndex` may build a component index. Unlike the plugins, it has no way to discover which Carbon components your app imports, so the caller passes them explicitly via `components`.
+
+```js
+// esbuild
+import { writeFileSync } from "node:fs";
+import { optimizeCarbonCss } from "carbon-preprocess-svelte";
+import { build } from "esbuild";
+
+const result = await build({
+  entryPoints: ["src/main.js"],
+  bundle: true,
+  write: false,
+  metafile: true,
+  outdir: "dist",
+});
+
+const components = ["Button", "Accordion"];
+const sources = result.outputFiles
+  .filter((file) => file.path.endsWith(".js"))
+  .map((file) => file.text);
+
+for (const file of result.outputFiles) {
+  if (!file.path.endsWith(".css")) continue;
+  const { css } = await optimizeCarbonCss(file.text, { components, sources });
+  writeFileSync(file.path, css);
+}
+```
+
+```js
+// Bun.build
+import { optimizeCarbonCss } from "carbon-preprocess-svelte";
+
+const result = await Bun.build({
+  entrypoints: ["src/main.js"],
+  outdir: "dist",
+});
+
+const components = ["Button", "Accordion"];
+const jsOutputs = result.outputs.filter((output) => output.kind === "entry-point");
+const sources = await Promise.all(jsOutputs.map((output) => output.text()));
+
+for (const output of result.outputs) {
+  if (output.path.endsWith(".css")) {
+    const { css } = await optimizeCarbonCss(await output.text(), {
+      components,
+      sources,
+    });
+    await Bun.write(output.path, css);
+  }
+}
+```
+
+```ts
+optimizeCarbonCss(css, {
+  /**
+   * Carbon components used by the app, as names (`"Button"`) or paths to
+   * their `.svelte` source. Classes referenced by these components are kept.
+   * An empty list returns the CSS unchanged.
+   */
+  components: ["Button", "Accordion"],
+
+  /**
+   * Source code to scan for literal `bx--` tokens, for example the JS output
+   * of your bundler. Same detection as the plugins' `scanModules`.
+   * @default undefined
+   */
+  sources: [],
+
+  /** Directory that `content` globs resolve from. @default process.cwd() */
+  cwd: process.cwd(),
+
+  /**
+   * Glob patterns of source files to scan for literal `bx--`-prefixed
+   * tokens. Every token found is kept. Resolves relative to `cwd`.
+   * @default undefined
+   */
+  content: ["src/**/*.{svelte,js,ts}"],
+
+  /**
+   * Class selectors to always keep, regardless of which components are
+   * imported. See the `optimizeCss` API above for the string vs. `RegExp`
+   * matching rules.
+   * @default []
+   */
+  safelist: [".bx--grid", ".bx--aspect-ratio", /^\.bx--btn--/],
+
+  /**
+   * Set to `true` to retain *all* IBM Plex `@font-face` rules instead of
+   * only the ones Carbon Svelte components actually use.
+   * @default false
+   */
+  preserveAllIBMFonts: false,
+
+  experimental: {
+    /**
+     * Experimental. Builds the component index from *this project's*
+     * installed `carbon-components-svelte` instead of the version bundled
+     * with `carbon-preprocess-svelte`. See the `optimizeCss` API above for
+     * details.
+     * @default false
+     */
+    liveIndex: false,
+  },
+});
 ```
 
 ## Examples
