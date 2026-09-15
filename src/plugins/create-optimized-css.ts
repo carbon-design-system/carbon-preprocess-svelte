@@ -59,7 +59,8 @@ export type OptimizeCssOptions = {
   safelist?: Array<SafelistEntry>;
 
   /**
-   * Glob patterns (relative to the current working directory) of source files
+   * Glob patterns (relative to the project root: Vite `root`, webpack/Rspack
+   * `context`, or the working directory under plain Rollup) of source files
    * to scan for literal `bx--`-prefixed tokens. Every token found is kept.
    * For ``class={`bx--btn--${kind}`}``, the prefix `bx--btn--` in source
    * keeps runtime variants like `.bx--btn--primary`.

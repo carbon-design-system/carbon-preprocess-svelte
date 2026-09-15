@@ -1,4 +1,5 @@
 import { globSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 /** Literal `bx--`-prefixed tokens as they appear in source markup. */
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;
@@ -26,15 +27,19 @@ export function collectCarbonTokens(source: string, into: Set<string>): void {
  * the prefix in your source (`bx--btn--`). Prefix matching then keeps
  * `.bx--btn--primary` and similar at runtime.
  *
- * Globs resolve relative to the current working directory. Returns an empty
- * array when `content` is omitted or globbing fails.
+ * Globs resolve relative to `cwd` (the bundler's project root;
+ * `process.cwd()` when not provided). Returns an empty array when `content`
+ * is omitted or globbing fails.
  */
-export function scanContentClasses(content?: readonly string[]): string[] {
+export function scanContentClasses(
+  content?: readonly string[],
+  cwd: string = process.cwd(),
+): string[] {
   if (!content || content.length === 0) return [];
 
   let files: string[];
   try {
-    files = globSync([...content]);
+    files = globSync([...content], { cwd });
   } catch {
     return [];
   }
@@ -44,7 +49,7 @@ export function scanContentClasses(content?: readonly string[]): string[] {
   for (const file of files) {
     let source: string;
     try {
-      source = readFileSync(file, "utf-8");
+      source = readFileSync(path.resolve(cwd, file), "utf-8");
     } catch {
       // Skip directories and unreadable matches.
       continue;

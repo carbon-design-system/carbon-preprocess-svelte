@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Rollup } from "vite";
 import { CarbonSvelte } from "../src/constants";
 import { optimizeCss } from "../src/plugins/optimize-css";
@@ -199,5 +202,42 @@ describe("optimizeCss (Vite plugin)", () => {
     expect((secondBundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
     );
+  });
+
+  test("content globs resolve from Vite's config.root", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
+    try {
+      mkdirSync(join(dir, "src"));
+      writeFileSync(
+        join(dir, "src", "App.svelte"),
+        '<div class="bx--accordion"></div>',
+      );
+
+      const plugin = optimizeCss({
+        silent: true,
+        content: ["src/**/*.svelte"],
+      });
+      const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+
+      // @ts-expect-error
+      await plugin.buildStart();
+      // @ts-expect-error
+      plugin.configResolved({ root: dir });
+      // @ts-expect-error
+      plugin.transform("", carbonComponent);
+
+      const bundle = makeCssBundle(cssContent);
+      // @ts-expect-error
+      await plugin.generateBundle({}, bundle);
+
+      expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+        `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

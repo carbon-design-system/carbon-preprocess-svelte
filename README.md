@@ -376,9 +376,10 @@ optimizeCss({
   safelist: [".bx--grid", ".bx--aspect-ratio", /^\.bx--btn--/],
 
   /**
-   * Glob patterns (relative to the working directory) of source files to scan
-   * for literal `bx--`-prefixed tokens. Every token found is kept. Use when
-   * class names are built at runtime. See the warning below.
+   * Glob patterns (relative to the project root: Vite `root`, webpack/Rspack
+   * `context`, or the working directory under plain Rollup) of source files
+   * to scan for literal `bx--`-prefixed tokens. Every token found is kept.
+   * Use when class names are built at runtime. See the warning below.
    *
    * @default undefined
    */

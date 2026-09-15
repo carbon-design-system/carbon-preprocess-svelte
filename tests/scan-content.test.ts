@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -59,6 +59,40 @@ describe("scanContentClasses", () => {
     const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
     try {
       expect(scanContentClasses([join(dir, "*.svelte")])).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("resolves relative globs from `cwd`", () => {
+    const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
+    try {
+      mkdirSync(join(dir, "src"));
+      writeFileSync(
+        join(dir, "src", "App.svelte"),
+        '<div class="bx--grid"></div>',
+      );
+
+      expect(scanContentClasses(["src/*.svelte"], dir)).toEqual([".bx--grid"]);
+      // Proves the old cwd-less behavior would have missed it.
+      expect(scanContentClasses(["src/*.svelte"])).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("absolute globs ignore `cwd`", () => {
+    const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
+    try {
+      mkdirSync(join(dir, "src"));
+      writeFileSync(
+        join(dir, "src", "App.svelte"),
+        '<div class="bx--grid"></div>',
+      );
+
+      expect(
+        scanContentClasses([join(dir, "src/*.svelte")], "/nonexistent"),
+      ).toEqual([".bx--grid"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Compiler } from "webpack";
 import { CarbonSvelte } from "../src/constants";
 import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
@@ -12,9 +15,15 @@ const createMockCompiler = (
     assets?: Record<string, unknown>;
     moduleResources?: ModuleResource[];
     mode?: "production" | "development" | "none";
+    context?: string;
   } = {},
 ) => {
-  const { assets = {}, moduleResources = [], mode = "production" } = options;
+  const {
+    assets = {},
+    moduleResources = [],
+    mode = "production",
+    context = process.cwd(),
+  } = options;
 
   let processAssetsPromise: Promise<void> | null = null;
 
@@ -49,6 +58,7 @@ const createMockCompiler = (
 
   return {
     options: { mode },
+    context,
     hooks: {
       thisCompilation: {
         tap: jest.fn((_, callback) => callback(compilation)),
@@ -252,6 +262,43 @@ describe("OptimizeCssPlugin", () => {
       `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`,
     );
+  });
+
+  test("content globs resolve from compiler.context", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
+    try {
+      mkdirSync(join(dir, "src"));
+      writeFileSync(
+        join(dir, "src", "App.svelte"),
+        '<div class="bx--accordion"></div>',
+      );
+
+      const plugin = new OptimizeCssPlugin({
+        silent: true,
+        content: ["src/**/*.svelte"],
+      });
+      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+
+      const mockCompiler = createMockCompiler({
+        assets: { "styles.css": { source: () => cssContent } },
+        moduleResources: [carbonComponent],
+        context: dir,
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
+      expect(asset.source()).toEqual(
+        `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("scanModules: false ignores app modules", async () => {
