@@ -1,10 +1,10 @@
 import { setComponents } from "../component-index-registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
-import { isCarbonSvelteImport, isCssFile } from "../utils";
+import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
-import { scanContentClasses } from "./scan-content";
+import { collectCarbonTokens, scanContentClasses } from "./scan-content";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
@@ -18,10 +18,19 @@ type WebpackAssetSource = {
   source(): string | Buffer;
 };
 
+type WebpackModule = {
+  resource?: unknown;
+  /** Present on NormalModule (webpack and Rspack): the loader output for this module. */
+  originalSource?: () => WebpackAssetSource | null | undefined;
+};
+
 type WebpackCompilation = {
   hooks: {
     finishModules: {
-      tap(name: string, callback: (modules: Iterable<unknown>) => void): void;
+      tap(
+        name: string,
+        callback: (modules: Iterable<WebpackModule>) => void,
+      ): void;
     };
     processAssets: {
       tapPromise(
@@ -91,6 +100,7 @@ export default class OptimizeCssPlugin {
       OptimizeCssPlugin.name,
       (compilation) => {
         const ids = new Set<string>();
+        const moduleClasses = new Set<string>();
 
         /**
          * `finishModules` fires once every module in the graph has resolved,
@@ -101,12 +111,27 @@ export default class OptimizeCssPlugin {
           OptimizeCssPlugin.name,
           (modules) => {
             for (const module of modules) {
-              const resource = (module as { resource?: unknown }).resource;
-              if (
-                typeof resource === "string" &&
-                isCarbonSvelteImport(resource)
-              ) {
+              const resource = module.resource;
+              if (typeof resource !== "string") continue;
+
+              if (isCarbonSvelteImport(resource)) {
                 ids.add(resource);
+                continue;
+              }
+
+              if (
+                this.options.scanModules !== false &&
+                isScannableModule(resource)
+              ) {
+                let source: string | Buffer | undefined;
+                try {
+                  source = module.originalSource?.()?.source();
+                } catch {
+                  // Some module types throw when asked for a source.
+                }
+                if (typeof source === "string" || Buffer.isBuffer(source)) {
+                  collectCarbonTokens(source.toString(), moduleClasses);
+                }
               }
             }
           },
@@ -134,7 +159,7 @@ export default class OptimizeCssPlugin {
             const optimizer = createCssOptimizer({
               ...this.options,
               ids,
-              contentClasses,
+              contentClasses: [...contentClasses, ...moduleClasses],
             });
 
             for (const id of Object.keys(assets).filter(isCssFile)) {

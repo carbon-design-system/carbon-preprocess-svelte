@@ -4,6 +4,21 @@ import { globSync, readFileSync } from "node:fs";
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;
 
 /**
+ * Add every literal `bx--` token in `source` to `into` as a class selector.
+ * Shared by the `content` glob scan and the bundler module scan. The
+ * `includes` check is the fast path: most modules (vendor code, app logic)
+ * contain no Carbon token, and a substring search is far cheaper than
+ * running the regex.
+ */
+export function collectCarbonTokens(source: string, into: Set<string>): void {
+  if (!source.includes("bx--")) return;
+
+  for (const token of source.match(CARBON_TOKEN) ?? []) {
+    into.add(`.${token}`);
+  }
+}
+
+/**
  * Scan files matched by `content` globs for literal `bx--`-prefixed tokens.
  * Returns them as class selectors (`.bx--token`).
  *
@@ -35,9 +50,7 @@ export function scanContentClasses(content?: readonly string[]): string[] {
       continue;
     }
 
-    for (const token of source.match(CARBON_TOKEN) ?? []) {
-      classes.add(`.${token}`);
-    }
+    collectCarbonTokens(source, classes);
   }
 
   return [...classes];

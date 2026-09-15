@@ -189,7 +189,7 @@ export default {
 
 The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on production builds and after other plugins.
 
-1. During `transform`, it collects absolute paths of imported `carbon-components-svelte` sources.
+1. During `transform`, it collects absolute paths of imported `carbon-components-svelte` sources, and, unless `scanModules: false`, every literal `bx--` token in the code of other modules.
 2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components via an internal index, plus global selectors like `.bx--body`.
 3. A PostCSS plugin prunes Carbon (`bx--`) selectors outside that allowlist:
    - Individual selectors are pruned out of comma-separated lists instead of keeping the whole rule when any one branch matches
@@ -384,6 +384,17 @@ optimizeCss({
    */
   content: ["src/**/*.{svelte,js,ts}"],
 
+  /**
+   * Scan the code of every bundled module for literal `bx--` tokens and keep
+   * them, so hand-written Carbon classes in your own markup
+   * (`<div class="bx--grid">`) and prefix literals (`` `bx--btn--${kind}` ``)
+   * survive without configuration. Carbon's own sources, CSS modules, and
+   * virtual modules are skipped. Set to `false` to rely only on imported
+   * components, `safelist`, and `content`.
+   * @default true
+   */
+  scanModules: false,
+
   experimental: {
     /**
      * Experimental. Builds the component index from *this project's*
@@ -411,19 +422,23 @@ optimizeCss({
 ```
 
 > [!WARNING]
-> **Dynamically constructed class names are not detected.** The allowlist comes from Carbon component source files you import. It only knows about classes those components reference. Runtime assembly is invisible:
+> **Class names that never appear as a literal `bx--` token cannot be detected.** The plugin keeps classes referenced by imported Carbon components, plus every literal `bx--…` token found in your bundled modules (`scanModules`). Two things stay invisible:
 >
 > ```svelte
-> <!-- pruned: optimizer never sees literal `bx--btn--secondary` -->
-> <button class={`bx--btn--${kind}`}>...</button>
+> <!-- pruned: "bx-" and "-btn" never appear together as one literal token -->
+> <script>
+>   const p = "bx-" + "-btn";
+> </script>
+> <button class={`${p}--${kind}`}>...</button>
 > ```
 >
-> Hand-written Carbon classes in your markup (e.g. `<div class="bx--grid">`) have the same problem. No imported component references them, so they get pruned. If the plugin "deleted your styles," this is usually why.
+> - Tokens assembled at runtime from pieces that do not themselves start with `bx--`.
+> - Files the bundler never processes (markdown, HTML templates, CMS content).
 >
 > Two ways to fix it:
 >
 > - **`safelist`**: list selectors (or a `RegExp`) to keep: `safelist: [".bx--grid", /^\.bx--btn--/]`.
-> - **`content`**: scan your source for literal `bx--` prefixes: `content: ["src/**/*.{svelte,js,ts}"]`.
+> - **`content`**: scan additional files for literal `bx--` prefixes: `content: ["**/*.{md,html}"]`.
 
 ### `OptimizeCssPlugin`
 

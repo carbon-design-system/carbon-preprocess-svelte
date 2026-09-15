@@ -32,8 +32,8 @@
   "vite": {
     "file": "assets/index-*.css",
     "before_kb": 710.39,
-    "after_kb": 49.43,
-    "reduction_percent": 93.04
+    "after_kb": 49.68,
+    "reduction_percent": 93.01
   },
   "vite@svelte-5": {
     "composed-modal-bundle": {

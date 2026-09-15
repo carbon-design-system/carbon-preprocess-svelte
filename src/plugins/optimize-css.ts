@@ -1,11 +1,11 @@
 import type { Plugin } from "vite";
 import { setComponents } from "../component-index-registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
-import { isCarbonSvelteImport, isCssFile } from "../utils";
+import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
 import { printDiff } from "./print-diff";
-import { scanContentClasses } from "./scan-content";
+import { collectCarbonTokens, scanContentClasses } from "./scan-content";
 
 /**
  * Vite/Rollup plugin that removes unused Carbon CSS classes from production builds.
@@ -28,6 +28,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const ids = new Set<string>();
   /** Classes from `content` globs. Cached after first scan. */
   let contentClasses: string[] | undefined;
+  /** Literal `bx--` classes found while scanning bundled module code. */
+  const moduleClasses = new Set<string>();
 
   return {
     name: "vite:carbon:optimize-css",
@@ -45,6 +47,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     async buildStart() {
       ids.clear();
       contentClasses = undefined;
+      moduleClasses.clear();
 
       if (options?.experimental?.liveIndex) {
         setComponents(await ensureLiveComponentIndex());
@@ -55,9 +58,13 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * We don't modify the code here—we just track which Carbon components
      * are imported so we know which CSS classes to preserve later.
      */
-    transform(_, id) {
+    transform(code, id) {
       if (isCarbonSvelteImport(id)) {
         ids.add(id);
+        return;
+      }
+      if (options?.scanModules !== false && isScannableModule(id)) {
+        collectCarbonTokens(code, moduleClasses);
       }
     },
     /**
@@ -76,7 +83,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       const optimizer = createCssOptimizer({
         ...options,
         ids,
-        contentClasses,
+        contentClasses: [...contentClasses, ...moduleClasses],
       });
 
       for (const id in bundle) {

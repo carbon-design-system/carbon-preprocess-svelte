@@ -72,4 +72,132 @@ describe("optimizeCss (Vite plugin)", () => {
       cssContent,
     );
   });
+
+  test("keeps literal bx-- classes found in app modules", async () => {
+    const plugin = optimizeCss({ silent: true });
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+    // @ts-expect-error
+    plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
+
+    const bundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle({}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+      `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`,
+    );
+  });
+
+  test("scanModules: false ignores app modules", async () => {
+    const plugin = optimizeCss({ silent: true, scanModules: false });
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+    // @ts-expect-error
+    plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
+
+    const bundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle({}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+      ".bx--btn { color: blue }",
+    );
+  });
+
+  test("does not scan CSS modules or virtual modules", async () => {
+    const plugin = optimizeCss({ silent: true });
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+    // @ts-expect-error
+    plugin.transform(
+      "bx--accordion",
+      "/app/src/App.svelte?svelte&type=style&lang.css",
+    );
+    // @ts-expect-error
+    plugin.transform("bx--accordion", "\0virtual:thing");
+
+    const bundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle({}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+      ".bx--btn { color: blue }",
+    );
+  });
+
+  test("does not scan Carbon's own non-component sources", async () => {
+    const plugin = optimizeCss({ silent: true });
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+    // @ts-expect-error
+    plugin.transform(
+      "bx--accordion",
+      `/n/node_modules/${CarbonSvelte.Components}/src/utils/x.js`,
+    );
+
+    const bundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle({}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+      ".bx--btn { color: blue }",
+    );
+  });
+
+  test("clears module classes between watch-mode rebuilds", async () => {
+    const plugin = optimizeCss({ silent: true });
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+    // First build: Button is imported and an app module has a literal token.
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+    // @ts-expect-error
+    plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
+    const firstBundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle({}, firstBundle);
+    expect((firstBundle["styles.css"] as OutputAsset).source).toEqual(
+      cssContent,
+    );
+
+    // Second build: Button is re-imported but the app module is gone. If
+    // `moduleClasses` leaked across builds, `.bx--accordion` would survive.
+    // @ts-expect-error
+    await plugin.buildStart();
+    // @ts-expect-error
+    plugin.transform("", carbonComponent);
+    const secondBundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle({}, secondBundle);
+
+    expect((secondBundle["styles.css"] as OutputAsset).source).toEqual(
+      ".bx--btn { color: blue }",
+    );
+  });
 });

@@ -69,6 +69,17 @@ export type OptimizeCssOptions = {
    */
   content?: string[];
 
+  /**
+   * Scan the code of every bundled module for literal `bx--` tokens and keep
+   * them, so hand-written Carbon classes in your own markup
+   * (`<div class="bx--grid">`) and prefix literals (`` `bx--btn--${kind}` ``)
+   * survive without configuration. Carbon's own sources, CSS modules, and
+   * virtual modules are skipped. Set to `false` to rely only on imported
+   * components, `safelist`, and `content`.
+   * @default true
+   */
+  scanModules?: boolean;
+
   experimental?: {
     /**
      * Build the component index from *this project's* installed
