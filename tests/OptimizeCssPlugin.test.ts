@@ -2,11 +2,15 @@ import type { Compiler } from "webpack";
 import { CarbonSvelte } from "../src/constants";
 import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
 
+type ModuleResource =
+  | string
+  | { resource: string; source?: string; throwOnSource?: boolean };
+
 // Mock webpack compiler and related types
 const createMockCompiler = (
   options: {
     assets?: Record<string, unknown>;
-    moduleResources?: string[];
+    moduleResources?: ModuleResource[];
     mode?: "production" | "development" | "none";
   } = {},
 ) => {
@@ -18,7 +22,20 @@ const createMockCompiler = (
     hooks: {
       finishModules: {
         tap: jest.fn((_, callback) => {
-          callback(moduleResources.map((resource) => ({ resource })));
+          callback(
+            moduleResources.map((entry) => {
+              if (typeof entry === "string") return { resource: entry };
+              const { resource, source, throwOnSource } = entry;
+              if (source === undefined && !throwOnSource) return { resource };
+              return {
+                resource,
+                originalSource: () => {
+                  if (throwOnSource) throw new Error("no source available");
+                  return { source: () => source as string };
+                },
+              };
+            }),
+          );
         }),
       },
       processAssets: {
@@ -207,5 +224,102 @@ describe("OptimizeCssPlugin", () => {
 
     const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
     expect(asset.source()).toEqual(".bx--btn { color: blue }");
+  });
+
+  test("keeps literal bx-- classes found in app modules", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => cssContent } },
+      moduleResources: [
+        carbonComponent,
+        {
+          resource: "/app/src/App.js",
+          source: 'const c = "bx--accordion";',
+        },
+      ],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
+    expect(asset.source()).toEqual(
+      `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`,
+    );
+  });
+
+  test("scanModules: false ignores app modules", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true, scanModules: false });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => cssContent } },
+      moduleResources: [
+        carbonComponent,
+        {
+          resource: "/app/src/App.js",
+          source: 'const c = "bx--accordion";',
+        },
+      ],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
+    expect(asset.source()).toEqual(".bx--btn { color: blue }");
+  });
+
+  test("does not scan CSS modules, virtual modules, or Carbon's own sources", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`;
+
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => cssContent } },
+      moduleResources: [
+        carbonComponent,
+        { resource: "/app/styles.css", source: "bx--accordion" },
+        { resource: "\0virtual:thing", source: "bx--accordion" },
+        {
+          resource: `node_modules/${CarbonSvelte.Components}/src/utils/x.js`,
+          source: "bx--accordion",
+        },
+      ],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    const [, asset] = mockCompiler.compilation.updateAsset.mock.calls[0];
+    expect(asset.source()).toEqual(".bx--btn { color: blue }");
+  });
+
+  test("ignores a module whose originalSource() throws", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const cssContent = ".bx--btn { color: blue }";
+
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => cssContent } },
+      moduleResources: [
+        carbonComponent,
+        { resource: "/app/src/Broken.js", throwOnSource: true },
+      ],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await expect(mockCompiler.waitForProcessAssets()).resolves.toBeUndefined();
+
+    expect(mockCompiler.compilation.updateAsset).toHaveBeenCalled();
   });
 });

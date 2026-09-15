@@ -1,7 +1,37 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanContentClasses } from "carbon-preprocess-svelte/plugins/scan-content";
+import {
+  collectCarbonTokens,
+  scanContentClasses,
+} from "carbon-preprocess-svelte/plugins/scan-content";
+
+describe("collectCarbonTokens", () => {
+  test("adds nothing when the source has no bx-- token", () => {
+    const classes = new Set<string>();
+    collectCarbonTokens("const x = 1;", classes);
+    expect(classes.size).toBe(0);
+  });
+
+  test("adds every literal bx-- token as a class selector", () => {
+    const classes = new Set<string>();
+    collectCarbonTokens('class="bx--grid bx--row"', classes);
+    expect([...classes].sort()).toEqual([".bx--grid", ".bx--row"]);
+  });
+
+  test("keeps the trailing hyphen for a template literal prefix", () => {
+    const classes = new Set<string>();
+    collectCarbonTokens("`bx--btn--" + "$" + "{kind}`", classes);
+    expect([...classes]).toEqual([".bx--btn--"]);
+  });
+
+  test("does not duplicate tokens across calls into the same set", () => {
+    const classes = new Set<string>();
+    collectCarbonTokens('class="bx--grid"', classes);
+    collectCarbonTokens('class="bx--grid"', classes);
+    expect([...classes]).toEqual([".bx--grid"]);
+  });
+});
 
 describe("scanContentClasses", () => {
   test("returns an empty array when no content is provided", () => {

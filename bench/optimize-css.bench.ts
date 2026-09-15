@@ -6,7 +6,10 @@ import {
   createCssOptimizer,
   optimizeCssWithReport,
 } from "../src/plugins/create-optimized-css";
-import { scanContentClasses } from "../src/plugins/scan-content";
+import {
+  collectCarbonTokens,
+  scanContentClasses,
+} from "../src/plugins/scan-content";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
 
 // Real Carbon theme CSS (~700kb minified), same source the plugin optimizes
@@ -193,3 +196,39 @@ group(
     },
   },
 );
+
+/**
+ * A compiled Svelte 5 component body: ~60 lines of generated JS with the
+ * same `bx--` token density per module as the `content scan` fixture above,
+ * so the two groups' 200-item medians are comparable.
+ */
+function compiledModule(i: number): string {
+  let body = `import { append, init, insert } from "svelte/internal";\nfunction create_fragment_${i}(ctx) {\n`;
+  for (let line = 0; line < 60; line++) {
+    body += `  const class_${line} = "bx--grid bx--row-${line % 7} app-${i}-${line}";\n`;
+  }
+  body += `  const btn_class = \`bx--btn--\${kind}\`;\n  return { class_0, btn_class };\n}\nexport default create_fragment_${i};\n`;
+  return body;
+}
+
+const MODULES: string[] = Array.from({ length: 200 }, (_, i) =>
+  compiledModule(i),
+);
+
+const VENDOR_MODULE = Array.from(
+  { length: 6500 },
+  (_, i) => `function vendorHelper${i}(x){return x*${i}+1;}`,
+).join("\n");
+
+group("module scan", () => {
+  task("collectCarbonTokens (200 modules, in memory)", () => {
+    const classes = new Set<string>();
+    for (const source of MODULES) {
+      collectCarbonTokens(source, classes);
+    }
+  });
+
+  task("collectCarbonTokens (300 kB vendor module, fast path)", () => {
+    collectCarbonTokens(VENDOR_MODULE, new Set<string>());
+  });
+});
