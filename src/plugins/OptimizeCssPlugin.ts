@@ -3,6 +3,7 @@ import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
+import { NO_CARBON_IMPORTS } from "./messages";
 import { printDiff } from "./print-diff";
 import { collectCarbonTokens, scanContentClasses } from "./scan-content";
 
@@ -40,6 +41,7 @@ type WebpackCompilation = {
     };
   };
   updateAsset(name: string, source: unknown): void;
+  warnings: { push(error: Error): void };
 };
 
 type WebpackCompiler = {
@@ -48,6 +50,7 @@ type WebpackCompiler = {
   webpack: {
     Compilation: { PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE: number };
     sources: { RawSource: new (source: string) => unknown };
+    WebpackError: new (message: string) => Error;
   };
   hooks: {
     thisCompilation: {
@@ -94,6 +97,7 @@ export default class OptimizeCssPlugin {
       webpack: {
         Compilation,
         sources: { RawSource },
+        WebpackError,
       },
     } = compiler;
 
@@ -149,8 +153,13 @@ export default class OptimizeCssPlugin {
             stage: Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE,
           },
           async (assets) => {
-            // Skip processing if no Carbon Svelte imports are found.
-            if (ids.size === 0) return;
+            // Warn (not `silent`-suppressible) and skip processing if no
+            // Carbon Svelte imports are found; that's almost always a
+            // misconfiguration.
+            if (ids.size === 0) {
+              compilation.warnings.push(new WebpackError(NO_CARBON_IMPORTS));
+              return;
+            }
 
             if (this.options.experimental?.liveIndex) {
               setComponents(await ensureLiveComponentIndex());

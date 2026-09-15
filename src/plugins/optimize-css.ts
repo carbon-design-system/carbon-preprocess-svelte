@@ -4,6 +4,7 @@ import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
+import { NO_CARBON_IMPORTS } from "./messages";
 import { printDiff } from "./print-diff";
 import { collectCarbonTokens, scanContentClasses } from "./scan-content";
 
@@ -81,8 +82,12 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * Mutating `file.source` directly updates the bundle output in-place.
      */
     async generateBundle(_, bundle) {
-      // Skip processing if no Carbon Svelte imports are found.
-      if (ids.size === 0) return;
+      // Warn (not `silent`-suppressible) and skip processing if no Carbon
+      // Svelte imports are found; that's almost always a misconfiguration.
+      if (ids.size === 0) {
+        this.warn(NO_CARBON_IMPORTS);
+        return;
+      }
 
       if (contentClasses === undefined) {
         contentClasses = scanContentClasses(options?.content, root);

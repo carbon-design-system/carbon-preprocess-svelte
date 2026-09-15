@@ -12,6 +12,7 @@ export type OptimizeCssOptions = {
   /**
    * Set to `true` to suppress the size difference
    * logging between original and optimized CSS.
+   * Does not suppress bundler warnings.
    * @default false
    */
   silent?: boolean;

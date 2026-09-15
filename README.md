@@ -233,6 +233,8 @@ dist/assets/index-Ceijs3eO.js   53.65 kB │ gzip: 15.88 kB
 
 > [!NOTE]
 > This is a plugin and not a Svelte preprocessor. It should be added to the list of `vite.plugins`. For Vite set-ups, this plugin _is not run_ during development and is only executed when building the app (i.e., `vite build`). For Rollup and Webpack, you should conditionally apply the plugin to only execute when building for production.
+>
+> If the plugin finds no `carbon-components-svelte` component imports in a production build, it leaves the CSS untouched and raises a bundler warning (`carbon-preprocess-svelte: no carbon-components-svelte component imports were found…`). `silent` does not suppress warnings, only the size log.
 
 #### SvelteKit
 
@@ -340,6 +342,7 @@ optimizeCss({
   /**
    * Set to `true` to suppress the size difference
    * logging between original and optimized CSS.
+   * Does not suppress bundler warnings.
    * @default false
    */
   silent: true,
