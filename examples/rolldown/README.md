@@ -22,14 +22,20 @@ In this folder, you can run the following commands:
 bun i
 ```
 
-Run the app in development mode. This should only apply the `optimizeImports` preprocessor.
+Run the app in development mode. This should only apply the `optimizeImports` preprocessor. Rolldown has no built-in dev server, so this also starts a [`deserved`](https://www.npmjs.com/package/deserved) static server with live reload on `http://localhost:3000`.
 
 ```sh
 bun run dev
 ```
 
-Build the app for production. This should run both the `optimizeImports` and `optimizeCss` preprocessors.
+Build the app for production. This should run both the `optimizeImports` and `optimizeCss` preprocessors. The CSS file is content-hashed (e.g. `bundle-<hash>.css`); `index.html` (a template — the served `public/` dir is gitignored and regenerated on every build) is rewritten with the real filename.
 
 ```sh
 bun run build
+```
+
+Serve the production build.
+
+```sh
+bun run preview
 ```
