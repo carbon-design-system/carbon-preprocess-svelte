@@ -36,7 +36,7 @@ export const RE_EXT_STYLESHEET =
 export const RE_MODULE_QUERY = /[?#].*$/;
 
 /** Matches a Vite Svelte style sub-module query (`?svelte&type=style&...`). */
-export const RE_STYLE_QUERY = /type=style/;
+export const RE_STYLE_QUERY = /[?&]type=style(&|$)/;
 
 // Vite uses the decimal system for file sizes.
 export const BITS_DENOM = 1_000;

@@ -99,6 +99,11 @@ describe("isScannableModule", () => {
     expect(
       isScannableModule("/app/App.svelte?svelte&type=style&lang.css"),
     ).toBe(false);
+    expect(isScannableModule("/app/App.svelte?svelte&type=style")).toBe(false);
+  });
+
+  test("returns true when 'type=style' appears outside the query string", () => {
+    expect(isScannableModule("/app/src/sometype=style-guide.js")).toBe(true);
   });
 
   test("returns false for stylesheets of any flavor", () => {
