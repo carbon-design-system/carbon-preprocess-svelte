@@ -182,11 +182,11 @@ Shared helpers (`buildAllowlist`, `matchesAllowlist`, `shouldKeepStrictSelector`
 
 The examples are real downstream consumers, each linking the package via `"carbon-preprocess-svelte": "link:carbon-preprocess-svelte"`:
 
-- `examples/rollup`, `examples/rolldown`, `examples/vite`, `examples/vite@svelte-5`, `examples/sveltekit`: Vite/Rollup plugin path
+- `examples/rollup`, `examples/rolldown`, `examples/vite`, `examples/vite@svelte-5`, `examples/sveltekit`, `examples/astro`: Vite/Rollup plugin path
 - `examples/webpack`, `examples/webpack@svelte-5`: Webpack plugin path
 - `examples/rspack`: Rspack plugin path, using the same `OptimizeCssPlugin` export as Webpack
 
-Other Svelte frameworks (Astro, Routify, …) run Vite under the hood, so the Vite examples cover them. When you change output shape or reduction behavior, update snapshots and read the diff:
+Other Svelte frameworks (Routify, …) run Vite under the hood, so the Vite examples cover them. When you change output shape or reduction behavior, update snapshots and read the diff:
 
 ```sh
 bun run test:e2e:update
