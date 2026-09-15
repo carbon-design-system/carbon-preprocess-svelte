@@ -191,7 +191,9 @@ export type OptimizedCssReport = {
   removed: number;
 };
 
-function toCssString(source: CreateOptimizedCssOptions["source"]): string {
+export function toCssString(
+  source: CreateOptimizedCssOptions["source"],
+): string {
   if (typeof source === "string") return source;
   // Same decoding PostCSS applies to a Buffer, without copying the bytes.
   return Buffer.from(

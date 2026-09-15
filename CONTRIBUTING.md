@@ -61,6 +61,7 @@ The package has two entry points, exported from [`src/index.ts`](src/index.ts):
 
 ```ts
 export { default as OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin"; // Webpack/Rspack
+export { optimizeCarbonCss } from "./plugins/optimize-carbon-css";          // Bundler-agnostic
 export { optimizeCss } from "./plugins/optimize-css";                       // Vite/Rollup
 export { optimizeImports } from "./preprocessors/optimize-imports";         // Svelte preprocessor
 ```
@@ -121,7 +122,7 @@ Both plugins do the same job through different bundler hooks, then call the same
 
 Unless `scanModules: false`, both plugins also scan the code of every bundled module (`transform` for Vite, `module.originalSource()` in `finishModules` for Webpack/Rspack) for literal `bx--` tokens, so hand-written classes in app markup survive without `content`/`safelist`. The scan itself, `collectCarbonTokens()`, lives in [`src/plugins/scan-content.ts`](src/plugins/scan-content.ts) and is shared with the `content` glob scan (`scanContentClasses`).
 
-The shared core is [`src/plugins/create-optimized-css.ts`](src/plugins/create-optimized-css.ts). It builds an **allowlist** of `.bx--*` classes from the bundled components' index entries, plus `ALWAYS_ON_CLASSES` and any `content`/module-scanned tokens, then runs the splice scanner in [`css-splice-optimizer.ts`](src/plugins/css-splice-optimizer.ts). It exposes sync (`optimizeCssWithReport`) and async (`…Async`) variants because Vite and Webpack differ. Keep the two in lockstep when you change behavior. The `report.removed` count suppresses the size-diff log when nothing was pruned ([#131](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/131)).
+The shared core is [`src/plugins/create-optimized-css.ts`](src/plugins/create-optimized-css.ts). It builds an **allowlist** of `.bx--*` classes from the bundled components' index entries, plus `ALWAYS_ON_CLASSES` and any `content`/module-scanned tokens, then runs the splice scanner in [`css-splice-optimizer.ts`](src/plugins/css-splice-optimizer.ts). It exposes sync (`optimizeCssWithReport`) and async (`…Async`) variants because Vite and Webpack differ. Keep the two in lockstep when you change behavior. The `report.removed` count suppresses the size-diff log when nothing was pruned ([#131](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/131)). `optimizeCarbonCss` in [`src/plugins/optimize-carbon-css.ts`](src/plugins/optimize-carbon-css.ts) is the bundler-agnostic wrapper over the same core.
 
 Pruning is implemented in [`src/plugins/strict-css-optimizer.ts`](src/plugins/strict-css-optimizer.ts) (the module name predates graduating this to the only/default matcher; there is no other mode to switch on). It prunes individual selectors out of comma lists. Every Carbon class in a same-element compound must match. Descendant selectors split into ancestors + subject (subject must fully match; ancestors may match `CONTEXT_ANCESTORS` without being imported). Strips `:not(...)` before matching. Drops flatpickr/legacy `bx-` rules unless DatePicker is bundled. Parenthesis-aware for `:is()`. Most CSS-correctness work happens here.
 
