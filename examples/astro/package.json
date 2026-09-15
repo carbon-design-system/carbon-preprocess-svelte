@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "devDependencies": {
+    "@astrojs/svelte": "latest",
+    "astro": "latest",
+    "carbon-components-svelte": "latest",
+    "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "svelte": "^5.57.0",
+    "typescript": "latest"
+  }
+}

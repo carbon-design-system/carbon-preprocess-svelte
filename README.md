@@ -249,6 +249,30 @@ export default defineConfig({
 });
 ```
 
+#### Astro
+
+See [examples/astro](examples/astro).
+
+```js
+// astro.config.mjs
+import svelte from "@astrojs/svelte";
+import { optimizeCss } from "carbon-preprocess-svelte";
+import { defineConfig } from "astro/config";
+
+export default defineConfig({
+  integrations: [svelte()],
+  build: {
+    // Keep CSS as a separate asset so the pruned output is visible.
+    inlineStylesheets: "never",
+  },
+  vite: {
+    plugins: [optimizeCss()],
+  },
+});
+```
+
+`inlineStylesheets: "never"` is only there to make the pruned asset inspectable and is not required.
+
 #### Vite
 
 See [examples/vite](examples/vite).

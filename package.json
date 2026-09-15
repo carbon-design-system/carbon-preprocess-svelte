@@ -63,6 +63,7 @@
     "optimize imports",
     "optimize CSS",
     "vite",
+    "astro",
     "rollup",
     "rolldown",
     "webpack",
