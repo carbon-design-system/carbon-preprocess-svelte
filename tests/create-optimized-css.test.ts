@@ -1,4 +1,5 @@
 import {
+  createCssOptimizer,
   createOptimizedCss,
   optimizeCssWithReport,
 } from "carbon-preprocess-svelte/plugins/create-optimized-css";
@@ -449,6 +450,21 @@ button, .flatpickr-day.selected { color: red }`,
       });
       expect(removed).toBe(1);
       expect(css).toEqual(".bx--btn { color: white }");
+    });
+  });
+
+  describe("usage", () => {
+    test("reports the de-duplicated, sorted list of matched components", () => {
+      const { usage } = createCssOptimizer({
+        ids: [
+          "/x/Button.svelte",
+          "/x/Button.svelte",
+          "/x/NotAComponent.svelte",
+        ],
+      });
+
+      expect(usage.components).toEqual(["Button"]);
+      expect(usage.allowlistSize).toBeGreaterThan(0);
     });
   });
 });

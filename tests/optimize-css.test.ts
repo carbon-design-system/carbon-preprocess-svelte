@@ -376,6 +376,43 @@ describe("optimizeCss (Vite plugin)", () => {
     consoleSpy.mockRestore();
   });
 
+  test("report prints detected components and assets", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = resolvePlugin(optimizeCss({ report: true, silent: true }));
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+    plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
+
+    const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    const lines = consoleSpy.mock.calls.map((call) => call.join(" "));
+
+    expect(
+      lines.some((line) => line.includes("Detected components (1): Button")),
+    ).toEqual(true);
+    expect(lines.some((line) => line.includes("module scan 1 tokens"))).toEqual(
+      true,
+    );
+    expect(
+      lines.some(
+        (line) => line.includes("styles.css") && line.includes("rules removed"),
+      ),
+    ).toEqual(true);
+    expect(
+      lines.some(
+        (line) => line.includes("Optimized") && line.includes("Before:"),
+      ),
+    ).toEqual(false);
+
+    consoleSpy.mockRestore();
+  });
+
   test("does not warn when content globs match", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-"));
     try {

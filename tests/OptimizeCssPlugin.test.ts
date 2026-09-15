@@ -438,6 +438,47 @@ describe("OptimizeCssPlugin", () => {
     expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
   });
 
+  test("report prints detected components and assets", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = new OptimizeCssPlugin({ report: true, silent: true });
+    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => cssContent } },
+      moduleResources: [
+        carbonComponent,
+        { resource: "/app/src/App.js", source: 'const c = "bx--accordion";' },
+      ],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    const lines = consoleSpy.mock.calls.map((call) => call.join(" "));
+
+    expect(
+      lines.some((line) => line.includes("Detected components (1): Button")),
+    ).toEqual(true);
+    expect(lines.some((line) => line.includes("module scan 1 tokens"))).toEqual(
+      true,
+    );
+    expect(
+      lines.some(
+        (line) => line.includes("styles.css") && line.includes("rules removed"),
+      ),
+    ).toEqual(true);
+    expect(
+      lines.some(
+        (line) => line.includes("Optimized") && line.includes("Before:"),
+      ),
+    ).toEqual(false);
+
+    consoleSpy.mockRestore();
+  });
+
   test("warns when content globs match nothing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
     try {

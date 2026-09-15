@@ -10,6 +10,8 @@ import {
   NO_CARBON_IMPORTS,
 } from "./messages";
 import { printDiff } from "./print-diff";
+import type { AssetReport } from "./print-report";
+import { printReport } from "./print-report";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 
 /**
@@ -112,6 +114,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         ids,
         contentClasses: [...contentClasses, ...moduleClasses],
       });
+      const assetReports: AssetReport[] = [];
 
       for (const id in bundle) {
         const file = bundle[id];
@@ -133,7 +136,31 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
             }
             printDiff({ original_css, optimized_css, id });
           }
+
+          if (options?.report) {
+            assetReports.push({
+              id,
+              removed,
+              beforeBytes:
+                typeof original_css === "string"
+                  ? Buffer.byteLength(original_css)
+                  : original_css.byteLength,
+              afterBytes: Buffer.byteLength(optimized_css),
+            });
+          }
         }
+      }
+
+      if (options?.report) {
+        printReport({
+          components: optimizer.usage.components,
+          allowlistSize: optimizer.usage.allowlistSize,
+          moduleTokens: moduleClasses.size,
+          contentTokens: contentClasses.length,
+          safelistEntries: options.safelist?.length ?? 0,
+          assets: assetReports,
+          dryRun: options.dryRun,
+        });
       }
     },
   };

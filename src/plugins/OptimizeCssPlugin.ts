@@ -9,6 +9,8 @@ import {
   NO_CARBON_IMPORTS,
 } from "./messages";
 import { printDiff } from "./print-diff";
+import type { AssetReport } from "./print-report";
+import { printReport } from "./print-report";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 
 /**
@@ -205,6 +207,7 @@ export default class OptimizeCssPlugin {
               ids,
               contentClasses: [...contentClasses, ...moduleClasses],
             });
+            const assetReports: AssetReport[] = [];
 
             for (const id of Object.keys(assets).filter(isCssFile)) {
               const original_css = assets[id].source().toString();
@@ -223,6 +226,27 @@ export default class OptimizeCssPlugin {
                 }
                 printDiff({ original_css, optimized_css, id });
               }
+
+              if (this.options.report) {
+                assetReports.push({
+                  id,
+                  removed,
+                  beforeBytes: Buffer.byteLength(original_css),
+                  afterBytes: Buffer.byteLength(optimized_css),
+                });
+              }
+            }
+
+            if (this.options.report) {
+              printReport({
+                components: optimizer.usage.components,
+                allowlistSize: optimizer.usage.allowlistSize,
+                moduleTokens: moduleClasses.size,
+                contentTokens: contentClasses.length,
+                safelistEntries: this.options.safelist?.length ?? 0,
+                assets: assetReports,
+                dryRun: this.options.dryRun,
+              });
             }
           },
         );
