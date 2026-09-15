@@ -1,3 +1,7 @@
+import {
+  decodeComponentIndex,
+  encodeComponentIndex,
+} from "../src/component-index-codec";
 import { buildComponentIndex } from "../src/indexer/build-index";
 
 /**
@@ -23,42 +27,20 @@ for (const [identifier, classes] of Object.entries(MANUAL_OVERRIDES)) {
   }
 }
 
-// Class names repeat heavily across components (e.g. `.bx--skeleton` shows up
-// in dozens of *Skeleton components), so entries are encoded as indexes into
-// a deduplicated pool instead of repeating each string per component. This
-// keeps the exported `components` shape identical (`classes: string[]`);
-// only the on-disk encoding changes.
-const classPool = [
-  ...new Set(Object.values(components).flatMap((c) => c.classes)),
-].sort((a, b) => a.localeCompare(b));
-const classIndex = new Map(classPool.map((name, i) => [name, i]));
+// The index is written in the compact form described in
+// src/component-index-codec.ts and expanded once at module load, so the
+// exported `components` shape stays `{ path: string; classes: string[] }`.
+const encoded = encodeComponentIndex(components);
 
-function toClassIndex(name: string): number {
-  const index = classIndex.get(name);
-  if (index === undefined) {
-    throw new Error(`Class "${name}" missing from generated class pool.`);
-  }
-  return index;
-}
-
-const entries: Record<string, { path: string; classes: number[] }> =
-  Object.fromEntries(
-    Object.entries(components).map(([identifier, entry]) => [
-      identifier,
-      {
-        path: entry.path,
-        classes: entry.classes.map(toClassIndex),
-      },
-    ]),
+// The encoding is lossless only for an index whose class lists are sorted
+// the way `buildComponentIndex` sorts them, so prove the round trip before
+// writing anything.
+const decoded = decodeComponentIndex(encoded);
+if (JSON.stringify(decoded) !== JSON.stringify(components)) {
+  throw new Error(
+    "Encoded component index does not round-trip; see src/component-index-codec.ts.",
   );
-
-const isBuild = process.env.BUILD === "true";
-const classPoolString = isBuild
-  ? JSON.stringify(classPool)
-  : JSON.stringify(classPool, null, 2);
-const entriesString = isBuild
-  ? JSON.stringify(entries)
-  : JSON.stringify(entries, null, 2);
+}
 
 await Bun.write(
   "src/component-index.ts",
@@ -66,22 +48,16 @@ await Bun.write(
 // This file was automatically generated and should not be edited.
 // @see scripts/index-components.ts
 
-// Deduplicated pool of CSS class names referenced by index below, since the
-// same classes (e.g. ".bx--skeleton") are shared across many components.
-const classPool: string[] = ${classPoolString};
+import { decodeComponentIndex } from "./component-index-codec";
 
-const entries: Record<string, { path: string; classes: number[] }> = ${entriesString};
-
-export const components: Record<string, { path: string; classes: string[] }> =
-  Object.freeze(
-    Object.fromEntries(
-      Object.entries(entries).map(([identifier, entry]) => [
-        identifier,
-        {
-          path: entry.path,
-          classes: entry.classes.map((i) => classPool[i]),
-        },
-      ]),
-    ),
-  );\n`,
+// Compact encoding of every component's path and CSS classes; see
+// src/component-index-codec.ts for the format.
+export const components = Object.freeze(
+  decodeComponentIndex({
+    pool: ${JSON.stringify(encoded.pool)},
+    names: ${JSON.stringify(encoded.names)},
+    paths: ${JSON.stringify(encoded.paths)},
+    classes: ${JSON.stringify(encoded.classes)},
+  }),
+);\n`,
 );
