@@ -353,6 +353,14 @@ optimizeCss({
   dryRun: true,
 
   /**
+   * Print a per-build summary of what the plugin detected: imported Carbon
+   * components, allowlist size and its sources (module scan, `content`,
+   * `safelist`), and per-asset results. Independent of `silent`.
+   * @default false
+   */
+  report: true,
+
+  /**
    * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
    * for all available IBM Plex fonts, many of which are not actually
    * used in Carbon Svelte components.
@@ -451,6 +459,7 @@ optimizeCss({
 >
 > - **`safelist`**: list selectors (or a `RegExp`) to keep: `safelist: [".bx--grid", /^\.bx--btn--/]`.
 > - **`content`**: scan additional files for literal `bx--` prefixes: `content: ["**/*.{md,html}"]`.
+> - **`report`**: set `report: true` to print which components and tokens were detected, then compare against the class you are missing.
 
 ### `OptimizeCssPlugin`
 

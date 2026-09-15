@@ -32,6 +32,14 @@ export type OptimizeCssOptions = {
   dryRun?: boolean;
 
   /**
+   * Print a per-build summary of what the plugin detected: imported Carbon
+   * components, allowlist size and its sources (module scan, `content`,
+   * `safelist`), and per-asset results. Independent of `silent`.
+   * @default false
+   */
+  report?: boolean;
+
+  /**
    * By default, pre-compiled Carbon StyleSheets ship `@font-face` rules
    * for all available IBM Plex fonts, many of which are not actually
    * used in Carbon Svelte components.
@@ -140,9 +148,11 @@ function buildUsage(
 ): {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
+  components: string[];
 } {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
-  const components = getComponents();
+  const componentIndex = getComponents();
+  const usedComponents = new Set<string>();
   let preserveFlatpickr = false;
 
   for (const id of ids) {
@@ -152,8 +162,9 @@ function buildUsage(
       preserveFlatpickr = true;
     }
 
-    if (name in components) {
-      for (const cls of components[name].classes) {
+    if (name in componentIndex) {
+      usedComponents.add(name);
+      for (const cls of componentIndex[name].classes) {
         allowlist.add(cls);
       }
     }
@@ -163,7 +174,11 @@ function buildUsage(
     allowlist.add(cls);
   }
 
-  return { allowlist, preserveFlatpickr };
+  return {
+    allowlist,
+    preserveFlatpickr,
+    components: [...usedComponents].sort(),
+  };
 }
 
 /**
@@ -189,7 +204,7 @@ function toCssString(source: CreateOptimizedCssOptions["source"]): string {
 export function createCssOptimizer(
   options: Omit<CreateOptimizedCssOptions, "source">,
 ) {
-  const { allowlist, preserveFlatpickr } = buildUsage(
+  const { allowlist, preserveFlatpickr, components } = buildUsage(
     options.ids,
     options.contentClasses,
   );
@@ -201,6 +216,7 @@ export function createCssOptimizer(
   };
 
   return {
+    usage: { components, allowlistSize: allowlist.size },
     // Second argument is unused now that the scanner never falls back to
     // PostCSS (it only ever needed `from` for PostCSS's own `Input`
     // bookkeeping); kept in the signature since the Vite/webpack plugins
