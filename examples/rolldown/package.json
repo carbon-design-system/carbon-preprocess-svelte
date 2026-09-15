@@ -2,12 +2,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "rolldown -c -w",
-    "build": "NODE_ENV=production rolldown -c"
+    "dev": "mkdir -p public && (rolldown -c -w & deserved public --watch --open)",
+    "build": "NODE_ENV=production rolldown -c",
+    "preview": "deserved public --open"
   },
   "devDependencies": {
     "carbon-components-svelte": "latest",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "deserved": "latest",
     "rolldown": "latest",
     "rollup-plugin-css-only": "latest",
     "rollup-plugin-svelte": "latest",
