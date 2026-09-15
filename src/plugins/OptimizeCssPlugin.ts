@@ -153,11 +153,12 @@ export default class OptimizeCssPlugin {
             stage: Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE,
           },
           async (assets) => {
-            // Warn (not `silent`-suppressible) and skip processing if no
-            // Carbon Svelte imports are found; that's almost always a
-            // misconfiguration.
+            // Skip processing if no Carbon Svelte imports are found; that's
+            // almost always a misconfiguration, so warn unless silenced.
             if (ids.size === 0) {
-              compilation.warnings.push(new WebpackError(NO_CARBON_IMPORTS));
+              if (!isSilent(this.options)) {
+                compilation.warnings.push(new WebpackError(NO_CARBON_IMPORTS));
+              }
               return;
             }
 

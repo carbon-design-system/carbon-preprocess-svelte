@@ -148,6 +148,19 @@ describe("OptimizeCssPlugin", () => {
     expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
   });
 
+  test("silent suppresses the no-imports warning", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => "body { color: red; }" } },
+      moduleResources: [],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    expect(mockCompiler.compilation.warnings).toEqual([]);
+  });
+
   test("processes CSS files when Carbon Svelte imports are found", async () => {
     const plugin = new OptimizeCssPlugin();
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;

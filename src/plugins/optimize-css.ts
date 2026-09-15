@@ -82,10 +82,10 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * Mutating `file.source` directly updates the bundle output in-place.
      */
     async generateBundle(_, bundle) {
-      // Warn (not `silent`-suppressible) and skip processing if no Carbon
-      // Svelte imports are found; that's almost always a misconfiguration.
+      // Skip processing if no Carbon Svelte imports are found; that's
+      // almost always a misconfiguration, so warn unless silenced.
       if (ids.size === 0) {
-        this.warn(NO_CARBON_IMPORTS);
+        if (!silent) this.warn(NO_CARBON_IMPORTS);
         return;
       }
 

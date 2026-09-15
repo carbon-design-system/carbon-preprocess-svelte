@@ -47,7 +47,7 @@ describe("optimizeCss (Vite plugin)", () => {
     // same plugin instance across rebuilds. If tracked ids aren't reset, a
     // component removed from the app in a later rebuild still keeps its CSS
     // classes alive, silently degrading optimization over time.
-    const plugin = optimizeCss({ silent: true });
+    const plugin = optimizeCss();
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
 
@@ -256,7 +256,7 @@ describe("optimizeCss (Vite plugin)", () => {
   });
 
   test("warns when no Carbon component was imported", async () => {
-    const plugin = optimizeCss({ silent: true });
+    const plugin = optimizeCss();
     const cssContent = ".bx--btn { color: blue }";
     const ctx = { warn: jest.fn() };
 
@@ -270,5 +270,20 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(ctx.warn).toHaveBeenCalledTimes(1);
     expect(ctx.warn).toHaveBeenCalledWith(NO_CARBON_IMPORTS);
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+  });
+
+  test("silent suppresses the no-imports warning", async () => {
+    const plugin = optimizeCss({ silent: true });
+    const cssContent = ".bx--btn { color: blue }";
+    const ctx = { warn: jest.fn() };
+
+    // @ts-expect-error
+    await plugin.buildStart();
+
+    const bundle = makeCssBundle(cssContent);
+    // @ts-expect-error
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(ctx.warn).not.toHaveBeenCalled();
   });
 });
