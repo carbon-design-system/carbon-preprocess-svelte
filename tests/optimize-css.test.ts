@@ -13,6 +13,7 @@ type OutputAsset = Rollup.OutputAsset;
 type OutputBundle = Rollup.OutputBundle;
 
 const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+const SIZE_BLOCK_HEADER = /^\n\nOptimized styles\.css\nBefore: /;
 
 function makeCssBundle(source: string): OutputBundle {
   return {
@@ -24,7 +25,10 @@ function makeCssBundle(source: string): OutputBundle {
 }
 
 type ResolvedPlugin = {
-  configResolved: (config: { root: string }) => void;
+  configResolved: (config: {
+    root: string;
+    logger?: { info: (message: string) => void };
+  }) => void;
   buildStart: () => Promise<void>;
   transform: (code: string, id: string) => void;
   generateBundle: (
@@ -39,6 +43,10 @@ function resolvePlugin(plugin: Rollup.Plugin): ResolvedPlugin {
 }
 
 describe("optimizeCss (Vite plugin)", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test("prunes unused Carbon classes when a component is imported", async () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     const cssContent = `.bx--btn { color: blue }
@@ -442,5 +450,61 @@ describe("optimizeCss (Vite plugin)", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("uses Vite's logger when configResolved ran", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = resolvePlugin(optimizeCss());
+    const logger = { info: jest.fn() };
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
+
+    await plugin.buildStart();
+    plugin.configResolved({ root: process.cwd(), logger });
+    plugin.transform("", carbonComponent);
+
+    const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(logger.info).toHaveBeenCalledTimes(1);
+    const [message] = logger.info.mock.calls[0];
+    expect(message).toMatch(SIZE_BLOCK_HEADER);
+    expect(message).toContain("\nAfter:  ");
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  test("falls back to console.log without Vite", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const plugin = resolvePlugin(optimizeCss());
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+
+    const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(consoleSpy).toHaveBeenCalledTimes(4);
+    expect(consoleSpy.mock.calls[1]).toEqual(["Optimized", "styles.css"]);
+  });
+
+  test("silent suppresses the logger path too", async () => {
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    const logger = { info: jest.fn() };
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
+
+    await plugin.buildStart();
+    plugin.configResolved({ root: process.cwd(), logger });
+    plugin.transform("", carbonComponent);
+
+    const bundle = makeCssBundle(cssContent);
+    const ctx = { warn: jest.fn() };
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(logger.info).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,7 @@ import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
 } from "./messages";
-import { printDiff } from "./print-diff";
+import { formatDiff, printDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
 import { printReport } from "./print-report";
 import { collectCarbonTokens, scanContent } from "./scan-content";
@@ -34,6 +34,13 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
    */
   const ids = new Set<string>();
   let root = process.cwd();
+  /**
+   * Set by `configResolved`, which only Vite calls—not plain Rollup or
+   * Rolldown—so this stays `undefined` there and the `printDiff` console
+   * fallback below is used instead. Rollup's CLI writes plugin logs to
+   * stderr, which would move the size block off stdout.
+   */
+  let logInfo: ((message: string) => void) | undefined;
   /** Classes from `content` globs. Cached after first scan. */
   let contentClasses: string[] | undefined;
   /** Literal `bx--` classes found while scanning bundled module code. */
@@ -49,6 +56,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      */
     configResolved(config) {
       root = config.root;
+      if (config.logger) {
+        logInfo = (message) => config.logger.info(message);
+      }
     },
     /**
      * Runs once before any module is transformed. Resets state tracked from
@@ -134,7 +144,14 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
             if (options?.dryRun) {
               console.log(`Dry run: ${id} left unchanged`);
             }
-            printDiff({ original_css, optimized_css, id });
+            // Not `this.info`: it prefixes the plugin name, is absent on
+            // Rollup 2 contexts, and writes to stderr under the Rollup CLI.
+            if (logInfo) {
+              const block = formatDiff({ original_css, optimized_css, id });
+              if (block !== null) logInfo(block);
+            } else {
+              printDiff({ original_css, optimized_css, id });
+            }
           }
 
           if (options?.report) {
