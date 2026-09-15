@@ -26,7 +26,7 @@ bun add -D carbon-preprocess-svelte
 ## Usage
 
 - [**optimizeImports**](#optimizeimports): Svelte preprocessor that rewrites Carbon Svelte imports to their source path in the `script` block, making development compile times dramatically faster.
-- [**optimizeCss**](#optimizecss): Vite/Rollup plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
+- [**optimizeCss**](#optimizecss): Vite/Rollup/Rolldown plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
 - [**OptimizeCssPlugin**](#optimizecssplugin): The corresponding `optimizeCss` plugin for Webpack and Rspack that removes unused Carbon styles.
 
 ### `optimizeImports`
@@ -182,7 +182,7 @@ export default {
 
 ### `optimizeCss`
 
-`optimizeCss` is a Vite plugin that removes unused Carbon styles at build time. The plugin is compatible with Rollup ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
+`optimizeCss` is a Vite plugin that removes unused Carbon styles at build time. The plugin is compatible with Rollup and [Rolldown](https://rolldown.rs), which implement the same plugin API ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
 
 <details>
 <summary>How it works</summary>
@@ -274,6 +274,28 @@ import svelte from "rollup-plugin-svelte";
 import { optimizeCss } from "carbon-preprocess-svelte";
 
 const production = !process.env.ROLLUP_WATCH;
+
+export default {
+  plugins: [
+    svelte({
+      preprocess: [optimizeImports()],
+    }),
+
+    // Only apply the plugin when building for production.
+    production && optimizeCss(),
+  ],
+};
+```
+
+#### Rolldown
+
+See [examples/rolldown](examples/rolldown).
+
+```js
+// rolldown.config.ts
+import { optimizeCss, optimizeImports } from "carbon-preprocess-svelte";
+
+const production = process.env.NODE_ENV === "production";
 
 export default {
   plugins: [

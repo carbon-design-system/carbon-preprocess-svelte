@@ -182,7 +182,7 @@ Shared helpers (`buildAllowlist`, `matchesAllowlist`, `shouldKeepStrictSelector`
 
 The examples are real downstream consumers, each linking the package via `"carbon-preprocess-svelte": "link:carbon-preprocess-svelte"`:
 
-- `examples/rollup`, `examples/vite`, `examples/vite@svelte-5`, `examples/sveltekit`: Vite/Rollup plugin path
+- `examples/rollup`, `examples/rolldown`, `examples/vite`, `examples/vite@svelte-5`, `examples/sveltekit`: Vite/Rollup plugin path
 - `examples/webpack`, `examples/webpack@svelte-5`: Webpack plugin path
 - `examples/rspack`: Rspack plugin path, using the same `OptimizeCssPlugin` export as Webpack
 
