@@ -3,6 +3,7 @@ import {
   encodeComponentIndex,
 } from "../src/component-index-codec";
 import { buildComponentIndex } from "../src/indexer/build-index";
+import { diffComponentIndex } from "./diff-component-index";
 
 /**
  * Proven exceptions when automation misses on a Carbon bump. Prefer updating
@@ -39,6 +40,23 @@ const decoded = decodeComponentIndex(encoded);
 if (JSON.stringify(decoded) !== JSON.stringify(components)) {
   throw new Error(
     "Encoded component index does not round-trip; see src/component-index-codec.ts.",
+  );
+}
+
+// The packed file's git diff says nothing useful, so report what actually
+// changed against the checked-in index (best effort: a missing or broken
+// file just skips the report).
+const previous = await import("../src/component-index")
+  .then((module) => module.components)
+  .catch(() => undefined);
+if (previous) {
+  const diff = diffComponentIndex(previous, decoded);
+  console.log(
+    diff.length === 0
+      ? "[index] no changes"
+      : ["[index] changes:", ...diff.map((line) => `[index] ${line}`)].join(
+          "\n",
+        ),
   );
 }
 
