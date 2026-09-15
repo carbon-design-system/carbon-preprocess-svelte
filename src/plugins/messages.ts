@@ -1,3 +1,5 @@
+import type { ContentScan } from "./scan-content";
+
 /** Prefix for every warning either plugin raises, so users can grep for it. */
 export const WARN_PREFIX = "carbon-preprocess-svelte:";
 
@@ -19,4 +21,21 @@ export function contentGlobFailed(
   error: string,
 ): string {
   return `${WARN_PREFIX} \`content\` globs ${JSON.stringify(content)} could not be expanded (resolved from ${root}): ${error}. No classes from \`content\` were kept.`;
+}
+
+/**
+ * Warning for a failed or empty `content` scan. Returns `undefined` when
+ * `content` was omitted or the globs matched at least one file.
+ */
+export function contentScanWarning(
+  content: readonly string[] | undefined,
+  root: string,
+  scan: ContentScan,
+): string | undefined {
+  if (!content || content.length === 0) return undefined;
+  if (scan.error !== undefined) {
+    return contentGlobFailed(content, root, scan.error);
+  }
+  if (scan.matchedFiles === 0) return contentMatchedNothing(content, root);
+  return undefined;
 }

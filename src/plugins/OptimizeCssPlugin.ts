@@ -3,15 +3,12 @@ import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
-import {
-  contentGlobFailed,
-  contentMatchedNothing,
-  NO_CARBON_IMPORTS,
-} from "./messages";
-import { printDiff } from "./print-diff";
+import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
+import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
-import { printReport } from "./print-report";
+import { printReport, toAssetReport } from "./print-report";
 import { collectCarbonTokens, scanContent } from "./scan-content";
+import { hasOptimizableCss } from "./strict-css-optimizer";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
@@ -78,8 +75,8 @@ type WebpackCompiler = {
  * 1. During module processing, it collects all Carbon Svelte component file paths
  *    by inspecting each module's `resource` in the `finishModules` hook, which
  *    fires once every module in the graph has resolved.
- * 2. During asset processing, it uses PostCSS to strip CSS rules that don't match
- *    any classes used by the collected components.
+ * 2. During asset processing, it splices out CSS rules that don't match any
+ *    classes used by the collected components.
  *
  * This can dramatically reduce CSS bundle size since Carbon's full stylesheet
  * includes styles for all components, but apps typically use only a subset.
@@ -106,12 +103,17 @@ export default class OptimizeCssPlugin {
         WebpackError,
       },
     } = compiler;
+    const options = this.options;
+    const silent = isSilent(options);
 
     compiler.hooks.thisCompilation.tap(
       OptimizeCssPlugin.name,
       (compilation) => {
         const ids = new Set<string>();
         const moduleClasses = new Set<string>();
+        const warn = (message: string) => {
+          if (!silent) compilation.warnings.push(new WebpackError(message));
+        };
 
         /**
          * `finishModules` fires once every module in the graph has resolved,
@@ -131,7 +133,7 @@ export default class OptimizeCssPlugin {
               }
 
               if (
-                this.options.scanModules !== false &&
+                options.scanModules !== false &&
                 isScannableModule(resource)
               ) {
                 let source: string | Buffer | undefined;
@@ -159,93 +161,73 @@ export default class OptimizeCssPlugin {
             stage: Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE,
           },
           async (assets) => {
-            // Skip processing if no Carbon Svelte imports are found; that's
-            // almost always a misconfiguration, so warn unless silenced.
+            const cssIds = Object.keys(assets).filter(isCssFile);
+
             if (ids.size === 0) {
-              if (!isSilent(this.options)) {
-                compilation.warnings.push(new WebpackError(NO_CARBON_IMPORTS));
-              }
+              // Warn only when this compiler emitted Carbon CSS. A second
+              // compiler in a multi-config setup that never imports Carbon
+              // has nothing to prune.
+              const hasCarbonCss = cssIds.some((id) =>
+                hasOptimizableCss(assets[id].source().toString()),
+              );
+              if (hasCarbonCss) warn(NO_CARBON_IMPORTS);
               return;
             }
 
-            if (this.options.experimental?.liveIndex) {
+            if (options.experimental?.liveIndex) {
               setComponents(await ensureLiveComponentIndex());
             }
 
-            const scan = scanContent(this.options.content, compiler.context);
-
-            if (
-              !isSilent(this.options) &&
-              this.options.content &&
-              this.options.content.length > 0
-            ) {
-              if (scan.error !== undefined) {
-                compilation.warnings.push(
-                  new WebpackError(
-                    contentGlobFailed(
-                      this.options.content,
-                      compiler.context,
-                      scan.error,
-                    ),
-                  ),
-                );
-              } else if (scan.matchedFiles === 0) {
-                compilation.warnings.push(
-                  new WebpackError(
-                    contentMatchedNothing(
-                      this.options.content,
-                      compiler.context,
-                    ),
-                  ),
-                );
-              }
-            }
+            const scan = scanContent(options.content, compiler.context);
+            const warning = contentScanWarning(
+              options.content,
+              compiler.context,
+              scan,
+            );
+            if (warning) warn(warning);
 
             const contentClasses = scan.classes;
             const optimizer = createCssOptimizer({
-              ...this.options,
+              ...options,
               ids,
               contentClasses: [...contentClasses, ...moduleClasses],
             });
             const assetReports: AssetReport[] = [];
 
-            for (const id of Object.keys(assets).filter(isCssFile)) {
+            for (const id of cssIds) {
               const original_css = assets[id].source().toString();
-              const { css: optimized_css, removed } = optimizer.run(
-                original_css,
-                id,
-              );
+              const { css: optimized_css, removed } =
+                optimizer.run(original_css);
 
-              if (!this.options.dryRun) {
+              if (!options.dryRun) {
                 compilation.updateAsset(id, new RawSource(optimized_css));
               }
 
-              if (!isSilent(this.options) && removed > 0) {
-                if (this.options.dryRun) {
-                  console.log(`Dry run: ${id} left unchanged`);
-                }
-                printDiff({ original_css, optimized_css, id });
+              if (!silent && removed > 0) {
+                logAssetDiff({
+                  original_css,
+                  optimized_css,
+                  id,
+                  dryRun: options.dryRun,
+                });
               }
 
-              if (this.options.report) {
-                assetReports.push({
-                  id,
-                  removed,
-                  beforeBytes: Buffer.byteLength(original_css),
-                  afterBytes: Buffer.byteLength(optimized_css),
-                });
+              if (options.report) {
+                assetReports.push(
+                  toAssetReport(id, original_css, optimized_css, removed),
+                );
               }
             }
 
-            if (this.options.report) {
+            if (options.report) {
               printReport({
                 components: optimizer.usage.components,
                 allowlistSize: optimizer.usage.allowlistSize,
                 moduleTokens: moduleClasses.size,
                 contentTokens: contentClasses.length,
-                safelistEntries: this.options.safelist?.length ?? 0,
+                safelistEntries: options.safelist?.length ?? 0,
                 assets: assetReports,
-                dryRun: this.options.dryRun,
+                dryRun: options.dryRun,
               });
             }
           },

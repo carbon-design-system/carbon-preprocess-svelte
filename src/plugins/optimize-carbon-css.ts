@@ -6,15 +6,8 @@ import {
   optimizeCssWithReport,
   toCssString,
 } from "./create-optimized-css";
-import { collectCarbonTokens, scanContentClasses } from "./scan-content";
+import { collectCarbonTokens, scanContent } from "./scan-content";
 
-/**
- * Bundler-agnostic entry point for the CSS optimizer. `optimizeCss` (Vite)
- * and `OptimizeCssPlugin` (Webpack/Rspack) are thin adapters over this same
- * core: they collect `ids`/`contentClasses` from bundler hooks and call
- * `optimizeCssWithReport`. This function does the same job for any other
- * build tool, with the caller supplying the used components directly.
- */
 type OptimizeCarbonCssOptions = Pick<
   OptimizeCssOptions,
   "safelist" | "content" | "preserveAllIBMFonts" | "experimental"
@@ -36,6 +29,13 @@ type OptimizeCarbonCssOptions = Pick<
   cwd?: string;
 };
 
+/**
+ * Bundler-agnostic entry point for the CSS optimizer. `optimizeCss` (Vite)
+ * and `OptimizeCssPlugin` (Webpack/Rspack) are thin adapters over this same
+ * core: they collect `ids`/`contentClasses` from bundler hooks and call
+ * `optimizeCssWithReport`. This function does the same job for any other
+ * build tool, with the caller supplying the used components directly.
+ */
 export async function optimizeCarbonCss(
   css: string | Uint8Array,
   options: OptimizeCarbonCssOptions,
@@ -50,7 +50,7 @@ export async function optimizeCarbonCss(
   }
 
   const contentClasses = new Set(
-    scanContentClasses(options.content, options.cwd),
+    scanContent(options.content, options.cwd).classes,
   );
   for (const source of options.sources ?? []) {
     collectCarbonTokens(source, contentClasses);

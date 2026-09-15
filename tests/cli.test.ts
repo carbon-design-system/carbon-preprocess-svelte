@@ -12,9 +12,8 @@ import { join } from "node:path";
 const CLI_PATH = join(import.meta.dirname, "../src/cli.ts");
 
 /**
- * A minimal project: one Svelte file importing `Button` from the barrel, and
- * a built CSS asset with one class each component would keep (`.bx--btn`)
- * and drop (`.bx--accordion`), so a run's effect is visible either way.
+ * Temp project with one Svelte file that imports `Button`, plus a CSS file
+ * that has `.bx--btn` (kept) and `.bx--accordion` (dropped).
  */
 function createTempProject(): string {
   const dir = mkdtempSync(join(tmpdir(), "cps-cli-"));

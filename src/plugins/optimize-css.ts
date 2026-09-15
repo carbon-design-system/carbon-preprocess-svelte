@@ -1,18 +1,34 @@
-import type { Plugin } from "vite";
+import type { Plugin, Rollup } from "vite";
 import { setComponents } from "../component-index-registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createCssOptimizer, isSilent } from "./create-optimized-css";
 import {
-  contentGlobFailed,
-  contentMatchedNothing,
-  NO_CARBON_IMPORTS,
-} from "./messages";
-import { formatDiff, printDiff } from "./print-diff";
+  createCssOptimizer,
+  isSilent,
+  toCssString,
+} from "./create-optimized-css";
+import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
+import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
-import { printReport } from "./print-report";
+import { printReport, toAssetReport } from "./print-report";
 import { collectCarbonTokens, scanContent } from "./scan-content";
+import { hasOptimizableCss } from "./strict-css-optimizer";
+
+/** True if any emitted CSS asset has Carbon rules the optimizer can prune. */
+function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
+  for (const id in bundle) {
+    const file = bundle[id];
+    if (
+      file.type === "asset" &&
+      isCssFile(id) &&
+      hasOptimizableCss(toCssString(file.source))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Vite/Rollup plugin that removes unused Carbon CSS classes from production builds.
@@ -35,9 +51,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const ids = new Set<string>();
   let root = process.cwd();
   /**
-   * Set by `configResolved`, which only Vite calls—not plain Rollup or
-   * Rolldown—so this stays `undefined` there and the `printDiff` console
-   * fallback below is used instead. Rollup's CLI writes plugin logs to
+   * Set by `configResolved`, which only Vite calls. Plain Rollup and
+   * Rolldown never call it, so this stays `undefined` and `printDiff`
+   * writes to the console instead. Rollup's CLI writes plugin logs to
    * stderr, which would move the size block off stdout.
    */
   let logInfo: ((message: string) => void) | undefined;
@@ -56,9 +72,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      */
     configResolved(config) {
       root = config.root;
-      if (config.logger) {
-        logInfo = (message) => config.logger.info(message);
-      }
+      // Not `this.info`: it prefixes the plugin name, is absent on Rollup 2
+      // contexts, and writes to stderr under the Rollup CLI.
+      logInfo = (message) => config.logger.info(message);
     },
     /**
      * Runs once before any module is transformed. Resets state tracked from
@@ -94,28 +110,21 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     },
     /**
      * generateBundle runs after all chunks and assets have been created.
-     * We iterate through CSS assets and run PostCSS to remove unused rules.
-     * Mutating `file.source` directly updates the bundle output in-place.
+     * Splices unused Carbon rules out of CSS assets. Mutating
+     * `file.source` updates the bundle output in place.
      */
     async generateBundle(_, bundle) {
-      // Skip processing if no Carbon Svelte imports are found; that's
-      // almost always a misconfiguration, so warn unless silenced.
       if (ids.size === 0) {
-        if (!silent) this.warn(NO_CARBON_IMPORTS);
+        // Warn only when this build emitted Carbon CSS. A secondary build
+        // that never imports Carbon has nothing to prune.
+        if (!silent && hasCarbonCss(bundle)) this.warn(NO_CARBON_IMPORTS);
         return;
       }
 
       if (contentClasses === undefined) {
         const scan = scanContent(options?.content, root);
-
-        if (!silent && options?.content && options.content.length > 0) {
-          if (scan.error !== undefined) {
-            this.warn(contentGlobFailed(options.content, root, scan.error));
-          } else if (scan.matchedFiles === 0) {
-            this.warn(contentMatchedNothing(options.content, root));
-          }
-        }
-
+        const warning = contentScanWarning(options?.content, root, scan);
+        if (!silent && warning) this.warn(warning);
         contentClasses = scan.classes;
       }
 
@@ -131,39 +140,26 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
         if (file.type === "asset" && isCssFile(id)) {
           const original_css = file.source;
-          const { css: optimized_css, removed } = optimizer.run(
-            original_css,
-            id,
-          );
+          const { css: optimized_css, removed } = optimizer.run(original_css);
 
           if (!options?.dryRun) {
             file.source = optimized_css;
           }
 
           if (!silent && removed > 0) {
-            if (options?.dryRun) {
-              console.log(`Dry run: ${id} left unchanged`);
-            }
-            // Not `this.info`: it prefixes the plugin name, is absent on
-            // Rollup 2 contexts, and writes to stderr under the Rollup CLI.
-            if (logInfo) {
-              const block = formatDiff({ original_css, optimized_css, id });
-              if (block !== null) logInfo(block);
-            } else {
-              printDiff({ original_css, optimized_css, id });
-            }
+            logAssetDiff({
+              original_css,
+              optimized_css,
+              id,
+              dryRun: options?.dryRun,
+              log: logInfo,
+            });
           }
 
           if (options?.report) {
-            assetReports.push({
-              id,
-              removed,
-              beforeBytes:
-                typeof original_css === "string"
-                  ? Buffer.byteLength(original_css)
-                  : original_css.byteLength,
-              afterBytes: Buffer.byteLength(optimized_css),
-            });
+            assetReports.push(
+              toAssetReport(id, original_css, optimized_css, removed),
+            );
           }
         }
       }

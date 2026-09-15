@@ -1,4 +1,11 @@
 import { BITS_DENOM } from "../constants";
+import { toCssString } from "./create-optimized-css";
+
+export type AssetDiff = {
+  original_css: Uint8Array | string;
+  optimized_css: string;
+  id: string;
+};
 
 const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
@@ -35,16 +42,13 @@ function padIfNeeded(a: string, b: string) {
 
 /**
  * Computes the display strings shared by `printDiff` and `formatDiff`.
- * Returns `null` when sizes are equal—this indicates either no Carbon CSS
- * was present, or all detected components' styles were preserved.
+ * Returns `null` when sizes are equal. That means no Carbon CSS was
+ * present, or every detected component's styles were kept.
  */
-function measure(props: {
-  original_css: Uint8Array | Buffer | string;
-  optimized_css: string;
-}) {
+function measure(props: Omit<AssetDiff, "id">) {
   const { original_css, optimized_css } = props;
 
-  const original_size = stringSizeInKB(original_css.toString());
+  const original_size = stringSizeInKB(toCssString(original_css));
   const optimized_size = stringSizeInKB(optimized_css);
 
   if (original_size === optimized_size) {
@@ -67,11 +71,7 @@ function measure(props: {
  * Silently returns if no size change occurred (e.g., when the CSS contains
  * no Carbon styles or all Carbon components are in use).
  */
-export function printDiff(props: {
-  original_css: Uint8Array | Buffer | string;
-  optimized_css: string;
-  id: string;
-}) {
+export function printDiff(props: AssetDiff) {
   const { id } = props;
   const result = measure(props);
 
@@ -93,11 +93,7 @@ export function printDiff(props: {
  * lets a host logger (Vite's `config.logger`) emit it as a single message,
  * which keeps the block intact for anything parsing the output.
  */
-export function formatDiff(props: {
-  original_css: Uint8Array | Buffer | string;
-  optimized_css: string;
-  id: string;
-}): string | null {
+export function formatDiff(props: AssetDiff): string | null {
   const { id } = props;
   const result = measure(props);
 
@@ -108,4 +104,27 @@ export function formatDiff(props: {
   const { original_display, optimized_display, diff } = result;
 
   return `\n\nOptimized ${id}\nBefore: ${original_display}\nAfter:  ${optimized_display} (-${diff})\n`;
+}
+
+/**
+ * Logs the dry-run notice and size block for one asset. Plugins and the CLI
+ * share this. When `log` is set, both go through that function, which Vite
+ * sets to `config.logger.info`. Otherwise `printDiff` writes to the console
+ * so the block's bytes match on every bundler.
+ */
+export function logAssetDiff(
+  props: AssetDiff & { dryRun?: boolean; log?: (message: string) => void },
+): void {
+  const { dryRun, log, ...diff } = props;
+
+  if (dryRun) {
+    (log ?? console.log)(`Dry run: ${diff.id} left unchanged`);
+  }
+
+  if (log) {
+    const block = formatDiff(diff);
+    if (block !== null) log(block);
+  } else {
+    printDiff(diff);
+  }
 }

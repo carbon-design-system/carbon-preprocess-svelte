@@ -54,10 +54,10 @@ async function buildProject() {
     return;
   }
 
-  // `svelte/compiler` must only ever be reached through the live index's
-  // dynamic import (see src/indexer/svelte-parser.ts). A static import here
-  // would make every consumer pay for it at module load. Checks every
-  // emitted file since splitting can move code into shared chunks.
+  // `svelte/compiler` is loaded only through the live index's dynamic import
+  // (see src/indexer/svelte-parser.ts). A static import would load it when
+  // any consumer loads this package. Scan every emitted file because code
+  // splitting can put the import in a shared chunk.
   const distFiles = await readdir("./dist");
   const jsFiles = distFiles.filter((file) => JS_FILE.test(file));
   const bundles = await Promise.all(
@@ -77,7 +77,8 @@ async function buildProject() {
     return;
   }
 
-  // Bun.build strips the shebang, so it's re-added and the file made executable.
+  // `src/cli.ts` has no shebang so tests can import it as a module.
+  // The published binary gets one here.
   const cliPath = resolve("./dist/cli.js");
   const cli = await readFile(cliPath, "utf8");
   await writeFile(cliPath, SHEBANG + cli);

@@ -6,7 +6,6 @@ const sizeFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-/** Separates columns in the per-asset table; also fills the padding gap. */
 const COLUMN_GAP = "   ";
 
 export type AssetReport = {
@@ -25,6 +24,24 @@ export type OptimizeCssReportInput = {
   assets: AssetReport[];
   dryRun?: boolean;
 };
+
+/** Byte counts for one asset, from a string or Uint8Array source. */
+export function toAssetReport(
+  id: string,
+  original_css: Uint8Array | string,
+  optimized_css: string,
+  removed: number,
+): AssetReport {
+  return {
+    id,
+    removed,
+    beforeBytes:
+      typeof original_css === "string"
+        ? Buffer.byteLength(original_css)
+        : original_css.byteLength,
+    afterBytes: Buffer.byteLength(optimized_css),
+  };
+}
 
 function toKB(bytes: number): string {
   return `${sizeFormatter.format(bytes / BITS_DENOM)} kB`;

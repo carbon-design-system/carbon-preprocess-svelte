@@ -1,6 +1,7 @@
 import {
   CarbonSvelte,
   RE_EXT_CSS,
+  RE_EXT_STYLESHEET,
   RE_EXT_SVELTE,
   RE_MODULE_QUERY,
   RE_STYLE_QUERY,
@@ -25,15 +26,15 @@ export function stripQuery(id: string): string {
 
 /**
  * Whether a bundled module's code should be scanned for literal `bx--`
- * tokens. Skips virtual modules (`\0` prefix), CSS modules (their `bx--`
- * selectors are the thing being pruned, not evidence of use), and anything
- * inside `carbon-components-svelte` itself (the component index already
- * covers Carbon's own sources more precisely than a token scan would).
+ * tokens. Skips virtual modules (`\0` prefix), stylesheets of any flavor
+ * (see `RE_EXT_STYLESHEET`), Svelte `<style>` sub-modules, and files inside
+ * `carbon-components-svelte`. The component index already covers Carbon's
+ * own sources more precisely than a token scan.
  */
 export function isScannableModule(id: string): boolean {
   if (id.startsWith("\0")) return false;
-  if (isCssFile(stripQuery(id)) || isCssFile(id)) return false;
-  if (RE_STYLE_QUERY.test(id)) return false;
-  if (id.includes(CarbonSvelte.Components)) return false;
-  return true;
+  if (RE_EXT_STYLESHEET.test(stripQuery(id)) || RE_STYLE_QUERY.test(id)) {
+    return false;
+  }
+  return !id.includes(CarbonSvelte.Components);
 }

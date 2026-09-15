@@ -6,10 +6,7 @@ import {
   createCssOptimizer,
   optimizeCssWithReport,
 } from "../src/plugins/create-optimized-css";
-import {
-  collectCarbonTokens,
-  scanContentClasses,
-} from "../src/plugins/scan-content";
+import { collectCarbonTokens, scanContent } from "../src/plugins/scan-content";
 import { collectCarbonImports } from "../src/plugins/scan-imports";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
 
@@ -76,24 +73,24 @@ const SAFELIST_REGEXPS = [/^\.bx--btn--/, /bx--tag/];
 // Every CSS asset in a build goes through `run`, not just the Carbon theme.
 // These cover each branch of that call: the no-Carbon skip, the splice path
 // on a mixed asset, the splice path on an asset with `@layer`, and the
-// raw-bytes input Vite hands over for emitted assets.
+// Uint8Array source like Vite emits for CSS assets.
 group("per-asset paths (small bundle)", () => {
   const optimizer = createCssOptimizer({ ids: BUNDLE_IDS, silent: true });
 
   task("non-Carbon chunk (skip, ~25kb)", () => {
-    optimizer.run(APP_CHUNK, "chunk.css");
+    optimizer.run(APP_CHUNK);
   });
 
   task("Carbon + app CSS (splice)", () => {
-    optimizer.run(CARBON_PLUS_APP, "index.css");
+    optimizer.run(CARBON_PLUS_APP);
   });
 
   task("Carbon + @layer (splice)", () => {
-    optimizer.run(CARBON_PLUS_LAYER, "index.css");
+    optimizer.run(CARBON_PLUS_LAYER);
   });
 
   task("Carbon as Uint8Array", () => {
-    optimizer.run(SOURCE_BYTES, "index.css");
+    optimizer.run(SOURCE_BYTES);
   });
 });
 
@@ -155,14 +152,14 @@ group("full build (small bundle, 4 assets)", () => {
 
   task("createCssOptimizer + run each asset", () => {
     const optimizer = createCssOptimizer({ ids: BUNDLE_IDS, silent: true });
-    for (const [id, css] of assets) {
-      optimizer.run(css, id);
+    for (const [_id, css] of assets) {
+      optimizer.run(css);
     }
   });
 });
 
 /**
- * `.bx--*` tokens as `scanContentClasses` would find them in app markup:
+ * `.bx--*` tokens as `scanContent` would find them in app markup:
  * a few hundred distinct tokens, some of them `-` prefixes.
  */
 const CONTENT_CLASSES = Array.from({ length: 300 }, (_, i) =>
@@ -187,8 +184,8 @@ for (let i = 0; i < 200; i++) {
 group(
   "content scan",
   () => {
-    task("scanContentClasses (200 files)", () => {
-      scanContentClasses([join(contentDir, "*.svelte")]);
+    task("scanContent (200 files)", () => {
+      scanContent([join(contentDir, "*.svelte")]);
     });
   },
   {
