@@ -10,9 +10,10 @@
 
 ```sh
 bun run bench          # all three
-bun run bench:css
-bun run bench:imports
-bun run bench:index
+
+ostia bench bench/optimize-css.bench.ts
+ostia bench bench/optimize-imports.bench.ts
+ostia bench bench/build-index.bench.ts
 
 ostia bench bench/optimize-imports.bench.ts --filter "medium|large"  # run a subset by group/name
 ```
@@ -21,5 +22,5 @@ ostia bench bench/optimize-imports.bench.ts --filter "medium|large"  # run a sub
 
 - Numbers are machine-relative, not absolute. Use them to compare before/after a change on the same machine, not across machines.
 - `optimize-css` and `build-index` don't mutate shared state between iterations (each call gets a fresh allowlist / index), so results aren't skewed by warm caches inside the library itself — only by the OS file cache for `build-index`.
-- When investigating a regression, run the relevant `bench:*` script before and after your change and compare `Median`/`Range`. `--export-json before.json` on the baseline and `ostia compare before.json after.json` gives a noise-aware verdict; `--cpu` adds a hotspot list per task.
+- When investigating a regression, run the relevant file with `ostia bench` before and after your change and compare `Median`/`Range`. `--export-json before.json` on the baseline and `ostia compare before.json after.json` gives a noise-aware verdict; `--cpu` adds a hotspot list per task.
 - `--alloc` reports retained heap per call after a forced GC, which is near zero for these tasks (nothing survives a call); it does not measure allocation volume.
