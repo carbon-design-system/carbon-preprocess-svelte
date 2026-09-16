@@ -239,7 +239,7 @@ function rollupDts(entryDts: string, emitted: Map<string, string>): string {
       } else if (EXPORT_RE.test(text)) {
         text = text.replace(EXPORT_PREFIX_RE, "");
       }
-      chunks.push(decl.leadingComment + rewriteInlineImportTypes(text));
+      chunks.push(rewriteInlineImportTypes(text));
       continue;
     }
 
