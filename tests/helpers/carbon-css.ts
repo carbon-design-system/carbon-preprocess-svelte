@@ -139,7 +139,7 @@ export function buildAllowlist(ids: string[]): Set<string> {
 }
 
 /** Classes owned by more than one component (e.g. `.bx--skeleton`). */
-export const sharedClasses: Set<string> = (() => {
+const sharedClasses: Set<string> = (() => {
   const counts = new Map<string, number>();
 
   for (const component of Object.values(components)) {
