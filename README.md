@@ -29,7 +29,7 @@ bun add -D carbon-preprocess-svelte
 - [**optimizeCss**](#optimizecss): Vite/Rollup/Rolldown plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
 - [**OptimizeCssPlugin**](#optimizecssplugin): The corresponding `optimizeCss` plugin for Webpack and Rspack that removes unused Carbon styles.
 - [**optimizeCarbonCss**](#optimizecarboncss): Programmatic version of the CSS optimizer for esbuild, Bun.build, or any post-build script.
-- [**CLI**](#cli): `npx carbon-preprocess-svelte optimize-css dist/**/*.css` for esbuild, Bun, or any pipeline without a plugin hook.
+- [**CLI**](#cli): Command-line tool that removes unused Carbon styles from built CSS files, for esbuild, Bun, or any pipeline without a plugin hook.
 
 ### `optimizeImports`
 
@@ -595,6 +595,52 @@ optimizeCarbonCss(css, {
 
 The CLI wraps `optimizeCarbonCss` for build pipelines that produce plain CSS files on disk but have no plugin hook to call it from, such as esbuild or `Bun.build`. It detects components by scanning `--content` files (default `src/**/*.{svelte,js,ts,mjs}`) for `carbon-components-svelte` imports, both the barrel form (`import { Button } from "carbon-components-svelte"`) and the direct-path form `optimizeImports` rewrites them to; literal `bx--` tokens in those same files are kept too, the same as `optimizeCss`'s `content` option. It rewrites every matched CSS file in place.
 
+#### Usage
+
+```sh
+npx carbon-preprocess-svelte optimize-css "dist/**/*.css"
+```
+
+Add it after the build step in `package.json`:
+
+```json
+{
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --outdir=dist && carbon-preprocess-svelte optimize-css \"dist/**/*.css\""
+  }
+}
+```
+
+```json
+{
+  "scripts": {
+    "build": "bun build src/main.ts --outdir dist && carbon-preprocess-svelte optimize-css \"dist/**/*.css\""
+  }
+}
+```
+
+#### Sample output
+
+```diff
+$ carbon-preprocess-svelte optimize-css "dist/**/*.css"
+
+Optimized dist/assets/index-CU4gbKFa.css
+- Before: 606.26 kB
++ After:   53.22 kB (-91.22%)
+```
+
+With `--report`:
+
+```
+carbon-preprocess-svelte report
+  Detected components (2): Button, Accordion
+  Allowlist: 128 classes (module scan 0 tokens, content 12 tokens, safelist 3 entries)
+  Assets:
+    dist/assets/index-CU4gbKFa.css   1,204 rules removed   606.26 kB -> 53.22 kB
+```
+
+#### Options
+
 ```
 Usage: carbon-preprocess-svelte optimize-css [options] <css-file-or-glob>...
 
@@ -616,16 +662,6 @@ Options:
   --report                Print detected components and allowlist summary.
   --silent                Suppress the per-file size log.
   -h, --help              Show this help.
-```
-
-```json
-// package.json (esbuild)
-"build": "esbuild src/main.ts --bundle --outdir=dist && carbon-preprocess-svelte optimize-css \"dist/**/*.css\""
-```
-
-```json
-// package.json (Bun)
-"build": "bun build src/main.ts --outdir dist && carbon-preprocess-svelte optimize-css \"dist/**/*.css\""
 ```
 
 ## Examples
