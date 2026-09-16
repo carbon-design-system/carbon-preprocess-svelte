@@ -49,7 +49,7 @@ bun install
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
 | `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). |
 | `bun run test:fixtures:update` | Rewrite the `optimize-css` fixture baselines under [`tests/fixtures/`](tests/fixtures/optimize-css). |
-| `bun run lint` | `biome lint .` |
+| `bun run lint` | `biome ci --error-on-warnings` (lint + format check, no write). |
 | `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
 | `bun run upgrade-examples` | `bun update` inside each `examples/*` project. |
 
@@ -206,7 +206,7 @@ bun run test:e2e:update
 [`.github/workflows/test.yml`](.github/workflows/test.yml) runs on every PR and on pushes to `main` (macOS runner):
 
 1. `bun ci`
-2. `bunx biome ci --error-on-warnings`
+2. `bun run lint`
 3. `bun run typecheck`
 4. `bun run test`
 5. `bun run test:e2e`
@@ -252,7 +252,7 @@ The following applies only to maintainers.
 
 ### Release
 
-[`.github/workflows/release.yml`](.github/workflows/release.yml) publishes to NPM with [provenance](https://docs.npmjs.com/generating-provenance-statements) when a tag starting with `v` is pushed. It installs, runs `bun run build` and `bun run build:prune-package`, then `npm publish --provenance --access public`.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) publishes to NPM with [provenance](https://docs.npmjs.com/generating-provenance-statements) when a tag starting with `v` is pushed. It installs, runs `bun run build`, then `npm publish --provenance --access public` from `dist/`.
 
 To cut a release:
 

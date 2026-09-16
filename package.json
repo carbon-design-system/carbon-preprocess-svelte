@@ -19,13 +19,9 @@
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
     "test:fixtures:update": "UPDATE_FIXTURES=true bun test tests/optimize-css-fixtures.test.ts",
     "bench": "ostia bench bench/optimize-css.bench.ts bench/optimize-imports.bench.ts bench/build-index.bench.ts",
-    "bench:css": "ostia bench bench/optimize-css.bench.ts",
-    "bench:imports": "ostia bench bench/optimize-imports.bench.ts",
-    "bench:index": "ostia bench bench/build-index.bench.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "biome lint .",
+    "lint": "biome ci --error-on-warnings",
     "lint:fix": "biome check --write --unsafe .",
-    "lint:fix:changed": "biome check --write --unsafe --changed --no-errors-on-unmatched .",
     "upgrade-examples": "bun scripts/upgrade-examples.ts"
   },
   "devDependencies": {
