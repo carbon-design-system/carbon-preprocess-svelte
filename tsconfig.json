@@ -1,15 +1,13 @@
 {
   "compilerOptions": {
-    "esModuleInterop": true,
+    "noEmit": true,
+    "target": "ESNext",
+    "module": "preserve",
+    "strict": true,
     "erasableSyntaxOnly": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "target": "ESNext",
-    "module": "ESNext",
-    "lib": ["ESNext"],
-    "moduleResolution": "bundler",
     "skipLibCheck": true,
-    "strict": true,
     "resolveJsonModule": true,
     "paths": {
       "carbon-preprocess-svelte": ["./src/index.ts"],
@@ -17,5 +15,5 @@
     },
     "types": ["jest"]
   },
-  "include": ["bench/**/*", "scripts/**/*", "src/**/*", "tests/**/*"]
+  "include": ["bench", "scripts", "src", "tests"]
 }
