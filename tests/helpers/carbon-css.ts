@@ -7,7 +7,10 @@ import {
   CONTEXT_ANCESTORS,
 } from "carbon-preprocess-svelte/constants";
 import postcss from "postcss";
-import { splitSelectorParts } from "../../src/indexer/css-selector-utils";
+import {
+  splitSelectorParts,
+  stripNotPseudoClasses,
+} from "../../src/indexer/css-selector-utils";
 
 const require = createRequire(import.meta.url);
 
@@ -64,38 +67,10 @@ export function prettifyCss(css: string): string {
   return `${root.toString().trim()}\n`;
 }
 
-/** Matches `stripNotPseudoClasses` in `strict-css-optimizer.ts`. */
-function stripNotPseudoClasses(selector: string): string {
-  let result = "";
-  let notDepth = 0;
-
-  for (let i = 0; i < selector.length; i++) {
-    if (
-      notDepth === 0 &&
-      selector[i] === ":" &&
-      selector.startsWith(":not(", i)
-    ) {
-      notDepth = 1;
-      i += 4;
-      continue;
-    }
-
-    if (notDepth > 0) {
-      if (selector[i] === "(") notDepth++;
-      else if (selector[i] === ")") notDepth--;
-      continue;
-    }
-
-    result += selector[i];
-  }
-
-  return result;
-}
-
 /**
  * Pull `.bx--*` tokens from a selector. Normalizes legacy `.bx-` to `.bx--`.
- * Matches the source's `:not()` stripping + `getCarbonClassesFromNormalized`
- * so drift shows up in tests.
+ * Strips `:not(...)` with `stripNotPseudoClasses`, then matches with regex.
+ * Fixture tests fail if `getCarbonClassesFromNormalized` changes token rules.
  */
 export function carbonClassesIn(selector: string): string[] {
   const normalized = stripNotPseudoClasses(selector);
