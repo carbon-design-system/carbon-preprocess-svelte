@@ -1,12 +1,12 @@
 import { parse } from "svelte/compiler";
-import { extractSelectors as extract } from "../src/indexer/extract-selectors";
+import { extractFromSvelte } from "../src/indexer/extract-selectors";
 
-const extractSelectors = (props: { code: string; filename: string }) =>
-  extract({ ...props, parse });
+const extract = (props: { code: string; filename: string }) =>
+  extractFromSvelte({ ...props, parse });
 
-describe("extractSelectors", () => {
+describe("extractFromSvelte", () => {
   test("extracts single class from class attribute", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: '<div class="test-class"></div>',
       filename: "test.svelte",
     });
@@ -15,7 +15,7 @@ describe("extractSelectors", () => {
   });
 
   test("extracts multiple classes from class attribute", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: '<div class="class1 class2 class3"></div>',
       filename: "test.svelte",
     });
@@ -24,7 +24,7 @@ describe("extractSelectors", () => {
   });
 
   test("extracts Carbon classes with bx-- prefix", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: '<div class="bx--btn bx--modal"></div>',
       filename: "test.svelte",
     });
@@ -32,7 +32,7 @@ describe("extractSelectors", () => {
   });
 
   test("extracts class directives", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: "<div class:active={isActive} class:bx--selected={isSelected}></div>",
       filename: "test.svelte",
     });
@@ -40,7 +40,7 @@ describe("extractSelectors", () => {
   });
 
   test("extracts classes from dynamic expressions", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: "<div class=\"{dynamic} static-class {condition ? 'bx--active' : ''}\"></div>",
       filename: "test.svelte",
     });
@@ -48,7 +48,7 @@ describe("extractSelectors", () => {
   });
 
   test("extracts global selectors", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: "<style>:global(.bx--global-class) { color: red; }</style>",
       filename: "test.svelte",
     });
@@ -56,7 +56,7 @@ describe("extractSelectors", () => {
   });
 
   test("extracts component references", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: `
         <script>
           import { Button, Modal } from 'carbon-components-svelte';
@@ -71,7 +71,7 @@ describe("extractSelectors", () => {
   });
 
   test("handles template literals with Carbon classes", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: `
         <script>
           const className = \`bx--template-class\`;
@@ -84,7 +84,7 @@ describe("extractSelectors", () => {
   });
 
   test("deduplicates classes and components", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: `
         <div class="duplicate duplicate bx--duplicate bx--duplicate"></div>
         <Button />
@@ -97,7 +97,7 @@ describe("extractSelectors", () => {
   });
 
   test("handles empty and whitespace-only classes", () => {
-    const result = extractSelectors({
+    const result = extract({
       code: '<div class="   "></div>',
       filename: "test.svelte",
     });

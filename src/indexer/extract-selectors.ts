@@ -150,8 +150,3 @@ export function extractFromSvelte(
     runtimeClasses: extractRuntimeClassesFromSource(code),
   };
 }
-
-export function extractSelectors(props: ExtractSelectorsProps) {
-  const { classes, components } = extractFromSvelte(props);
-  return { classes, components };
-}
