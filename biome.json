@@ -6,13 +6,6 @@
     "useIgnoreFile": true,
     "defaultBranch": "main"
   },
-  "assist": {
-    "actions": {
-      "source": {
-        "organizeImports": "on"
-      }
-    }
-  },
   "files": {
     "includes": [
       "**",
@@ -34,20 +27,15 @@
     }
   },
   "linter": {
-    "enabled": true,
     "rules": {
-      "preset": "recommended",
       "performance": {
-        "noAccumulatingSpread": "error",
         "noAwaitInLoops": "error",
         "noDelete": "error",
-        "noDynamicNamespaceImportAccess": "error",
         "noNamespaceImport": "error",
         "noReExportAll": "error",
         "useTopLevelRegex": "error"
       },
       "complexity": {
-        "noCommaOperator": "error",
         "noForEach": "error",
         "noUselessConstructor": "error",
         "noUselessEmptyExport": "error",
@@ -57,9 +45,7 @@
         "noUselessRename": "error",
         "noUselessSwitchCase": "error",
         "noUselessTypeConstraint": "error",
-        "useArrowFunction": "error",
-        "useLiteralKeys": "error",
-        "noImportantStyles": "error"
+        "useLiteralKeys": "error"
       },
       "suspicious": {
         "noImportCycles": "error"
