@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.46](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.46) - 2026-09-15
+
+**Features**
+
+- add `carbon-preprocess-svelte optimize-css` CLI
+- add bundler-agnostic `optimizeCarbonCss()`
+- `optimizeCss`: add `dryRun` and `report` options
+- `optimizeCss`: scan bundled modules for literal `bx--` classes
+- `optimizeCss`: warn when no Carbon component imports are found
+- `optimizeCss`: warn when `content` globs match nothing
+- `optimizeCss`: log size diff through Vite's logger
+
+**Fixes**
+
+- `optimizeCss`: resolve `content` globs from the project root
+- `optimizeCss`: skip stylesheets when scanning modules for `bx--` tokens
+- match `carbon-components-svelte` as a path segment
+- anchor `RE_STYLE_QUERY` to the query string
+- strip comments from internal types in bundled `.d.ts`
+
+**Performance**
+
+- `index`: dedupe and pack the generated component index (~164KB → ~64KB dist)
+
 ## [0.11.45](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.45) - 2026-09-12
 
 **Features**
