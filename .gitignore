@@ -5,3 +5,4 @@ build
 public/build/
 .svelte-kit
 *.tgz
+/src/component-index.ts
