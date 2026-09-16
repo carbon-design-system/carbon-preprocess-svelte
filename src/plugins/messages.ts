@@ -1,7 +1,7 @@
 import type { ContentScan } from "./scan-content";
 
 /** Prefix for every warning either plugin raises, so users can grep for it. */
-export const WARN_PREFIX = "carbon-preprocess-svelte:";
+const WARN_PREFIX = "carbon-preprocess-svelte:";
 
 export const NO_CARBON_IMPORTS =
   `${WARN_PREFIX} no carbon-components-svelte component imports were found in this build, so no Carbon CSS was pruned. ` +
@@ -15,7 +15,7 @@ export function contentMatchedNothing(
   return `${WARN_PREFIX} \`content\` globs ${JSON.stringify(content)} matched no files (resolved from ${root}). No classes from \`content\` were kept.`;
 }
 
-export function contentGlobFailed(
+function contentGlobFailed(
   content: readonly string[],
   root: string,
   error: string,
