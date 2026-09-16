@@ -44,7 +44,7 @@ bun install
 | --- | --- |
 | `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`). |
 | `bun run build` | Regenerate the component index, bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
-| `bun run typecheck` | `tsc --noEmit` over `scripts/`, `src/`, `tests/`. |
+| `bun run typecheck` | `tsc --noEmit` over `bench/`, `scripts/`, `src/`, `tests/`. |
 | `bun run index:components` | Regenerate [`src/component-index.ts`](src/component-index.ts) from the installed `carbon-components-svelte`. |
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
 | `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). |
@@ -141,7 +141,7 @@ Biome enforces most of this in CI (`bun run lint`). Config: [`biome.json`](biome
 - **No `enum`, no `@ts-ignore`, no `any`.** `noEnum`, `noTsIgnore`, `noExplicitAny`. Use `@ts-expect-error` when a test must suppress a type error. Use `import type` / `export type` (`useImportType`, `useExportType`).
 - **No focused or skipped tests.** `noFocusedTests` and `noSkippedTests`. Do not land `.only` or `.skip`.
 
-TypeScript ([`tsconfig.json`](tsconfig.json)) runs `strict` with `noUnusedLocals`, `noUnusedParameters`, and `erasableSyntaxOnly` (no runtime-emitting TS syntax: enums, parameter properties, etc.). The `carbon-preprocess-svelte` path alias resolves to `src/` so tests and fixtures import the package by name. `estree-walker`'s loose AST types are tightened in [`src/global.d.ts`](src/global.d.ts). Extend that module declaration instead of reaching for `any` when you walk new node types.
+TypeScript ([`tsconfig.json`](tsconfig.json)) is check-only (`noEmit`). JS and `.d.ts` come from [`scripts/build.ts`](scripts/build.ts) and [`scripts/bundle-dts.ts`](scripts/bundle-dts.ts). It runs `strict` with `noUnusedLocals`, `noUnusedParameters`, and `erasableSyntaxOnly` (no runtime-emitting TS syntax: enums, parameter properties, etc.). The `carbon-preprocess-svelte` path alias resolves to `src/` so tests import the package by name.
 
 Comment the _why_ behind non-obvious parser, hook-ordering, and CSS-matching logic. The existing modules are heavily annotated; match that density. Skip comments that restate the code.
 
