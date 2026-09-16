@@ -5,18 +5,11 @@
   "description": "A zero-dependency library providing Svelte preprocessors and build plugins for the Carbon Design System",
   "author": "Eric Liu (https://github.com/metonym)",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "carbon-preprocess-svelte": "./dist/cli.js"
   },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "index:components": "bun scripts/index-components.ts && biome check --write --unsafe src/component-index.ts",
     "prebuild": "bun run index:components",
