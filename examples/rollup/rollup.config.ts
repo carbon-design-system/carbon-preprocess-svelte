@@ -55,10 +55,12 @@ const emitHtml = {
     const cssFile = Object.values(bundle).find(
       (file) => file.type === "asset" && file.fileName.endsWith(".css"),
     );
-    const html = readFileSync(htmlTemplatePath, "utf8").replace(
-      "build/bundle.css",
-      `build/${cssFile.fileName}`,
+    const jsFile = Object.values(bundle).find(
+      (file) => file.type === "chunk" && file.fileName.endsWith(".js"),
     );
+    const html = readFileSync(htmlTemplatePath, "utf8")
+      .replace("build/bundle.css", `build/${cssFile.fileName}`)
+      .replace("build/bundle.js", `build/${jsFile.fileName}`);
     writeFileSync(htmlOutputPath, html);
   },
 };
@@ -69,7 +71,8 @@ export default {
     sourcemap: !production,
     format: "iife",
     name: "app",
-    file: "public/build/bundle.js",
+    dir: "public/build",
+    entryFileNames: production ? "bundle-[hash].js" : "bundle.js",
     assetFileNames: production ? "[name]-[hash][extname]" : "[name][extname]",
     inlineDynamicImports: true,
   },
