@@ -21,8 +21,10 @@ export default {
     path: path.resolve("./public"),
     filename: PROD ? "[name].[contenthash].js" : "[name].js",
     chunkFilename: "[name].[id].js",
+    cssFilename: PROD ? "[name].[contenthash].css" : "[name].css",
     clean: true,
   },
+  experiments: { css: true },
   module: {
     rules: [
       {
@@ -38,7 +40,7 @@ export default {
       },
       {
         test: /\.css$/,
-        use: [rspack.CssExtractRspackPlugin.loader, "css-loader"],
+        type: "css",
       },
       {
         test: /node_modules\/svelte\/.*\.mjs$/,
@@ -49,9 +51,6 @@ export default {
   mode: NODE_ENV,
   plugins: [
     new OptimizeCssPlugin(),
-    new rspack.CssExtractRspackPlugin({
-      filename: PROD ? "[name].[chunkhash].css" : "[name].css",
-    }),
     new rspack.HtmlRspackPlugin({
       templateContent: `
       <!DOCTYPE html>
