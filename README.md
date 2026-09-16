@@ -27,13 +27,13 @@ bun add -D carbon-preprocess-svelte
 
 This package has five independent tools; pick the one matching your bundler or pipeline.
 
-| Tool | Type | Works with | Does |
+| Tool | Type | Works with | Description |
 | :--- | :--- | :--- | :--- |
-| [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports to their source paths, for faster dev and build compile times |
-| [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Strips unused Carbon styles at build time, for smaller CSS bundles |
-| [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss`, for Webpack and Rspack |
-| [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, Bun.build, any post-build script | Programmatic version of the CSS optimizer |
-| [CLI](#cli) | Command-line tool | esbuild, Bun, any pipeline without a plugin hook | Removes unused Carbon styles from built CSS files |
+| [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports straight to source, for snappier dev and build times |
+| [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Prunes unused Carbon styles at build time, shrinking CSS bundles by up to 90% |
+| [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | All the power of `optimizeCss`, brought to Webpack and Rspack |
+| [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, Bun.build, any post-build script | The same CSS-slimming engine, exposed as a plain function for any pipeline |
+| [CLI](#cli) | Command-line tool | esbuild, Bun, any pipeline without a plugin hook | Prunes unused Carbon styles from built CSS files with a single command |
 
 ### `optimizeImports`
 
