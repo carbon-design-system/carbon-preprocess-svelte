@@ -137,7 +137,9 @@ Biome enforces most of this in CI (`bun run lint`). Config: [`biome.json`](biome
 - **No namespace imports, no barrel re-exports, no import cycles.** `noNamespaceImport`, `noReExportAll`, `noImportCycles`. Export named bindings explicitly, as [`src/index.ts`](src/index.ts) does.
 - **No `delete`, no accumulating spread, prefer arrow functions and literal keys.** `noDelete`, `noAccumulatingSpread`, `useArrowFunction`, `useLiteralKeys`.
 - **No `!important` in authored styles** (`noImportantStyles`) and **no `bun:test` imports**. The Bun test globals (`describe`, `test`, `expect`) are ambient. Importing them is an error.
-- **Use `node:` import specifiers**, e.g. `import path from "node:path"`, as the scripts and plugins do.
+- **Use `node:` import specifiers**, e.g. `import path from "node:path"`, as the scripts and plugins do. `useNodejsImportProtocol` is an error.
+- **No `enum`, no `@ts-ignore`, no `any`.** `noEnum`, `noTsIgnore`, `noExplicitAny`. Use `@ts-expect-error` when a test must suppress a type error. Use `import type` / `export type` (`useImportType`, `useExportType`).
+- **No focused or skipped tests.** `noFocusedTests` and `noSkippedTests`. Do not land `.only` or `.skip`.
 
 TypeScript ([`tsconfig.json`](tsconfig.json)) runs `strict` with `noUnusedLocals`, `noUnusedParameters`, and `erasableSyntaxOnly` (no runtime-emitting TS syntax: enums, parameter properties, etc.). The `carbon-preprocess-svelte` path alias resolves to `src/` so tests and fixtures import the package by name. `estree-walker`'s loose AST types are tightened in [`src/global.d.ts`](src/global.d.ts). Extend that module declaration instead of reaching for `any` when you walk new node types.
 
