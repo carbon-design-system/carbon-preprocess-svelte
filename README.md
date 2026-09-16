@@ -3,7 +3,7 @@
 [![NPM][npm]][npm-url]
 ![npm downloads to date](https://img.shields.io/npm/dt/carbon-preprocess-svelte?color=262626&style=for-the-badge)
 
-> Zero-dependency Svelte preprocessors and build plugins for the [Carbon Design System](https://carbondesignsystem.com/): faster dev builds, and CSS bundles cut by 90%+.
+> Zero-dependency Svelte preprocessors and build plugins for the [Carbon Design System](https://carbondesignsystem.com/): faster dev builds, and CSS bundles cut by up to 90%.
 
 ## Installation
 
@@ -27,11 +27,13 @@ bun add -D carbon-preprocess-svelte
 
 This package has five independent tools; pick the one matching your bundler or pipeline.
 
-- [**optimizeImports**](#optimizeimports): Svelte preprocessor that rewrites Carbon Svelte imports to their source paths, for faster dev and build compile times.
-- [**optimizeCss**](#optimizecss): Vite/Rollup/Rolldown plugin that strips unused Carbon styles at build time, for smaller CSS bundles.
-- [**OptimizeCssPlugin**](#optimizecssplugin): `optimizeCss` for Webpack and Rspack.
-- [**optimizeCarbonCss**](#optimizecarboncss): Programmatic version of the CSS optimizer for esbuild, Bun.build, or any post-build script.
-- [**CLI**](#cli): Command-line tool that removes unused Carbon styles from built CSS files, for esbuild, Bun, or any pipeline without a plugin hook.
+| Tool | Type | Works with | Does |
+| --- | --- | --- | --- |
+| [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports to their source paths, for faster dev and build compile times |
+| [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Strips unused Carbon styles at build time, for smaller CSS bundles |
+| [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss`, for Webpack and Rspack |
+| [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, Bun.build, any post-build script | Programmatic version of the CSS optimizer |
+| [CLI](#cli) | Command-line tool | esbuild, Bun, any pipeline without a plugin hook | Removes unused Carbon styles from built CSS files |
 
 ### `optimizeImports`
 
@@ -677,10 +679,6 @@ Full, runnable set-ups for every supported bundler live under [examples](example
 - [examples/webpack](examples/webpack): Webpack with Svelte 4
 - [examples/webpack@svelte-5](examples/webpack@svelte-5): Webpack with Svelte 5
 - [examples/rspack](examples/rspack): Rspack
-
-## Contributing
-
-Refer to the [contributing guidelines](CONTRIBUTING.md).
 
 ## License
 
