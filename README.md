@@ -28,7 +28,7 @@ bun add -D carbon-preprocess-svelte
 This package has five independent tools; pick the one matching your bundler or pipeline.
 
 | Tool | Type | Works with | Does |
-| --- | --- | --- | --- |
+| :--- | :--- | :--- | :--- |
 | [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports to their source paths, for faster dev and build compile times |
 | [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Strips unused Carbon styles at build time, for smaller CSS bundles |
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss`, for Webpack and Rspack |
