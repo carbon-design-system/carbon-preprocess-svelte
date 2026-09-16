@@ -3,7 +3,7 @@
 [![NPM][npm]][npm-url]
 ![npm downloads to date](https://img.shields.io/npm/dt/carbon-preprocess-svelte?color=262626&style=for-the-badge)
 
-> A zero-dependency library providing Svelte preprocessors and build plugins for the [Carbon Design System](https://carbondesignsystem.com/).
+> Zero-dependency Svelte preprocessors and build plugins for the [Carbon Design System](https://carbondesignsystem.com/): faster dev builds, and CSS bundles cut by 90%+.
 
 ## Installation
 
@@ -25,15 +25,17 @@ bun add -D carbon-preprocess-svelte
 
 ## Usage
 
-- [**optimizeImports**](#optimizeimports): Svelte preprocessor that rewrites Carbon Svelte imports to their source path in the `script` block, making development compile times dramatically faster.
-- [**optimizeCss**](#optimizecss): Vite/Rollup/Rolldown plugin that removes unused Carbon styles, resulting in smaller CSS bundles.
-- [**OptimizeCssPlugin**](#optimizecssplugin): The corresponding `optimizeCss` plugin for Webpack and Rspack that removes unused Carbon styles.
+This package has five independent tools; pick the one matching your bundler or pipeline.
+
+- [**optimizeImports**](#optimizeimports): Svelte preprocessor that rewrites Carbon Svelte imports to their source paths, for faster dev and build compile times.
+- [**optimizeCss**](#optimizecss): Vite/Rollup/Rolldown plugin that strips unused Carbon styles at build time, for smaller CSS bundles.
+- [**OptimizeCssPlugin**](#optimizecssplugin): `optimizeCss` for Webpack and Rspack.
 - [**optimizeCarbonCss**](#optimizecarboncss): Programmatic version of the CSS optimizer for esbuild, Bun.build, or any post-build script.
 - [**CLI**](#cli): Command-line tool that removes unused Carbon styles from built CSS files, for esbuild, Bun, or any pipeline without a plugin hook.
 
 ### `optimizeImports`
 
-`optimizeImports` is a Svelte preprocessor that rewrites barrel imports from Carbon components/icons/pictograms packages to their source Svelte code paths. This can significantly speed up development and build compile times while preserving typeahead and autocompletion offered by integrated development environments (IDE) like VS Code.
+`optimizeImports` rewrites barrel imports from Carbon's components/icons/pictograms packages to their source Svelte paths, speeding up dev and build compile times while keeping IDE typeahead and autocomplete working.
 
 The preprocessor optimizes imports from the following packages:
 
@@ -53,11 +55,9 @@ The preprocessor optimizes imports from the following packages:
 ```
 
 > [!NOTE]
-> When this preprocessor was first created, there was no workaround to optimize slow cold start times with Vite in development.
-> Today, [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte) enables [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries) by default.
-> However, this preprocessor is still useful for non-Vite bundlers, like Rollup and Webpack. Also, it can further improve cold start development times even with `prebundleSvelteLibraries: true`.
+> This preprocessor predates [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte)'s [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries), now the default, which covers the same Vite cold-start problem. It's still useful for non-Vite bundlers like Rollup and Webpack, and can further improve cold start even with `prebundleSvelteLibraries: true`.
 
-`optimizeImports({ experimental: { liveIndex: true } })` builds its component index from your installed `carbon-components-svelte` instead of the version bundled with this package — see [`experimental.liveIndex`](#optimizecss-api) under `optimizeCss` for details; the behavior is identical here.
+`optimizeImports({ experimental: { liveIndex: true } })` builds its index from your installed `carbon-components-svelte` instead of the bundled version. See [`experimental.liveIndex`](#optimizecss-api) under `optimizeCss` for details; behavior is identical here.
 
 #### SvelteKit
 
@@ -157,7 +157,7 @@ export default {
 
 #### Rspack
 
-[Rspack](https://rspack.rs) implements webpack's plugin and loader APIs, so the set-up is the same as [Webpack](#webpack) above (`svelte-loader` works unchanged). This code is abridged; see [examples/rspack](examples/rspack) for a full set-up.
+[Rspack](https://rspack.rs) implements webpack's plugin and loader APIs, so setup matches [Webpack](#webpack) above unchanged. This code is abridged; see [examples/rspack](examples/rspack) for a full set-up.
 
 ```js
 // rspack.config.mjs
@@ -184,23 +184,23 @@ export default {
 
 ### `optimizeCss`
 
-`optimizeCss` is a Vite plugin that removes unused Carbon styles at build time. The plugin is compatible with Rollup and [Rolldown](https://rolldown.rs), which implement the same plugin API ([Vite](https://vitejs.dev/guide/api-plugin) extends the Rollup plugin API).
+`optimizeCss` is a Vite plugin that strips unused Carbon styles at build time. It also works with Rollup and [Rolldown](https://rolldown.rs), which share the same plugin API ([Vite](https://vitejs.dev/guide/api-plugin) extends Rollup's).
 
 <details>
 <summary>How it works</summary>
 
 The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on production builds and after other plugins.
 
-1. During `transform`, it collects absolute paths of imported `carbon-components-svelte` sources, and, unless `scanModules: false`, every literal `bx--` token in the code of other modules.
+1. During `transform`, it collects imported `carbon-components-svelte` source paths, plus (unless `scanModules: false`) every literal `bx--` token found in other modules.
 2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components via an internal index, plus global selectors like `.bx--body`.
 3. A PostCSS plugin prunes Carbon (`bx--`) selectors outside that allowlist:
-   - Individual selectors are pruned out of comma-separated lists instead of keeping the whole rule when any one branch matches
+   - Individual selectors are pruned from comma-separated lists, not the whole rule, when only one branch matches
    - Every Carbon class in a compound selector (same-element and descendant) must match the allowlist, so importing NumberInput doesn't pull in `.bx--modal .bx--number` context rules, and Button doesn't pull in Tabs skeleton styles via a shared `.bx--skeleton` modifier
    - Flatpickr and legacy single-hyphen `bx-` rules are dropped unless DatePicker (or another flatpickr-based component) is in the bundle
-   - Selectors are parsed with parenthesis-awareness, so `:is(...)` and `:not(...)` groups are handled instead of naively split on commas
+   - Selectors are parsed with parenthesis-awareness, handling `:is(...)` and `:not(...)` groups instead of naively splitting on commas
 4. Empty rules are discarded, and the CSS bundles are optimized.
 
-**Risk profile:** this pruning is validated against a fixture suite covering most Carbon components and common multi-component bundles (see [`tests/fixtures/optimize-css`](tests/fixtures/optimize-css)) with zero unexplained survivors on every scenario, but it shares the blind spot described in the warning below — class names that never appear as a literal `bx--` token in bundled code.
+**Risk profile:** validated against a fixture suite covering most Carbon components and common multi-component bundles ([`tests/fixtures/optimize-css`](tests/fixtures/optimize-css)) with zero unexplained survivors, but it shares the blind spot in the warning below: class names that never appear as a literal `bx--` token in bundled code.
 
 ```mermaid
 flowchart TB
@@ -234,7 +234,7 @@ dist/assets/index-Ceijs3eO.js   53.65 kB │ gzip: 15.88 kB
 ```
 
 > [!NOTE]
-> This is a plugin and not a Svelte preprocessor. It should be added to the list of `vite.plugins`. For Vite set-ups, this plugin _is not run_ during development and is only executed when building the app (i.e., `vite build`). For Rollup and Webpack, you should conditionally apply the plugin to only execute when building for production.
+> This is a plugin, not a Svelte preprocessor. Add it to `vite.plugins`. Under Vite it only runs on `vite build`, never during dev. Under Rollup and Webpack, apply it conditionally so it only runs for production builds.
 
 #### SvelteKit
 
@@ -273,7 +273,7 @@ export default defineConfig({
 });
 ```
 
-`inlineStylesheets: "never"` is only there to make the pruned asset inspectable and is not required.
+`inlineStylesheets: "never"` just makes the pruned asset inspectable; it's not required.
 
 #### Vite
 
@@ -424,7 +424,7 @@ optimizeCss({
      * Experimental. Builds the component index from *this project's*
      * installed `carbon-components-svelte` instead of the version bundled
      * with `carbon-preprocess-svelte`. Useful when your app is ahead of (or
-     * behind) the Carbon version this package was last released against —
+     * behind) the Carbon version this package was last released against;
      * new/renamed components and classes are picked up without waiting on a
      * `carbon-preprocess-svelte` release.
      *
@@ -446,7 +446,7 @@ optimizeCss({
 ```
 
 > [!WARNING]
-> **Class names that never appear as a literal `bx--` token cannot be detected.** The plugin keeps classes referenced by imported Carbon components, plus every literal `bx--…` token found in your bundled modules (`scanModules`). Two things stay invisible:
+> **Class names that never appear as a literal `bx--` token can't be detected.** The plugin keeps classes from imported Carbon components, plus every literal `bx--…` token found in bundled modules (`scanModules`). Two things stay invisible:
 >
 > ```svelte
 > <!-- pruned: "bx-" and "-btn" never appear together as one literal token -->
@@ -467,7 +467,7 @@ optimizeCss({
 
 ### `OptimizeCssPlugin`
 
-For Webpack and [Rspack](https://rspack.rs) users, `OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`. The plugin API is identical to that of `optimizeCss`. Similarly, the plugin only runs in production mode. The same `OptimizeCssPlugin` instance works unchanged with both bundlers since Rspack implements webpack's plugin API.
+`OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`, for Webpack and [Rspack](https://rspack.rs) users. Same API, same production-only behavior. One instance works unchanged on both bundlers since Rspack implements webpack's plugin API.
 
 This code is abridged; see [examples/webpack](examples/webpack), [examples/webpack@svelte-5](examples/webpack@svelte-5), or [examples/rspack](examples/rspack) for a full set-up.
 
@@ -482,7 +482,7 @@ export default {
 
 ### `optimizeCarbonCss`
 
-`optimizeCarbonCss` is the same CSS optimization engine behind `optimizeCss` and `OptimizeCssPlugin`, exposed as a plain async function for bundlers without a plugin API, such as esbuild, `Bun.build`, or any post-build script. It is `async` because `experimental.liveIndex` may build a component index. Unlike the plugins, it has no way to discover which Carbon components your app imports, so the caller passes them explicitly via `components`.
+`optimizeCarbonCss` is the same optimization engine behind `optimizeCss` and `OptimizeCssPlugin`, exposed as a plain async function for bundlers without a plugin API: esbuild, `Bun.build`, or any post-build script. It's `async` because `experimental.liveIndex` may build a component index. It can't discover which Carbon components your app imports, so pass them explicitly via `components`. Shares the same detection blind spot as the plugins; see the [warning under `optimizeCss`](#optimizecss-api).
 
 > [!TIP]
 > If your pipeline can run a shell command after the build instead of calling a function, the [CLI](#cli) does the component/import detection for you and needs no code changes.
@@ -557,13 +557,6 @@ optimizeCarbonCss(css, {
   cwd: process.cwd(),
 
   /**
-   * Glob patterns of source files to scan for literal `bx--`-prefixed
-   * tokens. Every token found is kept. Resolves relative to `cwd`.
-   * @default undefined
-   */
-  content: ["src/**/*.{svelte,js,ts}"],
-
-  /**
    * Class selectors to always keep, regardless of which components are
    * imported. See the `optimizeCss` API above for the string vs. `RegExp`
    * matching rules.
@@ -577,6 +570,13 @@ optimizeCarbonCss(css, {
    * @default false
    */
   preserveAllIBMFonts: false,
+
+  /**
+   * Glob patterns of source files to scan for literal `bx--`-prefixed
+   * tokens. Every token found is kept. Resolves relative to `cwd`.
+   * @default undefined
+   */
+  content: ["src/**/*.{svelte,js,ts}"],
 
   experimental: {
     /**
@@ -593,9 +593,9 @@ optimizeCarbonCss(css, {
 
 ### CLI
 
-The CLI wraps `optimizeCarbonCss` for build pipelines that produce plain CSS files on disk but have no plugin hook to call it from, such as esbuild or `Bun.build`. It detects components by scanning `--content` files (default `src/**/*.{svelte,js,ts,mjs}`) for `carbon-components-svelte` imports, both the barrel form (`import { Button } from "carbon-components-svelte"`) and the direct-path form `optimizeImports` rewrites them to; literal `bx--` tokens in those same files are kept too, the same as `optimizeCss`'s `content` option. It rewrites every matched CSS file in place.
+The CLI wraps `optimizeCarbonCss` for pipelines with no plugin hook, like esbuild or `Bun.build`. It detects components by scanning `--content` files (default `src/**/*.{svelte,js,ts,mjs}`) for `carbon-components-svelte` imports, both the barrel form (`import { Button } from "carbon-components-svelte"`) and the direct-path form `optimizeImports` rewrites them to, and keeps literal `bx--` tokens found in those files too, the same as `optimizeCss`'s `content` option. It rewrites every matched CSS file in place, and shares the same detection blind spot as the plugins; see the [warning under `optimizeCss`](#optimizecss-api).
 
-#### Usage
+#### Command
 
 ```sh
 npx carbon-preprocess-svelte optimize-css "dist/**/*.css"
@@ -666,7 +666,17 @@ Options:
 
 ## Examples
 
-Refer to [examples](examples) for common set-ups.
+Full, runnable set-ups for every supported bundler live under [examples](examples):
+
+- [examples/sveltekit](examples/sveltekit): SvelteKit
+- [examples/vite](examples/vite): Vite with Svelte 4
+- [examples/vite@svelte-5](examples/vite@svelte-5): Vite with Svelte 5
+- [examples/astro](examples/astro): Astro
+- [examples/rollup](examples/rollup): Rollup
+- [examples/rolldown](examples/rolldown): Rolldown
+- [examples/webpack](examples/webpack): Webpack with Svelte 4
+- [examples/webpack@svelte-5](examples/webpack@svelte-5): Webpack with Svelte 5
+- [examples/rspack](examples/rspack): Rspack
 
 ## Contributing
 
