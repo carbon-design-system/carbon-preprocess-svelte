@@ -130,7 +130,7 @@ Supporting modules: [`safelist.ts`](src/plugins/safelist.ts) (string = literal c
 
 ## Conventions
 
-Biome enforces most of this in CI (`biome ci --error-on-warnings`). Config: [`biome.json`](biome.json), space indent, multiline attributes, imports auto-organized. The recommended preset is on. The rules below are **errors**, so a violation fails the build:
+Biome enforces most of this in CI (`bun run lint`). Config: [`biome.json`](biome.json), space indent, multiline attributes, imports auto-organized. The recommended preset is on by default. Extra rules in `biome.json` are errors. Warnings also fail CI.
 
 - **Hoist regexes to module scope.** `useTopLevelRegex` is an error. A regex literal inside a function fails lint. Declare it as a named top-level `const` (see the `*_REGEX` / `CARBON_*` constants at the top of nearly every module).
 - **No `await` in loops, no `forEach`.** `noAwaitInLoops` and `noForEach` are errors. Build the work and `await Promise.all(...)`, or use `for...of` with hoisted awaits. The two intentional sequential-await loops in [`tests/test-e2e.ts`](tests/test-e2e.ts) carry `// biome-ignore` comments explaining why. Match that pattern if you genuinely need ordering.
