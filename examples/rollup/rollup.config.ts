@@ -1,13 +1,44 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import commonjs from "@rollup/plugin-commonjs";
 import resolve from "@rollup/plugin-node-resolve";
+import terser from "@rollup/plugin-terser";
 import { optimizeCss, optimizeImports } from "carbon-preprocess-svelte";
-import css from "rollup-plugin-css-only";
 import svelte from "rollup-plugin-svelte";
-import { terser } from "rollup-plugin-terser";
 
 const production = !process.env.ROLLUP_WATCH;
+
+// Minimal stand-in for rollup-plugin-css-only: collects the virtual `.css`
+// modules that rollup-plugin-svelte emits (one per component, in import
+// order) and writes them out as a single bundled stylesheet.
+const styles = new Map();
+function collectCssImports(id, getModuleInfo, ids, visited = new Set()) {
+  if (id == null || visited.has(id)) return;
+  visited.add(id);
+  if (styles.has(id)) ids.add(id);
+  for (const importedId of getModuleInfo(id)?.importedIds ?? []) {
+    collectCssImports(importedId, getModuleInfo, ids, visited);
+  }
+}
+const emitCss = {
+  name: "emit-css",
+  transform(code, id) {
+    if (!id.endsWith(".css")) return;
+    styles.set(id, code);
+    return "";
+  },
+  generateBundle(_opts, bundle) {
+    const ids = new Set();
+    for (const file of Object.values(bundle)) {
+      collectCssImports(file.facadeModuleId, this.getModuleInfo, ids);
+    }
+    const source = Array.from(ids)
+      .map((id) => styles.get(id))
+      .join("\n");
+    // `name` (not `fileName`) is passed so output.assetFileNames controls
+    // whether the emitted file is content-hashed.
+    this.emitFile({ type: "asset", name: "bundle.css", source });
+  },
+};
 
 // index.html is a template, not the served file: `public/` (the served
 // output dir) is gitignored, so rewrite the template's asset links with the
@@ -39,9 +70,6 @@ export default {
     format: "iife",
     name: "app",
     file: "public/build/bundle.js",
-    // `fileName` is left unset on the css plugin below (only `name` is
-    // given), so it emits the asset by name rather than a fixed fileName,
-    // letting assetFileNames control whether the CSS file is content-hashed.
     assetFileNames: production ? "[name]-[hash][extname]" : "[name][extname]",
     inlineDynamicImports: true,
   },
@@ -51,8 +79,7 @@ export default {
       compilerOptions: { dev: !production },
     }),
     resolve({ browser: true, dedupe: ["svelte"] }),
-    commonjs(),
-    css({ name: "bundle.css" }),
+    emitCss,
     production && terser(),
     production && optimizeCss(),
     emitHtml,

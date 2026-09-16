@@ -7,15 +7,13 @@
     "preview": "deserved public --open"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "latest",
     "@rollup/plugin-node-resolve": "latest",
+    "@rollup/plugin-terser": "latest",
     "carbon-components-svelte": "latest",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
     "deserved": "latest",
     "rollup": "latest",
-    "rollup-plugin-css-only": "latest",
     "rollup-plugin-svelte": "latest",
-    "rollup-plugin-terser": "latest",
     "svelte": "^4.2.20"
   }
 }
