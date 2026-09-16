@@ -3,7 +3,7 @@
 [![NPM][npm]][npm-url]
 ![npm downloads to date](https://img.shields.io/npm/dt/carbon-preprocess-svelte?color=262626&style=for-the-badge)
 
-> Zero-dependency Svelte preprocessors and build plugins for the [Carbon Design System](https://carbondesignsystem.com/): faster dev builds, and CSS bundles cut by up to 90%.
+> Zero-dependency Svelte preprocessors and build plugins for the [Carbon Design System](https://carbondesignsystem.com/).
 
 ## Installation
 
@@ -37,7 +37,7 @@ This package has five independent tools; pick the one matching your bundler or p
 
 ### `optimizeImports`
 
-`optimizeImports` rewrites barrel imports from Carbon's components/icons/pictograms packages to their source Svelte paths, speeding up dev and build compile times while keeping IDE typeahead and autocomplete working.
+`optimizeImports` rewrites barrel imports from Carbon's components/icons/pictograms packages to their source Svelte paths, speeding up dev and build compile times while preserving IDE typeahead and autocomplete.
 
 The preprocessor optimizes imports from the following packages:
 
@@ -60,6 +60,8 @@ The preprocessor optimizes imports from the following packages:
 > This preprocessor predates [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte)'s [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries), now the default, which covers the same Vite cold-start problem. It's still useful for non-Vite bundlers like Rollup and Webpack, and can further improve cold start even with `prebundleSvelteLibraries: true`.
 
 `optimizeImports({ experimental: { liveIndex: true } })` builds its index from your installed `carbon-components-svelte` instead of the bundled version. See [`experimental.liveIndex`](#optimizecss-api) under `optimizeCss` for details; behavior is identical here.
+
+**Set-ups:** [SvelteKit](#sveltekit) · [Vite](#vite) · [Rollup](#rollup) · [Webpack](#webpack) · [Rspack](#rspack)
 
 #### SvelteKit
 
@@ -237,6 +239,8 @@ dist/assets/index-Ceijs3eO.js   53.65 kB │ gzip: 15.88 kB
 
 > [!NOTE]
 > This is a plugin, not a Svelte preprocessor. Add it to `vite.plugins`. Under Vite it only runs on `vite build`, never during dev. Under Rollup and Webpack, apply it conditionally so it only runs for production builds.
+
+**Set-ups:** [SvelteKit](#sveltekit-1) · [Astro](#astro) · [Vite](#vite-1) · [Rollup](#rollup-1) · [Rolldown](#rolldown) · [API reference](#optimizecss-api)
 
 #### SvelteKit
 
@@ -596,6 +600,8 @@ optimizeCarbonCss(css, {
 ### CLI
 
 The CLI wraps `optimizeCarbonCss` for pipelines with no plugin hook, like esbuild or `Bun.build`. It detects components by scanning `--content` files (default `src/**/*.{svelte,js,ts,mjs}`) for `carbon-components-svelte` imports, both the barrel form (`import { Button } from "carbon-components-svelte"`) and the direct-path form `optimizeImports` rewrites them to, and keeps literal `bx--` tokens found in those files too, the same as `optimizeCss`'s `content` option. It rewrites every matched CSS file in place, and shares the same detection blind spot as the plugins; see the [warning under `optimizeCss`](#optimizecss-api).
+
+**Jump to:** [Command](#command) · [Sample output](#sample-output) · [Options](#options)
 
 #### Command
 
