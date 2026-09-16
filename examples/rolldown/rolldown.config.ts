@@ -2,29 +2,45 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { optimizeCss, optimizeImports } from "carbon-preprocess-svelte";
 import { defineConfig } from "rolldown";
-import css from "rollup-plugin-css-only";
 import svelte from "rollup-plugin-svelte";
 
 const production = process.env.NODE_ENV === "production";
 
-// rollup-plugin-css-only walks every `bundle` entry's `facadeModuleId` and
-// passes it straight to `getModuleInfo`, relying on Rollup returning `null`
-// for bogus ids (e.g. the `.map` sourcemap asset, which has no
-// facadeModuleId). Rolldown's native binding throws instead of returning
-// null for a non-string id, so filter the bundle down to chunks before
-// calling into the plugin.
-//
-// `fileName` is left unset (only `name` given) so the plugin emits the
-// asset by name rather than a fixed `fileName`, letting `output.assetFileNames`
-// (below) control whether the CSS file is content-hashed.
-const cssPlugin = css({ name: "bundle.css" });
-const rolldownSafeCssPlugin = {
-  ...cssPlugin,
-  generateBundle(opts, bundle) {
-    const chunksOnly = Object.fromEntries(
-      Object.entries(bundle).filter(([, output]) => output.type === "chunk"),
-    );
-    return cssPlugin.generateBundle.call(this, opts, chunksOnly);
+// Minimal stand-in for rollup-plugin-css-only: collects the virtual `.css`
+// modules that rollup-plugin-svelte emits (one per component, in import
+// order) and writes them out as a single bundled stylesheet. Unlike
+// rollup-plugin-css-only, this skips non-chunk bundle entries (e.g. the
+// `.map` sourcemap asset) before calling `getModuleInfo`, since Rolldown's
+// native binding throws on a non-string id instead of returning `null`.
+const styles = new Map();
+function collectCssImports(id, getModuleInfo, ids, visited = new Set()) {
+  if (id == null || visited.has(id)) return;
+  visited.add(id);
+  if (styles.has(id)) ids.add(id);
+  for (const importedId of getModuleInfo(id)?.importedIds ?? []) {
+    collectCssImports(importedId, getModuleInfo, ids, visited);
+  }
+}
+const emitCss = {
+  name: "emit-css",
+  transform(code, id) {
+    if (!id.endsWith(".css")) return;
+    styles.set(id, code);
+    return "";
+  },
+  generateBundle(_opts, bundle) {
+    const ids = new Set();
+    for (const file of Object.values(bundle)) {
+      if (file.type === "chunk") {
+        collectCssImports(file.facadeModuleId, this.getModuleInfo, ids);
+      }
+    }
+    const source = Array.from(ids)
+      .map((id) => styles.get(id))
+      .join("\n");
+    // `name` (not `fileName`) is passed so output.assetFileNames controls
+    // whether the emitted file is content-hashed.
+    this.emitFile({ type: "asset", name: "bundle.css", source });
   },
 };
 
@@ -72,7 +88,7 @@ export default defineConfig({
       preprocess: [optimizeImports()],
       compilerOptions: { dev: !production },
     }),
-    rolldownSafeCssPlugin,
+    emitCss,
     // Only apply the plugin when building for production.
     production && optimizeCss(),
     emitHtml,
