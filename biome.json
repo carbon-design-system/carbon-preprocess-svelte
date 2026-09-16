@@ -48,9 +48,17 @@
         "useLiteralKeys": "error"
       },
       "suspicious": {
-        "noImportCycles": "error"
+        "noExplicitAny": "error",
+        "noFocusedTests": "error",
+        "noImportCycles": "error",
+        "noSkippedTests": "error",
+        "noTsIgnore": "error"
       },
       "style": {
+        "noEnum": "error",
+        "useExportType": "error",
+        "useImportType": "error",
+        "useNodejsImportProtocol": "error",
         "noRestrictedImports": {
           "level": "error",
           "options": {
