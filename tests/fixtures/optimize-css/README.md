@@ -23,7 +23,7 @@ Review the .report.json diff. Carbon ships minified CSS; the test pretty-prints 
 
 ## What gets checked
 
-Each scenario also validates against src/component-index.ts, the same component-to-class map the plugin uses:
+Each scenario also validates against src/component-index/index.ts, the same component-to-class map the plugin uses:
 
 - No over-prune: if a source selector would survive strict pruning, its Carbon classes must still appear in the output.
 - No foreign survivor: no kept selector should fail strict allowlist matching (subject classes must match; context ancestors may be exempt).

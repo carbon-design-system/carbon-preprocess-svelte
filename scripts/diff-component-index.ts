@@ -3,7 +3,7 @@ import type { ComponentIndex } from "../src/indexer/build-index";
 /**
  * Human-readable summary of what changed between two component indexes:
  * components added or removed, paths that moved, and per component the
- * classes gained or lost. Since `src/component-index.ts` is stored packed,
+ * classes gained or lost. Since `src/component-index/index.ts` is stored packed,
  * its git diff no longer shows any of this; `bun run index:components`
  * prints these lines instead, which is what you want to read after a
  * Carbon bump.

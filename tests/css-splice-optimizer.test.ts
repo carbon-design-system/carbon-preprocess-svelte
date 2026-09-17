@@ -1,4 +1,4 @@
-import { getComponents } from "carbon-preprocess-svelte/component-index-registry";
+import { getComponents } from "carbon-preprocess-svelte/component-index/registry";
 import { ALWAYS_ON_CLASSES } from "carbon-preprocess-svelte/constants";
 import {
   type SpliceOptimizerOptions,

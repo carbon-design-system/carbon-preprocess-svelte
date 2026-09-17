@@ -1,4 +1,4 @@
-import { setComponents } from "../component-index-registry";
+import { setComponents } from "../component-index/registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 import {
   type OptimizeCssOptions,

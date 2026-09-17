@@ -2,7 +2,7 @@ import { optimizeImports } from "carbon-preprocess-svelte";
 import {
   getComponents,
   setComponents,
-} from "carbon-preprocess-svelte/component-index-registry";
+} from "carbon-preprocess-svelte/component-index/registry";
 import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
 import type { Preprocessor, Processed } from "svelte/compiler";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";

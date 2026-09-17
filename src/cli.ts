@@ -1,7 +1,7 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { setComponents } from "./component-index-registry";
+import { setComponents } from "./component-index/registry";
 import { ensureLiveComponentIndex } from "./indexer/live-index";
 import { createCssOptimizer } from "./plugins/create-optimized-css";
 import { logAssetDiff } from "./plugins/print-diff";

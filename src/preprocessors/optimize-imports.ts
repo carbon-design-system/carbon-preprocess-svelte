@@ -1,5 +1,5 @@
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
-import { getComponents, setComponents } from "../component-index-registry";
+import { getComponents, setComponents } from "../component-index/registry";
 import { CarbonSvelte } from "../constants";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 

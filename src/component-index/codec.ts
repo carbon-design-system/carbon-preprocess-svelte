@@ -1,5 +1,5 @@
-import { CarbonSvelte } from "./constants";
-import type { ComponentIndex } from "./indexer/build-index";
+import { CarbonSvelte } from "../constants";
+import type { ComponentIndex } from "../indexer/build-index";
 
 /**
  * Compact on-disk encoding for the generated component index. The index is

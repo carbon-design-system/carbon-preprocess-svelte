@@ -2,7 +2,7 @@ import { components } from "carbon-preprocess-svelte/component-index";
 import {
   decodeComponentIndex,
   encodeComponentIndex,
-} from "carbon-preprocess-svelte/component-index-codec";
+} from "carbon-preprocess-svelte/component-index/codec";
 import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
 
 describe("component index codec", () => {
