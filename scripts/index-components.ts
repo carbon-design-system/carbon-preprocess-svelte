@@ -1,7 +1,7 @@
 import {
   decodeComponentIndex,
   encodeComponentIndex,
-} from "../src/component-index-codec";
+} from "../src/component-index/codec";
 import { buildComponentIndex } from "../src/indexer/build-index";
 import { diffComponentIndex } from "./diff-component-index";
 
@@ -29,7 +29,7 @@ for (const [identifier, classes] of Object.entries(MANUAL_OVERRIDES)) {
 }
 
 // The index is written in the compact form described in
-// src/component-index-codec.ts and expanded once at module load, so the
+// src/component-index/codec.ts and expanded once at module load, so the
 // exported `components` shape stays `{ path: string; classes: string[] }`.
 const encoded = encodeComponentIndex(components);
 
@@ -39,14 +39,14 @@ const encoded = encodeComponentIndex(components);
 const decoded = decodeComponentIndex(encoded);
 if (JSON.stringify(decoded) !== JSON.stringify(components)) {
   throw new Error(
-    "Encoded component index does not round-trip; see src/component-index-codec.ts.",
+    "Encoded component index does not round-trip; see src/component-index/codec.ts.",
   );
 }
 
 // The packed file's git diff says nothing useful, so report what actually
 // changed against the checked-in index (best effort: a missing or broken
 // file just skips the report).
-const previous = await import("../src/component-index")
+const previous = await import("../src/component-index/index")
   .then((module) => module.components)
   .catch(() => undefined);
 if (previous) {
@@ -61,15 +61,15 @@ if (previous) {
 }
 
 await Bun.write(
-  "src/component-index.ts",
+  "src/component-index/index.ts",
   `// @generated
 // This file was automatically generated and should not be edited.
 // @see scripts/index-components.ts
 
-import { decodeComponentIndex } from "./component-index-codec";
+import { decodeComponentIndex } from "./codec";
 
 // Compact encoding of every component's path and CSS classes; see
-// src/component-index-codec.ts for the format.
+// src/component-index/codec.ts for the format.
 export const components = Object.freeze(
   decodeComponentIndex({
     pool: ${JSON.stringify(encoded.pool)},

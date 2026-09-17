@@ -1,5 +1,5 @@
-import { components as staticComponents } from "./component-index";
-import type { ComponentIndex } from "./indexer/build-index";
+import type { ComponentIndex } from "../indexer/build-index";
+import { components as staticComponents } from "./index";
 
 let active: ComponentIndex = staticComponents;
 

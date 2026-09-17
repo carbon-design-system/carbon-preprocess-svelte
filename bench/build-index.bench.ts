@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { group, task } from "ostia";
-import { getComponents } from "../src/component-index-registry";
+import { getComponents } from "../src/component-index/registry";
 import { CarbonSvelte } from "../src/constants";
 import {
   buildComponentIndex,

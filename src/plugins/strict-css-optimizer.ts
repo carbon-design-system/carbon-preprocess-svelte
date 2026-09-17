@@ -1,4 +1,4 @@
-import { getComponents } from "../component-index-registry";
+import { getComponents } from "../component-index/registry";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import {
   findSubjectStart,

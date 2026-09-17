@@ -1,5 +1,5 @@
 import path from "node:path";
-import { getComponents } from "../component-index-registry";
+import { getComponents } from "../component-index/registry";
 import { ALWAYS_ON_CLASSES } from "../constants";
 import {
   type SpliceOptimizerOptions,

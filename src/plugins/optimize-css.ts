@@ -1,5 +1,5 @@
 import type { Plugin, Rollup } from "vite";
-import { setComponents } from "../component-index-registry";
+import { setComponents } from "../component-index/registry";
 import { ensureLiveComponentIndex } from "../indexer/live-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";

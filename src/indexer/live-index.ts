@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
-import { components as staticComponentIndex } from "../component-index";
+import { components as staticComponentIndex } from "../component-index/index";
 import type { ComponentIndex } from "./build-index";
 import { buildComponentIndex, resolveCarbonRoot } from "./build-index";
 
@@ -124,7 +124,7 @@ export async function resolveLiveComponentIndex(
 
 /**
  * Un-memoized `ensureLiveComponentIndex`: resolves the live index, falling
- * back to the bundled static `component-index.ts` on any failure
+ * back to the bundled static `component-index/index.ts` on any failure
  * (unresolvable `carbon-components-svelte`, unexpected Carbon `src` layout,
  * etc.) so opting in can't turn a working build into a broken one.
  */
