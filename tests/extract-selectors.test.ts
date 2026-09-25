@@ -113,6 +113,39 @@ describe("extractFromSvelte", () => {
     ]);
   });
 
+  test.each([['context="module"'], ["module"]])(
+    "module script (<script %s>) literals are importable classes",
+    (attr) => {
+      const result = extract({
+        code: `
+        <script ${attr}>
+          export const SIZES = { sm: "bx--foo--sm", lg: "bx--foo--lg" };
+          export const variant = (kind) => \`bx--foo--\${kind}\`;
+          export const inModal = (el) => el.closest(".bx--modal");
+        </script>
+        <script>
+          const local = "bx--instance-only";
+        </script>
+        <div class={SIZES.sm}></div>
+      `,
+        filename: "test.svelte",
+      });
+      expect(result.moduleClasses).toEqual([
+        ".bx--foo--sm",
+        ".bx--foo--lg",
+        ".bx--foo--",
+      ]);
+      // The component itself still gets all of them, lookups included.
+      expect(result.classes).toEqual(
+        expect.arrayContaining([
+          ".bx--foo--sm",
+          ".bx--modal",
+          ".bx--instance-only",
+        ]),
+      );
+    },
+  );
+
   test("deduplicates classes and components", () => {
     const result = extract({
       code: `

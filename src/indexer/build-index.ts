@@ -128,11 +128,14 @@ export async function buildComponentIndex(options?: {
 
       moduleGraph.importsByModule.set(moduleKey, extracted.imports);
 
-      if (extracted.runtimeClasses.length > 0) {
-        moduleGraph.runtimeByModule.set(
-          moduleKey,
-          new Set(extracted.runtimeClasses),
-        );
+      // Module-script classes travel with imports, so a component that
+      // imports a hoisted constant from another component gets its classes.
+      const graphClasses = [
+        ...extracted.runtimeClasses,
+        ...extracted.moduleClasses,
+      ];
+      if (graphClasses.length > 0) {
+        moduleGraph.runtimeByModule.set(moduleKey, new Set(graphClasses));
       }
     }
 
