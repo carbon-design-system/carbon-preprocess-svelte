@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { resolvePackageRoot } from "./resolve-package-root";
@@ -23,6 +29,22 @@ export function createFakeProject() {
       const link = path.join(nodeModules, "carbon-components-svelte");
       symlinkSync(target, link, "dir");
       return link;
+    },
+    /**
+     * A `carbon-components-svelte` with a `package.json` but no `src/`:
+     * resolvable, but indexing it fails.
+     */
+    installBrokenCarbon(): void {
+      const carbon = path.join(
+        root,
+        "node_modules",
+        "carbon-components-svelte",
+      );
+      mkdirSync(carbon, { recursive: true });
+      writeFileSync(
+        path.join(carbon, "package.json"),
+        JSON.stringify({ name: "carbon-components-svelte", version: "9.9.9" }),
+      );
     },
     dispose() {
       rmSync(root, { recursive: true, force: true });

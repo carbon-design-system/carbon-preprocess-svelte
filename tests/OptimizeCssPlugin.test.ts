@@ -8,6 +8,7 @@ import {
   NO_CARBON_IMPORTS,
 } from "../src/plugins/messages";
 import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
+import { createFakeProject } from "./helpers/fake-project";
 
 type ModuleResource =
   | string
@@ -106,13 +107,41 @@ describe("OptimizeCssPlugin", () => {
     const plugin = new OptimizeCssPlugin({
       silent: true,
       preserveAllIBMFonts: true,
-      experimental: { liveIndex: true },
     });
     expect(getOptions(plugin)).toEqual({
       silent: true,
       preserveAllIBMFonts: true,
-      experimental: { liveIndex: true },
     });
+  });
+
+  test("leaves CSS unpruned when the component index can't be built", async () => {
+    const project = createFakeProject();
+    project.installBrokenCarbon();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const plugin = new OptimizeCssPlugin();
+      const mockCompiler = createMockCompiler({
+        assets: {
+          "styles.css": {
+            source: () => ".bx--btn{color:red}.bx--accordion{color:blue}",
+          },
+        },
+        moduleResources: [
+          `node_modules/${CarbonSvelte.Components}/Button.svelte`,
+        ],
+        context: project.root,
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
+      expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
+    } finally {
+      warn.mockRestore();
+      project.dispose();
+    }
   });
 
   test("skips processing in development mode", () => {

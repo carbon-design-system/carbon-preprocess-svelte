@@ -2,9 +2,29 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { optimizeCarbonCss } from "carbon-preprocess-svelte";
+import { createFakeProject } from "./helpers/fake-project";
 
-// `experimental.liveIndex` is not exercised here; tests/live-index.test.ts
-// covers building the index itself.
+describe("optimizeCarbonCss: component index unavailable", () => {
+  test("warns and returns the CSS unpruned", async () => {
+    const project = createFakeProject();
+    project.installBrokenCarbon();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const css = ".bx--btn{color:red}.bx--accordion{color:blue}";
+
+    try {
+      const result = await optimizeCarbonCss(css, {
+        components: ["Button"],
+        cwd: project.root,
+      });
+
+      expect(result).toEqual({ css, removed: 0 });
+      expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
+    } finally {
+      warn.mockRestore();
+      project.dispose();
+    }
+  });
+});
 
 describe("optimizeCarbonCss", () => {
   test("keeps classes of named components", async () => {

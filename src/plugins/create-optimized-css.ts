@@ -1,6 +1,6 @@
 import path from "node:path";
-import { getComponents } from "../component-index/registry";
 import { ALWAYS_ON_CLASSES } from "../constants";
+import type { ComponentIndex } from "../indexer/build-index";
 import {
   type SpliceOptimizerOptions,
   spliceOptimizeCss,
@@ -101,19 +101,6 @@ export type OptimizeCssOptions = {
    * @default true
    */
   scanModules?: boolean;
-
-  experimental?: {
-    /**
-     * Build the component index from *this project's* installed
-     * `carbon-components-svelte` instead of using the version bundled with
-     * `carbon-preprocess-svelte`. Resolved once per build (cached on disk,
-     * keyed by the Carbon and preprocessor versions). If it can't be built,
-     * Carbon CSS is left unpruned, so this can't turn a working build into a
-     * broken one.
-     * @default false
-     */
-    liveIndex?: boolean;
-  };
 };
 
 /**
@@ -128,6 +115,8 @@ export function isSilent(options?: OptimizeCssOptions): boolean {
 
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;
+  /** Index of the installed Carbon; see `loadComponentIndex`. */
+  components: ComponentIndex;
   ids: Iterable<string>;
   /**
    * Class selectors (`.bx--*`) from scanning `content` globs. Pre-scanned by
@@ -141,11 +130,12 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
  * Build the class allowlist from bundled component paths and whether flatpickr
  * CSS should stay (any DatePicker import).
  *
- * Paths like "Button.svelte" map through component-index to `.bx--*` classes.
+ * Paths like "Button.svelte" map through the component index to `.bx--*` classes.
  * `.bx--body` is always kept; apps set it on `<body>` but no component file
  * references it.
  */
 function buildUsage(
+  componentIndex: ComponentIndex,
   ids: Iterable<string>,
   contentClasses?: Iterable<string>,
 ): {
@@ -154,7 +144,6 @@ function buildUsage(
   components: string[];
 } {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
-  const componentIndex = getComponents();
   const usedComponents = new Set<string>();
   let preserveFlatpickr = false;
 
@@ -210,11 +199,13 @@ export function createCssOptimizer(
   options: Omit<CreateOptimizedCssOptions, "source">,
 ) {
   const { allowlist, preserveFlatpickr, components } = buildUsage(
+    options.components,
     options.ids,
     options.contentClasses,
   );
   const optimizerOptions: SpliceOptimizerOptions = {
     allowlist,
+    components: options.components,
     preserveAllIBMFonts: options.preserveAllIBMFonts === true,
     preserveFlatpickr,
     safelist: options.safelist ?? [],

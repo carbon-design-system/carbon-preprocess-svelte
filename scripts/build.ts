@@ -102,7 +102,7 @@ async function buildProject() {
     return;
   }
 
-  // `svelte/compiler` is loaded only through the live index's dynamic import
+  // `svelte/compiler` is loaded only through the component index's dynamic import
   // (see src/indexer/svelte-parser.ts). A static import would load it when
   // any consumer loads this package. Scan every emitted file because code
   // splitting can put the import in a shared chunk.

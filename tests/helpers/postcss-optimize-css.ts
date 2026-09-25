@@ -48,6 +48,7 @@ function optimizeStrictAtRule(
 
 function createPostcssPlugins(
   allowlist: Set<string>,
+  components: SpliceOptimizerOptions["components"],
   preserveAllIBMFonts: boolean,
   preserveFlatpickr: boolean,
   safelist: SpliceOptimizerOptions["safelist"],
@@ -59,6 +60,7 @@ function createPostcssPlugins(
       Rule(node) {
         report.removed += optimizeStrictRule(node, {
           allowlist,
+          components,
           preserveFlatpickr,
           safelist,
         });
@@ -109,6 +111,7 @@ export function optimizeCssWithPostcss(
   const { css } = postcss(
     createPostcssPlugins(
       options.allowlist,
+      options.components,
       options.preserveAllIBMFonts,
       options.preserveFlatpickr,
       options.safelist,

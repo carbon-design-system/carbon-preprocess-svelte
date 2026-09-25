@@ -9,6 +9,7 @@ import {
 import { collectCarbonTokens, scanContent } from "../src/plugins/scan-content";
 import { collectCarbonImports } from "../src/plugins/scan-imports";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
+import { components } from "../tests/helpers/component-index";
 
 // Real Carbon theme CSS (~700kb minified), same source the plugin optimizes
 // at build time. Any theme works for selector coverage.
@@ -59,6 +60,7 @@ for (const scenario of SCENARIOS) {
   group(scenario.name, () => {
     task("optimizeCssWithReport", () => {
       optimizeCssWithReport({
+        components,
         source,
         ids: scenario.ids,
         silent: true,
@@ -75,7 +77,11 @@ const SAFELIST_REGEXPS = [/^\.bx--btn--/, /bx--tag/];
 // on a mixed asset, the splice path on an asset with `@layer`, and the
 // Uint8Array source like Vite emits for CSS assets.
 group("per-asset paths (small bundle)", () => {
-  const optimizer = createCssOptimizer({ ids: BUNDLE_IDS, silent: true });
+  const optimizer = createCssOptimizer({
+    components,
+    ids: BUNDLE_IDS,
+    silent: true,
+  });
 
   task("non-Carbon chunk (skip, ~25kb)", () => {
     optimizer.run(APP_CHUNK);
@@ -98,6 +104,7 @@ group("per-asset paths (small bundle)", () => {
 group("options (small bundle)", () => {
   task("safelist: strings", () => {
     optimizeCssWithReport({
+      components,
       source,
       ids: BUNDLE_IDS,
       silent: true,
@@ -107,6 +114,7 @@ group("options (small bundle)", () => {
 
   task("safelist: RegExp", () => {
     optimizeCssWithReport({
+      components,
       source,
       ids: BUNDLE_IDS,
       silent: true,
@@ -116,6 +124,7 @@ group("options (small bundle)", () => {
 
   task("contentClasses: 300 tokens", () => {
     optimizeCssWithReport({
+      components,
       source,
       ids: BUNDLE_IDS,
       silent: true,
@@ -125,6 +134,7 @@ group("options (small bundle)", () => {
 
   task("DatePicker (flatpickr kept)", () => {
     optimizeCssWithReport({
+      components,
       source,
       ids: [...BUNDLE_IDS, "DatePicker", "DatePickerInput"],
       silent: true,
@@ -133,6 +143,7 @@ group("options (small bundle)", () => {
 
   task("preserveAllIBMFonts", () => {
     optimizeCssWithReport({
+      components,
       source,
       ids: BUNDLE_IDS,
       silent: true,
@@ -151,7 +162,11 @@ group("full build (small bundle, 4 assets)", () => {
   ] as const;
 
   task("createCssOptimizer + run each asset", () => {
-    const optimizer = createCssOptimizer({ ids: BUNDLE_IDS, silent: true });
+    const optimizer = createCssOptimizer({
+      components,
+      ids: BUNDLE_IDS,
+      silent: true,
+    });
     for (const [_id, css] of assets) {
       optimizer.run(css);
     }

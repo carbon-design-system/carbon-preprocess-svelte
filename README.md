@@ -196,7 +196,7 @@ export default {
 The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on production builds and after other plugins.
 
 1. During `transform`, it collects imported `carbon-components-svelte` source paths, plus (unless `scanModules: false`) every literal `bx--` token found in other modules.
-2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components via an internal index, plus global selectors like `.bx--body`.
+2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components, plus global selectors like `.bx--body`. The component-to-class index is built from your installed `carbon-components-svelte` (see [Component index](#component-index)), so it always matches the version you have.
 3. A PostCSS plugin prunes Carbon (`bx--`) selectors outside that allowlist:
    - Individual selectors are pruned from comma-separated lists, not the whole rule, when only one branch matches
    - Every Carbon class in a compound selector (same-element and descendant) must match the allowlist, so importing NumberInput doesn't pull in `.bx--modal .bx--number` context rules, and Button doesn't pull in Tabs skeleton styles via a shared `.bx--skeleton` modifier
@@ -424,28 +424,6 @@ optimizeCss({
    * @default true
    */
   scanModules: false,
-
-  experimental: {
-    /**
-     * Experimental. Builds the component index from *this project's*
-     * installed `carbon-components-svelte` instead of the version bundled
-     * with `carbon-preprocess-svelte`. Useful when your app is ahead of (or
-     * behind) the Carbon version this package was last released against;
-     * new/renamed components and classes are picked up without waiting on a
-     * `carbon-preprocess-svelte` release.
-     *
-     * Resolved once per build and cached on disk in your project at
-     * `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`,
-     * so bumping either package invalidates the cache automatically. If the
-     * index can't be built (unresolvable `carbon-components-svelte` or
-     * `svelte/compiler`, unexpected `src` layout, etc.), the build warns and
-     * leaves Carbon CSS unpruned, so enabling it can't turn a working build
-     * into a broken one.
-     *
-     * @default false
-     */
-    liveIndex: true,
-  },
 });
 ```
 
@@ -486,7 +464,7 @@ export default {
 
 ### `optimizeCarbonCss`
 
-`optimizeCarbonCss` is the same optimization engine behind `optimizeCss` and `OptimizeCssPlugin`, exposed as a plain async function for bundlers without a plugin API: esbuild, `Bun.build`, or any post-build script. It's `async` because `experimental.liveIndex` may build a component index. It can't discover which Carbon components your app imports, so pass them explicitly via `components`. Shares the same detection blind spot as the plugins; see the [warning under `optimizeCss`](#optimizecss-api).
+`optimizeCarbonCss` is the same optimization engine behind `optimizeCss` and `OptimizeCssPlugin`, exposed as a plain async function for bundlers without a plugin API: esbuild, `Bun.build`, or any post-build script. It's `async` because it may build the [component index](#component-index). It can't discover which Carbon components your app imports, so pass them explicitly via `components`. Shares the same detection blind spot as the plugins; see the [warning under `optimizeCss`](#optimizecss-api).
 
 > [!TIP]
 > If your pipeline can run a shell command after the build instead of calling a function, the [CLI](#cli) does the component/import detection for you and needs no code changes.
@@ -557,7 +535,11 @@ optimizeCarbonCss(css, {
    */
   sources: [],
 
-  /** Directory that `content` globs resolve from. @default process.cwd() */
+  /**
+   * Project directory: `content` globs and the installed
+   * `carbon-components-svelte` resolve from it.
+   * @default process.cwd()
+   */
   cwd: process.cwd(),
 
   /**
@@ -581,17 +563,6 @@ optimizeCarbonCss(css, {
    * @default undefined
    */
   content: ["src/**/*.{svelte,js,ts}"],
-
-  experimental: {
-    /**
-     * Experimental. Builds the component index from *this project's*
-     * installed `carbon-components-svelte` instead of the version bundled
-     * with `carbon-preprocess-svelte`. See the `optimizeCss` API above for
-     * details.
-     * @default false
-     */
-    liveIndex: false,
-  },
 });
 ```
 
@@ -661,14 +632,23 @@ Options:
                           slashes for a RegExp: --safelist "/^\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
-  --live-index            Build the component index from the installed
-                          carbon-components-svelte (experimental).
-  --cwd <dir>             Directory globs resolve from. Default: process.cwd()
+  --cwd <dir>             Project directory; globs and carbon-components-svelte
+                          resolve from it. Default: process.cwd()
   --dry-run               Print sizes, write nothing.
   --report                Print detected components and allowlist summary.
   --silent                Suppress the per-file size log.
   -h, --help              Show this help.
 ```
+
+## Component index
+
+The CSS tools (`optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, and the CLI) prune against an index of the `bx--` classes each Carbon component renders. It's built at build time from your installed `carbon-components-svelte`, so it matches the version you have, whether that's older or newer than this package.
+
+- Carbon's source is parsed with `svelte/compiler`, resolved from your project.
+- The index is built once (well under a second) and cached at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`. Bumping either package rebuilds it.
+- If it can't be built (for example, `carbon-components-svelte` or `svelte` can't be resolved), the build logs a warning and leaves Carbon CSS unpruned instead of failing.
+
+`optimizeImports` doesn't use this index: it reads import paths from Carbon's `src/index.js` directly.
 
 ## Examples
 

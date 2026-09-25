@@ -1,5 +1,5 @@
-import { getComponents } from "../component-index/registry";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
+import type { ComponentIndex } from "../indexer/build-index";
 import {
   findSubjectStart,
   isClassTokenChar,
@@ -63,18 +63,18 @@ export function hasOptimizableCss(css: string): boolean {
 
 export type StrictCssOptimizerOptions = {
   allowlist: Set<string>;
+  /** Index `allowlist` was built from; supplies the cross-component classes. */
+  components: ComponentIndex;
   preserveFlatpickr: boolean;
   safelist: readonly SafelistEntry[];
 };
 
-let sharedClassesFor: ReturnType<typeof getComponents> | undefined;
-let sharedClassesCache: Set<string> | undefined;
+const sharedClassesCache = new WeakMap<ComponentIndex, Set<string>>();
 
-function getSharedClasses(): Set<string> {
-  const components = getComponents();
-  if (sharedClassesCache && sharedClassesFor === components) {
-    return sharedClassesCache;
-  }
+/** Classes more than one component renders. */
+function getSharedClasses(components: ComponentIndex): Set<string> {
+  const cached = sharedClassesCache.get(components);
+  if (cached) return cached;
 
   const counts = new Map<string, number>();
 
@@ -84,12 +84,11 @@ function getSharedClasses(): Set<string> {
     }
   }
 
-  sharedClassesFor = components;
-  sharedClassesCache = new Set(
+  const shared = new Set(
     [...counts].filter(([, count]) => count > 1).map(([cls]) => cls),
   );
-
-  return sharedClassesCache;
+  sharedClassesCache.set(components, shared);
+  return shared;
 }
 
 type AllowlistIndex = {
@@ -106,11 +105,14 @@ type AllowlistIndex = {
 
 const allowlistIndexCache = new WeakMap<Set<string>, AllowlistIndex>();
 
-function getAllowlistIndex(allowlist: Set<string>): AllowlistIndex {
+function getAllowlistIndex(
+  allowlist: Set<string>,
+  components: ComponentIndex,
+): AllowlistIndex {
   const cached = allowlistIndexCache.get(allowlist);
   if (cached) return cached;
 
-  const shared = getSharedClasses();
+  const shared = getSharedClasses(components);
   const hyphenPrefixes: string[] = [];
 
   for (const selector of allowlist) {
@@ -268,8 +270,8 @@ export function pruneRuleSelector(
   selector: string,
   options: StrictCssOptimizerOptions,
 ): PrunedSelector | undefined {
-  const { allowlist, preserveFlatpickr, safelist } = options;
-  const index = getAllowlistIndex(allowlist);
+  const { allowlist, components, preserveFlatpickr, safelist } = options;
+  const index = getAllowlistIndex(allowlist, components);
 
   // `bx-` is either followed by another hyphen (Carbon) or not (legacy), so
   // one substring check covers both prefixes. A flatpickr match inside any

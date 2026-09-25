@@ -10,6 +10,7 @@ import {
   resolveCarbonCss,
   shouldKeepStrictSelector,
 } from "./helpers/carbon-css";
+import { components } from "./helpers/component-index";
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/optimize-css");
 const UPDATE_FIXTURES = process.env.UPDATE_FIXTURES === "true";
@@ -163,6 +164,7 @@ const source = resolveCarbonCss(THEME);
 for (const scenario of SCENARIOS) {
   describe(`optimize-css fixtures: ${scenario.name}`, () => {
     const output = createOptimizedCss({
+      components,
       source,
       ids: scenario.ids,
     });

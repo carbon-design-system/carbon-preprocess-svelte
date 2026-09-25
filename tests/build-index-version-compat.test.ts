@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { buildComponentIndex } from "../src/indexer/build-index";
+import { createOptimizedCss } from "../src/plugins/create-optimized-css";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
@@ -16,6 +19,33 @@ describe("buildComponentIndex against a real historical carbon-components-svelte
     // ContainedList was added to carbon-components-svelte after 0.85.0:
     // an old install simply not having it should never crash the build.
     expect(index.ContainedList).toBeUndefined();
+  });
+
+  // 0.85.0's `Tabs.svelte` renders a `.bx--tabs-trigger` wrapper (mobile
+  // dropdown-style trigger) via a `class:` directive; later releases dropped
+  // it. An index built from a newer release doesn't list it under `Tabs`, so
+  // pruning against one removed the (hiding) rule for apps still on an older
+  // Carbon install (#213). Indexing the installed release picks the class
+  // straight out of its actual markup.
+  test("keeps a class only the old install's Tabs markup has, still pruning unrelated classes", async () => {
+    const carbonRoot = resolvePackageRoot("carbon-components-svelte-old");
+    const index = await buildComponentIndex({ carbonRoot });
+
+    expect(index.Tabs?.classes).toEqual(
+      expect.arrayContaining([".bx--tabs-trigger", ".bx--tabs-trigger-text"]),
+    );
+
+    const optimized = createOptimizedCss({
+      source: readFileSync(path.join(carbonRoot, "css", "white.css"), "utf8"),
+      components: index,
+      ids: ["Tabs"],
+    });
+
+    expect(optimized).toContain(".bx--tabs-trigger{display:none}");
+    expect(optimized).toContain(".bx--tabs-trigger-text{");
+    // Strict pruning still drops classes owned by components that
+    // weren't imported -- the fix is not "keep everything".
+    expect(optimized).not.toContain(".bx--accordion");
   });
 });
 
