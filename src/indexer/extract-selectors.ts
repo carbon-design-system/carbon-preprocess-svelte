@@ -1,5 +1,5 @@
-import { CARBON_PREFIX } from "../constants";
 import {
+  extractCarbonClassTokens,
   extractRuntimeClassesFromSource,
   resolveRelativeImport,
 } from "./extract-runtime-classes";
@@ -104,19 +104,18 @@ export function extractFromSvelte(
         selectors.add(cleanSelector);
       }
 
-      if (
-        node.type === "Literal" &&
-        typeof node.value === "string" &&
-        CARBON_PREFIX.test(node.value)
-      ) {
-        selectors.add(node.value);
+      // A string may hold several classes (`"bx--a bx--b"`), a selector
+      // (`".bx--a .bx--b"`), or markup, so add each class it names.
+      if (node.type === "Literal" && typeof node.value === "string") {
+        for (const cls of extractCarbonClassTokens(node.value)) {
+          selectors.add(cls);
+        }
       }
 
-      if (
-        node.type === "TemplateElement" &&
-        CARBON_PREFIX.test(node.value.raw)
-      ) {
-        selectors.add(node.value.raw);
+      if (node.type === "TemplateElement") {
+        for (const cls of extractCarbonClassTokens(node.value.raw)) {
+          selectors.add(cls);
+        }
       }
 
       if (node.type === "Element") {

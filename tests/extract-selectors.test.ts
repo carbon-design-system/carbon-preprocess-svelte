@@ -83,6 +83,36 @@ describe("extractFromSvelte", () => {
     expect(result.classes).toEqual([".bx--template-class"]);
   });
 
+  test("string literals naming several classes add each one", () => {
+    const result = extract({
+      code: `
+        <script>
+          const both = "bx--tooltip__trigger bx--tooltip--a11y";
+          const selector = ".bx--tree-node:not(.bx--tree-node--hidden)";
+          const markup = '<strong class="bx--highlight">';
+          const prefixed = "bx--aspect-ratio bx--aspect-ratio--" + ratio;
+          const mixed = \`bx--a \${x ? "bx--b" : ""} bx--c--\${size}\`;
+          const unrelated = "not-carbon bx-single-hyphen";
+          const pattern = /^bx--(overflow-menu|checkbox)/;
+        </script>
+      `,
+      filename: "test.svelte",
+    });
+    expect(result.classes).toEqual([
+      ".bx--tooltip__trigger",
+      ".bx--tooltip--a11y",
+      ".bx--tree-node",
+      ".bx--tree-node--hidden",
+      ".bx--highlight",
+      ".bx--aspect-ratio",
+      ".bx--aspect-ratio--",
+      // The walk visits a template's expressions before its quasis.
+      ".bx--b",
+      ".bx--a",
+      ".bx--c--",
+    ]);
+  });
+
   test("deduplicates classes and components", () => {
     const result = extract({
       code: `
