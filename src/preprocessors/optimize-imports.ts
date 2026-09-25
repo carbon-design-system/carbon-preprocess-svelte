@@ -2,7 +2,11 @@ import path from "node:path";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { CarbonSvelte } from "../constants";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
-import { type CarbonExport, readCarbonExports } from "./carbon-exports";
+import {
+  type CarbonExport,
+  readCarbonExports,
+  readExportsPolicy,
+} from "./carbon-exports";
 
 const LOG_PREFIX = "[carbon-preprocess-svelte]";
 
@@ -477,6 +481,33 @@ export function transformScript(
 }
 
 /**
+ * The barrel exports of the Carbon installed at `carbonRoot` that its
+ * `package.json#exports` lets a bundler import directly. Rewriting to a
+ * blocked path would fail the build, so those names stay on the barrel.
+ */
+function readImportableExports(carbonRoot: string): Map<string, CarbonExport> {
+  const exports = readCarbonExports(carbonRoot);
+  const isImportable = readExportsPolicy(carbonRoot);
+  const blocked: string[] = [];
+
+  for (const [name, { path: importPath }] of exports) {
+    if (!isImportable(importPath)) {
+      exports.delete(name);
+      blocked.push(importPath);
+    }
+  }
+
+  if (blocked.length > 0) {
+    const more = blocked.length > 1 ? ` and ${blocked.length - 1} more` : "";
+    console.warn(
+      `${LOG_PREFIX} optimizeImports: the installed ${CarbonSvelte.Components}'s package.json "exports" doesn't allow importing ${blocked[0]}${more}; leaving those imports on the barrel.`,
+    );
+  }
+
+  return exports;
+}
+
+/**
  * Barrel exports of the Carbon a directory resolves, as the bundler resolves
  * the barrel import. Cached per directory and per install; warns once.
  */
@@ -495,7 +526,7 @@ function createCarbonExportsResolver(): (
       const carbonRoot = resolveCarbonRoot(dir);
       exports = byCarbonRoot.get(carbonRoot);
       if (!exports) {
-        exports = readCarbonExports(carbonRoot);
+        exports = readImportableExports(carbonRoot);
         byCarbonRoot.set(carbonRoot, exports);
       }
     } catch (error) {

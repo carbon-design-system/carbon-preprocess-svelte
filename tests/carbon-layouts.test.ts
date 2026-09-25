@@ -1,10 +1,18 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { optimizeImports } from "carbon-preprocess-svelte";
 import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
 import {
   createCssOptimizer,
   createOptimizedCss,
 } from "carbon-preprocess-svelte/plugins/create-optimized-css";
-import { readCarbonExports } from "carbon-preprocess-svelte/preprocessors/carbon-exports";
+import {
+  readCarbonExports,
+  readExportsPolicy,
+} from "carbon-preprocess-svelte/preprocessors/carbon-exports";
 import { transformScript } from "carbon-preprocess-svelte/preprocessors/optimize-imports";
+import type { Processed } from "svelte/compiler";
+import { createFakeProject } from "./helpers/fake-project";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 
 const CSS = ".bx--btn{color:red}.bx--tag{color:blue}";
@@ -162,6 +170,107 @@ describe("a bundled Carbon file missing from the index", () => {
       expect(optimizer.usage.unindexed).toEqual(["Gone/Gone.svelte"]);
       expect(optimizer.run(CSS)).toEqual({ css: CSS, removed: 0 });
     } finally {
+      carbon.dispose();
+    }
+  });
+});
+
+describe("readExportsPolicy", () => {
+  const BUTTON_PATH = "carbon-components-svelte/src/Button/Button.svelte";
+  const UTIL_PATH = "carbon-components-svelte/src/utils/toCsv.js";
+
+  test.each([
+    ["no exports field", undefined, true, true],
+    ["only the barrel (string)", "./src/index.js", false, false],
+    [
+      "only the barrel (conditions)",
+      { svelte: "./src/index.js" },
+      false,
+      false,
+    ],
+    [
+      "only .svelte files",
+      { ".": "./src/index.js", "./src/*.svelte": "./src/*.svelte" },
+      true,
+      false,
+    ],
+    [
+      "a longer pattern blocking a folder",
+      { "./src/*": "./src/*", "./src/utils/*": null },
+      true,
+      false,
+    ],
+    [
+      "an exact key overriding a pattern",
+      { "./src/*": "./src/*", "./src/Button/Button.svelte": null },
+      false,
+      true,
+    ],
+    [
+      "conditions with a non-null target",
+      { "./src/*": { types: "./types/*.d.ts", import: "./src/*" } },
+      true,
+      true,
+    ],
+  ])("%s", (_, exportsField, button, util) => {
+    const carbon = createMockCarbonPackage({});
+    writeFileSync(
+      path.join(carbon.root, "package.json"),
+      JSON.stringify({
+        name: "carbon-components-svelte",
+        exports: exportsField,
+      }),
+    );
+
+    try {
+      const isImportable = readExportsPolicy(carbon.root);
+      expect(isImportable(BUTTON_PATH)).toBe(button);
+      expect(isImportable(UTIL_PATH)).toBe(util);
+    } finally {
+      carbon.dispose();
+    }
+  });
+});
+
+describe("a Carbon whose exports hide src/", () => {
+  test("optimizeImports leaves imports on the barrel instead of breaking the build", () => {
+    const project = createFakeProject();
+    const carbon = createMockCarbonPackage({
+      "index.js": `export { default as Button } from "./Button/Button.svelte";`,
+      "Button/Button.svelte": BUTTON,
+    });
+    writeFileSync(
+      path.join(carbon.root, "package.json"),
+      JSON.stringify({
+        name: "carbon-components-svelte",
+        version: "9.0.0",
+        exports: { ".": { svelte: "./src/index.js" } },
+      }),
+    );
+    project.linkCarbon(project.root, carbon.root);
+    mkdirSync(path.join(project.root, "src"));
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const preprocessor = optimizeImports();
+      const content = `import { Button } from "carbon-components-svelte";`;
+      for (const file of ["App.svelte", "Other.svelte"]) {
+        const result = preprocessor.script({
+          attributes: {},
+          filename: path.join(project.root, "src", file),
+          content,
+          markup: "",
+        }) as Processed;
+        expect(result.code).toBe(content);
+      }
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain(
+        "leaving those imports on the barrel",
+      );
+    } finally {
+      warn.mockRestore();
+      project.dispose();
       carbon.dispose();
     }
   });

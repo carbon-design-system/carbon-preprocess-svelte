@@ -97,6 +97,69 @@ function resolveModule(from: string, source: string): string | undefined {
   ].find(isFile);
 }
 
+/** A `null` target, or conditions that all resolve to `null`, blocks the import. */
+function isAllowedTarget(target: unknown): boolean {
+  if (target === null) return false;
+  if (typeof target === "object" && !Array.isArray(target)) {
+    return Object.values(target).some(isAllowedTarget);
+  }
+  return true;
+}
+
+/**
+ * Returns whether Carbon's `package.json#exports` lets a bundler import a
+ * direct path (`carbon-components-svelte/src/Button/Button.svelte`), per
+ * Node's rules: exact keys first, then the `*` pattern with the longest
+ * prefix. Everything is importable when there's no `exports` field.
+ */
+export function readExportsPolicy(
+  carbonRoot: string,
+): (importPath: string) => boolean {
+  let exportsField: unknown;
+  try {
+    exportsField = JSON.parse(
+      readFileSync(path.join(carbonRoot, "package.json"), "utf8"),
+    ).exports;
+  } catch {
+    exportsField = undefined;
+  }
+
+  if (exportsField === undefined) return () => true;
+
+  const subpaths =
+    typeof exportsField === "object" &&
+    exportsField !== null &&
+    !Array.isArray(exportsField) &&
+    Object.keys(exportsField).some((key) => key.startsWith("."))
+      ? (exportsField as Record<string, unknown>)
+      : // A string, array, or conditions object only exports ".".
+        { ".": exportsField };
+
+  return (importPath) => {
+    const subpath = `.${importPath.slice(CarbonSvelte.Components.length)}`;
+    if (Object.hasOwn(subpaths, subpath)) {
+      return isAllowedTarget(subpaths[subpath]);
+    }
+
+    let match: string | undefined;
+    for (const key of Object.keys(subpaths)) {
+      const star = key.indexOf("*");
+      if (star === -1) continue;
+      const prefix = key.slice(0, star);
+      const suffix = key.slice(star + 1);
+      if (
+        subpath.length >= prefix.length + suffix.length &&
+        subpath.startsWith(prefix) &&
+        subpath.endsWith(suffix) &&
+        (match === undefined || prefix.length > match.indexOf("*"))
+      ) {
+        match = key;
+      }
+    }
+    return match !== undefined && isAllowedTarget(subpaths[match]);
+  };
+}
+
 /**
  * Maps every name `carbon-components-svelte`'s `src/index.js` exports to the
  * module that defines it, following re-export chains: older releases
