@@ -645,7 +645,7 @@ Options:
 The CSS tools (`optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, and the CLI) prune against an index of the `bx--` classes each Carbon component renders. It's built at build time from your installed `carbon-components-svelte`, so it matches the version you have, whether that's older or newer than this package.
 
 - Carbon's source is parsed with `svelte/compiler`, resolved from your project.
-- The index is built once (well under a second) and cached at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`. Bumping either package rebuilds it.
+- The index is built once (well under a second) and cached at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`. Bumping either package rebuilds it. A `carbon-components-svelte` linked from a local checkout (`bun link`, `npm link`, `workspace:`) isn't cached, so edits to its source are picked up on the next build.
 - If it can't be built (for example, `carbon-components-svelte` or `svelte` can't be resolved), the build logs a warning and leaves Carbon CSS unpruned instead of failing.
 
 `optimizeImports` doesn't use this index: it reads import paths from Carbon's `src/index.js` directly.

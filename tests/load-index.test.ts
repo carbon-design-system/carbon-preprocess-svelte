@@ -9,6 +9,7 @@ import {
 import { version as OWN_VERSION } from "../package.json";
 import { components } from "./helpers/component-index";
 import { createFakeProject } from "./helpers/fake-project";
+import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
 const CARBON_VERSION: string = (
@@ -125,6 +126,38 @@ describe("resolveComponentIndex", () => {
 
     expect(index).toEqual(components);
     expect(JSON.parse(await Bun.file(cacheFile).text())).toEqual(index);
+  });
+
+  test("a linked Carbon checkout is re-indexed every time, never cached", async () => {
+    const checkout = createMockCarbonPackage({
+      "index.js": `export { default as Foo } from "./Foo/Foo.svelte";`,
+      "Foo/Foo.svelte": `<div class="bx--foo"></div>`,
+    });
+    writeFileSync(
+      path.join(checkout.root, "package.json"),
+      JSON.stringify({ name: "carbon-components-svelte", version: "0.1.0" }),
+    );
+    const linked = createFakeProject();
+    linked.linkCarbon(linked.root, checkout.root);
+
+    try {
+      const before = await resolveComponentIndex({ projectRoot: linked.root });
+      expect(before.Foo?.classes).toEqual([".bx--foo"]);
+
+      writeFileSync(
+        path.join(checkout.root, "src", "Foo", "Foo.svelte"),
+        `<div class="bx--foo bx--foo--new"></div>`,
+      );
+      const after = await resolveComponentIndex({ projectRoot: linked.root });
+      expect(after.Foo?.classes).toEqual([".bx--foo", ".bx--foo--new"]);
+
+      expect(existsSync(path.join(linked.root, "node_modules", ".cache"))).toBe(
+        false,
+      );
+    } finally {
+      linked.dispose();
+      checkout.dispose();
+    }
   });
 
   test("a cache written by another preprocessor version is not reused", async () => {
