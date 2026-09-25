@@ -1,7 +1,9 @@
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
-import { getComponents, setComponents } from "../component-index/registry";
 import { CarbonSvelte } from "../constants";
-import { ensureLiveComponentIndex } from "../indexer/live-index";
+import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
+import { type CarbonExport, readCarbonExports } from "./carbon-exports";
+
+const LOG_PREFIX = "[carbon-preprocess-svelte]";
 
 const NODE_MODULES_REGEX = /node_modules/;
 
@@ -63,37 +65,17 @@ function isWhitespace(code: number): boolean {
   );
 }
 
-type ComponentIndex = ReturnType<typeof getComponents>;
-
 /**
- * Resolves the direct-path replacement for a named specifier, or `undefined`
- * when it should stay on the barrel.
- *
- * Names missing from the component index: PascalCase gets an optimistic
- * `src/Name/Name.svelte` path; camelCase stays on the barrel so utilities
- * don't point at a `.svelte` file that isn't there.
+ * Carbon's barrel exports, read on first use: files that only import icons
+ * or pictograms never need `carbon-components-svelte` installed.
  */
-function resolvePath(
-  source: string,
-  imported: string,
-  components: ComponentIndex,
-): string | undefined {
-  if (source !== CarbonSvelte.Components) {
-    return `${source}/lib/${imported}.svelte`;
-  }
+export type CarbonExportsLoader = () => ReadonlyMap<string, CarbonExport>;
 
-  // Prefer indexed path (handles .js and other special cases).
-  const path = components[imported]?.path;
-  if (path !== undefined) return path;
-
-  // Not in index: PascalCase gets an optimistic component path;
-  // camelCase stays on the barrel (utility, not a .svelte file).
-  const code = imported.charCodeAt(0);
-  if (code >= 65 && code <= 90) {
-    return `${source}/src/${imported}/${imported}.svelte`;
-  }
-
-  return undefined;
+/** Emits `import local from "path"` or `import { name as local } from "path"`. */
+function directImport(local: string, path: string, name: string): string {
+  if (name === "default") return `import ${local} from "${path}";`;
+  const binding = name === local ? name : `${name} as ${local}`;
+  return `import { ${binding} } from "${path}";`;
 }
 
 /**
@@ -107,7 +89,7 @@ function resolvePath(
 function rewriteImport(
   source: string,
   clause: string | undefined,
-  components: ComponentIndex,
+  loadExports: CarbonExportsLoader,
 ): string | null {
   if (
     source !== CarbonSvelte.Components &&
@@ -157,17 +139,26 @@ function rewriteImport(
       local = (localPart ?? importedPart).trim();
     }
 
-    // Per-specifier type imports (`import { type X, Y }`) stay on the barrel.
-    const path = isType ? undefined : resolvePath(source, imported, components);
+    // Per-specifier type imports (`import { type X, Y }`) stay on the
+    // barrel, as do names the installed Carbon's barrel doesn't export.
+    let replacement: string | undefined;
+    if (!isType) {
+      if (source !== CarbonSvelte.Components) {
+        replacement = `import ${local} from "${source}/lib/${imported}.svelte";`;
+      } else {
+        const target = loadExports().get(imported);
+        if (target) replacement = directImport(local, target.path, target.name);
+      }
+    }
 
-    if (path === undefined) {
+    if (replacement === undefined) {
       // Keep specifier for barrel re-import below.
       if (preserved) preserved += ", ";
       if (isType) preserved += "type ";
       preserved += imported === local ? local : `${imported} as ${local}`;
     } else {
       if (rewritten) rewritten += "\n";
-      rewritten += `import ${local} from "${path}";`;
+      rewritten += replacement;
     }
 
     index = entryEnd + 1;
@@ -424,45 +415,11 @@ function writeVlq(buffer: Uint8Array, out: number, value: number): number {
   return out;
 }
 
-/**
- * Svelte preprocessor that transforms barrel imports from Carbon libraries
- * into direct path imports for better tree-shaking and faster builds.
- *
- * Skips loading the full component index, which speeds up HMR and builds.
- * @example
- * ```ts
- *   import { Button, Modal } from "carbon-components-svelte";
- *   import { Add } from "carbon-icons-svelte";
- *   import { Airplane } from "carbon-pictograms-svelte";
- * ```
- * becomes:
- * ```ts
- *   import Button from "carbon-components-svelte/src/Button/Button.svelte";
- *   import Modal from "carbon-components-svelte/src/Modal/Modal.svelte";
- *   import Add from "carbon-icons-svelte/lib/Add.svelte";
- *   import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
- * ```
- *
- * Names missing from the component index: PascalCase gets an optimistic
- * `src/Name/Name.svelte` path; camelCase stays on the barrel so utilities
- * don't point at a `.svelte` file that isn't there.
- */
-type OptimizeImportsOptions = {
-  experimental?: {
-    /**
-     * Build the component index from *this project's* installed
-     * `carbon-components-svelte` instead of using the version bundled with
-     * `carbon-preprocess-svelte`. Resolved once per build (cached on disk,
-     * keyed by the Carbon and preprocessor versions) and falls back to the bundled
-     * index if anything about the live build fails.
-     * @default false
-     */
-    liveIndex?: boolean;
-  };
-};
-
-function transformScript(raw: string, filename: string) {
-  const components = getComponents();
+export function transformScript(
+  raw: string,
+  filename: string,
+  loadExports: CarbonExportsLoader,
+) {
   let code = "";
   let mappings: MappingsBuilder | undefined;
   let lastIndex = 0;
@@ -475,7 +432,7 @@ function transformScript(raw: string, filename: string) {
     // leave them entirely untouched.
     const replacement = match[2]
       ? null
-      : rewriteImport(match[4], match[3], components);
+      : rewriteImport(match[4], match[3], loadExports);
 
     if (replacement !== null) {
       const start = index + match[1].length;
@@ -518,18 +475,48 @@ function transformScript(raw: string, filename: string) {
   };
 }
 
-export const optimizeImports: SveltePreprocessor<"script"> = (
-  options?: OptimizeImportsOptions,
-) => {
-  let liveIndexReady: Promise<void> | undefined;
+function loadCarbonExports(): ReadonlyMap<string, CarbonExport> {
+  try {
+    return readCarbonExports(resolveCarbonRoot());
+  } catch (error) {
+    console.warn(
+      `${LOG_PREFIX} optimizeImports: could not read the exports of the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving its imports on the barrel.`,
+    );
+    return new Map();
+  }
+}
+
+/**
+ * Svelte preprocessor that transforms barrel imports from Carbon libraries
+ * into direct path imports for better tree-shaking and faster builds.
+ *
+ * @example
+ * ```ts
+ *   import { Button, Modal } from "carbon-components-svelte";
+ *   import { Add } from "carbon-icons-svelte";
+ *   import { Airplane } from "carbon-pictograms-svelte";
+ * ```
+ * becomes:
+ * ```ts
+ *   import Button from "carbon-components-svelte/src/Button/Button.svelte";
+ *   import Modal from "carbon-components-svelte/src/Modal/Modal.svelte";
+ *   import Add from "carbon-icons-svelte/lib/Add.svelte";
+ *   import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
+ * ```
+ *
+ * Component paths come from the installed `carbon-components-svelte`'s own
+ * `src/index.js`, read once per preprocessor instance, so they always match
+ * the installed version. Names that barrel doesn't export stay on the barrel.
+ */
+export const optimizeImports: SveltePreprocessor<"script"> = () => {
+  let carbonExports: ReadonlyMap<string, CarbonExport> | undefined;
+  const loadExports: CarbonExportsLoader = () => {
+    carbonExports ??= loadCarbonExports();
+    return carbonExports;
+  };
 
   return {
     name: "carbon:optimize-imports",
-    // Not declared `async`: without `experimental.liveIndex`, this returns
-    // the transformed result synchronously (existing callers rely on that).
-    // Svelte's own preprocess pipeline accepts either a plain result or a
-    // Promise, so the `liveIndex` branch returning a Promise below is
-    // equally valid.
     script({ filename, content: raw }) {
       // Skip files in node_modules to minimize unnecessary preprocessing
       if (!filename) return;
@@ -539,12 +526,7 @@ export const optimizeImports: SveltePreprocessor<"script"> = (
       // Skip import scanning for the common no-Carbon file.
       if (!raw.includes("carbon-")) return;
 
-      if (options?.experimental?.liveIndex) {
-        liveIndexReady ??= ensureLiveComponentIndex().then(setComponents);
-        return liveIndexReady.then(() => transformScript(raw, filename));
-      }
-
-      return transformScript(raw, filename);
+      return transformScript(raw, filename, loadExports);
     },
   };
 };
