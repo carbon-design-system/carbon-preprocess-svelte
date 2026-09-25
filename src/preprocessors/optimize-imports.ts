@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { CarbonSvelte } from "../constants";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
@@ -475,15 +476,41 @@ export function transformScript(
   };
 }
 
-function loadCarbonExports(): ReadonlyMap<string, CarbonExport> {
-  try {
-    return readCarbonExports(resolveCarbonRoot());
-  } catch (error) {
-    console.warn(
-      `${LOG_PREFIX} optimizeImports: could not read the exports of the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving its imports on the barrel.`,
-    );
-    return new Map();
-  }
+/**
+ * Barrel exports of the Carbon a directory resolves, as the bundler resolves
+ * the barrel import. Cached per directory and per install; warns once.
+ */
+function createCarbonExportsResolver(): (
+  dir: string,
+) => ReadonlyMap<string, CarbonExport> {
+  const byDir = new Map<string, ReadonlyMap<string, CarbonExport>>();
+  const byCarbonRoot = new Map<string, ReadonlyMap<string, CarbonExport>>();
+  let warned = false;
+
+  return (dir) => {
+    let exports = byDir.get(dir);
+    if (exports) return exports;
+
+    try {
+      const carbonRoot = resolveCarbonRoot(dir);
+      exports = byCarbonRoot.get(carbonRoot);
+      if (!exports) {
+        exports = readCarbonExports(carbonRoot);
+        byCarbonRoot.set(carbonRoot, exports);
+      }
+    } catch (error) {
+      if (!warned) {
+        warned = true;
+        console.warn(
+          `${LOG_PREFIX} optimizeImports: could not read the exports of the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving its imports on the barrel.`,
+        );
+      }
+      exports = new Map();
+    }
+
+    byDir.set(dir, exports);
+    return exports;
+  };
 }
 
 /**
@@ -504,16 +531,12 @@ function loadCarbonExports(): ReadonlyMap<string, CarbonExport> {
  *   import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
  * ```
  *
- * Component paths come from the installed `carbon-components-svelte`'s own
- * `src/index.js`, read once per preprocessor instance, so they always match
- * the installed version. Names that barrel doesn't export stay on the barrel.
+ * Component paths come from the `src/index.js` of the
+ * `carbon-components-svelte` each file resolves, so they match the installed
+ * version. Names that barrel doesn't export stay on the barrel.
  */
 export const optimizeImports: SveltePreprocessor<"script"> = () => {
-  let carbonExports: ReadonlyMap<string, CarbonExport> | undefined;
-  const loadExports: CarbonExportsLoader = () => {
-    carbonExports ??= loadCarbonExports();
-    return carbonExports;
-  };
+  const carbonExportsFor = createCarbonExportsResolver();
 
   return {
     name: "carbon:optimize-imports",
@@ -526,7 +549,8 @@ export const optimizeImports: SveltePreprocessor<"script"> = () => {
       // Skip import scanning for the common no-Carbon file.
       if (!raw.includes("carbon-")) return;
 
-      return transformScript(raw, filename, loadExports);
+      const dir = path.dirname(path.resolve(filename));
+      return transformScript(raw, filename, () => carbonExportsFor(dir));
     },
   };
 };
