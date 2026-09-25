@@ -67,6 +67,21 @@ describe("resolveComponentIndex", () => {
     );
   });
 
+  test("a Carbon zipped by Yarn PnP caches in the project's node_modules, not the archive", () => {
+    const zipped =
+      "/home/me/.yarn/berry/cache/carbon-components-svelte-npm-0.112.0.zip/node_modules/carbon-components-svelte";
+
+    expect(componentIndexCacheFile(zipped, CARBON_VERSION, project.root)).toBe(
+      path.join(
+        project.root,
+        "node_modules",
+        ".cache",
+        "carbon-preprocess-svelte",
+        `${CARBON_VERSION}_${OWN_VERSION}.json`,
+      ),
+    );
+  });
+
   test("cold: builds from the installed Carbon, matches a direct build, writes the cache", async () => {
     expect(existsSync(cacheFile)).toBe(false);
 
