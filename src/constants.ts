@@ -4,8 +4,6 @@ export const CarbonSvelte = {
   Pictograms: "carbon-pictograms-svelte",
 } as const;
 
-export const CARBON_PREFIX = /bx--/;
-
 export const ALWAYS_ON_CLASSES = [".bx--body"];
 
 /**

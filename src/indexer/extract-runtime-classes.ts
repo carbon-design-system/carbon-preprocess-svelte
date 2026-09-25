@@ -10,6 +10,25 @@ const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;
 const JS_EXT = /\.js$/;
 
+/**
+ * A `bx--` class name, not preceded by a class-name character: matches each
+ * class in `"bx--a bx--b"`, `".bx--a .bx--b"`, or
+ * `'<strong class="bx--a">'`, and a trailing-hyphen prefix like the
+ * `bx--btn--` in `` `bx--btn--${kind}` ``. A bare `bx--` (as in
+ * `/^bx--(overflow-menu|checkbox)/`) is not a class: as a prefix it would
+ * keep every Carbon rule.
+ */
+const CARBON_CLASS_TOKEN = /(?<![\w-])bx--[\w-]+/g;
+
+/** Every `bx--` class name in `text`, as `.bx--…` selectors. */
+export function extractCarbonClassTokens(text: string): string[] {
+  const classes: string[] = [];
+  for (const [token] of text.matchAll(CARBON_CLASS_TOKEN)) {
+    classes.push(`.${token}`);
+  }
+  return classes;
+}
+
 export function extractRuntimeClassesFromSource(code: string): string[] {
   const classes = new Set<string>();
 
