@@ -110,7 +110,10 @@ export async function resolveLiveComponentIndex(
   const cached = await readCache(cacheFile);
   if (cached) return cached;
 
-  const index = await buildComponentIndex({ carbonRoot });
+  const index = await buildComponentIndex({
+    carbonRoot,
+    projectRoot: options?.projectRoot,
+  });
 
   if (!isComponentIndex(index)) {
     throw new Error(
