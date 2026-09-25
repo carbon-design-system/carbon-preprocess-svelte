@@ -1,6 +1,7 @@
 import path from "node:path";
-import { ALWAYS_ON_CLASSES } from "../constants";
+import { ALWAYS_ON_CLASSES, CarbonSvelte } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
+import { stripQuery } from "../utils";
 import {
   type SpliceOptimizerOptions,
   spliceOptimizeCss,
@@ -126,11 +127,39 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
   contentClasses?: Iterable<string>;
 };
 
+const CARBON_SRC = `${CarbonSvelte.Components}/src/`;
+
+const keysBySourcePath = new WeakMap<ComponentIndex, Map<string, string>>();
+
+/** Index key for each entry's path under Carbon's `src/`. */
+function getKeysBySourcePath(
+  componentIndex: ComponentIndex,
+): Map<string, string> {
+  let keys = keysBySourcePath.get(componentIndex);
+  if (!keys) {
+    keys = new Map();
+    for (const [key, { path }] of Object.entries(componentIndex)) {
+      keys.set(path.slice(CARBON_SRC.length), key);
+    }
+    keysBySourcePath.set(componentIndex, keys);
+  }
+  return keys;
+}
+
+/** `/app/node_modules/carbon-components-svelte/src/Button/Button.svelte` -> `Button/Button.svelte`. */
+function carbonSourcePath(id: string): string | undefined {
+  const normalized = stripQuery(id).replace(/\\/g, "/");
+  const at = normalized.lastIndexOf(CARBON_SRC);
+  return at === -1 ? undefined : normalized.slice(at + CARBON_SRC.length);
+}
+
 /**
  * Build the class allowlist from bundled component paths and whether flatpickr
  * CSS should stay (any DatePicker import).
  *
- * Paths like "Button.svelte" map through the component index to `.bx--*` classes.
+ * A bundled Carbon file maps to its index entry by its path under `src/`, so
+ * it doesn't matter what the file is named. Bare names ("Button", from the
+ * CLI or `optimizeCarbonCss`) map by name.
  * `.bx--body` is always kept; apps set it on `<body>` but no component file
  * references it.
  */
@@ -147,6 +176,8 @@ function buildUsage(
   const usedComponents = new Set<string>();
   let preserveFlatpickr = false;
 
+  const keys = getKeysBySourcePath(componentIndex);
+
   for (const id of ids) {
     const { name } = path.parse(id);
 
@@ -154,9 +185,16 @@ function buildUsage(
       preserveFlatpickr = true;
     }
 
-    if (name in componentIndex) {
-      usedComponents.add(name);
-      for (const cls of componentIndex[name].classes) {
+    const sourcePath = carbonSourcePath(id);
+    const key = sourcePath === undefined ? name : keys.get(sourcePath);
+    const entry =
+      key !== undefined && Object.hasOwn(componentIndex, key)
+        ? componentIndex[key]
+        : undefined;
+
+    if (key !== undefined && entry) {
+      if (!entry.internal) usedComponents.add(key);
+      for (const cls of entry.classes) {
         allowlist.add(cls);
       }
     }

@@ -71,7 +71,7 @@ export type StrictCssOptimizerOptions = {
 
 const sharedClassesCache = new WeakMap<ComponentIndex, Set<string>>();
 
-/** Classes more than one component renders. */
+/** Classes more than one exported component renders. */
 function getSharedClasses(components: ComponentIndex): Set<string> {
   const cached = sharedClassesCache.get(components);
   if (cached) return cached;
@@ -79,6 +79,7 @@ function getSharedClasses(components: ComponentIndex): Set<string> {
   const counts = new Map<string, number>();
 
   for (const component of Object.values(components)) {
+    if (component.internal) continue;
     for (const cls of component.classes) {
       counts.set(cls, (counts.get(cls) ?? 0) + 1);
     }
