@@ -59,7 +59,7 @@ The preprocessor optimizes imports from the following packages:
 > [!NOTE]
 > This preprocessor predates [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte)'s [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries), now the default, which covers the same Vite cold-start problem. It's still useful for non-Vite bundlers like Rollup and Webpack, and can further improve cold start even with `prebundleSvelteLibraries: true`.
 
-`optimizeImports({ experimental: { liveIndex: true } })` builds its index from your installed `carbon-components-svelte` instead of the bundled version. See [`experimental.liveIndex`](#optimizecss-api) under `optimizeCss` for details; behavior is identical here.
+Component paths are read from your installed `carbon-components-svelte`'s own `src/index.js`, so they always match the version you have. Utilities exported by name stay named imports (`import { toCsv } from "carbon-components-svelte/src/DataTable/data-table-utils.js"`), and names that barrel doesn't export are left on the barrel.
 
 **Set-ups:** [SvelteKit](#sveltekit) · [Vite](#vite) · [Rollup](#rollup) · [Webpack](#webpack) · [Rspack](#rspack)
 
@@ -440,9 +440,6 @@ optimizeCss({
      * the bundled static index if the live build fails for any reason
      * (unresolvable `carbon-components-svelte`, unexpected `src` layout,
      * etc.), so enabling it can't turn a working build into a broken one.
-     *
-     * `optimizeImports` accepts the same option, independently, since it
-     * doesn't share a config object with `optimizeCss`.
      *
      * @default false
      */

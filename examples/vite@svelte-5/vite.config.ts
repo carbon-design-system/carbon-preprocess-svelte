@@ -18,10 +18,7 @@ export default {
   },
   plugins: [
     svelte({
-      preprocess: [
-        vitePreprocess(),
-        optimizeImports({ experimental: { liveIndex: true } }),
-      ],
+      preprocess: [vitePreprocess(), optimizeImports()],
     }),
     optimizeCss({ experimental: { liveIndex: true } }),
   ],

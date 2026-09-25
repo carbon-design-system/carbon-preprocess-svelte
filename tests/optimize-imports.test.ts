@@ -1,9 +1,6 @@
 import { optimizeImports } from "carbon-preprocess-svelte";
-import {
-  getComponents,
-  setComponents,
-} from "carbon-preprocess-svelte/component-index/registry";
-import { buildComponentIndex } from "carbon-preprocess-svelte/indexer/build-index";
+import { readCarbonExports } from "carbon-preprocess-svelte/preprocessors/carbon-exports";
+import { transformScript } from "carbon-preprocess-svelte/preprocessors/optimize-imports";
 import type { Preprocessor, Processed } from "svelte/compiler";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
@@ -58,7 +55,7 @@ import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`,
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import Accordion2 from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
-import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
+import { toHierarchy } from "carbon-components-svelte/src/utils/toHierarchy.js";
 
 import Add from "carbon-icons-svelte/lib/Add.svelte";
 import Add2 from "carbon-icons-svelte/lib/Add.svelte";
@@ -69,27 +66,25 @@ import Airplane2 from "carbon-pictograms-svelte/lib/Airplane.svelte";
 import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`);
   });
 
-  test("re-exports from the same module resolve to their .js file", () => {
+  test("named re-exports from one module stay named imports of its .js file", () => {
     expect(
       preprocess({
-        content: `import { filterTreeById, filterTreeByText, filterTreeNodes } from "carbon-components-svelte";`,
+        content: `import { filterTreeById, filterTreeByText as byText, filterTreeNodes } from "carbon-components-svelte";`,
       }),
-    ).toEqual(`import filterTreeById from "carbon-components-svelte/src/utils/filterTreeNodes.js";
-import filterTreeByText from "carbon-components-svelte/src/utils/filterTreeNodes.js";
-import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";`);
+    ).toEqual(`import { filterTreeById } from "carbon-components-svelte/src/utils/filterTreeNodes.js";
+import { filterTreeByText as byText } from "carbon-components-svelte/src/utils/filterTreeNodes.js";
+import { filterTreeNodes } from "carbon-components-svelte/src/utils/filterTreeNodes.js";`);
   });
 
-  test("invalid imports should be optimistic", () => {
+  test("names the installed barrel doesn't export stay on the barrel", () => {
     expect(
       preprocess({
         content: "import { NonExistent } from 'carbon-components-svelte'",
       }),
-    ).toEqual(
-      'import NonExistent from "carbon-components-svelte/src/NonExistent/NonExistent.svelte";',
-    );
+    ).toEqual("import { NonExistent } from 'carbon-components-svelte'");
   });
 
-  test("un-indexed camelCase utility is left untouched", () => {
+  test("unknown camelCase utility is left untouched", () => {
     expect(
       preprocess({
         content: `import { someFutureUtil } from "carbon-components-svelte"`,
@@ -231,71 +226,103 @@ import breakpointObserver from "carbon-components-svelte/src/Breakpoint/breakpoi
 import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
 import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedList.svelte";
 import ContainedListItem from "carbon-components-svelte/src/ContainedList/ContainedListItem.svelte";
-import filterTreeNodes from "carbon-components-svelte/src/utils/filterTreeNodes.js";
-import toHierarchy from "carbon-components-svelte/src/utils/toHierarchy.js";
-import NewComponent from "carbon-components-svelte/src/NewComponent/NewComponent.svelte";`);
+import { filterTreeNodes } from "carbon-components-svelte/src/utils/filterTreeNodes.js";
+import { toHierarchy } from "carbon-components-svelte/src/utils/toHierarchy.js";
+import { NewComponent } from "carbon-components-svelte";`);
   });
 
-  test("experimental.liveIndex: returns a promise that resolves to the rewritten script", async () => {
-    const result = optimizeImports({
-      experimental: { liveIndex: true },
-    }).script({
+  test("the script hook resolves synchronously", () => {
+    const result = optimizeImports().script({
       attributes: {},
       filename: "test.svelte",
       content: `import { Button } from "carbon-components-svelte";`,
       markup: "",
     });
 
-    expect(result).toBeInstanceOf(Promise);
-    expect((await result)?.code).toEqual(
+    expect(result).not.toBeInstanceOf(Promise);
+    expect((result as Processed).code).toEqual(
       `import Button from "carbon-components-svelte/src/Button/Button.svelte";`,
     );
   });
 
-  test("optimistic guess resolves correctly against a real old-version index (0.85.0), not just a made-up name", async () => {
-    const carbonRoot = resolvePackageRoot("carbon-components-svelte-old");
-    const oldIndex = await buildComponentIndex({ carbonRoot });
-    const currentComponents = getComponents();
+  test("icon-only files never read carbon-components-svelte", () => {
+    const loadExports = jest.fn(() => new Map());
 
-    try {
-      setComponents(oldIndex);
+    expect(
+      transformScript(
+        `import { Add } from "carbon-icons-svelte";`,
+        "test.svelte",
+        loadExports,
+      ).code,
+    ).toEqual(`import Add from "carbon-icons-svelte/lib/Add.svelte";`);
+    expect(loadExports).not.toHaveBeenCalled();
+  });
+});
 
-      expect(
-        // ContainedList was added to carbon-components-svelte after 0.85.0,
-        // so a real old install's index genuinely lacks it -- the guessed
-        // path still has to land on the component's real location (#97).
-        preprocess({
-          content: `import { Accordion, ContainedList } from "carbon-components-svelte";`,
-        }),
-      ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
-import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedList.svelte";`);
-    } finally {
-      setComponents(currentComponents);
-    }
+describe("readCarbonExports", () => {
+  const rewrite = (content: string, carbonRoot: string) => {
+    const exports = readCarbonExports(carbonRoot);
+    return transformScript(content, "test.svelte", () => exports).code;
+  };
+
+  // 0.85.0 re-exports every component through its folder's `index.js`
+  // (`export { Accordion } from "./Accordion"`) and predates ContainedList.
+  test("follows folder re-exports in a real old release (0.85.0)", () => {
+    expect(
+      rewrite(
+        `import { Accordion, breakpoints, ContainedList } from "carbon-components-svelte";`,
+        resolvePackageRoot("carbon-components-svelte-old"),
+      ),
+    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
+import { ContainedList } from "carbon-components-svelte";`);
   });
 
-  // resolvePath always emits a default import for an indexed path, even
-  // when the target module only has a named export.
-  test("named-only-export util is rewritten as a default import", async () => {
+  test("resolves extensionless, aliased, and multi-hop re-exports", () => {
     const fixture = createMockCarbonPackage({
-      "index.js": `export { fuzzyMatch } from "./utils/fuzzy-match.js";`,
-      "utils/fuzzy-match.js": `export function fuzzyMatch() {}`,
+      "index.js": `// export { Commented } from "./nowhere";
+export { default as Button } from "./Button/Button.svelte";
+export {
+  Tabs,
+  Tab as TabItem,
+} from "./Tabs";
+export { fuzzyMatch } from "./utils/fuzzy-match";`,
+      "Button/Button.svelte": "<button />",
+      "Tabs/index.js": `export { default as Tabs } from "./Tabs.svelte";
+export { default as Tab } from "./Tab.svelte";`,
+      "Tabs/Tabs.svelte": "<div />",
+      "Tabs/Tab.svelte": "<div />",
+      "utils/fuzzy-match.js": "export function fuzzyMatch() {}",
     });
-    const currentComponents = getComponents();
 
     try {
-      const index = await buildComponentIndex({ carbonRoot: fixture.root });
-      setComponents(index);
+      expect(Object.fromEntries(readCarbonExports(fixture.root))).toEqual({
+        Button: {
+          path: "carbon-components-svelte/src/Button/Button.svelte",
+          name: "default",
+        },
+        Tabs: {
+          path: "carbon-components-svelte/src/Tabs/Tabs.svelte",
+          name: "default",
+        },
+        TabItem: {
+          path: "carbon-components-svelte/src/Tabs/Tab.svelte",
+          name: "default",
+        },
+        fuzzyMatch: {
+          path: "carbon-components-svelte/src/utils/fuzzy-match.js",
+          name: "fuzzyMatch",
+        },
+      });
 
       expect(
-        preprocess({
-          content: `import { fuzzyMatch } from "carbon-components-svelte";`,
-        }),
-      ).toEqual(
-        `import fuzzyMatch from "carbon-components-svelte/src/utils/fuzzy-match.js";`,
-      );
+        rewrite(
+          `import { fuzzyMatch, TabItem } from "carbon-components-svelte";`,
+          fixture.root,
+        ),
+      ).toEqual(`import { fuzzyMatch } from "carbon-components-svelte/src/utils/fuzzy-match.js";
+import TabItem from "carbon-components-svelte/src/Tabs/Tab.svelte";`);
     } finally {
-      setComponents(currentComponents);
       fixture.dispose();
     }
   });
