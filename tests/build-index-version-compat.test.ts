@@ -38,3 +38,33 @@ describe("buildComponentIndex for a kebab-case util re-exported under a differen
     }
   });
 });
+
+describe("buildComponentIndex: classes hoisted out of a component", () => {
+  test("a .js module's class literals reach every component importing it", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { default as Foo } from "./Foo/Foo.svelte";`,
+      "Foo/Foo.svelte": `<script>
+  import { HIGHLIGHT, sizeClass } from "./classes.js";
+</script>
+<div class="{HIGHLIGHT} {sizeClass('sm')}"></div>`,
+      "Foo/classes.js": `import { inModal } from "../utils/lookups.js";
+export const HIGHLIGHT = "bx--foo--highlighted";
+export const sizeClass = (size) => \`bx--foo--\${size}\`;`,
+      "utils/lookups.js": `export const inModal = (el) => el.closest(".bx--modal") !== null;
+const RE_ROW = /^bx--(checkbox|radio-button)/;`,
+    });
+
+    try {
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+
+      expect(index.Foo?.classes).toContain(".bx--foo--highlighted");
+      expect(index.Foo?.classes).toContain(".bx--foo--");
+      // Lookups find elements rendered elsewhere, and a bare `bx--` prefix
+      // would keep every Carbon rule.
+      expect(index.Foo?.classes).not.toContain(".bx--modal");
+      expect(index.Foo?.classes).not.toContain(".bx--");
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
