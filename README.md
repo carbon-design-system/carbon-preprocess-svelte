@@ -436,10 +436,11 @@ optimizeCss({
      *
      * Resolved once per build and cached on disk in your project at
      * `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`,
-     * so bumping either package invalidates the cache automatically. Falls back to
-     * the bundled static index if the live build fails for any reason
-     * (unresolvable `carbon-components-svelte`, unexpected `src` layout,
-     * etc.), so enabling it can't turn a working build into a broken one.
+     * so bumping either package invalidates the cache automatically. If the
+     * index can't be built (unresolvable `carbon-components-svelte` or
+     * `svelte/compiler`, unexpected `src` layout, etc.), the build warns and
+     * leaves Carbon CSS unpruned, so enabling it can't turn a working build
+     * into a broken one.
      *
      * @default false
      */
