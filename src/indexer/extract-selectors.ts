@@ -4,7 +4,7 @@ import {
   resolveRelativeImport,
 } from "./extract-runtime-classes";
 import type { SvelteParser } from "./svelte-parser";
-import { walk } from "./walk";
+import { type ANode, walk } from "./walk";
 
 const WHITESPACE_REGEX = /\s+/;
 const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
@@ -21,7 +21,27 @@ export type ExtractFromSvelteResult = {
   slotWrappers: string[];
   imports: string[];
   runtimeClasses: string[];
+  /**
+   * Classes named by literals in the module script (`context="module"` or
+   * Svelte 5's `module`), minus lookup selectors: what another module can
+   * import from this one.
+   */
+  moduleClasses: string[];
 };
+
+/** Classes a string or template literal node names; `[]` for any other node. */
+function literalClasses(
+  node: ANode,
+  options?: { skipLookups?: boolean },
+): string[] {
+  if (node.type === "Literal" && typeof node.value === "string") {
+    return extractCarbonClassTokens(node.value, options);
+  }
+  if (node.type === "TemplateElement") {
+    return extractCarbonClassTokens(node.value.raw, options);
+  }
+  return [];
+}
 
 function nodeContainsDefaultSlot(node: {
   type?: string;
@@ -106,16 +126,8 @@ export function extractFromSvelte(
 
       // A string may hold several classes (`"bx--a bx--b"`), a selector
       // (`".bx--a .bx--b"`), or markup, so add each class it names.
-      if (node.type === "Literal" && typeof node.value === "string") {
-        for (const cls of extractCarbonClassTokens(node.value)) {
-          selectors.add(cls);
-        }
-      }
-
-      if (node.type === "TemplateElement") {
-        for (const cls of extractCarbonClassTokens(node.value.raw)) {
-          selectors.add(cls);
-        }
+      for (const cls of literalClasses(node)) {
+        selectors.add(cls);
       }
 
       if (node.type === "Element") {
@@ -134,6 +146,18 @@ export function extractFromSvelte(
     },
   });
 
+  const moduleClasses = new Set<string>();
+
+  if (ast.module) {
+    walk(ast.module, {
+      enter(node) {
+        for (const cls of literalClasses(node, { skipLookups: true })) {
+          moduleClasses.add(cls);
+        }
+      },
+    });
+  }
+
   const classes: string[] = [];
 
   for (const raw of selectors) {
@@ -147,5 +171,6 @@ export function extractFromSvelte(
     slotWrappers: [...new Set(slotWrappers)],
     imports: [...new Set(imports)],
     runtimeClasses: extractRuntimeClassesFromSource(code),
+    moduleClasses: [...moduleClasses],
   };
 }

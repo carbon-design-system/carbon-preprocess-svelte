@@ -76,8 +76,12 @@ for (const file of files) {
     parse,
   });
   scanned.importsByModule.set(file, extracted.imports);
-  if (extracted.runtimeClasses.length > 0) {
-    scanned.runtimeByModule.set(file, new Set(extracted.runtimeClasses));
+  const graphClasses = [
+    ...extracted.runtimeClasses,
+    ...extracted.moduleClasses,
+  ];
+  if (graphClasses.length > 0) {
+    scanned.runtimeByModule.set(file, new Set(graphClasses));
   }
 }
 

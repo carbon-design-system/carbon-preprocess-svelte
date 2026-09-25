@@ -68,3 +68,34 @@ const RE_ROW = /^bx--(checkbox|radio-button)/;`,
     }
   });
 });
+
+describe("buildComponentIndex: classes hoisted into a module script", () => {
+  test("a component importing another's module-script constants gets their classes", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { default as Foo } from "./Foo/Foo.svelte";
+export { default as Bar } from "./Bar/Bar.svelte";`,
+      "Foo/Foo.svelte": `<script context="module">
+  export const SIZES = { sm: "bx--foo--sm" };
+  export const inModal = (el) => el.closest(".bx--modal");
+</script>
+<div class={SIZES.sm}></div>`,
+      // Imports Foo's constants without rendering Foo.
+      "Bar/Bar.svelte": `<script>
+  import { SIZES } from "../Foo/Foo.svelte";
+</script>
+<span class={SIZES.sm}></span>`,
+    });
+
+    try {
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+
+      expect(index.Foo?.classes).toEqual(
+        expect.arrayContaining([".bx--foo--sm", ".bx--modal"]),
+      );
+      expect(index.Bar?.classes).toContain(".bx--foo--sm");
+      expect(index.Bar?.classes).not.toContain(".bx--modal");
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
