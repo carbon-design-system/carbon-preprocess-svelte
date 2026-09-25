@@ -20,11 +20,20 @@ const JS_EXT = /\.js$/;
  */
 const CARBON_CLASS_TOKEN = /(?<![\w-])bx--[\w-]+/g;
 
-/** Every `bx--` class name in `text`, as `.bx--…` selectors. */
-export function extractCarbonClassTokens(text: string): string[] {
+/**
+ * Every `bx--` class name in `text`, as `.bx--…` selectors. With
+ * `skipLookups`, a class written as a selector (`closest(".bx--modal")`,
+ * `":not(.bx--hidden)"`) is skipped: it finds an element rendered
+ * elsewhere rather than applying the class.
+ */
+export function extractCarbonClassTokens(
+  text: string,
+  options?: { skipLookups?: boolean },
+): string[] {
   const classes: string[] = [];
-  for (const [token] of text.matchAll(CARBON_CLASS_TOKEN)) {
-    classes.push(`.${token}`);
+  for (const match of text.matchAll(CARBON_CLASS_TOKEN)) {
+    if (options?.skipLookups && text[match.index - 1] === ".") continue;
+    classes.push(`.${match[0]}`);
   }
   return classes;
 }
@@ -150,8 +159,16 @@ function resolveExistingModuleKey(
 }
 
 /**
- * Trace `classList` literals through relative imports reachable from exported
- * components. Only loads `.js` modules lazily along import paths.
+ * Trace Carbon classes through relative imports reachable from exported
+ * components: whatever `cache.runtimeByModule` holds for `.svelte` modules,
+ * and every `bx--` class a `.js` module applies (a hoisted
+ * `const HIGHLIGHT = "bx--…"`, a `classList` call, a class prefix). Only
+ * loads `.js` modules lazily along import paths.
+ *
+ * `.js` lookups (`closest(".bx--modal")`) are skipped: a shared utility is
+ * imported by many components, and each would keep the looked-up
+ * component's rules. Comments are scanned too; an extra class there only
+ * keeps an extra rule.
  */
 export async function buildRuntimeClassMap(
   carbonSrcPath: string,
@@ -195,7 +212,9 @@ export async function buildRuntimeClassMap(
     const load = (async () => {
       const filePath = path.join(carbonSrcPath, resolvedKey);
       const code = await readFile(filePath, "utf8");
-      const runtime = extractRuntimeClassesFromSource(code);
+      const runtime = isSvelteFile(resolvedKey)
+        ? extractRuntimeClassesFromSource(code)
+        : extractCarbonClassTokens(code, { skipLookups: true });
 
       if (runtime.length > 0) {
         runtimeByModule.set(resolvedKey, new Set(runtime));
