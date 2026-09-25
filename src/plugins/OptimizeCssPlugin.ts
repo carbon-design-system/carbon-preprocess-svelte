@@ -1,5 +1,4 @@
-import { setComponents } from "../component-index/registry";
-import { ensureLiveComponentIndex } from "../indexer/live-index";
+import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
@@ -174,12 +173,9 @@ export default class OptimizeCssPlugin {
               return;
             }
 
-            if (options.experimental?.liveIndex) {
-              const index = await ensureLiveComponentIndex();
-              // Already warned; leave this compilation's CSS unpruned.
-              if (!index) return;
-              setComponents(index);
-            }
+            const components = await loadComponentIndex(compiler.context);
+            // Already warned; leave this compilation's CSS unpruned.
+            if (!components) return;
 
             const scan = scanContent(options.content, compiler.context);
             const warning = contentScanWarning(
@@ -192,6 +188,7 @@ export default class OptimizeCssPlugin {
             const contentClasses = scan.classes;
             const optimizer = createCssOptimizer({
               ...options,
+              components,
               ids,
               contentClasses: [...contentClasses, ...moduleClasses],
             });

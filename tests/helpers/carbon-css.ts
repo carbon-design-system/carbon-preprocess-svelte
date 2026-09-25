@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { components } from "carbon-preprocess-svelte/component-index";
 import {
   ALWAYS_ON_CLASSES,
   CONTEXT_ANCESTORS,
@@ -11,6 +10,7 @@ import {
   splitSelectorParts,
   stripNotPseudoClasses,
 } from "../../src/indexer/css-selector-utils";
+import { components } from "./component-index";
 
 const require = createRequire(import.meta.url);
 

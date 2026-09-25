@@ -23,7 +23,7 @@ Review the .report.json diff. Carbon ships minified CSS; the test pretty-prints 
 
 ## What gets checked
 
-Each scenario also validates against src/component-index/index.ts, the same component-to-class map the plugin uses:
+Each scenario also validates against the component index built from the `carbon-components-svelte` devDependency (tests/helpers/component-index.ts), the same component-to-class map the plugin builds for a consuming project:
 
 - No over-prune: if a source selector would survive strict pruning, its Carbon classes must still appear in the output.
 - No foreign survivor: no kept selector should fail strict allowlist matching (subject classes must match; context ancestors may be exempt).
@@ -35,7 +35,7 @@ All scenarios target `leaked_count: 0`.
 
 Non-zero `leaked_count` is not a test failure when it occurs, but all fixtures currently target zero. Residual leaks usually come from single-class selectors where BEM prefix matching is broader than carbon-components-svelte markup (for example size tokens the library never renders).
 
-`src/indexer/build-index.ts` (invoked by `scripts/index-components.ts`) automates most context classes: import-graph `classList` tracing, slot-wrapper detection, gated Carbon CSS cross-reference, and CSS-orphan SVG classes. `MANUAL_OVERRIDES` is the fallback when automation misses on a Carbon bump.
+`src/indexer/build-index.ts` automates most context classes: import-graph `classList` tracing, slot-wrapper detection, gated Carbon CSS cross-reference, and CSS-orphan SVG classes. When automation misses on a Carbon bump, fix the extractor gate: there is no manual override list, since the index is built in every consuming project.
 
 Bundle pairs that stay strict (import both components): Select + Pagination for inline select, TextInput + FluidForm for fluid layout.
 
@@ -93,7 +93,7 @@ Bundle pairs that stay strict (import both components): Select + Pagination for 
 
 ## When to add a scenario
 
-- New `MANUAL_OVERRIDES` entry or automation gate change in src/indexer/build-index.ts
+- Automation gate change in src/indexer/build-index.ts
 - New typical multi-import bundle (like DatePicker + DatePickerInput)
 - Optimizer behavior change that should be regression-tested
 - Component with suspected over-prune or leak regression

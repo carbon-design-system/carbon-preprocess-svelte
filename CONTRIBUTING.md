@@ -13,7 +13,7 @@ If you're not sure what to build or how to approach a change, [file an issue](ht
 
 [Bun](https://bun.sh/) is the package manager, test runner, and bundler. There is no separate Node toolchain for development. Run package scripts with `bun run <script>` and one-off binaries with `bunx <bin>`.
 
-The package has no runtime dependencies. Everything it needs (`postcss`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. The one thing that is neither bundled nor declared is `svelte/compiler`: the live index parses Carbon's source with it, so [`src/indexer/svelte-parser.ts`](src/indexer/svelte-parser.ts) loads it through a dynamic `import()` that runs only when `experimental.liveIndex` is on, resolved from the consumer's own `svelte` install. `scripts/build.ts` fails the build if a static `from "svelte…"` import ever lands in `dist/index.js`. `carbon-components-svelte` is _also_ a `devDependency`. The index generator reads it (see below); the published package does not.
+The package has no runtime dependencies. Everything it needs (`postcss`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. The one thing that is neither bundled nor declared is `svelte/compiler`: the component index parses Carbon's source with it, so [`src/indexer/svelte-parser.ts`](src/indexer/svelte-parser.ts) loads it through a dynamic `import()` that runs only when an index is actually built, resolved from the consuming project first and this package's install location second. `scripts/build.ts` fails the build if a static `from "svelte…"` import ever lands in `dist/`. `carbon-components-svelte` is _also_ a `devDependency`, for tests and benchmarks; the published package reads the consumer's install instead.
 
 ## Project set-up
 
@@ -43,9 +43,8 @@ bun install
 | Script | What it does |
 | --- | --- |
 | `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`), after clearing the component index cache in `node_modules/.cache` (it's keyed by package versions, so it would otherwise hide local indexer changes; `test:e2e` clears each example's too). |
-| `bun run build` | Regenerate the component index, bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
+| `bun run build` | Bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
 | `bun run typecheck` | `tsc --noEmit` over `bench/`, `scripts/`, `src/`, `tests/`. |
-| `bun run index:components` | Regenerate [`src/component-index/index.ts`](src/component-index/index.ts) from the installed `carbon-components-svelte`. |
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
 | `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). |
 | `bun run test:fixtures:update` | Rewrite the `optimize-css` fixture baselines under [`tests/fixtures/`](tests/fixtures/optimize-css). |
@@ -66,22 +65,18 @@ export { optimizeCss } from "./plugins/optimize-css";                       // V
 export { optimizeImports } from "./preprocessors/optimize-imports";         // Svelte preprocessor
 ```
 
-Both paths lean on the generated **component index** and the helpers in [`src/constants.ts`](src/constants.ts) / [`src/utils.ts`](src/utils.ts) (`isSvelteFile`, `isCssFile`, `isCarbonSvelteImport`, the `CarbonSvelte` package-name map, the `bx--` prefix regex).
+The CSS paths lean on the **component index**, and everything leans on the helpers in [`src/constants.ts`](src/constants.ts) / [`src/utils.ts`](src/utils.ts) (`isSvelteFile`, `isCssFile`, `isCarbonSvelteImport`, the `CarbonSvelte` package-name map, the `bx--` prefix regex).
 
 ### The component index
 
-Most of the interesting work hangs off [`src/component-index/index.ts`](src/component-index/index.ts). It is a **generated** file (`// @generated`, frozen) that maps each public Carbon component name to its source path and the `.bx--*` classes it renders:
+The CSS tools prune against a map from each public Carbon component name to its source path and the `.bx--*` classes it renders:
 
 ```ts
-export const components: Record<string, { path: string; classes: string[] }>;
-// components.Button = { path: "carbon-components-svelte/src/Button/Button.svelte", classes: [".bx--btn", ".bx--btn--primary", …] }
+type ComponentIndex = Record<string, { path: string; classes: string[] }>;
+// index.Button = { path: "carbon-components-svelte/src/Button/Button.svelte", classes: [".bx--btn", ".bx--btn--primary", …] }
 ```
 
-On disk the file holds four packed strings that [`src/component-index/codec.ts`](src/component-index/codec.ts) expands once at module load (~0.3ms): a front-coded pool of distinct class names, the component names, their paths relative to `carbon-components-svelte/src` (collapsed when they follow the `Dir/Name.svelte` layout), and each component's classes as VLQ-encoded gaps between pool indexes. Stored as plain JSON the index was ~70% of the published bundle; packed it is under a third of its former size. The codec's doc comment describes the format, and `scripts/index-components.ts` decodes what it wrote and compares it to the built index before writing, so an encoding bug fails the regeneration rather than shipping. Because the packed file's git diff is unreadable, the script also prints what changed against the previously checked-in index (components added or removed, paths that moved, and per component the classes gained or lost, via [`scripts/diff-component-index.ts`](scripts/diff-component-index.ts)). That printout is the thing to read after a Carbon bump.
-
-`optimizeCss` reads `classes` to decide which CSS rules to keep. **Do not edit this file by hand.** Regenerate it with `bun run index:components` (also run automatically by `prebuild`) whenever `carbon-components-svelte` is bumped. A new component or a renamed class will not show up otherwise.
-
-The indexing logic lives in [`src/indexer/`](src/indexer), not `scripts/`, because it's shared by two callers: the maintainer's regeneration script below, and the opt-in runtime live-index (see [Live index](#live-index-experimental)). [`src/indexer/build-index.ts`](src/indexer/build-index.ts) exports `buildComponentIndex()`, the core:
+Nothing is checked in or shipped: the index is built at build time from *the consuming project's* installed `carbon-components-svelte`, so it always matches the installed version (#213 was an older install pruned against an index built from a newer one). [`src/indexer/build-index.ts`](src/indexer/build-index.ts) exports `buildComponentIndex()`, the core:
 
 1. Parse `src/index.js` (the barrel) to learn which names are public and how they re-export.
 2. List every `.svelte`/`.js` under `src/` ([`list-files.ts`](src/indexer/list-files.ts), a sorted Node-native walk), parsing markup with `svelte/compiler` + `estree-walker` to pull static classes, sub-components, slot wrappers, and imports.
@@ -90,19 +85,18 @@ The indexing logic lives in [`src/indexer/`](src/indexer), not `scripts/`, becau
    - [`extract-runtime-classes.ts`](src/indexer/extract-runtime-classes.ts) follows the module import graph from each component: `classList.add/remove/toggle("bx--…")` calls and module-script (`context="module"` / `module`) class literals in `.svelte` modules, and every `bx--` class a `.js` module applies (hoisted constants, class prefixes). So a component that imports a constant hoisted into another component's module script gets its classes without rendering that component. The walk follows all of an imported module's imports, so it can over-include; that only keeps extra rules. Lookup selectors in `.js` (`closest(".bx--modal")`) are skipped, since a shared utility would otherwise hand the looked-up component's classes to every importer.
    - [`extract-css-context.ts`](src/indexer/extract-css-context.ts) cross-references Carbon's compiled CSS to recover context/descendant classes. `LAYOUT_ANCESTOR_DENYLIST` stops layout ancestors from spreading too far. Shares selector parsing with [`css-selector-utils.ts`](src/indexer/css-selector-utils.ts).
 4. [`merge-sub-component-classes.ts`](src/indexer/merge-sub-component-classes.ts) propagates each sub-component's classes up into every ancestor that renders it. This runs to a **fixed point** (repeated passes until nothing changes, capped at 10) rather than a single pass: a parent may need classes from a child that hasn't itself absorbed its own children yet, and the propagation must land on both exported and internal (non-exported) components as merge targets. A single-pass version of this shipped for a while and was scan-order-dependent — see [#143](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/143) if you're touching this again.
-5. `MANUAL_OVERRIDES` (currently empty), applied by the CLI wrapper (below) after `buildComponentIndex()` returns, is the last resort. Fix an extractor's gate instead of hardcoding here. A manual entry rots on the next Carbon bump.
 
-[`scripts/index-components.ts`](scripts/index-components.ts) is a thin CLI wrapper: it calls `buildComponentIndex()`, applies `MANUAL_OVERRIDES`, and writes `src/component-index/index.ts`. The runtime live index and the committed file go through the exact same code path, so what a consumer builds at runtime is byte-for-byte what a maintainer commits.
+Since every consumer runs this code against whatever Carbon release they have installed, a gate that only holds for the latest release is a bug. [`tests/build-index-version-compat.test.ts`](tests/build-index-version-compat.test.ts) runs the real indexer against a real, `npm:`-aliased pin of an older release (`carbon-components-svelte-old` in `devDependencies`). `buildComponentIndex()` and `resolveCarbonCssPath()` both take an explicit `carbonRoot` for this reason: an injected root (a test fixture, an old-version pin) has to reach the CSS-derived half of the index too, not just the markup half.
 
-Set `DEBUG_INDEX=1` to print per-stage timings.
+[`src/indexer/load-index.ts`](src/indexer/load-index.ts) is what the entry points call. `loadComponentIndex(projectRoot)` resolves `carbon-components-svelte` from the project root (Vite `root`, webpack/Rspack `context`, `optimizeCarbonCss`'s `cwd`, the CLI's `--cwd`) via [`resolve-carbon-root.ts`](src/indexer/resolve-carbon-root.ts), which searches from the project first and this package's own install location second, so a hoisted monorepo install still finds the app's Carbon. It uses `require.resolve.paths()` rather than a package.json subpath because Carbon's `exports` map doesn't declare `./package.json`, so a direct `require.resolve` throws under strict Node ESM even though it works under Bun. The result is:
 
-### Live index (experimental)
+- cached in the project at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`, keyed by both versions so a bump on either side rebuilds, structurally validated on read (a parsed-but-wrong file is rebuilt, never served), and written atomically via temp file + rename;
+- memoized per project root for the life of the process, so every plugin instance in a build shares one indexing pass;
+- `undefined` on any failure, after one warning. Every CSS entry point then leaves Carbon CSS unpruned: a bigger stylesheet is safe, while pruning against a guess drops rules the installed markup still uses.
 
-`optimizeCss` and `OptimizeCssPlugin` accept `experimental: { liveIndex: true }`. When set, [`src/indexer/live-index.ts`](src/indexer/live-index.ts) calls `buildComponentIndex()` against *the consuming project's* installed `carbon-components-svelte` (resolved via [`resolve-carbon-root.ts`](src/indexer/resolve-carbon-root.ts), searching from the working directory first and this package's own install location second, so a hoisted monorepo install still finds the app's Carbon; it uses `require.resolve.paths()` rather than a package.json subpath because Carbon's `exports` map doesn't declare `./package.json`, so a direct `require.resolve` throws under strict Node ESM even though it works under Bun) instead of using the bundled static index. The result is cached in the project at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`, keyed by both versions so a bump on either side rebuilds, structurally validated on read (a parsed-but-wrong file is rebuilt, never served), written atomically via temp file + rename. On any failure `loadLiveComponentIndex` warns and returns `undefined`, and every CSS entry point then leaves Carbon CSS unpruned rather than pruning against an index for some other Carbon version. [`tests/live-index.test.ts`](tests/live-index.test.ts) exercises all of this against a throwaway project dir (see [`tests/helpers/fake-project.ts`](tests/helpers/fake-project.ts)).
+The index is passed explicitly to the optimizer (`createCssOptimizer({ components, … })`); there is no process-wide "active index". [`tests/load-index.test.ts`](tests/load-index.test.ts) exercises caching and failure against a throwaway project dir (see [`tests/helpers/fake-project.ts`](tests/helpers/fake-project.ts)), and [`tests/helpers/component-index.ts`](tests/helpers/component-index.ts) builds the index the other tests prune against from the `carbon-components-svelte` devDependency.
 
-[`src/component-index/registry.ts`](src/component-index/registry.ts) (`getComponents`/`setComponents`) holds whichever index is active; every consumer reads through it instead of importing `src/component-index/index.ts` directly. This is **process-wide global state by design** — every plugin instance in one build shares one active index, which is correct for the common case (one Carbon version per build) but means mixing a `liveIndex: true` instance with a default instance in the same process affects both. `src/plugins/strict-css-optimizer.ts`'s `SHARED_CLASSES` cache is lazily computed on first use (not at module load) for the same reason: it must reflect a `liveIndex` swap, and that swap is guaranteed to happen (in `buildStart`/before `processAssets`) before CSS optimization ever runs.
-
-`buildComponentIndex()` accepts an explicit `carbonRoot`, which [`tests/build-index-version-compat.test.ts`](tests/build-index-version-compat.test.ts) uses to run the real indexer against a real, `npm:`-aliased pin of an older `carbon-components-svelte` release (`carbon-components-svelte-old` in `devDependencies`) instead of the one bundled devDependency — proving backward-compat behavior against actual package contents rather than a hand-written fake. This is also why `resolveCarbonCssPath()` takes `carbonRoot` as a parameter instead of re-resolving it internally: it used to call `resolveCarbonRoot()` on its own, silently ignoring whatever root `buildComponentIndex()` was given and always reading the real installed package's CSS — harmless when there's only one real install, but it meant an injected `carbonRoot` (a test fixture, an old-version pin) never actually took effect for the CSS-derived half of the index.
+Pass `onTiming` to `buildComponentIndex()` (as [`bench/build-index.bench.ts`](bench/build-index.bench.ts) does) for per-stage timings.
 
 ### `optimizeImports`
 
@@ -171,7 +165,7 @@ Each scenario has two files:
 - `<name>.css`, the pruned, pretty-printed output. **Gitignored**, regenerated every run. Open it to see what survived.
 - `<name>.report.json`, the **committed** baseline: `reduction_percent`, `kept_rules`, byte counts, and `leaked_classes` (Carbon classes still present that the import allowlist cannot explain). Strict scenarios target `leaked_count: 0`.
 
-Beyond byte baselines, the test also checks the index: no over-prune (a selector that should survive keeps its classes), no foreign survivor in strict mode, correct multi-class strict pruning. See [`tests/fixtures/optimize-css/README.md`](tests/fixtures/optimize-css/README.md) for the scenario catalog and when to add a fixture (new `MANUAL_OVERRIDES` entry, new typical multi-import bundle, suspected leak/over-prune regression, not a duplicate import set).
+Beyond byte baselines, the test also checks the index: no over-prune (a selector that should survive keeps its classes), no foreign survivor in strict mode, correct multi-class strict pruning. See [`tests/fixtures/optimize-css/README.md`](tests/fixtures/optimize-css/README.md) for the scenario catalog and when to add a fixture (extractor gate change, new typical multi-import bundle, suspected leak/over-prune regression, not a duplicate import set).
 
 After an optimizer change or a Carbon bump, regenerate and **review the `.report.json` diff**. A baseline change is a behavior change:
 
@@ -201,7 +195,7 @@ bun run test:e2e:update
 
 ## Build
 
-[`scripts/build.ts`](scripts/build.ts) (`bun run build`) removes `dist/`, copies `README.md` and `LICENSE` into it (before anything generated lands there, so a failed build never leaves a half-written manifest next to missing assets), regenerates the component index (the `prebuild` step runs `index:components`), bundles two entry points, `src/index.ts` (the library) and `src/cli.ts` (the `optimize-css` CLI), with `Bun.build` (minified ESM, Node target, `splitting: true` so the code shared between them, the component index and the CSS optimizer, is emitted once as a `chunk-*.js` instead of duplicated into both bundles), then runs [`scripts/bundle-dts.ts`](scripts/bundle-dts.ts) to emit `dist/index.d.ts` (the CLI exports no types, so it's skipped there). Rather than mirroring every `src` module into `dist/` (`tsc`'s default behavior), `bundle-dts.ts` uses the TypeScript compiler API (via `@typescript/typescript6`, since TypeScript 7's `typescript` package no longer ships it) to inline only the declarations reachable from `src/index.ts`'s public exports into a single tree-shaken file. After the bundle step, `dist/cli.js` gets a `#!/usr/bin/env node` shebang and is `chmod`ed executable (Bun's build strips shebangs), and the static-`svelte`-import guard runs over every emitted `.js` file under `dist/`, not just `index.js`, since splitting can move code into a shared chunk. Finally the build writes `dist/package.json`: a copy of the root manifest with `devDependencies`, `scripts`, and `files` stripped, and `main`/`types`/`bin`/`exports` rewritten from `./dist/*` to `./*` so paths resolve once `dist/` is published as the tarball root. `dist/` is gitignored and never committed. `bun run build -w` rebuilds on changes under `src/` and keeps linked examples current.
+[`scripts/build.ts`](scripts/build.ts) (`bun run build`) removes `dist/`, copies `README.md` and `LICENSE` into it (before anything generated lands there, so a failed build never leaves a half-written manifest next to missing assets), bundles two entry points, `src/index.ts` (the library) and `src/cli.ts` (the `optimize-css` CLI), with `Bun.build` (minified ESM, Node target, `splitting: true` so the code shared between them, the indexer and the CSS optimizer, is emitted once as a `chunk-*.js` instead of duplicated into both bundles), then runs [`scripts/bundle-dts.ts`](scripts/bundle-dts.ts) to emit `dist/index.d.ts` (the CLI exports no types, so it's skipped there). Rather than mirroring every `src` module into `dist/` (`tsc`'s default behavior), `bundle-dts.ts` uses the TypeScript compiler API (via `@typescript/typescript6`, since TypeScript 7's `typescript` package no longer ships it) to inline only the declarations reachable from `src/index.ts`'s public exports into a single tree-shaken file. After the bundle step, `dist/cli.js` gets a `#!/usr/bin/env node` shebang and is `chmod`ed executable (Bun's build strips shebangs), and the static-`svelte`-import guard runs over every emitted `.js` file under `dist/`, not just `index.js`, since splitting can move code into a shared chunk. Finally the build writes `dist/package.json`: a copy of the root manifest with `devDependencies`, `scripts`, and `files` stripped, and `main`/`types`/`bin`/`exports` rewritten from `./dist/*` to `./*` so paths resolve once `dist/` is published as the tarball root. `dist/` is gitignored and never committed. `bun run build -w` rebuilds on changes under `src/` and keeps linked examples current.
 
 ## Continuous integration
 
@@ -224,7 +218,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 - Common types: `fix`, `feat`, `perf`, `chore`, `test`, `docs`, `refactor`.
-- Scope is the area touched: `optimize-css`, `optimize-imports`, `index`, `components`, `examples`, `e2e`, `deps-dev`, `ci`.
+- Scope is the area touched: `optimize-css`, `optimize-imports`, `index`, `examples`, `e2e`, `deps-dev`, `ci`.
 - Imperative mood, one concise line. Put detail in the body and reference issues with `Fixes #N`.
 
 Examples from the log:
@@ -233,7 +227,6 @@ Examples from the log:
 feat(optimize-css): add safelist and content escape hatches
 perf(optimize-imports): skip parse for files without carbon- imports
 fix(index): automate runtime and CSS context classes
-chore(components): re-index using v0.109.0
 ```
 
 ## Submit a pull request
@@ -246,7 +239,7 @@ git checkout main
 git merge upstream/main
 ```
 
-Push your branch and open a PR comparing your feature branch to `origin/main`. Keep PRs focused. Include regenerated artifacts your change needs: the component index, fixture baselines, and e2e snapshots. Those diffs are part of the review.
+Push your branch and open a PR comparing your feature branch to `origin/main`. Keep PRs focused. Include regenerated artifacts your change needs: fixture baselines and e2e snapshots. Those diffs are part of the review.
 
 ## Maintainer guide
 

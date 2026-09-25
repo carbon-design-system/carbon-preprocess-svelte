@@ -1,4 +1,3 @@
-import { getComponents } from "carbon-preprocess-svelte/component-index/registry";
 import { ALWAYS_ON_CLASSES } from "carbon-preprocess-svelte/constants";
 import {
   type SpliceOptimizerOptions,
@@ -6,6 +5,7 @@ import {
 } from "carbon-preprocess-svelte/plugins/css-splice-optimizer";
 import type { SafelistEntry } from "carbon-preprocess-svelte/plugins/safelist";
 import { resolveCarbonCss } from "./helpers/carbon-css";
+import { components } from "./helpers/component-index";
 import { optimizeCssWithPostcss } from "./helpers/postcss-optimize-css";
 
 /**
@@ -44,13 +44,13 @@ const SCENARIOS: Record<string, Scenario> = {
 };
 
 function toOptions(scenario: Scenario): SpliceOptimizerOptions {
-  const components = getComponents();
   const allowlist = new Set(ALWAYS_ON_CLASSES);
   for (const id of scenario.ids) {
     for (const cls of components[id]?.classes ?? []) allowlist.add(cls);
   }
   return {
     allowlist,
+    components,
     preserveAllIBMFonts: scenario.preserveAllIBMFonts === true,
     preserveFlatpickr: scenario.ids.includes("DatePicker"),
     // Fresh RegExp instances so `lastIndex` starts equal for both runs.

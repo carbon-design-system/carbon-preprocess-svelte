@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { group, task } from "ostia";
-import { getComponents } from "../src/component-index/registry";
 import { CarbonSvelte } from "../src/constants";
 import {
   buildComponentIndex,
@@ -24,8 +23,8 @@ const carbonRoot = resolveCarbonRoot();
 const carbonSrc = path.join(carbonRoot, "src");
 
 // Rebuilds the full component index from the installed `carbon-components-svelte`
-// (file scan + CSS indexing + runtime-class graph). Runs once per build normally,
-// or once per dev-server start with `experimental.liveIndex`, so this is a coarser
+// (file scan + CSS indexing + runtime-class graph). Runs once per Carbon/preprocessor
+// version pair in a consuming project (then read from cache), so this is a coarser
 // end-to-end benchmark rather than a tight microbenchmark.
 group("buildComponentIndex (full scan)", () => {
   task("cold-ish rebuild", async () => {
@@ -45,9 +44,9 @@ const BUTTON = readFileSync(
 );
 const carbonCss = readFileSync(resolveCarbonCssPath(carbonRoot), "utf8");
 
-// Inputs for the CSS pass, derived from the frozen index: every exported
+// Inputs for the CSS pass, derived from a full index: every exported
 // component's classes, keyed the way `buildComponentIndex` keys them.
-const components = getComponents();
+const components = await buildComponentIndex();
 const componentClasses = new Map<string, Set<string>>();
 const moduleToComponent = new Map<string, string>();
 const srcPrefix = `${CarbonSvelte.Components}/src/`;

@@ -1,14 +1,13 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { components as staticComponents } from "carbon-preprocess-svelte/component-index";
 import {
-  ensureLiveComponentIndex,
+  componentIndexCacheFile,
   isComponentIndex,
-  liveIndexCacheFile,
-  loadLiveComponentIndex,
-  resolveLiveComponentIndex,
-} from "carbon-preprocess-svelte/indexer/live-index";
+  loadComponentIndex,
+  resolveComponentIndex,
+} from "carbon-preprocess-svelte/indexer/load-index";
 import { version as OWN_VERSION } from "../package.json";
+import { components } from "./helpers/component-index";
 import { createFakeProject } from "./helpers/fake-project";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
@@ -20,7 +19,7 @@ const CARBON_VERSION: string = (
 
 describe("isComponentIndex", () => {
   test("accepts the shape buildComponentIndex produces", () => {
-    expect(isComponentIndex(staticComponents)).toBe(true);
+    expect(isComponentIndex(components)).toBe(true);
     expect(
       isComponentIndex({ Button: { path: "a.svelte", classes: [".bx--btn"] } }),
     ).toBe(true);
@@ -41,7 +40,7 @@ describe("isComponentIndex", () => {
   });
 });
 
-describe("resolveLiveComponentIndex", () => {
+describe("resolveComponentIndex", () => {
   let project: ReturnType<typeof createFakeProject>;
   let carbonRoot: string;
   let cacheFile: string;
@@ -49,7 +48,7 @@ describe("resolveLiveComponentIndex", () => {
   beforeEach(() => {
     project = createFakeProject();
     carbonRoot = project.linkCarbon();
-    cacheFile = liveIndexCacheFile(carbonRoot, CARBON_VERSION);
+    cacheFile = componentIndexCacheFile(carbonRoot, CARBON_VERSION);
   });
 
   afterEach(() => {
@@ -68,14 +67,14 @@ describe("resolveLiveComponentIndex", () => {
     );
   });
 
-  test("cold: builds from the installed Carbon, matches the frozen index, writes the cache", async () => {
+  test("cold: builds from the installed Carbon, matches a direct build, writes the cache", async () => {
     expect(existsSync(cacheFile)).toBe(false);
 
-    const index = await resolveLiveComponentIndex({
+    const index = await resolveComponentIndex({
       projectRoot: project.root,
     });
 
-    expect(index).toEqual(staticComponents);
+    expect(index).toEqual(components);
     expect(existsSync(cacheFile)).toBe(true);
     expect(JSON.parse(await Bun.file(cacheFile).text())).toEqual(index);
     // No leftover temp file from the atomic write.
@@ -89,7 +88,7 @@ describe("resolveLiveComponentIndex", () => {
     mkdirSync(path.dirname(cacheFile), { recursive: true });
     writeFileSync(cacheFile, JSON.stringify(tampered));
 
-    const index = await resolveLiveComponentIndex({
+    const index = await resolveComponentIndex({
       projectRoot: project.root,
     });
 
@@ -105,11 +104,11 @@ describe("resolveLiveComponentIndex", () => {
     mkdirSync(path.dirname(cacheFile), { recursive: true });
     writeFileSync(cacheFile, contents);
 
-    const index = await resolveLiveComponentIndex({
+    const index = await resolveComponentIndex({
       projectRoot: project.root,
     });
 
-    expect(index).toEqual(staticComponents);
+    expect(index).toEqual(components);
     expect(JSON.parse(await Bun.file(cacheFile).text())).toEqual(index);
   });
 
@@ -124,32 +123,22 @@ describe("resolveLiveComponentIndex", () => {
       JSON.stringify({ Button: { path: "stale.svelte", classes: [] } }),
     );
 
-    const index = await resolveLiveComponentIndex({
+    const index = await resolveComponentIndex({
       projectRoot: project.root,
     });
 
-    expect(index).toEqual(staticComponents);
+    expect(index).toEqual(components);
   });
 });
 
-describe("loadLiveComponentIndex", () => {
+describe("loadComponentIndex", () => {
   test("returns undefined with a warning when indexing fails", async () => {
     const project = createFakeProject();
-    // A package.json but no `src/`: resolvable, un-indexable.
-    const broken = path.join(
-      project.root,
-      "node_modules",
-      "carbon-components-svelte",
-    );
-    mkdirSync(broken, { recursive: true });
-    writeFileSync(
-      path.join(broken, "package.json"),
-      JSON.stringify({ name: "carbon-components-svelte", version: "9.9.9" }),
-    );
+    project.installBrokenCarbon();
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
 
     try {
-      const index = await loadLiveComponentIndex({ projectRoot: project.root });
+      const index = await loadComponentIndex(project.root);
 
       expect(index).toBeUndefined();
       expect(warn).toHaveBeenCalledTimes(1);
@@ -162,12 +151,19 @@ describe("loadLiveComponentIndex", () => {
       project.dispose();
     }
   });
-});
 
-describe("ensureLiveComponentIndex", () => {
-  test("is memoized per process", async () => {
-    const first = ensureLiveComponentIndex();
-    expect(ensureLiveComponentIndex()).toBe(first);
-    expect(isComponentIndex(await first)).toBe(true);
+  test("is memoized per project root", async () => {
+    const project = createFakeProject();
+    project.linkCarbon();
+
+    try {
+      const first = loadComponentIndex(project.root);
+
+      expect(loadComponentIndex(`${project.root}/`)).toBe(first);
+      expect(loadComponentIndex()).not.toBe(first);
+      expect(await first).toEqual(components);
+    } finally {
+      project.dispose();
+    }
   });
 });

@@ -27,11 +27,10 @@ export type ComponentIndex = Record<
 >;
 
 /**
- * Rebuilds the component index (name -> import path + owned CSS classes)
- * directly from an installed `carbon-components-svelte`. Shared core behind
- * both the maintainer's `bun run index:components` regeneration script and
- * the opt-in runtime live-index (see `./live-index.ts`), so a fix to the
- * extraction gates here benefits both.
+ * Builds the component index (name -> source path + owned CSS classes)
+ * directly from an installed `carbon-components-svelte`. Called at build
+ * time against the consuming project's install; `./load-index.ts` caches
+ * the result on disk.
  */
 export async function buildComponentIndex(options?: {
   carbonRoot?: string;

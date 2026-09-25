@@ -8,6 +8,7 @@ import {
   NO_CARBON_IMPORTS,
 } from "../src/plugins/messages";
 import { optimizeCss } from "../src/plugins/optimize-css";
+import { createFakeProject } from "./helpers/fake-project";
 
 type OutputAsset = Rollup.OutputAsset;
 type OutputBundle = Rollup.OutputBundle;
@@ -43,6 +44,34 @@ type ResolvedPlugin = {
 function resolvePlugin(plugin: Rollup.Plugin): ResolvedPlugin {
   return plugin as unknown as ResolvedPlugin;
 }
+
+describe("optimizeCss (Vite plugin): component index unavailable", () => {
+  test("warns once and leaves CSS unpruned", async () => {
+    const project = createFakeProject();
+    project.installBrokenCarbon();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const plugin = resolvePlugin(optimizeCss());
+      plugin.configResolved({ root: project.root, logger: quietLogger });
+      await plugin.buildStart();
+      plugin.transform(
+        "",
+        `node_modules/${CarbonSvelte.Components}/Button.svelte`,
+      );
+      const css = ".bx--btn{color:red}.bx--accordion{color:blue}";
+      const bundle = makeCssBundle(css);
+      await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+
+      expect((bundle["styles.css"] as OutputAsset).source).toBe(css);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
+    } finally {
+      warn.mockRestore();
+      project.dispose();
+    }
+  });
+});
 
 describe("optimizeCss (Vite plugin)", () => {
   afterEach(() => {

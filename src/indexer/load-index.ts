@@ -72,8 +72,11 @@ async function writeCache(
   }
 }
 
-export type LiveIndexOptions = {
-  /** Directory the installed `carbon-components-svelte` is resolved from. */
+export type ComponentIndexOptions = {
+  /**
+   * Directory the installed `carbon-components-svelte` and `svelte/compiler`
+   * are resolved from.
+   */
   projectRoot?: string;
 };
 
@@ -83,7 +86,7 @@ export type LiveIndexOptions = {
  * Keyed by both so a bump on either side misses and rebuilds: a new Carbon
  * changes the input, a new preprocessor may change the extraction.
  */
-export function liveIndexCacheFile(
+export function componentIndexCacheFile(
   carbonRoot: string,
   carbonVersion: string,
 ): string {
@@ -96,16 +99,15 @@ export function liveIndexCacheFile(
 
 /**
  * Builds (or reads a cached copy of) the component index for whichever
- * `carbon-components-svelte` is actually installed in the consuming project
- * -- no waiting on this library to re-publish its frozen index after a
- * Carbon bump.
+ * `carbon-components-svelte` is actually installed in the consuming
+ * project. Throws if it can't; see `loadComponentIndex`.
  */
-export async function resolveLiveComponentIndex(
-  options?: LiveIndexOptions,
+export async function resolveComponentIndex(
+  options?: ComponentIndexOptions,
 ): Promise<ComponentIndex> {
   const carbonRoot = resolveCarbonRoot(options?.projectRoot);
   const version = await readCarbonVersion(carbonRoot);
-  const cacheFile = liveIndexCacheFile(carbonRoot, version);
+  const cacheFile = componentIndexCacheFile(carbonRoot, version);
 
   const cached = await readCache(cacheFile);
   if (cached) return cached;
@@ -125,38 +127,35 @@ export async function resolveLiveComponentIndex(
   return index;
 }
 
+const memoized = new Map<string, Promise<ComponentIndex | undefined>>();
+
 /**
- * Un-memoized `ensureLiveComponentIndex`: resolves the live index, or
- * `undefined` with a warning on any failure (unresolvable
+ * The component index every CSS entry point prunes against, or `undefined`
+ * with a warning when it can't be built (unresolvable
  * `carbon-components-svelte` or `svelte/compiler`, unexpected Carbon `src`
  * layout, etc.). Callers then leave CSS unpruned: a bigger stylesheet is
  * safe, while pruning against an index for some other Carbon version drops
  * rules the installed markup still uses (#213).
+ *
+ * Memoized per project root for the life of the process, so every plugin
+ * instance in a build triggers at most one indexing pass (or cache read),
+ * and a failure warns once.
  */
-export async function loadLiveComponentIndex(
-  options?: LiveIndexOptions,
+export function loadComponentIndex(
+  projectRoot: string = process.cwd(),
 ): Promise<ComponentIndex | undefined> {
-  try {
-    return await resolveLiveComponentIndex(options);
-  } catch (error) {
-    console.warn(
-      `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving Carbon CSS unpruned.`,
-    );
-    return undefined;
+  const root = path.resolve(projectRoot);
+  let pending = memoized.get(root);
+
+  if (!pending) {
+    pending = resolveComponentIndex({ projectRoot: root }).catch((error) => {
+      console.warn(
+        `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving Carbon CSS unpruned.`,
+      );
+      return undefined;
+    });
+    memoized.set(root, pending);
   }
-}
 
-let memoized: Promise<ComponentIndex | undefined> | undefined;
-
-/**
- * Memoized per build process: every plugin instance that opts into
- * `experimental.liveIndex: true` triggers at most one indexing pass (or
- * cache read), no matter how many `optimizeImports`/`optimizeCss` instances
- * request it.
- */
-export function ensureLiveComponentIndex(): Promise<
-  ComponentIndex | undefined
-> {
-  memoized ??= loadLiveComponentIndex();
-  return memoized;
+  return pending;
 }

@@ -20,7 +20,7 @@ export default {
     svelte({
       preprocess: [vitePreprocess(), optimizeImports()],
     }),
-    optimizeCss({ experimental: { liveIndex: true } }),
+    optimizeCss(),
   ],
   optimizeDeps: {
     exclude: [

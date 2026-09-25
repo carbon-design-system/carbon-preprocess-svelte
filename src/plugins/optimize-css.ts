@@ -1,6 +1,6 @@
 import type { Plugin, Rollup } from "vite";
-import { setComponents } from "../component-index/registry";
-import { ensureLiveComponentIndex } from "../indexer/live-index";
+import type { ComponentIndex } from "../indexer/build-index";
+import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import {
@@ -61,8 +61,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   let contentClasses: string[] | undefined;
   /** Literal `bx--` classes found while scanning bundled module code. */
   const moduleClasses = new Set<string>();
-  /** Set when the live index couldn't be built: CSS is left unpruned. */
-  let indexUnavailable = false;
+  /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
+  let components: ComponentIndex | undefined;
 
   return {
     name: "vite:carbon:optimize-css",
@@ -82,23 +82,16 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * Runs once before any module is transformed. Resets state tracked from
      * a prior build so `vite build --watch` rebuilds (which reuse this same
      * plugin instance) don't leak component ids or a stale content scan into
-     * the next build. When `experimental.liveIndex` is set, this is also
-     * where the component index gets rebuilt from the project's installed
-     * `carbon-components-svelte` (or read from cache), so it's ready before
-     * `transform`/`generateBundle` ever consult it. If it can't be built,
-     * this build's CSS is left unpruned.
+     * the next build. Also loads the component index for the project's
+     * installed `carbon-components-svelte` (built once, then read from
+     * cache), so it's ready before `generateBundle` consults it. If it
+     * can't be built, this build's CSS is left unpruned.
      */
     async buildStart() {
       ids.clear();
       contentClasses = undefined;
       moduleClasses.clear();
-      indexUnavailable = false;
-
-      if (options?.experimental?.liveIndex) {
-        const index = await ensureLiveComponentIndex();
-        if (index) setComponents(index);
-        else indexUnavailable = true;
-      }
+      components = await loadComponentIndex(root);
     },
     /**
      * The transform hook is called for every module in the build graph.
@@ -120,7 +113,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * `file.source` updates the bundle output in place.
      */
     async generateBundle(_, bundle) {
-      if (indexUnavailable) return;
+      // Already warned by `loadComponentIndex`.
+      if (!components) return;
 
       if (ids.size === 0) {
         // Warn only when this build emitted Carbon CSS. A secondary build
@@ -138,6 +132,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
       const optimizer = createCssOptimizer({
         ...options,
+        components,
         ids,
         contentClasses: [...contentClasses, ...moduleClasses],
       });

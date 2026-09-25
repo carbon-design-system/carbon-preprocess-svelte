@@ -24,7 +24,7 @@ async function importParser(specifier: string): Promise<SvelteParser> {
 /**
  * `svelte/compiler` is loaded on demand, never at module scope: this package
  * declares no dependency on `svelte` (bundling the compiler would defeat the
- * point, and a peer dependency would be paid by consumers who never index).
+ * point, and every consumer already has it to compile its own components).
  * The dynamic import stays dynamic in `dist/`, so loading the package never
  * touches the compiler.
  *

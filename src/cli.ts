@@ -1,8 +1,7 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { setComponents } from "./component-index/registry";
-import { ensureLiveComponentIndex } from "./indexer/live-index";
+import { loadComponentIndex } from "./indexer/load-index";
 import { createCssOptimizer } from "./plugins/create-optimized-css";
 import { logAssetDiff } from "./plugins/print-diff";
 import type { AssetReport } from "./plugins/print-report";
@@ -28,9 +27,8 @@ Options:
                           slashes for a RegExp: --safelist "/^\\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
-  --live-index            Build the component index from the installed
-                          carbon-components-svelte (experimental).
-  --cwd <dir>             Directory globs resolve from. Default: process.cwd()
+  --cwd <dir>             Project directory; globs and carbon-components-svelte
+                          resolve from it. Default: process.cwd()
   --dry-run               Print sizes, write nothing.
   --report                Print detected components and allowlist summary.
   --silent                Suppress the per-file size log.
@@ -52,7 +50,6 @@ async function main() {
       components: { type: "string" },
       safelist: { type: "string", multiple: true },
       "preserve-all-ibm-fonts": { type: "boolean" },
-      "live-index": { type: "boolean" },
       cwd: { type: "string" },
       "dry-run": { type: "boolean" },
       report: { type: "boolean" },
@@ -117,17 +114,15 @@ async function main() {
     );
   }
 
-  if (values["live-index"]) {
-    const index = await ensureLiveComponentIndex();
-    // Already warned; leave every file unpruned.
-    if (!index) return;
-    setComponents(index);
-  }
+  const index = await loadComponentIndex(cwd);
+  // Already warned; leave every file unpruned.
+  if (!index) return;
 
   const safelist = parseSafelist(values.safelist ?? []);
   const dryRun = values["dry-run"] === true;
   const silent = values.silent === true;
   const optimizer = createCssOptimizer({
+    components: index,
     ids: components,
     contentClasses,
     safelist,
