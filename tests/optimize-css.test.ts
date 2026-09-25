@@ -6,6 +6,7 @@ import { CarbonSvelte } from "../src/constants";
 import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
+  unindexedCarbonFiles,
 } from "../src/plugins/messages";
 import { optimizeCss } from "../src/plugins/optimize-css";
 import { createFakeProject } from "./helpers/fake-project";
@@ -278,6 +279,30 @@ describe("optimizeCss (Vite plugin)", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("leaves CSS unpruned and warns when a bundled Carbon file isn't indexed", async () => {
+    const plugin = resolvePlugin(optimizeCss());
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { color: red }";
+    const ctx = { warn: jest.fn() };
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+    // A file the installed Carbon's index doesn't know, e.g. from a second
+    // carbon-components-svelte install.
+    plugin.transform(
+      "",
+      `/app/node_modules/${CarbonSvelte.Components}/src/Gone/Gone.svelte`,
+    );
+
+    const bundle = makeCssBundle(cssContent);
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+    expect(ctx.warn).toHaveBeenCalledWith(
+      unindexedCarbonFiles(["Gone/Gone.svelte"]),
+    );
   });
 
   test("warns when no Carbon component was imported", async () => {

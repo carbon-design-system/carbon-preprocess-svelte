@@ -8,7 +8,11 @@ import {
   isSilent,
   toCssString,
 } from "./create-optimized-css";
-import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
+import {
+  contentScanWarning,
+  NO_CARBON_IMPORTS,
+  unindexedCarbonFiles,
+} from "./messages";
 import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
 import { printReport, toAssetReport } from "./print-report";
@@ -136,6 +140,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         ids,
         contentClasses: [...contentClasses, ...moduleClasses],
       });
+      if (!silent && optimizer.usage.unindexed.length > 0) {
+        this.warn(unindexedCarbonFiles(optimizer.usage.unindexed));
+      }
       const assetReports: AssetReport[] = [];
 
       for (const id in bundle) {

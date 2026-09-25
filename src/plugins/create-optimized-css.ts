@@ -158,8 +158,9 @@ function carbonSourcePath(id: string): string | undefined {
  * CSS should stay (any DatePicker import).
  *
  * A bundled Carbon file maps to its index entry by its path under `src/`, so
- * it doesn't matter what the file is named. Bare names ("Button", from the
- * CLI or `optimizeCarbonCss`) map by name.
+ * it doesn't matter what the file is named; one with no entry is returned
+ * in `unindexed`. Bare names ("Button", from the CLI or `optimizeCarbonCss`)
+ * map by name.
  * `.bx--body` is always kept; apps set it on `<body>` but no component file
  * references it.
  */
@@ -171,9 +172,11 @@ function buildUsage(
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
   components: string[];
+  unindexed: string[];
 } {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
   const usedComponents = new Set<string>();
+  const unindexed = new Set<string>();
   let preserveFlatpickr = false;
 
   const keys = getKeysBySourcePath(componentIndex);
@@ -187,6 +190,9 @@ function buildUsage(
 
     const sourcePath = carbonSourcePath(id);
     const key = sourcePath === undefined ? name : keys.get(sourcePath);
+    if (sourcePath !== undefined && key === undefined) {
+      unindexed.add(sourcePath);
+    }
     const entry =
       key !== undefined && Object.hasOwn(componentIndex, key)
         ? componentIndex[key]
@@ -208,6 +214,7 @@ function buildUsage(
     allowlist,
     preserveFlatpickr,
     components: [...usedComponents].sort(),
+    unindexed: [...unindexed].sort(),
   };
 }
 
@@ -236,7 +243,7 @@ export function toCssString(
 export function createCssOptimizer(
   options: Omit<CreateOptimizedCssOptions, "source">,
 ) {
-  const { allowlist, preserveFlatpickr, components } = buildUsage(
+  const { allowlist, preserveFlatpickr, components, unindexed } = buildUsage(
     options.components,
     options.ids,
     options.contentClasses,
@@ -250,14 +257,16 @@ export function createCssOptimizer(
   };
 
   return {
-    usage: { components, allowlistSize: allowlist.size },
+    usage: { components, allowlistSize: allowlist.size, unindexed },
     run(source: CreateOptimizedCssOptions["source"]): OptimizedCssReport {
       // Bundlers hand every CSS asset to the plugin, including per-route
       // chunks with no Carbon styles at all. Parsing and re-serializing
       // those is pure overhead, so skip the scanner unless something
       // removable could be present.
       const input = toCssString(source);
-      if (!hasOptimizableCss(input)) {
+      // Nothing is known about what an unindexed file renders, so any rule
+      // could be its; see `unindexedCarbonFiles`.
+      if (unindexed.length > 0 || !hasOptimizableCss(input)) {
         return { css: input, removed: 0 };
       }
 

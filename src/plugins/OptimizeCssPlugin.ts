@@ -2,7 +2,11 @@ import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer, isSilent } from "./create-optimized-css";
-import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
+import {
+  contentScanWarning,
+  NO_CARBON_IMPORTS,
+  unindexedCarbonFiles,
+} from "./messages";
 import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
 import { printReport, toAssetReport } from "./print-report";
@@ -192,6 +196,9 @@ export default class OptimizeCssPlugin {
               ids,
               contentClasses: [...contentClasses, ...moduleClasses],
             });
+            if (optimizer.usage.unindexed.length > 0) {
+              warn(unindexedCarbonFiles(optimizer.usage.unindexed));
+            }
             const assetReports: AssetReport[] = [];
 
             for (const id of cssIds) {

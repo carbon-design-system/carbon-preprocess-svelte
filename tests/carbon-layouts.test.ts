@@ -144,3 +144,25 @@ describe("internal components", () => {
     }
   });
 });
+
+describe("a bundled Carbon file missing from the index", () => {
+  test("leaves CSS unpruned, since nothing is known about what it renders", async () => {
+    const carbon = createMockCarbonPackage({
+      "index.js": `export { default as Button } from "./Button/Button.svelte";\n${TAG_EXPORT}`,
+      "Button/Button.svelte": BUTTON,
+      "Tag/Tag.svelte": TAG,
+    });
+
+    try {
+      const optimizer = createCssOptimizer({
+        components: await buildComponentIndex({ carbonRoot: carbon.root }),
+        ids: [bundled("Button/Button.svelte"), bundled("Gone/Gone.svelte")],
+      });
+
+      expect(optimizer.usage.unindexed).toEqual(["Gone/Gone.svelte"]);
+      expect(optimizer.run(CSS)).toEqual({ css: CSS, removed: 0 });
+    } finally {
+      carbon.dispose();
+    }
+  });
+});

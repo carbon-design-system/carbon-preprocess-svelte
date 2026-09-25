@@ -8,6 +8,12 @@ export const NO_CARBON_IMPORTS =
   'If you expected pruning, check that components are imported from "carbon-components-svelte" (importing only the stylesheet is not enough) ' +
   "and that the plugin is part of the production build.";
 
+export function unindexedCarbonFiles(files: readonly string[]): string {
+  const shown = files.slice(0, 3).join(", ");
+  const more = files.length > 3 ? ` and ${files.length - 3} more` : "";
+  return `${WARN_PREFIX} bundled carbon-components-svelte files aren't in the component index of the installed version (${shown}${more}), so no Carbon CSS was pruned. The bundle and the project root likely resolve different carbon-components-svelte installs.`;
+}
+
 export function contentMatchedNothing(
   content: readonly string[],
   root: string,
