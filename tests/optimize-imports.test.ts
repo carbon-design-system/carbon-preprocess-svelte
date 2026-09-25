@@ -379,4 +379,66 @@ import TabItem from "carbon-components-svelte/src/Tabs/Tab.svelte";`);
       fixture.dispose();
     }
   });
+
+  test("follows `export *`, including nested and cyclic ones", () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export * from "./Button";
+export * from "./utils";`,
+      "Button/index.js": `export { default as Button } from "./Button.svelte";
+export * from "../Button";`,
+      "Button/Button.svelte": "<button />",
+      "utils/index.js": `export * from "./toCsv.js";
+export default function ignored() {}`,
+      "utils/toCsv.js": "export function toCsv() {}\nexport const SEP = ',';",
+    });
+
+    try {
+      expect(Object.fromEntries(readCarbonExports(fixture.root))).toEqual({
+        Button: {
+          path: "carbon-components-svelte/src/Button/Button.svelte",
+          name: "default",
+        },
+        toCsv: {
+          path: "carbon-components-svelte/src/utils/toCsv.js",
+          name: "toCsv",
+        },
+        SEP: {
+          path: "carbon-components-svelte/src/utils/toCsv.js",
+          name: "SEP",
+        },
+      });
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("follows names imported and then exported", () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `import Button from "./Button/Button.svelte";
+import Tag, { SIZES as TAG_SIZES } from "./Tag/Tag.svelte";
+const local = 1;
+export { Button, Tag, TAG_SIZES, local };`,
+      "Button/Button.svelte": "<button />",
+      "Tag/Tag.svelte": "<span />",
+    });
+
+    try {
+      expect(Object.fromEntries(readCarbonExports(fixture.root))).toEqual({
+        Button: {
+          path: "carbon-components-svelte/src/Button/Button.svelte",
+          name: "default",
+        },
+        Tag: {
+          path: "carbon-components-svelte/src/Tag/Tag.svelte",
+          name: "default",
+        },
+        TAG_SIZES: {
+          path: "carbon-components-svelte/src/Tag/Tag.svelte",
+          name: "SIZES",
+        },
+      });
+    } finally {
+      fixture.dispose();
+    }
+  });
 });

@@ -10,29 +10,76 @@ export type CarbonExport = {
   name: string;
 };
 
-type ReExport = { local: string; source: string };
+type Binding = { local: string; source: string };
 
-// `export { a, b as c } from "./x"`, the only form Carbon's barrels use.
+type ModuleExports = {
+  /** Exported name -> the imported binding it passes on. */
+  forwarded: Map<string, Binding>;
+  declared: Set<string>;
+  /** `export * from` sources. */
+  stars: string[];
+};
+
 // `[^}]` spans newlines, so multi-line specifier lists match too.
 const RE_EXPORT_REGEX = /export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
+const EXPORT_LIST_REGEX = /export\s*\{([^}]*)\}(?!\s*from\b)/g;
+const EXPORT_STAR_REGEX = /export\s*\*\s*from\s*["']([^"']+)["']/g;
+const EXPORT_DECLARATION_REGEX =
+  /export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([\w$]+)/g;
+const IMPORT_REGEX =
+  /import\s+([\w$]+)?\s*,?\s*(?:\{([^}]*)\})?\s*from\s*["']([^"']+)["']/g;
 const COMMENT_REGEX = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
 const AS_REGEX = /\s+as\s+/;
 
-/** Hops from the barrel to a definition; Carbon needs at most two. */
+/** Hops from the barrel to a definition; Carbon needs at most three. */
 const MAX_HOPS = 8;
 
-function readReExports(file: string): Map<string, ReExport> {
-  const code = readFileSync(file, "utf8").replace(COMMENT_REGEX, "");
-  const reExports = new Map<string, ReExport>();
+/** `a, b as c` -> `[["a", "a"], ["b", "c"]]` (original name, then alias). */
+function parseSpecifiers(list: string): Array<[string, string]> {
+  const specifiers: Array<[string, string]> = [];
+  for (const specifier of list.split(",")) {
+    const [name, alias = name] = specifier.trim().split(AS_REGEX);
+    if (name) specifiers.push([name, alias]);
+  }
+  return specifiers;
+}
 
-  for (const [, specifiers, source] of code.matchAll(RE_EXPORT_REGEX)) {
-    for (const specifier of specifiers.split(",")) {
-      const [local, exported = local] = specifier.trim().split(AS_REGEX);
-      if (local) reExports.set(exported, { local, source });
+function readModuleExports(file: string): ModuleExports {
+  const code = readFileSync(file, "utf8").replace(COMMENT_REGEX, "");
+
+  const imports = new Map<string, Binding>();
+  for (const [, defaultName, named, source] of code.matchAll(IMPORT_REGEX)) {
+    if (defaultName) imports.set(defaultName, { local: "default", source });
+    for (const [imported, local] of parseSpecifiers(named ?? "")) {
+      imports.set(local, { local: imported, source });
     }
   }
 
-  return reExports;
+  const forwarded = new Map<string, Binding>();
+  for (const [, list, source] of code.matchAll(RE_EXPORT_REGEX)) {
+    for (const [local, exported] of parseSpecifiers(list)) {
+      forwarded.set(exported, { local, source });
+    }
+  }
+
+  const declared = new Set<string>();
+  for (const [, name] of code.matchAll(EXPORT_DECLARATION_REGEX)) {
+    declared.add(name);
+  }
+  // `import Button from "./Button.svelte"; export { Button };`
+  for (const [, list] of code.matchAll(EXPORT_LIST_REGEX)) {
+    for (const [local, exported] of parseSpecifiers(list)) {
+      const imported = imports.get(local);
+      if (imported) forwarded.set(exported, imported);
+      else declared.add(exported);
+    }
+  }
+
+  const stars = [...code.matchAll(EXPORT_STAR_REGEX)].map(
+    ([, source]) => source,
+  );
+
+  return { forwarded, declared, stars };
 }
 
 function isFile(file: string): boolean {
@@ -55,7 +102,8 @@ function resolveModule(from: string, source: string): string | undefined {
  * module that defines it, following re-export chains: older releases
  * re-export each component through its folder's `index.js`
  * (`export { Button } from "./Button"`), newer ones point straight at the
- * `.svelte` file. Reads only the barrel and the modules it re-exports from,
+ * `.svelte` file. `export *` and imported-then-exported names are followed
+ * too. Reads only the barrel and the modules it re-exports from,
  * synchronously, with no Svelte compiler involved.
  */
 export function readCarbonExports(
@@ -63,40 +111,77 @@ export function readCarbonExports(
 ): Map<string, CarbonExport> {
   const src = path.join(carbonRoot, "src");
   const barrel = path.join(src, "index.js");
-  const reExportsByFile = new Map<string, Map<string, ReExport>>();
+  const modules = new Map<string, ModuleExports>();
+  const namesByFile = new Map<string, Set<string>>();
 
-  function reExportsOf(file: string): Map<string, ReExport> {
-    let reExports = reExportsByFile.get(file);
-    if (!reExports) {
-      reExports = readReExports(file);
-      reExportsByFile.set(file, reExports);
+  function exportsOf(file: string): ModuleExports {
+    let exports = modules.get(file);
+    if (!exports) {
+      exports = readModuleExports(file);
+      modules.set(file, exports);
     }
-    return reExports;
+    return exports;
   }
 
-  const exports = new Map<string, CarbonExport>();
+  /** Every name `file` exports, including through `export *`. */
+  function exportedNames(file: string): Set<string> {
+    let names = namesByFile.get(file);
+    if (names) return names;
 
-  for (const [exported, reExport] of reExportsOf(barrel)) {
-    let file = resolveModule(barrel, reExport.source);
-    let name = reExport.local;
+    names = new Set<string>();
+    // Set before recursing so an `export *` cycle ends here.
+    namesByFile.set(file, names);
+    const { forwarded, declared, stars } = exportsOf(file);
+    for (const name of forwarded.keys()) names.add(name);
+    for (const name of declared) names.add(name);
+    for (const source of stars) {
+      const target = resolveModule(file, source);
+      if (!target?.endsWith(".js")) continue;
+      for (const name of exportedNames(target)) {
+        if (name !== "default") names.add(name);
+      }
+    }
+    return names;
+  }
 
-    for (let hop = 0; file && hop < MAX_HOPS; hop++) {
+  function definitionOf(
+    file: string,
+    name: string,
+  ): { file: string; name: string } {
+    for (let hop = 0; hop < MAX_HOPS; hop++) {
       // `.svelte` modules only have a default export, and a default export
       // is where the chain ends: it is the definition.
       if (name === "default" || !file.endsWith(".js")) break;
-      const next = reExportsOf(file).get(name);
+
+      const { forwarded, declared, stars } = exportsOf(file);
+      let next = forwarded.get(name);
+      if (!next && !declared.has(name)) {
+        const source = stars.find((star) => {
+          const target = resolveModule(file, star);
+          return target?.endsWith(".js") && exportedNames(target).has(name);
+        });
+        if (source) next = { local: name, source };
+      }
       if (!next) break;
+
       const target = resolveModule(file, next.source);
       if (!target) break;
       file = target;
       name = next.local;
     }
+    return { file, name };
+  }
 
-    if (!file) continue;
+  const exports = new Map<string, CarbonExport>();
+
+  for (const exported of exportedNames(barrel)) {
+    const definition = definitionOf(barrel, exported);
+    // Defined in the barrel itself, or unresolvable: stays on the barrel.
+    if (definition.file === barrel) continue;
 
     exports.set(exported, {
-      path: `${CarbonSvelte.Components}/src/${path.relative(src, file).split(path.sep).join("/")}`,
-      name,
+      path: `${CarbonSvelte.Components}/src/${path.relative(src, definition.file).split(path.sep).join("/")}`,
+      name: definition.name,
     });
   }
 
