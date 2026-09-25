@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
@@ -106,6 +107,18 @@ export function componentIndexCacheFile(
 }
 
 /**
+ * A checkout linked in (`bun link`, `workspace:`, ...) rather than installed.
+ * Its source changes under a fixed version, so a cached index would go stale.
+ */
+function isLinkedCheckout(carbonRoot: string): boolean {
+  try {
+    return !realpathSync(carbonRoot).split(path.sep).includes("node_modules");
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Builds (or reads a cached copy of) the component index for whichever
  * `carbon-components-svelte` is actually installed in the consuming
  * project. Throws if it can't; see `loadComponentIndex`.
@@ -114,14 +127,15 @@ export async function resolveComponentIndex(
   options?: ComponentIndexOptions,
 ): Promise<ComponentIndex> {
   const carbonRoot = resolveCarbonRoot(options?.projectRoot);
-  const version = await readCarbonVersion(carbonRoot);
-  const cacheFile = componentIndexCacheFile(
-    carbonRoot,
-    version,
-    options?.projectRoot,
-  );
+  const cacheFile = isLinkedCheckout(carbonRoot)
+    ? undefined
+    : componentIndexCacheFile(
+        carbonRoot,
+        await readCarbonVersion(carbonRoot),
+        options?.projectRoot,
+      );
 
-  const cached = await readCache(cacheFile);
+  const cached = cacheFile && (await readCache(cacheFile));
   if (cached) return cached;
 
   const index = await buildComponentIndex({
@@ -135,7 +149,7 @@ export async function resolveComponentIndex(
     );
   }
 
-  await writeCache(cacheFile, index);
+  if (cacheFile) await writeCache(cacheFile, index);
   return index;
 }
 
