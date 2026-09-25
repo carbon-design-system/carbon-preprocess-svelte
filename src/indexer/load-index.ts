@@ -9,6 +9,8 @@ const LOG_PREFIX = "[carbon-preprocess-svelte]";
 
 const CACHE_DIRNAME = ".cache/carbon-preprocess-svelte";
 
+const ZIP_ARCHIVE_REGEX = /\.zip[\\/]/;
+
 async function readCarbonVersion(carbonRoot: string): Promise<string> {
   const pkg = JSON.parse(
     await readFile(path.join(carbonRoot, "package.json"), "utf8"),
@@ -85,13 +87,19 @@ export type ComponentIndexOptions = {
  * consuming project's `node_modules/.cache/carbon-preprocess-svelte/`.
  * Keyed by both so a bump on either side misses and rebuilds: a new Carbon
  * changes the input, a new preprocessor may change the extraction.
+ *
+ * A Carbon zipped by Yarn PnP uses the project's `node_modules` instead:
+ * PnP's `fs` would write into the archive.
  */
 export function componentIndexCacheFile(
   carbonRoot: string,
   carbonVersion: string,
+  projectRoot: string = process.cwd(),
 ): string {
   return path.join(
-    path.dirname(carbonRoot),
+    ZIP_ARCHIVE_REGEX.test(carbonRoot)
+      ? path.join(path.resolve(projectRoot), "node_modules")
+      : path.dirname(carbonRoot),
     CACHE_DIRNAME,
     `${carbonVersion}_${OWN_VERSION}.json`,
   );
@@ -107,7 +115,11 @@ export async function resolveComponentIndex(
 ): Promise<ComponentIndex> {
   const carbonRoot = resolveCarbonRoot(options?.projectRoot);
   const version = await readCarbonVersion(carbonRoot);
-  const cacheFile = componentIndexCacheFile(carbonRoot, version);
+  const cacheFile = componentIndexCacheFile(
+    carbonRoot,
+    version,
+    options?.projectRoot,
+  );
 
   const cached = await readCache(cacheFile);
   if (cached) return cached;

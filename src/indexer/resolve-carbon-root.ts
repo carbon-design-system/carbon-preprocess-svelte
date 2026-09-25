@@ -1,9 +1,36 @@
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
+import Module, { createRequire } from "node:module";
 import path from "node:path";
 import { CarbonSvelte } from "../constants";
 
 const nodeRequire = createRequire(import.meta.url);
+
+type PnpApi = {
+  resolveToUnqualified(request: string, issuer: string): string | null;
+};
+
+/**
+ * Carbon's directory according to Yarn Plug'n'Play, which has no
+ * `node_modules` to search, or `undefined` outside PnP.
+ */
+function resolveWithPnp(from: string): string | undefined {
+  const { findPnpApi } = Module as {
+    findPnpApi?: (lookupSource: string) => PnpApi | null;
+  };
+  if (typeof findPnpApi !== "function") return undefined;
+
+  // A trailing separator makes the issuer the directory itself.
+  const issuer = `${path.resolve(from)}${path.sep}`;
+  try {
+    const dir = findPnpApi(issuer)?.resolveToUnqualified(
+      CarbonSvelte.Components,
+      issuer,
+    );
+    return dir ? path.resolve(dir) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Directory of the installed `carbon-components-svelte` package.
@@ -23,6 +50,9 @@ const nodeRequire = createRequire(import.meta.url);
  * isn't subject to that gate.
  */
 export function resolveCarbonRoot(from: string = process.cwd()): string {
+  const pnp = resolveWithPnp(from);
+  if (pnp) return pnp;
+
   // `createRequire` wants a module filename; it need not exist on disk.
   const projectRequire = createRequire(path.join(from, "__resolve__.js"));
   const searchPaths = new Set([
