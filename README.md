@@ -657,6 +657,7 @@ Full, runnable set-ups for every supported bundler live under [examples](example
 - [examples/sveltekit](examples/sveltekit): SvelteKit
 - [examples/vite](examples/vite): Vite with Svelte 4
 - [examples/vite@svelte-5](examples/vite@svelte-5): Vite with Svelte 5
+- [examples/vite@carbon-0.85](examples/vite@carbon-0.85): Vite pinned to an older Carbon (0.85.0)
 - [examples/astro](examples/astro): Astro
 - [examples/rollup](examples/rollup): Rollup
 - [examples/rolldown](examples/rolldown): Rolldown

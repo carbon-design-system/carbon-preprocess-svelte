@@ -35,6 +35,12 @@
     "after_kb": 49.68,
     "reduction_percent": 93.01
   },
+  "vite@carbon-0.85": {
+    "file": "assets/index-*.css",
+    "before_kb": 606.42,
+    "after_kb": 96.81,
+    "reduction_percent": 84.04
+  },
   "vite@svelte-5": {
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
