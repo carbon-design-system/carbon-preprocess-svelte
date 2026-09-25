@@ -35,6 +35,8 @@ export type ComponentIndex = Record<
  */
 export async function buildComponentIndex(options?: {
   carbonRoot?: string;
+  /** Directory `svelte/compiler` is resolved from first. */
+  projectRoot?: string;
   onTiming?: (label: string, ms: number) => void;
 }): Promise<ComponentIndex> {
   const emit = options?.onTiming ?? (() => {});
@@ -43,7 +45,7 @@ export async function buildComponentIndex(options?: {
   const index_js = path.join(carbon_src, "index.js");
   const [index_file, parse] = await Promise.all([
     readFile(index_js, "utf8"),
-    loadSvelteParser(),
+    loadSvelteParser(options?.projectRoot),
   ]);
 
   type Identifier = string;
