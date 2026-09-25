@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
-import { components as staticComponentIndex } from "../component-index/index";
+import { CarbonSvelte } from "../constants";
 import type { ComponentIndex } from "./build-index";
 import { buildComponentIndex, resolveCarbonRoot } from "./build-index";
 
@@ -126,25 +126,27 @@ export async function resolveLiveComponentIndex(
 }
 
 /**
- * Un-memoized `ensureLiveComponentIndex`: resolves the live index, falling
- * back to the bundled static `component-index/index.ts` on any failure
- * (unresolvable `carbon-components-svelte`, unexpected Carbon `src` layout,
- * etc.) so opting in can't turn a working build into a broken one.
+ * Un-memoized `ensureLiveComponentIndex`: resolves the live index, or
+ * `undefined` with a warning on any failure (unresolvable
+ * `carbon-components-svelte` or `svelte/compiler`, unexpected Carbon `src`
+ * layout, etc.). Callers then leave CSS unpruned: a bigger stylesheet is
+ * safe, while pruning against an index for some other Carbon version drops
+ * rules the installed markup still uses (#213).
  */
 export async function loadLiveComponentIndex(
   options?: LiveIndexOptions,
-): Promise<ComponentIndex> {
+): Promise<ComponentIndex | undefined> {
   try {
     return await resolveLiveComponentIndex(options);
   } catch (error) {
     console.warn(
-      `${LOG_PREFIX} experimental.liveIndex: falling back to the bundled static component index (${(error as Error)?.message ?? error}).`,
+      `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving Carbon CSS unpruned.`,
     );
-    return staticComponentIndex;
+    return undefined;
   }
 }
 
-let memoized: Promise<ComponentIndex> | undefined;
+let memoized: Promise<ComponentIndex | undefined> | undefined;
 
 /**
  * Memoized per build process: every plugin instance that opts into
@@ -152,7 +154,9 @@ let memoized: Promise<ComponentIndex> | undefined;
  * cache read), no matter how many `optimizeImports`/`optimizeCss` instances
  * request it.
  */
-export function ensureLiveComponentIndex(): Promise<ComponentIndex> {
+export function ensureLiveComponentIndex(): Promise<
+  ComponentIndex | undefined
+> {
   memoized ??= loadLiveComponentIndex();
   return memoized;
 }

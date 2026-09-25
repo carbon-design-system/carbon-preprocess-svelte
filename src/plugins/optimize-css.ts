@@ -61,6 +61,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   let contentClasses: string[] | undefined;
   /** Literal `bx--` classes found while scanning bundled module code. */
   const moduleClasses = new Set<string>();
+  /** Set when the live index couldn't be built: CSS is left unpruned. */
+  let indexUnavailable = false;
 
   return {
     name: "vite:carbon:optimize-css",
@@ -83,15 +85,19 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * the next build. When `experimental.liveIndex` is set, this is also
      * where the component index gets rebuilt from the project's installed
      * `carbon-components-svelte` (or read from cache), so it's ready before
-     * `transform`/`generateBundle` ever consult it.
+     * `transform`/`generateBundle` ever consult it. If it can't be built,
+     * this build's CSS is left unpruned.
      */
     async buildStart() {
       ids.clear();
       contentClasses = undefined;
       moduleClasses.clear();
+      indexUnavailable = false;
 
       if (options?.experimental?.liveIndex) {
-        setComponents(await ensureLiveComponentIndex());
+        const index = await ensureLiveComponentIndex();
+        if (index) setComponents(index);
+        else indexUnavailable = true;
       }
     },
     /**
@@ -114,6 +120,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * `file.source` updates the bundle output in place.
      */
     async generateBundle(_, bundle) {
+      if (indexUnavailable) return;
+
       if (ids.size === 0) {
         // Warn only when this build emitted Carbon CSS. A secondary build
         // that never imports Carbon has nothing to prune.

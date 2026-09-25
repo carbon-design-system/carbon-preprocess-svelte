@@ -175,7 +175,10 @@ export default class OptimizeCssPlugin {
             }
 
             if (options.experimental?.liveIndex) {
-              setComponents(await ensureLiveComponentIndex());
+              const index = await ensureLiveComponentIndex();
+              // Already warned; leave this compilation's CSS unpruned.
+              if (!index) return;
+              setComponents(index);
             }
 
             const scan = scanContent(options.content, compiler.context);

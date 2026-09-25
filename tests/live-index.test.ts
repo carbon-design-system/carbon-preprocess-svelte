@@ -133,7 +133,7 @@ describe("resolveLiveComponentIndex", () => {
 });
 
 describe("loadLiveComponentIndex", () => {
-  test("falls back to the frozen index with a warning when indexing fails", async () => {
+  test("returns undefined with a warning when indexing fails", async () => {
     const project = createFakeProject();
     // A package.json but no `src/`: resolvable, un-indexable.
     const broken = path.join(
@@ -151,11 +151,9 @@ describe("loadLiveComponentIndex", () => {
     try {
       const index = await loadLiveComponentIndex({ projectRoot: project.root });
 
-      expect(index).toBe(staticComponents);
+      expect(index).toBeUndefined();
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain(
-        "falling back to the bundled static component index",
-      );
+      expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
       expect(
         existsSync(path.join(project.root, "node_modules", ".cache")),
       ).toBe(false);

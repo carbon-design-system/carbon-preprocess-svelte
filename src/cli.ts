@@ -118,7 +118,10 @@ async function main() {
   }
 
   if (values["live-index"]) {
-    setComponents(await ensureLiveComponentIndex());
+    const index = await ensureLiveComponentIndex();
+    // Already warned; leave every file unpruned.
+    if (!index) return;
+    setComponents(index);
   }
 
   const safelist = parseSafelist(values.safelist ?? []);

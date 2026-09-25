@@ -41,7 +41,10 @@ export async function optimizeCarbonCss(
   options: OptimizeCarbonCssOptions,
 ): Promise<OptimizedCssReport> {
   if (options.experimental?.liveIndex) {
-    setComponents(await ensureLiveComponentIndex());
+    const index = await ensureLiveComponentIndex();
+    // Already warned; return the CSS unpruned.
+    if (!index) return { css: toCssString(css), removed: 0 };
+    setComponents(index);
   }
 
   const ids = [...options.components];
