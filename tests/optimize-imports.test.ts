@@ -1,7 +1,10 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { optimizeImports } from "carbon-preprocess-svelte";
 import { readCarbonExports } from "carbon-preprocess-svelte/preprocessors/carbon-exports";
 import { transformScript } from "carbon-preprocess-svelte/preprocessors/optimize-imports";
 import type { Preprocessor, Processed } from "svelte/compiler";
+import { createFakeProject } from "./helpers/fake-project";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
@@ -243,6 +246,56 @@ import { NewComponent } from "carbon-components-svelte";`);
     expect((result as Processed).code).toEqual(
       `import Button from "carbon-components-svelte/src/Button/Button.svelte";`,
     );
+  });
+
+  test("each file gets the barrel of the Carbon install its directory resolves", () => {
+    // Two apps on Carbon releases that moved `Button`, one preprocessor.
+    const project = createFakeProject();
+    const carbons = ["Button", "Buttons"].map((folder, version) => {
+      const carbon = createMockCarbonPackage({
+        "index.js": `export { default as Button } from "./${folder}/Button.svelte";`,
+        [`${folder}/Button.svelte`]: "<button />",
+      });
+      writeFileSync(
+        path.join(carbon.root, "package.json"),
+        JSON.stringify({
+          name: "carbon-components-svelte",
+          version: `0.${version}.0`,
+        }),
+      );
+      return carbon;
+    });
+    const apps = carbons.map((carbon, i) => {
+      const app = path.join(project.root, "apps", `app-${i}`);
+      mkdirSync(path.join(app, "src"), { recursive: true });
+      project.linkCarbon(app, carbon.root);
+      return app;
+    });
+
+    try {
+      const preprocessor = optimizeImports();
+      const [first, second] = apps.map(
+        (app) =>
+          (
+            preprocessor.script({
+              attributes: {},
+              filename: path.join(app, "src", "App.svelte"),
+              content: `import { Button } from "carbon-components-svelte";`,
+              markup: "",
+            }) as Processed
+          ).code,
+      );
+
+      expect(first).toEqual(
+        `import Button from "carbon-components-svelte/src/Button/Button.svelte";`,
+      );
+      expect(second).toEqual(
+        `import Button from "carbon-components-svelte/src/Buttons/Button.svelte";`,
+      );
+    } finally {
+      project.dispose();
+      for (const carbon of carbons) carbon.dispose();
+    }
   });
 
   test("icon-only files never read carbon-components-svelte", () => {
