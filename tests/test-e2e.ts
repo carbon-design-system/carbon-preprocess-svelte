@@ -10,6 +10,8 @@ const OPTIMIZED_REGEX = /Optimized\s+(.+\.css)/;
 const BEFORE_REGEX = /Before:\s*([\d,.]+)\s*(kB|MB)/;
 const AFTER_REGEX = /After:\s*([\d,.]+)\s*(kB|MB)\s*\(-?([\d.]+)%\)/;
 const DOUBLE_NEWLINE_REGEX = /\n\n+/;
+// Preprocessor/index loader prefix, then the plugins' prefix.
+const WARNING_REGEX = /\[carbon-preprocess-svelte\]|carbon-preprocess-svelte:/;
 
 type OptimizationResult = {
   file: string;
@@ -26,7 +28,53 @@ type BuildOutcome = {
   example: string;
   passed: boolean;
   message: string;
+  /** Failed on a warning, which a snapshot update can't fix. */
+  warned?: boolean;
 };
+
+type BuildRun = {
+  stdout: string;
+  warnings: string[];
+};
+
+/** Runs a package script. Not `.text()`: it drops stderr, where warnings land. */
+async function runBuild(dir: string, script: string): Promise<BuildRun> {
+  const result = await $`cd ${dir} && bun run ${script}`.nothrow().quiet();
+  const stdout = result.stdout.toString();
+  const stderr = result.stderr.toString();
+  console.log(stdout);
+  if (stderr) console.error(stderr);
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `"bun run ${script}" failed in ${dir} (exit ${result.exitCode})`,
+    );
+  }
+
+  const warnings = `${stdout}\n${stderr}`
+    .split("\n")
+    .filter((line) => WARNING_REGEX.test(line))
+    .map((line) => line.trim());
+
+  return { stdout, warnings };
+}
+
+/**
+ * Any warning fails the build: size snapshots miss some degraded builds
+ * (webpack and Rspack prune the same CSS whether or not imports were rewritten).
+ */
+function warningOutcome(
+  label: string,
+  warnings: string[],
+): BuildOutcome | undefined {
+  if (warnings.length === 0) return undefined;
+  return {
+    example: label,
+    passed: false,
+    message: `Build emitted carbon-preprocess-svelte warnings:\n  ${warnings.join("\n  ")}`,
+    warned: true,
+  };
+}
 
 function isOptimizationResult(
   value: ExampleSnapshot,
@@ -186,10 +234,12 @@ async function buildSingleEntry(
   snapshots: Snapshots,
   newSnapshots: Snapshots,
 ): Promise<BuildOutcome> {
-  const buildResult = await $`cd ${dir} && bun run build`.text();
-  console.log(buildResult);
+  const { stdout, warnings } = await runBuild(dir, "build");
 
-  const parsed = parseLastOptimizationBlock(buildResult);
+  const warned = warningOutcome(exampleName, warnings);
+  if (warned) return warned;
+
+  const parsed = parseLastOptimizationBlock(stdout);
   if (!parsed) {
     return {
       example: exampleName,
@@ -235,11 +285,17 @@ async function buildMultiEntry(
   for (const entry of entries) {
     console.log(`\n--- entry: ${entry} ---\n`);
     // biome-ignore lint/performance/noAwaitInLoops: build entries sequentially to capture output correctly
-    const buildResult = await $`cd ${dir} && bun run build:${entry}`.text();
-    console.log(buildResult);
+    const { stdout, warnings } = await runBuild(dir, `build:${entry}`);
 
     const label = `${exampleName}/${entry}`;
-    const parsed = parseLastOptimizationBlock(buildResult);
+
+    const warned = warningOutcome(label, warnings);
+    if (warned) {
+      outcomes.push(warned);
+      continue;
+    }
+
+    const parsed = parseLastOptimizationBlock(stdout);
 
     if (!parsed) {
       outcomes.push({
@@ -322,6 +378,7 @@ async function main() {
   console.log("=".repeat(60));
 
   let allPassed = true;
+  let anyWarned = false;
   for (const result of results) {
     const status = result.passed ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✗\x1b[0m";
     console.log(`${status} ${result.example}`);
@@ -331,16 +388,24 @@ async function main() {
     if (!result.passed) {
       allPassed = false;
     }
+    if (result.warned) {
+      anyWarned = true;
+    }
   }
 
-  if (UPDATE_SNAPSHOTS) {
+  // A warned build recorded no result, so saving would drop its snapshot.
+  if (UPDATE_SNAPSHOTS && anyWarned) {
+    console.log(
+      "\n\x1b[31mSnapshots not updated: fix the warnings first.\x1b[0m",
+    );
+  } else if (UPDATE_SNAPSHOTS) {
     saveSnapshots(newSnapshots);
     console.log(`\n\x1b[33mSnapshots updated: ${SNAPSHOT_PATH}\x1b[0m`);
   }
 
   console.log();
 
-  if (!allPassed && !UPDATE_SNAPSHOTS) {
+  if (anyWarned || (!allPassed && !UPDATE_SNAPSHOTS)) {
     process.exit(1);
   }
 }
