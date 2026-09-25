@@ -42,7 +42,7 @@ bun install
 
 | Script | What it does |
 | --- | --- |
-| `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`). |
+| `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`), after clearing the component index cache in `node_modules/.cache` (it's keyed by package versions, so it would otherwise hide local indexer changes; `test:e2e` clears each example's too). |
 | `bun run build` | Regenerate the component index, bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
 | `bun run typecheck` | `tsc --noEmit` over `bench/`, `scripts/`, `src/`, `tests/`. |
 | `bun run index:components` | Regenerate [`src/component-index/index.ts`](src/component-index/index.ts) from the installed `carbon-components-svelte`. |

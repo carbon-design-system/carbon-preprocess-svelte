@@ -14,7 +14,7 @@
     "index:components": "bun scripts/index-components.ts && biome check --write --unsafe src/component-index/index.ts",
     "prebuild": "bun run index:components",
     "build": "bun scripts/build.ts",
-    "test": "bun test --parallel",
+    "test": "rm -rf node_modules/.cache/carbon-preprocess-svelte && bun test --parallel",
     "test:e2e": "bun tests/test-e2e.ts",
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
     "test:fixtures:update": "UPDATE_FIXTURES=true bun test tests/optimize-css-fixtures.test.ts",
