@@ -47,7 +47,7 @@ export type OptimizeCssOptions = {
    * used in Carbon Svelte components.
    *
    * The default behavior is to preserve the following IBM Plex fonts:
-   * - IBM Plex Sans (300/400/600-weight and normal-font-style rules)
+   * - IBM Plex Sans (300/400/600-weight rules; italic only if `<Text italic>` is used)
    * - IBM Plex Mono (400-weight and normal-font-style rules)
    *
    * Set to `true` to disable this behavior and

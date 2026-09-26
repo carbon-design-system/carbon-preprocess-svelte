@@ -64,6 +64,11 @@ a { color: blue }
 }
 @font-face {
   font-family: IBM Plex Sans;
+  font-style: italic;
+  font-weight: 700;
+}
+@font-face {
+  font-family: IBM Plex Sans;
   font-style: normal;
   font-weight: 100;
 }`;
@@ -98,6 +103,44 @@ a { color: blue }
   font-family: IBM Plex Sans;
   font-style: normal;
   font-weight: 300;
+}`);
+  });
+
+  test("keeps IBM Plex Sans italic faces for `<Text italic>`", () => {
+    const result = createOptimizedCss({
+      components,
+      source: font_rules,
+      ids: ["/Text.svelte"],
+    });
+    expect(result).toEqual(`@font-face {
+  font-family: 'CustomFont';
+  src: url('path/to/custom-font.ttf');
+}
+@font-face {
+  font-display: auto;
+  font-family: IBM Plex Mono;
+  font-style: normal;
+  font-weight: 400;
+}
+@font-face {
+  font-family: IBM Plex Sans;
+  font-style: normal;
+  font-weight: 600;
+}
+@font-face {
+  font-family: IBM Plex Sans;
+  font-style: normal;
+  font-weight: 400;
+}
+@font-face {
+  font-family: IBM Plex Sans;
+  font-style: normal;
+  font-weight: 300;
+}
+@font-face {
+  font-family: IBM Plex Sans;
+  font-style: italic;
+  font-weight: 400;
 }`);
   });
 
@@ -142,6 +185,11 @@ a { color: blue }
   font-family: IBM Plex Sans;
   font-style: italic;
   font-weight: 400;
+}
+@font-face {
+  font-family: IBM Plex Sans;
+  font-style: italic;
+  font-weight: 700;
 }
 @font-face {
   font-family: IBM Plex Sans;

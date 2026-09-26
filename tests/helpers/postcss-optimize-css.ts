@@ -91,6 +91,7 @@ function createPostcssPlugins(
               attributes["font-family"],
               attributes["font-style"],
               attributes["font-weight"],
+              { allowlist, components },
             )
           ) {
             node.remove();

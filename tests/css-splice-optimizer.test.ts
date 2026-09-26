@@ -38,6 +38,7 @@ const SCENARIOS: Record<string, Scenario> = {
   button: { ids: ["Button"] },
   datepicker: { ids: ["DatePicker", "DatePickerInput"] },
   fonts: { ids: ["Button"], preserveAllIBMFonts: true },
+  text: { ids: ["Text"] },
   safelist: { ids: ["Accordion"], safelist: [".bx--grid", /^\.bx--btn--/] },
   // Stateful regexes make the visitor call sequence observable.
   safelistGlobal: { ids: ["Accordion"], safelist: [/bx--btn/g] },
@@ -134,9 +135,13 @@ const HOSTILE: Record<string, string> = {
     "@media (min-width:1px){.bx--unused{a:b}.bx--btn{c:d}}@media x{.bx--unused{a:b}}@media y{}",
   "media brace in params": "@media (a{b){.bx--unused{a:b}}.bx--btn{c:d}",
   "font-face keep":
-    FF("IBM Plex Sans", "normal", "400") + FF("IBM Plex Mono", "normal", "400"),
+    FF("IBM Plex Sans", "normal", "400") +
+    FF("IBM Plex Sans", "italic", "600") +
+    FF("IBM Plex Mono", "normal", "400"),
   "font-face drop":
-    FF("IBM Plex Sans", "italic", "400") + FF("IBM Plex Sans", "normal", "700"),
+    FF("IBM Plex Sans", "italic", "700") +
+    FF("IBM Plex Sans", "normal", "700") +
+    FF("IBM Plex Mono", "italic", "400"),
   "font-face other":
     FF("Comic Sans", "normal", "700") + FF('"IBM Plex Sans"', "normal", "400"),
   "font-face spacing":
@@ -144,12 +149,12 @@ const HOSTILE: Record<string, string> = {
   "font-face important":
     "@font-face{font-family:IBM Plex Sans;font-style:normal;font-weight:400 !important}",
   "font-face upper":
-    "@FONT-FACE{font-family:IBM Plex Sans;font-style:italic;font-weight:400}",
+    "@FONT-FACE{font-family:IBM Plex Sans;font-style:italic;font-weight:700}",
   "font-face empty": "@font-face{}.bx--btn{a:b}",
   "font-face nested":
     "@font-face{font-family:IBM Plex Sans;font-style:normal;font-weight:400;.bx--unused{a:b}}",
   "font-face duplicates":
-    "@font-face{font-family:IBM Plex Sans;font-weight:400;font-style:italic;font-style:normal}",
+    "@font-face{font-family:IBM Plex Mono;font-weight:400;font-style:italic;font-style:normal}",
   "font-face star hack":
     "@font-face{*font-family:IBM Plex Sans;font-style:normal;font-weight:700}",
   "font-face bareword important kept":
