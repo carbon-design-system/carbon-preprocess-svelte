@@ -195,8 +195,10 @@ export default {
 
 The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on production builds and after other plugins.
 
-1. During `transform`, it collects imported `carbon-components-svelte` source paths, plus (unless `scanModules: false`) every literal `bx--` token found in other modules.
+1. During `transform`, it collects imported `carbon-components-svelte` source paths, plus (unless `scanModules: false`) every literal `bx--` token found in other modules and the literal values they pass to variant props like Button's `kind`.
 2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components, plus global selectors like `.bx--body`. The component-to-class index is built from your installed `carbon-components-svelte` (see [Component index](#component-index)), so it always matches the version you have.
+   - A class a component builds from a prop (`` `bx--btn--${kind}` ``) keeps only the prop's default plus the values your code passes as literals. `<Button kind="danger">` keeps primary and danger styles and drops tertiary, ghost, and the rest. If any module passes the prop something else (`kind={k}`, `{...props}` from a variable), every variant stays.
+   - The same goes for a class a component only renders under a condition on its own props (`class:bx--tag--filter={filter}`, `size === "sm" && "bx--toggle-input--small"`): it's dropped when no default or literal your code passes can satisfy the condition. `<Tag type="red">` keeps red and drops the other colors, and `<PasswordInput>` without `tooltipPosition` drops the top, left and right tooltip styles.
 3. A PostCSS plugin prunes Carbon (`bx--`) selectors outside that allowlist:
    - Individual selectors are pruned from comma-separated lists, not the whole rule, when only one branch matches
    - Every Carbon class in a compound selector (same-element and descendant) must match the allowlist, so importing NumberInput doesn't pull in `.bx--modal .bx--number` context rules, and Button doesn't pull in Tabs skeleton styles via a shared `.bx--skeleton` modifier
@@ -421,6 +423,11 @@ optimizeCss({
    * survive without configuration. Carbon's own sources, CSS modules, and
    * virtual modules are skipped. Set to `false` to rely only on imported
    * components, `safelist`, and `content`.
+   *
+   * The same scan reads the literal values passed to the props that
+   * Carbon components derive classes from (Button's `kind`, Tag's `type`,
+   * `tooltipPosition`, boolean flags like `filter`) and keeps only the
+   * styles those values can produce. With `false`, every variant is kept.
    * @default true
    */
   scanModules: false,
@@ -440,12 +447,13 @@ optimizeCss({
 >
 > - Tokens assembled at runtime from pieces that do not themselves start with `bx--`.
 > - Files the bundler never processes (markdown, HTML templates, CMS content).
+> - Variant props (Button's `kind`, `tooltipPosition`, `tooltipAlignment`) whose literal value never passes through the bundler: spread from an object whose keys only exist at runtime (`<Button {...await res.json()} />`), or defined in code loaded outside the build at runtime (a remote, a script tag). Passing a variable (`kind={k}`) is fine: it keeps every variant, and so does any build that leaves an import external (an SSR build that doesn't bundle its dependencies).
 >
 > Two ways to fix it:
 >
 > - **`safelist`**: list selectors (or a `RegExp`) to keep: `safelist: [".bx--grid", /^\.bx--btn--/]`.
 > - **`content`**: scan additional files for literal `bx--` prefixes: `content: ["**/*.{md,html}"]`.
-> - **`report`**: set `report: true` to print which components and tokens were detected, then compare against the class you are missing.
+> - **`report`**: set `report: true` to print which components and tokens were detected, and which variant values were kept (`Variants: Button.kind primary, danger`), then compare against the class you are missing.
 
 ### `OptimizeCssPlugin`
 
@@ -647,6 +655,7 @@ The CSS tools (`optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, and the 
 - Carbon's source is parsed with `svelte/compiler`, resolved from your project.
 - The index is built once (well under a second) and cached at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`. Bumping either package rebuilds it. A `carbon-components-svelte` linked from a local checkout (`bun link`, `npm link`, `workspace:`) isn't cached, so edits to its source are picked up on the next build.
 - If it can't be built (for example, `carbon-components-svelte` or `svelte` can't be resolved), the build logs a warning and leaves Carbon CSS unpruned instead of failing.
+- It records class prefixes a component completes with one prop (`` `bx--btn--${kind}` `` with `export let kind = "primary"`), and classes a component only renders under a condition on its own props (`class:bx--tag--filter={filter}`), so the bundler plugins can keep only what the values your code passes can produce. Carbon components that render `<Button>` themselves (Modal, Pagination, …) keep every variant, since the values they pass aren't scanned. `optimizeCarbonCss` and the CLI don't scan your code, so they keep every variant.
 
 `optimizeImports` doesn't use this index: it reads import paths from Carbon's `src/index.js` directly.
 

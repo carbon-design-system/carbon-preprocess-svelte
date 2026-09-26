@@ -1,3 +1,4 @@
+import { isBuiltin } from "node:module";
 import type { Plugin, Rollup } from "vite";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
@@ -13,6 +14,15 @@ import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
 import { printReport, toAssetReport } from "./print-report";
 import { collectCarbonTokens, scanContent } from "./scan-content";
+import {
+  carbonSourceDir,
+  createModulePropScanner,
+  createPropUsage,
+  type ModulePropScanner,
+  markAllDynamic,
+  mergePropUsage,
+  type PropUsage,
+} from "./scan-props";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
 /** True if any emitted CSS asset has Carbon rules the optimizer can prune. */
@@ -27,6 +37,48 @@ function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
       return true;
     }
   }
+  return false;
+}
+
+type ModuleGraphContext = {
+  getModuleInfo?: (id: string) => {
+    importedIds: readonly string[];
+    dynamicallyImportedIds: readonly string[];
+    /** `null` for an external (and, in Rolldown, the only sign of one). */
+    code?: string | null;
+    /** Rollup only. */
+    isExternal?: boolean;
+  } | null;
+};
+
+/**
+ * Whether the build leaves any import external, other than a Node
+ * built-in. Both Rollup and Rolldown list externals in `getModuleIds()`;
+ * Rollup flags them `isExternal`, Rolldown only leaves `code` `null`. An
+ * imported id with no module info at all counts as external too.
+ */
+function hasExternalImport(
+  context: ModuleGraphContext,
+  graph: ReadonlySet<string>,
+): boolean {
+  if (!context.getModuleInfo) return false;
+  const isExternal = (id: string) => {
+    if (isBuiltin(id)) return false;
+    const info = context.getModuleInfo?.(id);
+    return !info || info.isExternal === true || info.code === null;
+  };
+
+  for (const id of graph) {
+    if (isExternal(id)) return true;
+    const info = context.getModuleInfo(id);
+    for (const imported of info?.importedIds ?? []) {
+      if (isExternal(imported)) return true;
+    }
+    for (const imported of info?.dynamicallyImportedIds ?? []) {
+      if (isExternal(imported)) return true;
+    }
+  }
+
   return false;
 }
 
@@ -68,6 +120,13 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
    * keeps its last scan, and a re-transformed one replaces it.
    */
   const moduleClasses = new Map<string, Set<string>>();
+  /**
+   * What each module passes to the index's variant props (`kind: "ghost"`),
+   * keyed by module id. Per module for the same reason as `ids`.
+   */
+  const propUsage = new Map<string, PropUsage>();
+  /** Set by `buildStart` unless `scanModules: false` or nothing to scan for. */
+  let scanProps: ModulePropScanner | undefined;
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
   let components: ComponentIndex | undefined;
 
@@ -98,6 +157,12 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     async buildStart() {
       contentClasses = undefined;
       components = await loadComponentIndex(root);
+      // Narrowing variants needs every module scanned: without the scan,
+      // no prop usage reaches the optimizer and every variant is kept.
+      scanProps =
+        options?.scanModules !== false && components
+          ? createModulePropScanner(components, carbonSourceDir(root))
+          : undefined;
     },
     /**
      * The transform hook is called for every module in the build graph.
@@ -105,6 +170,11 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      * are imported so we know which CSS classes to preserve later.
      */
     transform(code, id) {
+      if (scanProps) {
+        const usage = scanProps(id, code);
+        if (usage) propUsage.set(id, usage);
+        else propUsage.delete(id);
+      }
       if (isCarbonSvelteImport(id)) {
         ids.add(id);
         return;
@@ -138,6 +208,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         for (const id of moduleClasses.keys()) {
           if (!graph.has(id)) moduleClasses.delete(id);
         }
+        for (const id of propUsage.keys()) {
+          if (!graph.has(id)) propUsage.delete(id);
+        }
       }
       const moduleTokens = new Set<string>();
       for (const tokens of moduleClasses.values()) {
@@ -158,11 +231,26 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         contentClasses = scan.classes;
       }
 
+      let usage: PropUsage | undefined;
+      if (scanProps) {
+        usage = createPropUsage();
+        for (const moduleUsage of propUsage.values()) {
+          mergePropUsage(usage, moduleUsage);
+        }
+        // An external module (a dependency an SSR build leaves to Node, a
+        // CDN global) is imported but never transformed, so its code could
+        // pass a literal nothing recorded.
+        if (graph && hasExternalImport(this, graph)) {
+          markAllDynamic(usage, components);
+        }
+      }
+
       const optimizer = createCssOptimizer({
         ...options,
         components,
         ids,
         contentClasses: [...contentClasses, ...moduleTokens],
+        propUsage: usage,
       });
       const assetReports: AssetReport[] = [];
 
@@ -199,6 +287,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         printReport({
           components: optimizer.usage.components,
           allowlistSize: optimizer.usage.allowlistSize,
+          variants: optimizer.usage.variants,
+          gatedOff: optimizer.usage.gatedOff,
           moduleTokens: moduleTokens.size,
           contentTokens: contentClasses.length,
           safelistEntries: options.safelist?.length ?? 0,

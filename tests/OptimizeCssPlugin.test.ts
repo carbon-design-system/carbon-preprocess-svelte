@@ -19,6 +19,8 @@ const createMockCompiler = (
   options: {
     assets?: Record<string, unknown>;
     moduleResources?: ModuleResource[];
+    /** Requests of ExternalModules in the graph. */
+    externals?: string[];
     mode?: "production" | "development" | "none";
     context?: string;
   } = {},
@@ -26,18 +28,24 @@ const createMockCompiler = (
   const {
     assets = {},
     moduleResources = [],
+    externals = [],
     mode = "production",
     context = process.cwd(),
   } = options;
 
+  let finishModulesPromise: Promise<void> | null = null;
   let processAssetsPromise: Promise<void> | null = null;
 
   const compilation = {
     hooks: {
       finishModules: {
-        tap: jest.fn((_, callback) => {
-          callback(
-            moduleResources.map((entry) => {
+        tapPromise: jest.fn((_, callback) => {
+          finishModulesPromise = callback([
+            ...externals.map((request) => ({
+              externalType: "module",
+              request,
+            })),
+            ...moduleResources.map((entry) => {
               if (typeof entry === "string") return { resource: entry };
               const { resource, source, throwOnSource } = entry;
               if (source === undefined && !throwOnSource) return { resource };
@@ -49,12 +57,15 @@ const createMockCompiler = (
                 },
               };
             }),
-          );
+          ]);
         }),
       },
       processAssets: {
         tapPromise: jest.fn((_, callback) => {
-          processAssetsPromise = callback(assets);
+          processAssetsPromise = (async () => {
+            await finishModulesPromise;
+            await callback(assets);
+          })();
         }),
       },
     },
@@ -211,6 +222,56 @@ describe("OptimizeCssPlugin", () => {
 
     expect(mockCompiler.compilation.warnings).toEqual([]);
     expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["an external module", "ui-config", false],
+    ["a Node built-in external", "fs", true],
+  ])("Button kinds with %s", async (_, request, narrows) => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const css = ".bx--btn--primary{a:b}.bx--btn--ghost{a:b}";
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => css } },
+      moduleResources: [
+        `node_modules/${CarbonSvelte.Components}/src/Button/Button.svelte`,
+        { resource: "/app/src/App.svelte", source: "Button(node, {});" },
+      ],
+      externals: [request],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    expect(mockCompiler.webpack.sources.RawSource).toHaveBeenCalledWith(
+      narrows ? ".bx--btn--primary{a:b}" : css,
+    );
+  });
+
+  test.each([
+    ["a literal kind", {}, 'Button(node, { kind: "danger" });', false],
+    ["a dynamic kind", {}, "Button(node, { kind: k });", true],
+    ["an unreadable module", {}, undefined, true],
+    ["scanModules: false", { scanModules: false }, "", true],
+  ])("Button kinds with %s", async (_, options, source, keepsAll) => {
+    const plugin = new OptimizeCssPlugin({ silent: true, ...options });
+    const css =
+      ".bx--btn--primary{a:b}.bx--btn--danger{a:b}.bx--btn--ghost{a:b}";
+    const mockCompiler = createMockCompiler({
+      assets: { "styles.css": { source: () => css } },
+      moduleResources: [
+        `node_modules/${CarbonSvelte.Components}/src/Button/Button.svelte`,
+        source === undefined
+          ? { resource: "/app/src/App.svelte", throwOnSource: true }
+          : { resource: "/app/src/App.svelte", source },
+      ],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    expect(mockCompiler.webpack.sources.RawSource).toHaveBeenCalledWith(
+      keepsAll ? css : ".bx--btn--primary{a:b}.bx--btn--danger{a:b}",
+    );
   });
 
   test("processes CSS files when Carbon Svelte imports are found", async () => {

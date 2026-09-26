@@ -1,4 +1,5 @@
 import { BITS_DENOM } from "../constants";
+import type { GatedOffUsage, VariantUsage } from "./create-optimized-css";
 
 const countFormatter = new Intl.NumberFormat("en-US");
 const sizeFormatter = new Intl.NumberFormat("en-US", {
@@ -21,6 +22,10 @@ export type OptimizeCssReportInput = {
   moduleTokens: number;
   contentTokens: number;
   safelistEntries: number;
+  /** Omitted or empty prints no variants line. */
+  variants?: VariantUsage[];
+  /** Omitted or empty prints no gated-off line. */
+  gatedOff?: GatedOffUsage[];
   assets: AssetReport[];
   dryRun?: boolean;
 };
@@ -61,6 +66,8 @@ export function printReport(input: OptimizeCssReportInput): void {
     moduleTokens,
     contentTokens,
     safelistEntries,
+    variants = [],
+    gatedOff = [],
     assets,
     dryRun,
   } = input;
@@ -79,6 +86,24 @@ export function printReport(input: OptimizeCssReportInput): void {
       contentTokens,
     )} tokens, safelist ${countFormatter.format(safelistEntries)} entries)`,
   );
+  if (variants.length > 0) {
+    console.log(
+      `  Variants: ${variants
+        .map(
+          ({ component, prop, values }) =>
+            `${component}.${prop} ${values ? values.join(", ") : "(all)"}`,
+        )
+        .join("; ")}`,
+    );
+  }
+  if (gatedOff.length > 0) {
+    const total = gatedOff.reduce((n, { classes }) => n + classes.length, 0);
+    console.log(
+      `  Gated off: ${countFormatter.format(total)} classes (${gatedOff
+        .map(({ component, classes }) => `${component} ${classes.length}`)
+        .join(", ")})`,
+    );
+  }
   console.log(`  Assets:${dryRun ? " (dry run, assets unchanged)" : ""}`);
 
   const ids = padColumn(assets.map((asset) => asset.id));
