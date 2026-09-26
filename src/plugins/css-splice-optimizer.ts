@@ -1230,7 +1230,7 @@ class Optimizer {
         }
       }
 
-      if (isUnusedIbmPlexFontFace(family, style, weight)) {
+      if (isUnusedIbmPlexFontFace(family, style, weight, this.options)) {
         node.removed = true;
         markDirty(node.parent);
         this.removed++;

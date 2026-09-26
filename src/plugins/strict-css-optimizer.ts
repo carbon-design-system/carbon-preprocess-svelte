@@ -351,10 +351,14 @@ export function isFlatpickrKeyframes(
 
 const IBM_PLEX_SANS_WEIGHTS = ["300", "400", "600"];
 
+/** Class `<Text italic>` renders; the only Carbon rule that asks for italic Plex. */
+const ITALIC_TYPE_CLASS = ".bx--type-italic";
+
 /**
  * Whether an IBM Plex `@font-face` rule is one no Carbon Svelte component
  * uses. Only these faces are kept:
- * - IBM Plex Sans: weights 300/400/600 in normal style
+ * - IBM Plex Sans: weights 300/400/600 in normal style, plus italic style
+ *   when `.bx--type-italic` (`<Text italic>`) is in the allowlist
  * - IBM Plex Mono: weight 400 in normal style (for code snippets)
  *
  * Non-IBM Plex faces are never dropped.
@@ -363,6 +367,7 @@ export function isUnusedIbmPlexFontFace(
   family: string,
   style: string,
   weight: string,
+  options: Pick<StrictCssOptimizerOptions, "allowlist" | "components">,
 ): boolean {
   if (!family.startsWith("IBM Plex")) {
     return false;
@@ -372,9 +377,14 @@ export function isUnusedIbmPlexFontFace(
     style === "normal" && family === "IBM Plex Mono" && weight === "400";
 
   const is_sans =
-    style === "normal" &&
     family === "IBM Plex Sans" &&
-    IBM_PLEX_SANS_WEIGHTS.includes(weight);
+    IBM_PLEX_SANS_WEIGHTS.includes(weight) &&
+    (style === "normal" ||
+      (style === "italic" &&
+        matchesAllowlist(
+          ITALIC_TYPE_CLASS,
+          getAllowlistIndex(options.allowlist, options.components),
+        )));
 
   return !(is_sans || is_mono);
 }
