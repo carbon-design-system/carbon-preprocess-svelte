@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.47](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.47) - 2026-09-26
+
+**Breaking Changes**
+
+- remove the bundled static component index; CSS tools always index the project's installed `carbon-components-svelte`
+- remove `experimental.liveIndex` from `optimizeImports`, `optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, and the CLI `--live-index` flag
+- `optimizeImports`: read import paths from the installed Carbon barrel (named exports stay named)
+
+**Fixes**
+
+- `optimizeCss`: prune CSS on `vite build --watch` rebuilds
+- `optimizeCss`: keep Plex Sans italic faces for `<Text italic>`
+- `optimizeCss`: leave CSS unpruned when the live index can't be built
+- `optimizeImports`: resolve Carbon from each file's directory
+- `index`: resolve `carbon-components-svelte` under Yarn Plug'n'Play
+- `index`: don't cache the component index for a linked Carbon checkout
+- `index`: resolve `svelte/compiler` from the consuming project first
+- `index`: split string literals into individual Carbon classes
+- `index`: index class literals in `.js` modules components import
+- `index`: carry module-script classes to components that import them
+
+**Performance**
+
+- remove the bundled component index (~56KB → ~33KB shared dist chunk)
+
 ## [0.11.46](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.46) - 2026-09-15
 
 **Features**
