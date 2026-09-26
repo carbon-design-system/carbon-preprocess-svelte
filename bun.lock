@@ -11,7 +11,7 @@
         "@typescript/typescript6": "^6.0.2",
         "carbon-components-svelte": "0.112.0",
         "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
-        "ostia": "^0.2.4",
+        "ostia": "^0.2.7",
         "postcss": "^8.5.28",
         "postcss-discard-empty": "^9.0.2",
         "svelte": "^5.57.0",
@@ -313,7 +313,7 @@
 
     "node-releases": ["node-releases@2.0.27", "", {}, "sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA=="],
 
-    "ostia": ["ostia@0.2.4", "", { "bin": { "ostia": "cli.js" } }, "sha512-jUYqvCe8w/00OtXDwE0Qox3G5uba7MXb/96CyoT1ioyR8qdYX97BeOtOPyYHNfXmSpUmlM+eBfrP3WChOMDEfA=="],
+    "ostia": ["ostia@0.2.7", "", { "bin": { "ostia": "cli.js" } }, "sha512-u/p5MzEP0AWL1dS3hPjHEIpJ9l61DAahxMZNsu1muMROwgudLOz+4j/hBVNLz2i9JN068lBKoCr5H4VFCjPcpw=="],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
