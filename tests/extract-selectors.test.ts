@@ -167,3 +167,213 @@ describe("extractFromSvelte", () => {
     expect(result.classes).toEqual([]);
   });
 });
+
+describe("extractFromSvelte variants", () => {
+  const variants = (code: string) =>
+    extract({ code, filename: "test.svelte" }).variants;
+
+  test("a prefix completed only by an exported prop with a literal default", () => {
+    expect(
+      variants(`
+        <script>
+          export let kind = "primary";
+          export let size = "md";
+        </script>
+        <button class={[kind && \`bx--btn--\${kind}\`, \`bx--size--\${size}\`]}></button>
+      `),
+    ).toEqual([
+      { prefix: ".bx--btn--", prop: "kind", default: "primary" },
+      { prefix: ".bx--size--", prop: "size", default: "md" },
+    ]);
+  });
+
+  test.each([
+    [
+      "the prop has no literal default",
+      `<script>export let kind = undefined;</script>
+       <div class={\`bx--btn--\${kind}\`}></div>`,
+    ],
+    [
+      "the variable is not a prop",
+      `<script>let kind = "primary";</script>
+       <div class={\`bx--btn--\${kind}\`}></div>`,
+    ],
+    [
+      "the component reassigns the prop",
+      `<script>export let kind = "primary"; $: if (x) kind = "ghost";</script>
+       <div class={\`bx--btn--\${kind}\`}></div>`,
+    ],
+    [
+      "the prop is bound",
+      `<script>export let kind = "primary";</script>
+       <Select bind:selected={kind} />
+       <div class={\`bx--btn--\${kind}\`}></div>`,
+    ],
+    [
+      "a function parameter shadows the prop",
+      `<script>
+         export let kind = "primary";
+         const cls = (kind) => \`bx--btn--\${kind}\`;
+       </script>`,
+    ],
+    [
+      "an each block shadows the prop",
+      `<script>export let kind = "primary";</script>
+       {#each kinds as kind}<div class={\`bx--btn--\${kind}\`}></div>{/each}`,
+    ],
+    [
+      "another literal names the same prefix",
+      `<script>export let kind = "primary";</script>
+       <div class={\`bx--btn--\${kind}\`}></div>
+       <div class="bx--btn--{size}"></div>`,
+    ],
+    [
+      "two props complete the same prefix",
+      `<script>export let kind = "primary"; export let size = "md";</script>
+       <div class={[\`bx--btn--\${kind}\`, \`bx--btn--\${size}\`]}></div>`,
+    ],
+    [
+      "the template is longer than prefix + prop",
+      `<script>export let kind = "primary";</script>
+       <div class={\`bx--btn--\${kind}--sm\`}></div>`,
+    ],
+    [
+      "the template is in the module script",
+      `<script context="module">export const cls = (kind) => \`bx--btn--\${kind}\`;</script>
+       <script>export let kind = "primary";</script>`,
+    ],
+  ])("none when %s", (_, code) => {
+    expect(variants(code)).toEqual([]);
+  });
+});
+
+describe("extractFromSvelte gates", () => {
+  const gates = (code: string) =>
+    extract({ code, filename: "test.svelte" }).gates;
+
+  test("class directives on a boolean or compared prop", () => {
+    expect(
+      gates(`
+        <script>
+          export let filter = false;
+          export let size = "md";
+          export let type = undefined;
+        </script>
+        <div
+          class:bx--tag--filter={filter}
+          class:bx--tag--sm={size === "sm"}
+          class:bx--tag--red={"red" === type}
+        ></div>
+      `),
+    ).toEqual([
+      {
+        class: ".bx--tag--filter",
+        when: [[{ prop: "filter", default: false }]],
+      },
+      {
+        class: ".bx--tag--sm",
+        when: [[{ prop: "size", default: "md", equals: "sm" }]],
+      },
+      {
+        class: ".bx--tag--red",
+        when: [[{ prop: "type", default: null, equals: "red" }]],
+      },
+    ]);
+  });
+
+  test("non-Carbon classes are never gates", () => {
+    expect(
+      gates(`<script>export let active = false;</script>
+        <div class:active></div>`),
+    ).toEqual([]);
+  });
+
+  test("&& chains and ternaries, keeping only prop conditions", () => {
+    expect(
+      gates(`
+        <script>
+          export let inline = false;
+          export let size = "md";
+          let open = false;
+        </script>
+        <div class={[
+          inline && size === "sm" && "bx--label--inline--sm",
+          open && inline && "bx--label--open",
+          size === "xl" ? "bx--label--xl" : "bx--label--other",
+        ]}></div>
+      `),
+    ).toEqual([
+      {
+        class: ".bx--label--inline--sm",
+        when: [
+          [
+            { prop: "inline", default: false },
+            { prop: "size", default: "md", equals: "sm" },
+          ],
+        ],
+      },
+      {
+        class: ".bx--label--open",
+        when: [[{ prop: "inline", default: false }]],
+      },
+      {
+        class: ".bx--label--xl",
+        when: [[{ prop: "size", default: "md", equals: "xl" }]],
+      },
+    ]);
+  });
+
+  test("one entry per place a class is rendered", () => {
+    expect(
+      gates(`
+        <script>export let a = false; export let b = false;</script>
+        <div class:bx--x={a}></div><div class:bx--x={b}></div><div class:bx--x={a}></div>
+      `),
+    ).toEqual([
+      {
+        class: ".bx--x",
+        when: [
+          [{ prop: "a", default: false }],
+          [{ prop: "b", default: false }],
+        ],
+      },
+    ]);
+  });
+
+  test.each([
+    [
+      "the class is also rendered unconditionally",
+      `<script>export let filter = false;</script>
+       <div class:bx--tag--filter={filter}></div><span class="bx--tag--filter"></span>`,
+    ],
+    [
+      "the condition is component state",
+      `<script>let open = false;</script><div class:bx--x--open={open}></div>`,
+    ],
+    [
+      "the prop is reassigned",
+      `<script>export let open = false; const toggle = () => (open = !open);</script>
+       <div class:bx--x--open={open}></div>`,
+    ],
+    [
+      "the prop has a non-literal default",
+      `<script>export let size = defaultSize();</script>
+       <div class:bx--x--sm={size === "sm"}></div>`,
+    ],
+    [
+      "the condition is a negation",
+      `<script>export let hidden = false;</script><div class:bx--x--shown={!hidden}></div>`,
+    ],
+    [
+      "the class is the else branch",
+      `<script>export let a = false;</script><div class={a ? "" : "bx--x"}></div>`,
+    ],
+    [
+      "the condition is in the module script",
+      `<script context="module">export const cls = (a) => a && "bx--x";</script>
+       <script>export let a = false;</script>`,
+    ],
+  ])("none when %s", (_, code) => {
+    expect(gates(code)).toEqual([]);
+  });
+});

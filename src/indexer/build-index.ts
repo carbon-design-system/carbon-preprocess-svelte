@@ -10,7 +10,11 @@ import {
   buildRuntimeClassMap,
   type ModuleGraphCache,
 } from "./extract-runtime-classes";
-import { extractFromSvelte } from "./extract-selectors";
+import {
+  type ClassGate,
+  type ClassVariant,
+  extractFromSvelte,
+} from "./extract-selectors";
 import { listJsAndSvelteFiles } from "./list-files";
 import { mergeSubComponentClasses } from "./merge-sub-component-classes";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
@@ -21,9 +25,29 @@ export { resolveCarbonRoot } from "./resolve-carbon-root";
 
 const RELATIVE_SOURCE_PREFIX = /^\.\//;
 
+export type {
+  ClassGate,
+  ClassVariant,
+  GateCondition,
+  PropDefault,
+} from "./extract-selectors";
+
 export type ComponentIndex = Record<
   string,
-  { path: string; classes: string[] }
+  {
+    path: string;
+    classes: string[];
+    /**
+     * Prefixes in `classes` this component only completes with a prop's
+     * value. Omitted when there are none.
+     */
+    variants?: ClassVariant[];
+    /**
+     * Classes in `classes` this component only renders under a condition
+     * on its own props. Omitted when there are none.
+     */
+    gates?: ClassGate[];
+  }
 >;
 
 /**
@@ -48,13 +72,21 @@ export async function buildComponentIndex(options?: {
   ]);
 
   type Identifier = string;
-  type IdentifierValue = { path: string; classes: string[] };
+  type IdentifierValue = {
+    path: string;
+    classes: string[];
+    variants?: ClassVariant[];
+    gates?: ClassGate[];
+  };
 
   const exports_map = new Map<Identifier, null | IdentifierValue>();
   const internal_components = new Map<Identifier, null | IdentifierValue>();
   const sub_components = new Map<Identifier, Identifier[]>();
   const slot_wrapper_classes = new Map<Identifier, string[]>();
   const module_to_component = new Map<string, string>();
+  // exported component -> variants its own file declares, before vetting.
+  const own_variants = new Map<Identifier, ClassVariant[]>();
+  const own_gates = new Map<Identifier, ClassGate[]>();
   // src-relative path -> scanned entry (for re-export lookup).
   const file_entries = new Map<string, IdentifierValue>();
   // export name -> index.js re-export source (filterTreeById -> ./utils/filterTreeNodes).
@@ -143,6 +175,12 @@ export async function buildComponentIndex(options?: {
     if (exports_map.has(moduleName)) {
       exports_map.set(moduleName, map);
       module_to_component.set(moduleKey, moduleName);
+      if (extracted && extracted.variants.length > 0) {
+        own_variants.set(moduleName, extracted.variants);
+      }
+      if (extracted && extracted.gates.length > 0) {
+        own_gates.set(moduleName, extracted.gates);
+      }
     } else if (isSvelteFile(file)) {
       internal_components.set(moduleName, map);
     }
@@ -235,6 +273,45 @@ export async function buildComponentIndex(options?: {
     entry.classes = [...new Set([...entry.classes, ...classes])];
   }
 
+  // Vet variants and gates before the runtime/CSS classes land, so they can
+  // be told apart from the markup classes they would otherwise blend into.
+  // A class (or prefix) another source also contributes may be rendered
+  // without the prop, so it keeps its plain allowlist entry.
+  for (const component of new Set([
+    ...own_variants.keys(),
+    ...own_gates.keys(),
+  ])) {
+    const entry = exports_map.get(component);
+    if (
+      !entry ||
+      !onlyRenderedInMarkup(
+        component,
+        entry.path,
+        moduleGraph.importsByModule,
+        extractedByFile,
+      )
+    ) {
+      continue;
+    }
+
+    const other_sources = new Set([
+      ...(sub_components.get(component) ?? []).flatMap(
+        (child) => all_components.get(child)?.classes ?? [],
+      ),
+      ...(runtime_classes.get(component) ?? []),
+      ...(css_context.get(component) ?? []),
+      ...(css_orphans.get(component) ?? []),
+    ]);
+    const variants = (own_variants.get(component) ?? []).filter(
+      (variant) => !other_sources.has(variant.prefix),
+    );
+    const gates = (own_gates.get(component) ?? []).filter(
+      (gate) => !other_sources.has(gate.class),
+    );
+    if (variants.length > 0) entry.variants = variants;
+    if (gates.length > 0) entry.gates = gates;
+  }
+
   for (const [component, classes] of runtime_classes.entries()) {
     mergeClasses(component, classes);
   }
@@ -264,4 +341,43 @@ export async function buildComponentIndex(options?: {
   emit("total", performance.now() - scanStart);
 
   return components;
+}
+
+/**
+ * Whether every Carbon module importing `component` renders it as
+ * `<Component>`. Those parents absorb its classes whole (prefixes
+ * included) through `mergeSubComponentClasses`, so a variant only narrows
+ * what the component contributes when an app renders it directly. A module
+ * that imports it any other way (a JS helper mounting it, an aliased
+ * import) could pass values nothing scans for.
+ */
+function onlyRenderedInMarkup(
+  component: string,
+  componentPath: string,
+  importsByModule: Map<string, string[]>,
+  extractedByFile: Map<string, { components: string[] }>,
+): boolean {
+  const moduleKey = componentPath.slice(
+    `${CarbonSvelte.Components}/src/`.length,
+  );
+  const dir = path.posix.dirname(moduleKey);
+
+  for (const [importer, imports] of importsByModule) {
+    if (importer === moduleKey) continue;
+
+    const importsComponent = imports.some(
+      (spec) =>
+        spec === moduleKey ||
+        spec === `${dir}.js` ||
+        spec === `${dir}/index.js`,
+    );
+    if (
+      importsComponent &&
+      !extractedByFile.get(importer)?.components.includes(component)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }

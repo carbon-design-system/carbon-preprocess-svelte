@@ -1,11 +1,17 @@
 import path from "node:path";
 import { ALWAYS_ON_CLASSES } from "../constants";
-import type { ComponentIndex } from "../indexer/build-index";
+import type {
+  ClassGate,
+  ClassVariant,
+  ComponentIndex,
+  GateCondition,
+} from "../indexer/build-index";
 import {
   type SpliceOptimizerOptions,
   spliceOptimizeCss,
 } from "./css-splice-optimizer";
 import type { SafelistEntry } from "./safelist";
+import type { PropUsage } from "./scan-props";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
 export type OptimizeCssOptions = {
@@ -98,6 +104,11 @@ export type OptimizeCssOptions = {
    * survive without configuration. Carbon's own sources, CSS modules, and
    * virtual modules are skipped. Set to `false` to rely only on imported
    * components, `safelist`, and `content`.
+   *
+   * The same scan reads the literal values passed to the props that
+   * Carbon components derive classes from (Button's `kind`, Tag's `type`,
+   * `tooltipPosition`, boolean flags like `filter`) and keeps only the
+   * styles those values can produce. With `false`, every variant is kept.
    * @default true
    */
   scanModules?: boolean;
@@ -124,6 +135,26 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
    * the allowlist with imported component classes.
    */
   contentClasses?: Iterable<string>;
+  /**
+   * Literal values the app passes to the props behind the index's class
+   * variants, from scanning every bundled module. Without it (the module
+   * scan is off, or there is no bundle to scan), every variant is kept.
+   */
+  propUsage?: PropUsage;
+};
+
+/** Classes a component renders only under props no caller passes. */
+export type GatedOffUsage = {
+  component: string;
+  classes: string[];
+};
+
+/** Which values of a component's variant prop the allowlist keeps. */
+export type VariantUsage = {
+  component: string;
+  prop: string;
+  /** Kept values, default first; `null` when every value is kept. */
+  values: string[] | null;
 };
 
 /**
@@ -133,18 +164,30 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
  * Paths like "Button.svelte" map through the component index to `.bx--*` classes.
  * `.bx--body` is always kept; apps set it on `<body>` but no component file
  * references it.
+ *
+ * With `propUsage`, a component's variant prefix (`.bx--btn--` for
+ * `` `bx--btn--${kind}` ``) expands to the prop's default plus each literal
+ * the app passes it, unless something passes it a value the scan can't
+ * read. Another bundled component that renders the prefix unconditionally
+ * (a parent that renders `<Button kind={…}>`) still keeps it whole.
  */
 function buildUsage(
   componentIndex: ComponentIndex,
   ids: Iterable<string>,
   contentClasses?: Iterable<string>,
+  propUsage?: PropUsage,
 ): {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
   components: string[];
+  variants: VariantUsage[];
+  denied: Set<string>;
+  gatedOff: GatedOffUsage[];
 } {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
   const usedComponents = new Set<string>();
+  const gatedOffBy = new Map<string, string[]>();
+  const usedVariants: Array<[string, ClassVariant]> = [];
   let preserveFlatpickr = false;
 
   for (const id of ids) {
@@ -154,10 +197,40 @@ function buildUsage(
       preserveFlatpickr = true;
     }
 
-    if (name in componentIndex) {
+    if (name in componentIndex && !usedComponents.has(name)) {
       usedComponents.add(name);
-      for (const cls of componentIndex[name].classes) {
-        allowlist.add(cls);
+      const { classes, variants = [], gates = [] } = componentIndex[name];
+      const narrowed = new Map<string, ClassVariant>();
+      const gated = new Map<string, ClassGate>(
+        propUsage ? gates.map((gate) => [gate.class, gate]) : [],
+      );
+
+      for (const variant of variants) {
+        usedVariants.push([name, variant]);
+        if (propUsage && !propUsage.dynamic.has(variant.prop)) {
+          narrowed.set(variant.prefix, variant);
+        }
+      }
+
+      for (const cls of classes) {
+        const gate = gated.get(cls);
+        if (gate && propUsage && !canRender(gate, propUsage)) {
+          const off = gatedOffBy.get(name) ?? [];
+          off.push(cls);
+          gatedOffBy.set(name, off);
+          continue;
+        }
+
+        const variant = narrowed.get(cls);
+        if (!variant) {
+          allowlist.add(cls);
+          continue;
+        }
+
+        allowlist.add(`${cls}${variant.default}`);
+        for (const value of propUsage?.literals.get(variant.prop) ?? []) {
+          allowlist.add(`${cls}${value}`);
+        }
       }
     }
   }
@@ -166,11 +239,69 @@ function buildUsage(
     allowlist.add(cls);
   }
 
+  // A prefix still on the allowlist came in whole from somewhere else.
+  const variants = usedVariants.map(([component, variant]) => ({
+    component,
+    prop: variant.prop,
+    values:
+      !propUsage ||
+      propUsage.dynamic.has(variant.prop) ||
+      allowlist.has(variant.prefix)
+        ? null
+        : [
+            ...new Set([
+              variant.default,
+              ...(propUsage.literals.get(variant.prop) ?? []),
+            ]),
+          ],
+  }));
+
+  // Another bundled component (or the module scan) may still render a
+  // gated-off class; only classes nothing else keeps are denied.
+  const denied = new Set<string>();
+  const gatedOff: GatedOffUsage[] = [];
+  for (const [component, classes] of gatedOffBy) {
+    const off = classes.filter((cls) => !allowlist.has(cls));
+    for (const cls of off) denied.add(cls);
+    if (off.length > 0) gatedOff.push({ component, classes: off });
+  }
+
   return {
     allowlist,
     preserveFlatpickr,
     components: [...usedComponents].sort(),
+    variants,
+    denied,
+    gatedOff,
   };
+}
+
+/** Whether some place renders the gated class under props callers pass. */
+function canRender(gate: ClassGate, usage: PropUsage): boolean {
+  return gate.when.some((and) =>
+    and.every((condition) => canHold(condition, usage)),
+  );
+}
+
+/**
+ * Whether a condition can hold for some value the prop is given: its
+ * default or any literal the scan found, or anything if the prop is
+ * dynamic. Literals are strings, so `true` and `"true"` compare equal, and
+ * any literal (even `false`) counts as truthy: both only keep extra CSS.
+ */
+function canHold(condition: GateCondition, usage: PropUsage): boolean {
+  if (usage.dynamic.has(condition.prop)) return true;
+  const literals = usage.literals.get(condition.prop) ?? new Set<string>();
+
+  if (condition.equals === undefined) {
+    return Boolean(condition.default) || literals.size > 0;
+  }
+
+  const expected = String(condition.equals);
+  return (
+    (condition.default !== null && String(condition.default) === expected) ||
+    literals.has(expected)
+  );
 }
 
 /**
@@ -198,10 +329,18 @@ export function toCssString(
 export function createCssOptimizer(
   options: Omit<CreateOptimizedCssOptions, "source">,
 ) {
-  const { allowlist, preserveFlatpickr, components } = buildUsage(
+  const {
+    allowlist,
+    preserveFlatpickr,
+    components,
+    variants,
+    denied,
+    gatedOff,
+  } = buildUsage(
     options.components,
     options.ids,
     options.contentClasses,
+    options.propUsage,
   );
   const optimizerOptions: SpliceOptimizerOptions = {
     allowlist,
@@ -209,10 +348,11 @@ export function createCssOptimizer(
     preserveAllIBMFonts: options.preserveAllIBMFonts === true,
     preserveFlatpickr,
     safelist: options.safelist ?? [],
+    denied,
   };
 
   return {
-    usage: { components, allowlistSize: allowlist.size },
+    usage: { components, allowlistSize: allowlist.size, variants, gatedOff },
     run(source: CreateOptimizedCssOptions["source"]): OptimizedCssReport {
       // Bundlers hand every CSS asset to the plugin, including per-route
       // chunks with no Carbon styles at all. Parsing and re-serializing
