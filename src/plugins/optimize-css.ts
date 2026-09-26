@@ -45,8 +45,11 @@ function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const silent = isSilent(options);
   /**
-   * Set of absolute file paths to Carbon Svelte components used in the app.
-   * Populated during the transform phase, consumed during generateBundle.
+   * Absolute file paths of Carbon Svelte components seen by `transform`, in
+   * this build or an earlier `vite build --watch` build. Not cleared per
+   * build: on a rebuild Rollup serves unchanged modules from its cache
+   * without calling `transform`, so only the ids still in the module graph
+   * (`this.getModuleIds()`) count at `generateBundle`.
    */
   const ids = new Set<string>();
   let root = process.cwd();
@@ -59,8 +62,12 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   let logInfo: ((message: string) => void) | undefined;
   /** Classes from `content` globs. Cached after first scan. */
   let contentClasses: string[] | undefined;
-  /** Literal `bx--` classes found while scanning bundled module code. */
-  const moduleClasses = new Set<string>();
+  /**
+   * Literal `bx--` classes found in each scanned module's code, keyed by
+   * module id. Per module for the same reason as `ids`: a cached module
+   * keeps its last scan, and a re-transformed one replaces it.
+   */
+  const moduleClasses = new Map<string, Set<string>>();
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
   let components: ComponentIndex | undefined;
 
@@ -79,18 +86,17 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       logInfo = (message) => config.logger.info(message);
     },
     /**
-     * Runs once before any module is transformed. Resets state tracked from
-     * a prior build so `vite build --watch` rebuilds (which reuse this same
-     * plugin instance) don't leak component ids or a stale content scan into
-     * the next build. Also loads the component index for the project's
-     * installed `carbon-components-svelte` (built once, then read from
-     * cache), so it's ready before `generateBundle` consults it. If it
-     * can't be built, this build's CSS is left unpruned.
+     * Runs once before any module is transformed. Resets the content scan
+     * so `vite build --watch` rebuilds (which reuse this same plugin
+     * instance) re-read `content` files from disk. `ids` and
+     * `moduleClasses` are kept; `generateBundle` drops modules that left the
+     * graph. Also loads the component index for the project's installed
+     * `carbon-components-svelte` (built once, then read from cache), so it's
+     * ready before `generateBundle` consults it. If it can't be built, this
+     * build's CSS is left unpruned.
      */
     async buildStart() {
-      ids.clear();
       contentClasses = undefined;
-      moduleClasses.clear();
       components = await loadComponentIndex(root);
     },
     /**
@@ -104,7 +110,11 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         return;
       }
       if (options?.scanModules !== false && isScannableModule(id)) {
-        collectCarbonTokens(code, moduleClasses);
+        const tokens = new Set<string>();
+        collectCarbonTokens(code, tokens);
+        // Replace, don't merge: an edit that removes a class must drop it.
+        if (tokens.size > 0) moduleClasses.set(id, tokens);
+        else moduleClasses.delete(id);
       }
     },
     /**
@@ -115,6 +125,24 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     async generateBundle(_, bundle) {
       // Already warned by `loadComponentIndex`.
       if (!components) return;
+
+      // Includes modules served from Rollup's cache. Absent on the bare
+      // contexts unit tests pass, where everything collected counts.
+      const graph = this.getModuleIds
+        ? new Set(this.getModuleIds())
+        : undefined;
+      if (graph) {
+        // Forget modules the app no longer bundles, so a removed component
+        // or class stops keeping CSS alive.
+        for (const id of ids) if (!graph.has(id)) ids.delete(id);
+        for (const id of moduleClasses.keys()) {
+          if (!graph.has(id)) moduleClasses.delete(id);
+        }
+      }
+      const moduleTokens = new Set<string>();
+      for (const tokens of moduleClasses.values()) {
+        for (const token of tokens) moduleTokens.add(token);
+      }
 
       if (ids.size === 0) {
         // Warn only when this build emitted Carbon CSS. A secondary build
@@ -134,7 +162,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         ...options,
         components,
         ids,
-        contentClasses: [...contentClasses, ...moduleClasses],
+        contentClasses: [...contentClasses, ...moduleTokens],
       });
       const assetReports: AssetReport[] = [];
 
@@ -171,7 +199,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         printReport({
           components: optimizer.usage.components,
           allowlistSize: optimizer.usage.allowlistSize,
-          moduleTokens: moduleClasses.size,
+          moduleTokens: moduleTokens.size,
           contentTokens: contentClasses.length,
           safelistEntries: options.safelist?.length ?? 0,
           assets: assetReports,

@@ -35,7 +35,10 @@ type ResolvedPlugin = {
   buildStart: () => Promise<void>;
   transform: (code: string, id: string) => void;
   generateBundle: (
-    this: { warn: (message: string) => void },
+    this: {
+      warn: (message: string) => void;
+      getModuleIds?: () => IterableIterator<string>;
+    },
     options: unknown,
     bundle: OutputBundle,
   ) => Promise<void>;
@@ -43,6 +46,14 @@ type ResolvedPlugin = {
 
 function resolvePlugin(plugin: Rollup.Plugin): ResolvedPlugin {
   return plugin as unknown as ResolvedPlugin;
+}
+
+/** A `generateBundle` context whose module graph holds exactly `moduleIds`. */
+function graphContext(...moduleIds: string[]) {
+  return {
+    warn: jest.fn(),
+    getModuleIds: () => moduleIds.values(),
+  };
 }
 
 describe("optimizeCss (Vite plugin): component index unavailable", () => {
@@ -98,15 +109,15 @@ describe("optimizeCss (Vite plugin)", () => {
 
   test("does not leak imported component ids into the next build", async () => {
     // Regression test: a long-running `vite build --watch` session reuses the
-    // same plugin instance across rebuilds. If tracked ids aren't reset, a
-    // component removed from the app in a later rebuild still keeps its CSS
+    // same plugin instance across rebuilds. If a component removed from the
+    // app in a later rebuild were still tracked, it would keep its CSS
     // classes alive, silently degrading optimization over time.
     const plugin = resolvePlugin(optimizeCss());
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
 
     // First build: Button is imported.
-    const firstCtx = { warn: jest.fn() };
+    const firstCtx = graphContext(carbonComponent);
     await plugin.buildStart();
     plugin.transform("", carbonComponent);
     const firstBundle = makeCssBundle(cssContent);
@@ -116,9 +127,9 @@ describe("optimizeCss (Vite plugin)", () => {
     );
     expect(firstCtx.warn).not.toHaveBeenCalled();
 
-    // Second build (rebuild): Button is no longer imported, so `transform`
-    // never fires for it this time around.
-    const secondCtx = { warn: jest.fn() };
+    // Second build (rebuild): Button is no longer imported, so it's gone
+    // from the module graph.
+    const secondCtx = graphContext("/app/src/App.svelte");
     await plugin.buildStart();
     const secondBundle = makeCssBundle(cssContent);
     await plugin.generateBundle.call(secondCtx, {}, secondBundle);
@@ -219,28 +230,96 @@ describe("optimizeCss (Vite plugin)", () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
+    const app = "/app/src/App.svelte";
 
     // First build: Button is imported and an app module has a literal token.
     await plugin.buildStart();
     plugin.transform("", carbonComponent);
-    plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
+    plugin.transform('const c = "bx--accordion";', app);
     const firstBundle = makeCssBundle(cssContent);
-    const firstCtx = { warn: jest.fn() };
+    const firstCtx = graphContext(carbonComponent, app);
     await plugin.generateBundle.call(firstCtx, {}, firstBundle);
     expect((firstBundle["styles.css"] as OutputAsset).source).toEqual(
       cssContent,
     );
 
     // Second build: Button is re-imported but the app module is gone. If
-    // `moduleClasses` leaked across builds, `.bx--accordion` would survive.
+    // its classes outlived it, `.bx--accordion` would survive.
     await plugin.buildStart();
     plugin.transform("", carbonComponent);
     const secondBundle = makeCssBundle(cssContent);
-    const secondCtx = { warn: jest.fn() };
+    const secondCtx = graphContext(carbonComponent);
     await plugin.generateBundle.call(secondCtx, {}, secondBundle);
 
     expect((secondBundle["styles.css"] as OutputAsset).source).toEqual(
       ".bx--btn { color: blue }",
+    );
+  });
+
+  test("keeps cached modules' ids and classes on watch-mode rebuilds", async () => {
+    // Regression test: on a `vite build --watch` rebuild, Rollup serves
+    // unchanged modules from its cache without calling `transform`. They're
+    // still in the module graph, so they must still count.
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+    const app = "/app/src/App.svelte";
+    const other = "/app/src/other.ts";
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+    plugin.transform('const c = "bx--accordion";', app);
+    plugin.transform("export {};", other);
+    await plugin.generateBundle.call(
+      graphContext(carbonComponent, app, other),
+      {},
+      makeCssBundle(cssContent),
+    );
+
+    // Rebuild after an edit to `other`: only it is re-transformed.
+    await plugin.buildStart();
+    plugin.transform("export const x = 1;", other);
+    const bundle = makeCssBundle(cssContent);
+    const ctx = graphContext(carbonComponent, app, other);
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect(ctx.warn).not.toHaveBeenCalled();
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+      `.bx--btn { color: blue }
+.bx--accordion { background: yellow }`,
+    );
+  });
+
+  test("replaces a re-transformed module's classes on watch-mode rebuilds", async () => {
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    const cssContent = `.bx--btn { color: blue }
+.bx--accordion { background: yellow }
+.bx--modal { background: red }`;
+    const app = "/app/src/App.svelte";
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+    plugin.transform('const c = "bx--accordion";', app);
+    await plugin.generateBundle.call(
+      graphContext(carbonComponent, app),
+      {},
+      makeCssBundle(cssContent),
+    );
+
+    // The edit swaps `bx--accordion` for `bx--modal`.
+    await plugin.buildStart();
+    plugin.transform('const c = "bx--modal";', app);
+    const bundle = makeCssBundle(cssContent);
+    await plugin.generateBundle.call(
+      graphContext(carbonComponent, app),
+      {},
+      bundle,
+    );
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+      `.bx--btn { color: blue }
+.bx--modal { background: red }`,
     );
   });
 
