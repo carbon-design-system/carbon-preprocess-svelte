@@ -12,8 +12,8 @@ import {
  * compiled Carbon theme has), removing a node or rewriting a selector is a
  * pure text edit.
  *
- * Fidelity is by construction: the tokenizer and statement parser below
- * mirror `postcss/lib/tokenize` and `postcss/lib/parser` case by case
+ * The tokenizer and statement parser below mirror `postcss/lib/tokenize`
+ * and `postcss/lib/parser` case by case
  * (including their quirks, e.g. the `url(` lookbehind buffer and
  * `RE_BAD_BRACKET`), the visitor pass replays PostCSS's dirty-node re-walk,
  * and the emitter reproduces `postcss/lib/stringifier`'s semicolon rules.
@@ -26,9 +26,9 @@ import {
  * selector rules, paramless at-rule statements, and a duplicate/empty
  * named `@layer` is not replicated (only containers left with no
  * surviving children are still dropped). Anything this scanner cannot
- * classify — a genuine syntax error, or a construct too ambiguous to
- * compute an allowlist decision for — returns the input unchanged
- * (`removed: 0`) instead of guessing.
+ * classify returns the input unchanged (`removed: 0`) instead of
+ * guessing. That includes a genuine syntax error and a construct too
+ * ambiguous to compute an allowlist decision for.
  */
 
 export type SpliceOptimizerOptions = StrictCssOptimizerOptions & {
@@ -292,8 +292,8 @@ const D_CUSTOM = 2;
  * never removed on its own, so its leading whitespace is never spliced.
  * `clean` holds the `raw()`-clean value (comments dropped, `!important`
  * suffix stripped) for the rare declaration where it differs from
- * `css.slice(a, b)` — only `@font-face` descriptor comparison ever reads
- * it, so a sparse map beats a slot per declaration.
+ * `css.slice(a, b)`. Only `@font-face` descriptor comparison reads it,
+ * so a sparse map beats a slot per declaration.
  */
 class Decls {
   start: Int32Array;
@@ -1082,7 +1082,7 @@ class Parser {
    * A `;` with no preceding statement. If the previous sibling is a rule
    * without one already, it becomes that rule's own trailing semicolon
    * (`raws.ownSemicolon`, reusing `CssNode#semi`) and is removed along with
-   * it; otherwise it is just more `before` text for whatever comes next.
+   * it. Otherwise it is more `before` text for whatever comes next.
    */
   private freeSemicolon(end: number): void {
     const nodes = this.current.nodes;
@@ -1097,12 +1097,12 @@ class Parser {
         return;
       }
     }
-    // Not attached: the `;` is just more pending trivia for whatever comes
-    // next. `this.spaces` already marks where that trivia run started
-    // (unlike PostCSS's string accumulator, an offset doesn't need to grow
-    // to "include" it) — touching it here would make it start later than
-    // the previous structural boundary, and a since-removed node ahead
-    // would then wrongly flush the gap in between as kept text.
+    // Not attached. The `;` is more pending trivia for whatever comes
+    // next. `this.spaces` already marks where that trivia run started.
+    // Unlike PostCSS's string accumulator, an offset does not need to grow
+    // to include it. Touching it here would make it start later than the
+    // previous structural boundary, and a since-removed node ahead would
+    // then wrongly flush the gap in between as kept text.
   }
 
   private end(closeEnd: number): void {

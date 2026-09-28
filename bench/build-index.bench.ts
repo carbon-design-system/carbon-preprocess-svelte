@@ -23,9 +23,9 @@ const carbonRoot = resolveCarbonRoot();
 const carbonSrc = path.join(carbonRoot, "src");
 
 // Rebuilds the full component index from the installed `carbon-components-svelte`
-// (file scan + CSS indexing + runtime-class graph). Runs once per Carbon/preprocessor
-// version pair in a consuming project (then read from cache), so this is a coarser
-// end-to-end benchmark rather than a tight microbenchmark.
+// (file scan + CSS indexing + runtime-class graph). A project runs this
+// once per Carbon and preprocessor version pair, then reads the cache.
+// The scan does real file I/O.
 group("buildComponentIndex (full scan)", () => {
   task("cold-ish rebuild", async () => {
     await buildComponentIndex();
@@ -128,11 +128,11 @@ group("buildComponentIndex phases", () => {
   });
 });
 
-// Bonus: one-off phase breakdown (scan / css index / runtime graph / total) to
-// help point at *where* time goes, not just the aggregate.
-// Note: this suite runs via the `ostia bench` CLI (not ostia's in-file run()),
-// so this block executes during suite import, before the benchmark table below
-// is printed, not after like it did with mitata.
+// Prints one phase breakdown, scan, css index, runtime graph, and total,
+// so the numbers show which phase took the time.
+// This suite runs via the `ostia bench` CLI, not ostia's in-file `run()`,
+// so this block runs when the suite is imported, before the benchmark table
+// is printed. With mitata it ran after.
 const timings: Record<string, number> = {};
 await buildComponentIndex({
   onTiming: (label, ms) => {

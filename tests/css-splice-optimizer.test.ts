@@ -10,21 +10,24 @@ import { optimizeCssWithPostcss } from "./helpers/postcss-optimize-css";
 
 /**
  * The splice optimizer must produce exactly what the PostCSS pipeline
- * produces for every input whose shape it fully models. Checked here
- * against the PostCSS pipeline as the reference: hand-written hostile
- * inputs cover each construct the scanner special-cases, and a seeded
- * fuzzer covers their combinations.
+ * produces for every input whose shape it fully models. These tests use
+ * the PostCSS pipeline as the reference. Hand-written hostile inputs
+ * cover each construct the scanner special-cases, and a seeded fuzzer
+ * covers their combinations.
  *
- * `spliceOptimizeCss` never bails outright: a construct it does not model
- * either (a) is an intentional behavior change from PostCSS — a
- * round-tripping quirk deliberately not reproduced, e.g.
- * `postcss-discard-empty` deleting an empty declaration — or (b) is a
- * genuine syntax error (or a construct too ambiguous to classify), returned
- * unchanged with `removed: 0`, the same contract as an asset with nothing
- * optimizable. Neither can go through the parity checks above since the
- * PostCSS output is expected to differ (or PostCSS throws outright); they
- * are asserted directly instead, against a hand-written expectation, in
- * `describe("behavior changes", ...)` and `describe("syntax errors", ...)`.
+ * `spliceOptimizeCss` never bails outright. A construct it does not model
+ * is either an intentional behavior change from PostCSS or a case that
+ * returns the input unchanged.
+ *
+ * A behavior change is a round-tripping quirk deliberately not reproduced,
+ * for example `postcss-discard-empty` deleting an empty declaration. For
+ * a syntax error, or a construct too ambiguous to classify, the scanner
+ * returns the input unchanged with `removed: 0`. That is the same contract
+ * `run()` has for an asset with nothing optimizable. Neither case can go
+ * through the parity checks above. The PostCSS output is expected to
+ * differ, or PostCSS throws. Those cases are asserted directly, against
+ * a hand-written expectation, in `describe("behavior changes", ...)` and
+ * `describe("syntax errors", ...)`.
  */
 
 type Scenario = {
@@ -414,8 +417,9 @@ describe("css-splice-optimizer", () => {
       }
       if (chance(0.02)) {
         // Truncation can land anywhere, including mid at-rule-name with no
-        // trailing `;`/`{` — an EOF-terminated paramless at-rule statement,
-        // which PostCSS still discards as empty but this scanner now keeps.
+        // trailing `;` or `{`. That is an EOF-terminated paramless at-rule
+        // statement, which PostCSS still discards as empty but this scanner
+        // now keeps.
         // Too unpredictable to classify precisely; treat any truncation as
         // a possible divergence.
         css = css.slice(0, Math.floor(rnd() * css.length));
@@ -534,10 +538,10 @@ describe("css-splice-optimizer behavior changes", () => {
 });
 
 /**
- * Genuine syntax errors (PostCSS throws `CssSyntaxError` for every one of
- * these): `spliceOptimizeCss` returns the input unchanged with `removed: 0`
- * rather than guessing, the same contract `run()` has for an asset with
- * nothing optimizable.
+ * These are genuine syntax errors. PostCSS throws `CssSyntaxError` for
+ * every one of them. `spliceOptimizeCss` returns the input unchanged with
+ * `removed: 0` and does not guess. That is the same contract `run()` has
+ * for an asset with nothing optimizable.
  */
 const SYNTAX_ERRORS: Record<string, string> = {
   "unclosed comment": ".bx--btn{a:b}/*",
