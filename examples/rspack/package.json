@@ -11,7 +11,7 @@
     "@rspack/dev-server": "latest",
     "carbon-components-svelte": "latest",
     "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
-    "svelte": "^5.57.0",
+    "svelte": "^5.57.1",
     "svelte-loader": "latest",
     "svelte-preprocess": "latest",
     "typescript": "^6.0.3"
