@@ -44,7 +44,7 @@ bun install
 | --- | --- |
 | `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`), after clearing the component index cache in `node_modules/.cache` (it's keyed by package versions, so it would otherwise hide local indexer changes; `test:e2e` clears each example's too). |
 | `bun run build` | Bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
-| `bun run typecheck` | `tsc --noEmit` over `bench/`, `scripts/`, `src/`, `tests/`. |
+| `bun run typecheck` | `tsc6 --noEmit` over `bench/`, `scripts/`, `src/`, `tests/`. |
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
 | `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). |
 | `bun run test:fixtures:update` | Rewrite the `optimize-css` fixture baselines under [`tests/fixtures/`](tests/fixtures/optimize-css). |
