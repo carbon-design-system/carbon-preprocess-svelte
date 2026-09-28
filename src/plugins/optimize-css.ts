@@ -38,9 +38,8 @@ function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
  * The actual CSS optimization happens in `generateBundle` after all modules
  * have been transformed and the bundle structure is finalized.
  *
- * The plugin is configured with `apply: "build"` and `enforce: "post"` to ensure:
- * - It only runs during production builds (not dev server)
- * - It runs after other plugins have finished transforming modules
+ * `apply: "build"` limits it to production builds. `enforce: "post"` runs
+ * it after other plugins have transformed modules.
  */
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const silent = isSilent(options);
@@ -100,9 +99,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       components = await loadComponentIndex(root);
     },
     /**
-     * The transform hook is called for every module in the build graph.
-     * We don't modify the code here—we just track which Carbon components
-     * are imported so we know which CSS classes to preserve later.
+     * The transform hook runs for every module. It does not change the
+     * code. It records which Carbon components are imported so later
+     * passes know which CSS classes to keep.
      */
     transform(code, id) {
       if (isCarbonSvelteImport(id)) {

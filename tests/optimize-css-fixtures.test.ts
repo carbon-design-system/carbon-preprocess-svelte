@@ -32,7 +32,7 @@ const SCENARIOS: Scenario[] = [
   // Modal adds `.bx--body--with-modal-open` on `<body>` at runtime. Keep that
   // rule; drop descendant rules for tooltip/overflow-menu (Modal does not import them).
   { name: "modal.strict", ids: ["Modal"] },
-  // Zero-leak gold standard — well-indexed single components.
+  // Zero-leak baselines. Well-indexed single components.
   { name: "dropdown.strict", ids: ["Dropdown"] },
   { name: "combobox.strict", ids: ["ComboBox"] },
   { name: "overflowmenu.strict", ids: ["OverflowMenu"] },
@@ -47,7 +47,7 @@ const SCENARIOS: Scenario[] = [
   { name: "fluid-form.strict", ids: ["TextInput", "FluidForm"] },
   { name: "toggle.strict", ids: ["Toggle"] },
   { name: "numberinput.strict", ids: ["NumberInput"] },
-  // Multi-import bundles — import sets users actually ship.
+  // Multi-import bundles. Import sets users actually ship.
   {
     name: "dropdown-skeleton.strict",
     ids: ["Dropdown", "DropdownSkeleton"],
@@ -69,7 +69,8 @@ const SCENARIOS: Scenario[] = [
     name: "timepicker-bundle.strict",
     ids: ["TimePicker", "TimePickerSelect"],
   },
-  // Leaky regression baselines — compound-selector piggybacking.
+  // Leaky regression baselines. Compound selectors that keep another
+  // component's classes.
   { name: "tabs.strict", ids: ["Tabs"] },
   { name: "sidenav.strict", ids: ["SideNav"] },
   { name: "header.strict", ids: ["Header"] },

@@ -72,7 +72,7 @@ for (const scenario of SCENARIOS) {
 const BUNDLE_IDS = ["DataTable", "Toolbar", "ToolbarSearch", "OverflowMenu"];
 const SAFELIST_REGEXPS = [/^\.bx--btn--/, /bx--tag/];
 
-// Every CSS asset in a build goes through `run`, not just the Carbon theme.
+// Every CSS asset in a build goes through `run`.
 // These cover each branch of that call: the no-Carbon skip, the splice path
 // on a mixed asset, the splice path on an asset with `@layer`, and the
 // Uint8Array source like Vite emits for CSS assets.

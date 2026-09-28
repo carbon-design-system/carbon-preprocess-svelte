@@ -13,8 +13,8 @@ import { hasOptimizableCss } from "./strict-css-optimizer";
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
  * used by this plugin. Rspack's compiler exposes the same `compiler.webpack`
  * namespace (`Compilation`, `sources`, etc.) for plugin compatibility, so
- * typing against this shape—rather than importing from the `webpack`
- * package—lets the same plugin instance be used with either bundler without
+ * typing against this shape, instead of importing from the `webpack`
+ * package, lets the same plugin instance be used with either bundler without
  * adding a dependency on either one.
  */
 type WebpackAssetSource = {
@@ -77,8 +77,8 @@ type WebpackCompiler = {
  * 2. During asset processing, it splices out CSS rules that don't match any
  *    classes used by the collected components.
  *
- * This can dramatically reduce CSS bundle size since Carbon's full stylesheet
- * includes styles for all components, but apps typically use only a subset.
+ * Carbon's stylesheet includes every component. The plugin drops rules for
+ * components the app does not import.
  */
 export default class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
@@ -150,9 +150,9 @@ export default class OptimizeCssPlugin {
         );
 
         /**
-         * Process assets at OPTIMIZE_SIZE stage, which runs after the CSS has been
-         * extracted and concatenated but before final minification. This ensures
-         * that unused rules are removed before any minifier further processes the CSS.
+         * Process assets at OPTIMIZE_SIZE, after CSS extraction and
+         * concatenation and before minification, so unused rules are gone
+         * before a minifier sees the CSS.
          */
         compilation.hooks.processAssets.tapPromise(
           {

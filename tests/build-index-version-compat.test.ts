@@ -16,8 +16,8 @@ describe("buildComponentIndex against a real historical carbon-components-svelte
     );
     expect(index.Button?.classes.length).toBeGreaterThan(0);
 
-    // ContainedList was added to carbon-components-svelte after 0.85.0:
-    // an old install simply not having it should never crash the build.
+    // ContainedList was added to carbon-components-svelte after 0.85.0.
+    // An old install that does not have it should not crash the build.
     expect(index.ContainedList).toBeUndefined();
   });
 

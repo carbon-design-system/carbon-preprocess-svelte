@@ -58,7 +58,7 @@ async function readCache(
 /**
  * Best-effort, atomic: a sibling temp file is renamed into place so a
  * concurrent build (e.g. parallel client/server builds sharing one
- * `node_modules`) never observes a half-written file. A failed write just
+ * `node_modules`) never observes a half-written file. A failed write
  * means the next build re-indexes.
  */
 async function writeCache(
