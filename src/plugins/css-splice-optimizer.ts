@@ -8,10 +8,9 @@ import {
 
 /**
  * Carbon's pruning rules on top of caligula, which edits the source text
- * instead of round-tripping it through a PostCSS AST. Output is
- * byte-identical to the same rules run as PostCSS visitors; input caligula
- * can't reproduce exactly (a syntax error, or an ambiguous `@font-face`
- * descriptor) comes back unchanged with `removed: 0`.
+ * instead of round-tripping it through an AST. Input caligula can't
+ * reproduce exactly (a syntax error, or an ambiguous `@font-face` descriptor)
+ * comes back unchanged with `removed: 0`.
  */
 
 export type SpliceOptimizerOptions = StrictCssOptimizerOptions & {

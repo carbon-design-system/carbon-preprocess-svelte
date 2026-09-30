@@ -1,12 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { filterCss } from "caligula";
 import { createOptimizedCss } from "carbon-preprocess-svelte/plugins/create-optimized-css";
-import postcss from "postcss";
 import {
   buildAllowlist,
   carbonClassesIn,
   matchesAllowlist,
-  prettifyCss,
   resolveCarbonCss,
   shouldKeepStrictSelector,
 } from "./helpers/carbon-css";
@@ -124,18 +123,28 @@ function splitSelectorList(selector: string): string[] {
   return selectors.filter(Boolean);
 }
 
+/** Visit every rule's selector, including nested ones, without editing the CSS. */
+function walkRules(css: string, visit: (selector: string) => void): void {
+  filterCss(css, {
+    discardEmpty: false,
+    rule({ selector }) {
+      visit(selector);
+    },
+  });
+}
+
 /** Every individual selector (parenthesis-aware) across all rules in the CSS. */
 function selectorsOf(css: string): string[] {
   const out: string[] = [];
-  postcss.parse(css).walkRules((rule) => {
-    out.push(...splitSelectorList(rule.selector));
+  walkRules(css, (selector) => {
+    out.push(...splitSelectorList(selector));
   });
   return out;
 }
 
 function ruleCount(css: string): number {
   let count = 0;
-  postcss.parse(css).walkRules(() => {
+  walkRules(css, () => {
     count++;
   });
   return count;
@@ -190,8 +199,8 @@ for (const scenario of SCENARIOS) {
       leaked_classes: leakedClasses,
     };
 
-    // Pretty CSS for local inspection (.gitignore). Baseline is .report.json.
-    writeFixture(`${scenario.name}.css`, prettifyCss(output));
+    // Pruned CSS for local inspection (.gitignore). Baseline is .report.json.
+    writeFixture(`${scenario.name}.css`, output);
 
     if (UPDATE_FIXTURES) {
       writeFixture(

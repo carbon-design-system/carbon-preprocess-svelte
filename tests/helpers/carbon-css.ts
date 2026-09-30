@@ -5,7 +5,6 @@ import {
   ALWAYS_ON_CLASSES,
   CONTEXT_ANCESTORS,
 } from "carbon-preprocess-svelte/constants";
-import postcss from "postcss";
 import {
   splitSelectorParts,
   stripNotPseudoClasses,
@@ -36,35 +35,6 @@ export function resolveCarbonCss(theme = "white"): string {
   }
 
   return readFileSync(cssPath, "utf-8");
-}
-
-/**
- * Pretty-print minified CSS for readable diffs (one rule and one declaration per line).
- * Tweaks PostCSS `raws` only; same library as the plugin.
- */
-export function prettifyCss(css: string): string {
-  const root = postcss.parse(css);
-
-  root.walk((node) => {
-    if (node.type === "rule") {
-      // Don't touch `node.selector`; `:is(.a, .b)` must stay intact.
-      node.raws.before = node.prev() ? "\n" : "";
-      node.raws.between = " ";
-      node.raws.after = "\n";
-    } else if (node.type === "atrule") {
-      node.raws.before = node.prev() ? "\n" : "";
-      node.raws.between = node.nodes ? " " : "";
-      node.raws.afterName = node.params ? " " : "";
-      node.raws.after = "\n";
-    } else if (node.type === "decl") {
-      node.raws.before = "\n  ";
-      node.raws.between = ": ";
-    } else if (node.type === "comment") {
-      node.raws.before = node.prev() ? "\n" : "";
-    }
-  });
-
-  return `${root.toString().trim()}\n`;
 }
 
 /**

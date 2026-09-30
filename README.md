@@ -197,7 +197,7 @@ The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on produ
 
 1. During `transform`, it collects imported `carbon-components-svelte` source paths, plus (unless `scanModules: false`) every literal `bx--` token found in other modules.
 2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components, plus global selectors like `.bx--body`. The component-to-class index is built from your installed `carbon-components-svelte` (see [Component index](#component-index)), so it always matches the version you have.
-3. A PostCSS plugin prunes Carbon (`bx--`) selectors outside that allowlist:
+3. A CSS filter prunes Carbon (`bx--`) selectors outside that allowlist:
    - Individual selectors are pruned from comma-separated lists, not the whole rule, when only one branch matches
    - Every Carbon class in a compound selector (same-element and descendant) must match the allowlist, so importing NumberInput doesn't pull in `.bx--modal .bx--number` context rules, and Button doesn't pull in Tabs skeleton styles via a shared `.bx--skeleton` modifier
    - Flatpickr and legacy single-hyphen `bx-` rules are dropped unless DatePicker (or another flatpickr-based component) is in the bundle
@@ -214,7 +214,7 @@ flowchart TB
   subgraph emit["Bundle phase"]
     S --> G[generateBundle]
     G --> A["Allowlist bx-- selectors<br/>(index + .bx--body)"]
-    A --> P[Prune unused Carbon styles with PostCSS]
+    A --> P[Prune unused Carbon styles]
     P --> R[Optimize CSS assets]
   end
 
