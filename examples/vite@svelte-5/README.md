@@ -12,6 +12,7 @@ Each entry is a small app that mirrors an optimize-css fixture scenario. Pick on
 | datatable-overflowmenu | datatable-overflowmenu.strict | DataTable, OverflowMenu, Link |
 | datepicker | datepicker.strict | DatePicker, DatePickerInput |
 | timepicker-bundle | timepicker-bundle.strict | TimePicker, TimePickerSelect |
+| button | button.strict | Button (`kind`, icon-only `tooltipPosition`) |
 | modal | modal.strict | Modal |
 | composed-modal-bundle | composed-modal-bundle.strict | ComposedModal, ModalHeader, ModalBody, ModalFooter |
 | uishell | uishell.strict | Header, SideNav, SideNavItems, Content |

@@ -40,7 +40,58 @@ export function isComponentIndex(value: unknown): value is ComponentIndex {
       Array.isArray((entry as { classes?: unknown }).classes) &&
       (entry as { classes: unknown[] }).classes.every(
         (cls) => typeof cls === "string",
-      ),
+      ) &&
+      isVariantList((entry as { variants?: unknown }).variants) &&
+      isGateList((entry as { gates?: unknown }).gates),
+  );
+}
+
+function isPropValue(value: unknown): boolean {
+  return (
+    value === null || typeof value === "string" || typeof value === "boolean"
+  );
+}
+
+function isGateList(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every(
+        (gate) =>
+          typeof gate === "object" &&
+          gate !== null &&
+          typeof gate.class === "string" &&
+          Array.isArray(gate.when) &&
+          gate.when.every(
+            (and: unknown) =>
+              Array.isArray(and) &&
+              and.every(
+                (condition) =>
+                  typeof condition === "object" &&
+                  condition !== null &&
+                  typeof condition.prop === "string" &&
+                  isPropValue(condition.default) &&
+                  (condition.equals === undefined ||
+                    typeof condition.equals === "string" ||
+                    typeof condition.equals === "boolean"),
+              ),
+          ),
+      ))
+  );
+}
+
+function isVariantList(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every(
+        (variant) =>
+          typeof variant === "object" &&
+          variant !== null &&
+          typeof variant.prefix === "string" &&
+          typeof variant.prop === "string" &&
+          typeof variant.default === "string",
+      ))
   );
 }
 

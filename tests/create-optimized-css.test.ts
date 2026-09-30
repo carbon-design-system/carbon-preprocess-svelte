@@ -560,4 +560,178 @@ button, .flatpickr-day.selected { color: red }`,
       expect(usage.allowlistSize).toBeGreaterThan(0);
     });
   });
+
+  describe("class variants", () => {
+    const source = [
+      ".bx--btn--primary{a:b}",
+      ".bx--btn--secondary{a:b}",
+      ".bx--btn--danger{a:b}",
+      ".bx--btn--ghost{a:b}",
+      ".bx--btn--icon-only--bottom.bx--tooltip--align-center{a:b}",
+      ".bx--btn--icon-only--top.bx--tooltip--align-end{a:b}",
+      ".bx--btn--icon-only--left.bx--tooltip--align-start{a:b}",
+    ].join("");
+
+    const propUsage = (
+      literals: Record<string, string[]>,
+      dynamic: string[] = [],
+    ) => ({
+      literals: new Map(
+        Object.entries(literals).map(([prop, values]) => [
+          prop,
+          new Set(values),
+        ]),
+      ),
+      dynamic: new Set(dynamic),
+    });
+
+    test("keeps every variant without prop usage", () => {
+      expect(
+        createOptimizedCss({ components, source, ids: ["Button"] }),
+      ).toEqual(source);
+    });
+
+    test("keeps each prop's default plus the literals the app passes", () => {
+      const optimizer = createCssOptimizer({
+        components,
+        ids: ["Button"],
+        propUsage: propUsage({
+          kind: ["danger"],
+          tooltipPosition: ["top"],
+          tooltipAlignment: ["end"],
+        }),
+      });
+
+      expect(optimizer.run(source).css).toEqual(
+        [
+          ".bx--btn--primary{a:b}",
+          ".bx--btn--danger{a:b}",
+          ".bx--btn--icon-only--bottom.bx--tooltip--align-center{a:b}",
+          ".bx--btn--icon-only--top.bx--tooltip--align-end{a:b}",
+        ].join(""),
+      );
+      expect(optimizer.usage.variants).toEqual([
+        { component: "Button", prop: "kind", values: ["primary", "danger"] },
+        {
+          component: "Button",
+          prop: "tooltipPosition",
+          values: ["bottom", "top"],
+        },
+        {
+          component: "Button",
+          prop: "tooltipAlignment",
+          values: ["center", "end"],
+        },
+      ]);
+    });
+
+    test("a prop passed a dynamic value keeps all of its variants", () => {
+      const optimizer = createCssOptimizer({
+        components,
+        ids: ["Button"],
+        propUsage: propUsage({}, ["kind"]),
+      });
+      const css = optimizer.run(source).css;
+
+      expect(css).toContain(".bx--btn--secondary{a:b}");
+      expect(css).toContain(".bx--btn--ghost{a:b}");
+      expect(css).not.toContain(".bx--btn--icon-only--left");
+      expect(optimizer.usage.variants[0]).toEqual({
+        component: "Button",
+        prop: "kind",
+        values: null,
+      });
+    });
+
+    test("a bundled parent that renders the prefix keeps it whole", () => {
+      // Pagination renders `<Button kind="ghost" tooltipPosition={…}>`.
+      const optimizer = createCssOptimizer({
+        components,
+        ids: ["Button", "Pagination"],
+        propUsage: propUsage({}),
+      });
+
+      expect(optimizer.run(source).css).toContain(".bx--btn--secondary{a:b}");
+      expect(
+        optimizer.usage.variants.find((variant) => variant.prop === "kind"),
+      ).toEqual({ component: "Button", prop: "kind", values: null });
+    });
+  });
+
+  describe("class gates", () => {
+    const tag = {
+      path: "carbon-components-svelte/src/Tag/Tag.svelte",
+      classes: [
+        ".bx--tag",
+        ".bx--tag--filter",
+        ".bx--tag--red",
+        ".bx--tag--sm",
+      ],
+      gates: [
+        {
+          class: ".bx--tag--filter",
+          when: [[{ prop: "filter", default: false }]],
+        },
+        {
+          class: ".bx--tag--red",
+          when: [[{ prop: "type", default: null, equals: "red" }]],
+        },
+        {
+          class: ".bx--tag--sm",
+          when: [[{ prop: "size", default: "sm", equals: "sm" }]],
+        },
+      ],
+    };
+    const source =
+      ".bx--tag{a:b}.bx--tag--filter{a:b}.bx--tag--red{a:b}.bx--tag--sm{a:b}.bx--tag--blue{a:b}";
+    const usage = (
+      literals: Record<string, string[]>,
+      dynamic: string[] = [],
+    ) => ({
+      literals: new Map(
+        Object.entries(literals).map(([prop, values]) => [
+          prop,
+          new Set(values),
+        ]),
+      ),
+      dynamic: new Set(dynamic),
+    });
+    const run = (propUsage?: ReturnType<typeof usage>, extra = {}) =>
+      createCssOptimizer({
+        components: { Tag: tag, ...extra },
+        ids: ["Tag", ...Object.keys(extra)],
+        propUsage,
+      });
+
+    test("keeps gated classes without prop usage", () => {
+      // `.bx--tag--blue` rides on the unshared `.bx--tag` BEM parent.
+      expect(run().run(source).css).toEqual(source);
+    });
+
+    test("drops classes no condition can reach, overriding the BEM parent", () => {
+      const optimizer = run(usage({}));
+      expect(optimizer.run(source).css).toEqual(
+        ".bx--tag{a:b}.bx--tag--sm{a:b}.bx--tag--blue{a:b}",
+      );
+      expect(optimizer.usage.gatedOff).toEqual([
+        { component: "Tag", classes: [".bx--tag--filter", ".bx--tag--red"] },
+      ]);
+    });
+
+    test("a literal or a dynamic prop keeps the class", () => {
+      expect(
+        run(usage({ filter: ["true"] }, ["type"])).run(source).css,
+      ).toEqual(source);
+    });
+
+    test("another component rendering the class keeps it", () => {
+      const badge = {
+        path: "carbon-components-svelte/src/Badge/Badge.svelte",
+        classes: [".bx--tag--red"],
+      };
+      expect(run(usage({}), { Badge: badge }).run(source).css).toContain(
+        ".bx--tag--red{a:b}",
+      );
+    });
+  });
 });

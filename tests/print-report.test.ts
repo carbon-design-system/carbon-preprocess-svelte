@@ -49,6 +49,48 @@ describe("print-report", () => {
     ]);
   });
 
+  test("variants", () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
+
+    printReport({
+      components: ["Button"],
+      allowlistSize: 40,
+      moduleTokens: 0,
+      contentTokens: 0,
+      safelistEntries: 0,
+      variants: [
+        { component: "Button", prop: "kind", values: ["primary", "danger"] },
+        { component: "Button", prop: "tooltipPosition", values: null },
+      ],
+      assets: [],
+    });
+
+    expect(log.mock.calls[4]).toEqual([
+      "  Variants: Button.kind primary, danger; Button.tooltipPosition (all)",
+    ]);
+  });
+
+  test("gated off", () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
+
+    printReport({
+      components: ["Tag"],
+      allowlistSize: 10,
+      moduleTokens: 0,
+      contentTokens: 0,
+      safelistEntries: 0,
+      gatedOff: [
+        { component: "Tag", classes: [".bx--tag--red", ".bx--tag--filter"] },
+        { component: "Toggle", classes: [".bx--toggle--readonly"] },
+      ],
+      assets: [],
+    });
+
+    expect(log.mock.calls[4]).toEqual([
+      "  Gated off: 3 classes (Tag 2, Toggle 1)",
+    ]);
+  });
+
   test("no detected components", () => {
     const log = jest.spyOn(console, "log").mockImplementation(() => {});
 

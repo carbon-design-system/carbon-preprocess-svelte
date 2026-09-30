@@ -67,6 +67,13 @@ export type StrictCssOptimizerOptions = {
   components: ComponentIndex;
   preserveFlatpickr: boolean;
   safelist: readonly SafelistEntry[];
+  /**
+   * Classes a bundled component renders only under props no caller passes
+   * (see `ClassGate`), and nothing else keeps. They skip the BEM-parent
+   * inference: `.bx--tag` on the allowlist no longer implies
+   * `.bx--tag--filter`. An exact entry or a contributed prefix still wins.
+   */
+  denied?: ReadonlySet<string>;
 };
 
 const sharedClassesCache = new WeakMap<ComponentIndex, Set<string>>();
@@ -92,6 +99,7 @@ function getSharedClasses(components: ComponentIndex): Set<string> {
 }
 
 type AllowlistIndex = {
+  denied: ReadonlySet<string>;
   exact: Set<string>;
   hyphenPrefixes: string[];
   shared: Set<string>;
@@ -104,13 +112,17 @@ type AllowlistIndex = {
 };
 
 const allowlistIndexCache = new WeakMap<Set<string>, AllowlistIndex>();
+const NONE: ReadonlySet<string> = new Set();
 
 function getAllowlistIndex(
   allowlist: Set<string>,
   components: ComponentIndex,
+  denied: ReadonlySet<string> = NONE,
 ): AllowlistIndex {
+  // Keyed by the allowlist, which `buildUsage` creates together with its
+  // `denied` set; the check only guards against a caller mixing them.
   const cached = allowlistIndexCache.get(allowlist);
-  if (cached) return cached;
+  if (cached && cached.denied === denied) return cached;
 
   const shared = getSharedClasses(components);
   const hyphenPrefixes: string[] = [];
@@ -123,6 +135,7 @@ function getAllowlistIndex(
   }
 
   const index = {
+    denied,
     exact: allowlist,
     hyphenPrefixes,
     shared,
@@ -147,6 +160,8 @@ function computeAllowlistMatch(name: string, index: AllowlistIndex): boolean {
   for (const prefix of index.hyphenPrefixes) {
     if (name.startsWith(prefix)) return true;
   }
+
+  if (index.denied.has(name)) return false;
 
   for (let i = 1; i < name.length - 1; i++) {
     const a = name[i];
@@ -270,8 +285,9 @@ export function pruneRuleSelector(
   selector: string,
   options: StrictCssOptimizerOptions,
 ): PrunedSelector | undefined {
-  const { allowlist, components, preserveFlatpickr, safelist } = options;
-  const index = getAllowlistIndex(allowlist, components);
+  const { allowlist, components, preserveFlatpickr, safelist, denied } =
+    options;
+  const index = getAllowlistIndex(allowlist, components, denied);
 
   // `bx-` is either followed by another hyphen (Carbon) or not (legacy), so
   // one substring check covers both prefixes. A flatpickr match inside any
@@ -367,7 +383,10 @@ export function isUnusedIbmPlexFontFace(
   family: string,
   style: string,
   weight: string,
-  options: Pick<StrictCssOptimizerOptions, "allowlist" | "components">,
+  options: Pick<
+    StrictCssOptimizerOptions,
+    "allowlist" | "components" | "denied"
+  >,
 ): boolean {
   if (!family.startsWith("IBM Plex")) {
     return false;
@@ -383,7 +402,11 @@ export function isUnusedIbmPlexFontFace(
       (style === "italic" &&
         matchesAllowlist(
           ITALIC_TYPE_CLASS,
-          getAllowlistIndex(options.allowlist, options.components),
+          getAllowlistIndex(
+            options.allowlist,
+            options.components,
+            options.denied,
+          ),
         )));
 
   return !(is_sans || is_mono);

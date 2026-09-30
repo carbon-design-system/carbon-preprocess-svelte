@@ -129,3 +129,146 @@ export { default as Bar } from "./Bar/Bar.svelte";`,
     }
   });
 });
+
+describe("buildComponentIndex: class variants", () => {
+  test.each([["carbon-components-svelte"], ["carbon-components-svelte-old"]])(
+    "%s: Button's prop-completed prefixes are variants",
+    async (pkg) => {
+      const index = await buildComponentIndex({
+        carbonRoot: resolvePackageRoot(pkg),
+      });
+
+      expect(index.Button?.variants).toEqual([
+        { prefix: ".bx--btn--", prop: "kind", default: "primary" },
+        {
+          prefix: ".bx--btn--icon-only--",
+          prop: "tooltipPosition",
+          default: "bottom",
+        },
+        {
+          prefix: ".bx--tooltip--align-",
+          prop: "tooltipAlignment",
+          default: "center",
+        },
+      ]);
+      // The prefix stays in `classes` so parents that render `<Button>`
+      // inherit it whole.
+      expect(index.Button?.classes).toContain(".bx--btn--");
+      expect(index.Pagination?.classes).toContain(".bx--btn--");
+      expect(index.Pagination?.variants).toBeUndefined();
+    },
+  );
+
+  const foo = `<script>
+  export let kind = "primary";
+</script>
+<div class={\`bx--foo--\${kind}\`}></div>`;
+
+  test("a variant survives when every importer renders the component", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { default as Foo } from "./Foo/Foo.svelte";
+export { default as Bar } from "./Bar/Bar.svelte";`,
+      "Foo/Foo.svelte": foo,
+      "Bar/Bar.svelte": `<script>
+  import Foo from "../Foo/Foo.svelte";
+</script>
+<Foo kind={x} />`,
+    });
+
+    try {
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+      expect(index.Foo?.variants).toEqual([
+        { prefix: ".bx--foo--", prop: "kind", default: "primary" },
+      ]);
+      expect(index.Bar?.classes).toContain(".bx--foo--");
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("dropped when a module imports the component without rendering it", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { default as Foo } from "./Foo/Foo.svelte";
+export { default as Bar } from "./Bar/Bar.svelte";`,
+      "Foo/Foo.svelte": foo,
+      "Bar/Bar.svelte": `<script>
+  import { mountFoo } from "./mount.js";
+</script>
+<div use:mountFoo></div>`,
+      "Bar/mount.js": `import Foo from "../Foo/Foo.svelte";
+export const mountFoo = (target) => new Foo({ target, props: { kind: pick() } });`,
+    });
+
+    try {
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+      expect(index.Foo?.classes).toContain(".bx--foo--");
+      expect(index.Foo?.variants).toBeUndefined();
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  test("dropped when a child component renders the same prefix", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { default as Foo } from "./Foo/Foo.svelte";`,
+      "Foo/Foo.svelte": `<script>
+  import Child from "./Child.svelte";
+  export let kind = "primary";
+</script>
+<div class={\`bx--foo--\${kind}\`}><Child /></div>`,
+      "Foo/Child.svelte": `<script>
+  export let size = "sm";
+</script>
+<span class="bx--foo--{size}"></span>`,
+    });
+
+    try {
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+      expect(index.Foo?.classes).toContain(".bx--foo--");
+      expect(index.Foo?.variants).toBeUndefined();
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
+
+describe("buildComponentIndex: class gates", () => {
+  test("real Carbon: PasswordInput's tooltip classes are gated on their props", async () => {
+    const index = await buildComponentIndex({
+      carbonRoot: resolvePackageRoot("carbon-components-svelte"),
+    });
+
+    expect(index.PasswordInput?.gates).toEqual(
+      expect.arrayContaining([
+        {
+          class: ".bx--tooltip--top",
+          when: [
+            [{ prop: "tooltipPosition", default: "bottom", equals: "top" }],
+          ],
+        },
+      ]),
+    );
+    // Gated classes stay in `classes` for parents to inherit whole.
+    expect(index.PasswordInput?.classes).toContain(".bx--tooltip--top");
+  });
+
+  test("dropped when a child renders the same class", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { default as Foo } from "./Foo/Foo.svelte";`,
+      "Foo/Foo.svelte": `<script>
+  import Child from "./Child.svelte";
+  export let light = false;
+</script>
+<div class:bx--foo--light={light} class:bx--foo--dark={!light}><Child /></div>`,
+      "Foo/Child.svelte": `<span class="bx--foo--light"></span>`,
+    });
+
+    try {
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+      expect(index.Foo?.classes).toContain(".bx--foo--light");
+      expect(index.Foo?.gates).toBeUndefined();
+    } finally {
+      fixture.dispose();
+    }
+  });
+});

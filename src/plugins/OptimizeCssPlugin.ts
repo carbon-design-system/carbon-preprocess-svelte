@@ -1,3 +1,4 @@
+import { isBuiltin } from "node:module";
 import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
@@ -7,6 +8,14 @@ import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
 import { printReport, toAssetReport } from "./print-report";
 import { collectCarbonTokens, scanContent } from "./scan-content";
+import {
+  carbonSourceDir,
+  createModulePropScanner,
+  createPropUsage,
+  markAllDynamic,
+  mergePropUsage,
+  type PropUsage,
+} from "./scan-props";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
 /**
@@ -23,6 +32,10 @@ type WebpackAssetSource = {
 
 type WebpackModule = {
   resource?: unknown;
+  /** Set on ExternalModule (webpack and Rspack): how the import is left to the runtime. */
+  externalType?: unknown;
+  /** ExternalModule's request: `"fs"`, `"react"`, … */
+  request?: unknown;
   /** Present on NormalModule (webpack and Rspack): the loader output for this module. */
   originalSource?: () => WebpackAssetSource | null | undefined;
 };
@@ -30,9 +43,9 @@ type WebpackModule = {
 type WebpackCompilation = {
   hooks: {
     finishModules: {
-      tap(
+      tapPromise(
         name: string,
-        callback: (modules: Iterable<WebpackModule>) => void,
+        callback: (modules: Iterable<WebpackModule>) => Promise<void>,
       ): void;
     };
     processAssets: {
@@ -110,6 +123,8 @@ export default class OptimizeCssPlugin {
       (compilation) => {
         const ids = new Set<string>();
         const moduleClasses = new Set<string>();
+        /** What bundled modules pass to the index's variant props. */
+        let propUsage: PropUsage | undefined;
         const warn = (message: string) => {
           if (!silent) compilation.warnings.push(new WebpackError(message));
         };
@@ -117,35 +132,81 @@ export default class OptimizeCssPlugin {
         /**
          * `finishModules` fires once every module in the graph has resolved,
          * so each imported Carbon Svelte component already exists as its own
-         * module with a `resource` (its resolved file path) set.
+         * module with a `resource` (its resolved file path) set. The index
+         * loads first: it names the props the module scan looks for.
          */
-        compilation.hooks.finishModules.tap(
+        compilation.hooks.finishModules.tapPromise(
           OptimizeCssPlugin.name,
-          (modules) => {
+          async (iterable) => {
+            const modules = [...iterable];
+            // A compiler that bundles no Carbon never needs the index; loading
+            // it anyway would warn when Carbon isn't installed there.
+            const components =
+              options.scanModules !== false &&
+              modules.some(
+                ({ resource }) =>
+                  typeof resource === "string" &&
+                  isCarbonSvelteImport(resource),
+              )
+                ? await loadComponentIndex(compiler.context)
+                : undefined;
+            const scanProps =
+              components &&
+              createModulePropScanner(
+                components,
+                carbonSourceDir(compiler.context),
+              );
+            const usage = scanProps ? createPropUsage() : undefined;
+
             for (const module of modules) {
+              // An external (`externals`, a CDN global) is imported but its
+              // code isn't in the build, so it could pass any value.
+              if (
+                usage &&
+                components &&
+                typeof module.externalType === "string" &&
+                !(
+                  typeof module.request === "string" &&
+                  isBuiltin(module.request)
+                )
+              ) {
+                markAllDynamic(usage, components);
+              }
+
               const resource = module.resource;
               if (typeof resource !== "string") continue;
 
-              if (isCarbonSvelteImport(resource)) {
-                ids.add(resource);
+              const isCarbon = isCarbonSvelteImport(resource);
+              if (isCarbon) ids.add(resource);
+
+              const scanTokens =
+                !isCarbon &&
+                options.scanModules !== false &&
+                isScannableModule(resource);
+              if (!scanTokens && !scanProps) continue;
+
+              let source: string | Buffer | undefined;
+              let unreadable = false;
+              try {
+                source = module.originalSource?.()?.source();
+              } catch {
+                // Some module types throw when asked for a source.
+                unreadable = true;
+              }
+              if (typeof source !== "string" && !Buffer.isBuffer(source)) {
+                // A module whose code can't be read could pass any value.
+                if (unreadable && usage && components) {
+                  markAllDynamic(usage, components);
+                }
                 continue;
               }
 
-              if (
-                options.scanModules !== false &&
-                isScannableModule(resource)
-              ) {
-                let source: string | Buffer | undefined;
-                try {
-                  source = module.originalSource?.()?.source();
-                } catch {
-                  // Some module types throw when asked for a source.
-                }
-                if (typeof source === "string" || Buffer.isBuffer(source)) {
-                  collectCarbonTokens(source.toString(), moduleClasses);
-                }
-              }
+              const code = source.toString();
+              if (scanTokens) collectCarbonTokens(code, moduleClasses);
+              const moduleUsage = scanProps?.(resource, code);
+              if (usage && moduleUsage) mergePropUsage(usage, moduleUsage);
             }
+            propUsage = usage;
           },
         );
 
@@ -191,6 +252,7 @@ export default class OptimizeCssPlugin {
               components,
               ids,
               contentClasses: [...contentClasses, ...moduleClasses],
+              propUsage,
             });
             const assetReports: AssetReport[] = [];
 
@@ -223,6 +285,8 @@ export default class OptimizeCssPlugin {
               printReport({
                 components: optimizer.usage.components,
                 allowlistSize: optimizer.usage.allowlistSize,
+                variants: optimizer.usage.variants,
+                gatedOff: optimizer.usage.gatedOff,
                 moduleTokens: moduleClasses.size,
                 contentTokens: contentClasses.length,
                 safelistEntries: options.safelist?.length ?? 0,

@@ -36,6 +36,30 @@ describe("isComponentIndex", () => {
     ["entry missing classes", { Button: { path: "a.svelte" } }],
     ["entry with non-string class", { Button: { path: "a", classes: [1] } }],
     ["null entry", { Button: null }],
+    [
+      "entry with non-array variants",
+      { Button: { path: "a", classes: [], variants: {} } },
+    ],
+    [
+      "entry with a malformed gate",
+      {
+        Button: {
+          path: "a",
+          classes: [],
+          gates: [{ class: ".bx--x", when: [[{ prop: "p", default: 1 }]] }],
+        },
+      },
+    ],
+    [
+      "entry with a malformed variant",
+      {
+        Button: {
+          path: "a",
+          classes: [],
+          variants: [{ prefix: ".bx--btn--" }],
+        },
+      },
+    ],
   ])("rejects %s", (_, value) => {
     expect(isComponentIndex(value)).toBe(false);
   });

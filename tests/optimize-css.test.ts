@@ -38,6 +38,12 @@ type ResolvedPlugin = {
     this: {
       warn: (message: string) => void;
       getModuleIds?: () => IterableIterator<string>;
+      getModuleInfo?: (id: string) => {
+        importedIds: string[];
+        dynamicallyImportedIds: string[];
+        isExternal?: boolean;
+        code?: string | null;
+      } | null;
     },
     options: unknown,
     bundle: OutputBundle,
@@ -161,6 +167,183 @@ describe("optimizeCss (Vite plugin)", () => {
       `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`,
     );
+  });
+
+  test("keeps only the Button kinds app modules pass", async () => {
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    const cssContent =
+      ".bx--btn--primary{a:b}.bx--btn--danger{a:b}.bx--btn--ghost{a:b}";
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+    plugin.transform(
+      'Button(node, { kind: "danger" });',
+      "/app/src/App.svelte",
+    );
+
+    const bundle = makeCssBundle(cssContent);
+    await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(
+      ".bx--btn--primary{a:b}.bx--btn--danger{a:b}",
+    );
+  });
+
+  test("reads app modules under a folder named after Carbon", async () => {
+    // Carbon's docs site, or an app inside a fork: the `bx--` token scan
+    // skips these paths, but a missed literal here would drop its styles.
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    const cssContent = ".bx--btn--primary{a:b}.bx--btn--danger{a:b}";
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+    plugin.transform(
+      'Button(node, { kind: "danger" });',
+      "/work/carbon-components-svelte/docs/src/pages/Button.svx",
+    );
+
+    const bundle = makeCssBundle(cssContent);
+    await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+  });
+
+  test.each([
+    ["a dynamic kind", {}, "Button(node, { kind: k });"],
+    ["scanModules: false", { scanModules: false }, ""],
+  ])("keeps every Button kind with %s", async (_, options, code) => {
+    const plugin = resolvePlugin(optimizeCss({ silent: true, ...options }));
+    const cssContent = ".bx--btn--primary{a:b}.bx--btn--ghost{a:b}";
+
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+    plugin.transform(code, "/app/src/App.svelte");
+
+    const bundle = makeCssBundle(cssContent);
+    await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
+  });
+
+  describe("external modules", () => {
+    const cssContent = ".bx--btn--primary{a:b}.bx--btn--ghost{a:b}";
+    const app = "/app/src/App.svelte";
+
+    async function build(
+      imports: string[],
+      infos: Record<string, { isExternal?: boolean; code?: string | null }>,
+    ): Promise<string | Uint8Array> {
+      const plugin = resolvePlugin(optimizeCss({ silent: true }));
+      await plugin.buildStart();
+      plugin.transform("", carbonComponent);
+      plugin.transform("Button(node, {});", app);
+
+      const graph = [carbonComponent, app, ...Object.keys(infos)];
+      const moduleInfo = (id: string) => {
+        if (id === app) {
+          return { importedIds: imports, dynamicallyImportedIds: [] };
+        }
+        if (id === carbonComponent) {
+          return { importedIds: [], dynamicallyImportedIds: [] };
+        }
+        const info = infos[id];
+        return info
+          ? { importedIds: [], dynamicallyImportedIds: [], ...info }
+          : null;
+      };
+      const bundle = makeCssBundle(cssContent);
+      await plugin.generateBundle.call(
+        {
+          warn: jest.fn(),
+          getModuleIds: () => graph.values(),
+          getModuleInfo: moduleInfo,
+        },
+        {},
+        bundle,
+      );
+      return (bundle["styles.css"] as OutputAsset).source;
+    }
+
+    test("narrows when every import was bundled", async () => {
+      expect(await build([carbonComponent], {})).toEqual(
+        ".bx--btn--primary{a:b}",
+      );
+    });
+
+    test("ignores Node built-ins", async () => {
+      expect(await build(["node:fs", "path"], {})).toEqual(
+        ".bx--btn--primary{a:b}",
+      );
+    });
+
+    test.each([
+      [
+        "Rollup lists it with isExternal",
+        ["ui-config"],
+        { "ui-config": { isExternal: true } },
+      ],
+      [
+        "Rolldown lists it with null code",
+        ["ui-config"],
+        { "ui-config": { code: null } },
+      ],
+      ["it has no module info", ["ui-config"], {}],
+    ])(
+      "keeps every variant when an import is external: %s",
+      async (_, imports, infos) => {
+        expect(await build(imports, infos)).toEqual(cssContent);
+      },
+    );
+  });
+
+  describe("watch-mode rebuilds", () => {
+    const cssContent = ".bx--btn--primary{a:b}.bx--btn--ghost{a:b}";
+    const app = "/app/src/App.svelte";
+
+    async function rebuild(
+      plugin: ResolvedPlugin,
+      moduleIds: string[],
+      transformed: Record<string, string>,
+    ): Promise<string | Uint8Array> {
+      await plugin.buildStart();
+      for (const [id, code] of Object.entries(transformed)) {
+        plugin.transform(code, id);
+      }
+      const bundle = makeCssBundle(cssContent);
+      await plugin.generateBundle.call(
+        { warn: jest.fn(), getModuleIds: () => moduleIds.values() },
+        {},
+        bundle,
+      );
+      return (bundle["styles.css"] as OutputAsset).source;
+    }
+
+    test("keeps prop values from a module Rollup served from cache", async () => {
+      const plugin = resolvePlugin(optimizeCss({ silent: true }));
+      const ids = [carbonComponent, app];
+
+      await rebuild(plugin, ids, {
+        [carbonComponent]: "",
+        [app]: 'Button(node, { kind: "ghost" });',
+      });
+      // Rebuild: only the Carbon module is transformed again; App.svelte is
+      // unchanged, so Rollup reuses its cached transform.
+      expect(await rebuild(plugin, ids, { [carbonComponent]: "" })).toEqual(
+        cssContent,
+      );
+    });
+
+    test("drops prop values from a module no longer in the graph", async () => {
+      const plugin = resolvePlugin(optimizeCss({ silent: true }));
+
+      await rebuild(plugin, [carbonComponent, app], {
+        [carbonComponent]: "",
+        [app]: 'Button(node, { kind: "ghost" });',
+      });
+      expect(
+        await rebuild(plugin, [carbonComponent], { [carbonComponent]: "" }),
+      ).toEqual(".bx--btn--primary{a:b}");
+    });
   });
 
   test("scanModules: false ignores app modules", async () => {
