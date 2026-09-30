@@ -101,6 +101,17 @@ export type OptimizeCssOptions = {
    * @default true
    */
   scanModules?: boolean;
+
+  /**
+   * Directory the component index cache is written to, relative to the
+   * project root (Vite `root`, webpack/Rspack `context`, or the working
+   * directory under plain Rollup). The default location is inside
+   * `node_modules`, so a fresh install (`npm ci`, a new CI runner, a Docker
+   * build) drops it and the next build re-indexes Carbon. Point it at a
+   * directory your CI restores between runs to skip that.
+   * @default "node_modules/.cache/carbon-preprocess-svelte"
+   */
+  cacheDir?: string;
 };
 
 /**

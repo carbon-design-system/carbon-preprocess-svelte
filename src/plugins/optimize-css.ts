@@ -96,7 +96,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
      */
     async buildStart() {
       contentClasses = undefined;
-      components = await loadComponentIndex(root);
+      components = await loadComponentIndex(root, options);
     },
     /**
      * The transform hook runs for every module. It does not change the

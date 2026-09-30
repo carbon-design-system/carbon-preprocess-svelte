@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { optimizeCarbonCss } from "carbon-preprocess-svelte";
@@ -71,6 +77,23 @@ describe("optimizeCarbonCss", () => {
     );
     expect(result.css).toEqual(".bx--btn{color:red}.bx--accordion{color:blue}");
     expect(result.removed).toBe(0);
+  });
+
+  test("`cacheDir` writes the component index cache under `cwd`", async () => {
+    const project = createFakeProject();
+    project.linkCarbon();
+
+    try {
+      const result = await optimizeCarbonCss(
+        ".bx--btn{color:red}.bx--accordion{color:blue}",
+        { components: ["Button"], cwd: project.root, cacheDir: ".ci-cache" },
+      );
+
+      expect(result.css).toEqual(".bx--btn{color:red}");
+      expect(readdirSync(join(project.root, ".ci-cache"))).toHaveLength(1);
+    } finally {
+      project.dispose();
+    }
   });
 
   test("`content` resolves from `cwd`", async () => {

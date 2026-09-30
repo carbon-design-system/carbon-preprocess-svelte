@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -101,6 +102,17 @@ describe("cli optimize-css", () => {
         "Button",
       ]);
       expect(withComponents.status).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("--cache-dir writes the component index cache there, relative to --cwd", () => {
+    const dir = createTempProject();
+    try {
+      const result = runCli(dir, ["dist/app.css", "--cache-dir", ".ci-cache"]);
+      expect(result.status).toBe(0);
+      expect(readdirSync(join(dir, ".ci-cache"))).toHaveLength(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

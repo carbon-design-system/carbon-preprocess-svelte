@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Rollup } from "vite";
@@ -79,6 +85,23 @@ describe("optimizeCss (Vite plugin): component index unavailable", () => {
       expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
     } finally {
       warn.mockRestore();
+      project.dispose();
+    }
+  });
+});
+
+describe("optimizeCss (Vite plugin): cacheDir", () => {
+  test("writes the component index cache under the Vite root", async () => {
+    const project = createFakeProject();
+    project.linkCarbon();
+
+    try {
+      const plugin = resolvePlugin(optimizeCss({ cacheDir: ".ci-cache" }));
+      plugin.configResolved({ root: project.root, logger: quietLogger });
+      await plugin.buildStart();
+
+      expect(readdirSync(join(project.root, ".ci-cache"))).toHaveLength(1);
+    } finally {
       project.dispose();
     }
   });

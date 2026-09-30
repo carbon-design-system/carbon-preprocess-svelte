@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Compiler } from "webpack";
@@ -140,6 +146,32 @@ describe("OptimizeCssPlugin", () => {
       expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
     } finally {
       warn.mockRestore();
+      project.dispose();
+    }
+  });
+
+  test("`cacheDir` writes the component index cache under compiler.context", async () => {
+    const project = createFakeProject();
+    project.linkCarbon();
+
+    try {
+      const plugin = new OptimizeCssPlugin({
+        silent: true,
+        cacheDir: ".ci-cache",
+      });
+      const mockCompiler = createMockCompiler({
+        assets: { "styles.css": { source: () => ".bx--btn{color:red}" } },
+        moduleResources: [
+          `node_modules/${CarbonSvelte.Components}/Button.svelte`,
+        ],
+        context: project.root,
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      expect(readdirSync(join(project.root, ".ci-cache"))).toHaveLength(1);
+    } finally {
       project.dispose();
     }
   });

@@ -81,13 +81,20 @@ export type ComponentIndexOptions = {
    * are resolved from.
    */
   projectRoot?: string;
+  /**
+   * Directory the index cache file is written to, resolved from
+   * `projectRoot`. Replaces the default location, so a CI runner can keep
+   * the file in a directory it restores between runs.
+   */
+  cacheDir?: string;
 };
 
 /**
- * Cache file for one (Carbon version, preprocessor version) pair under the
- * consuming project's `node_modules/.cache/carbon-preprocess-svelte/`.
- * Keyed by both so a bump on either side misses and rebuilds: a new Carbon
- * changes the input, a new preprocessor may change the extraction.
+ * Cache file for one (Carbon version, preprocessor version) pair under
+ * `cacheDir` if given, else the consuming project's
+ * `node_modules/.cache/carbon-preprocess-svelte/`. Keyed by both so a bump
+ * on either side misses and rebuilds: a new Carbon changes the input, a new
+ * preprocessor may change the extraction.
  *
  * A Carbon zipped by Yarn PnP uses the project's `node_modules` instead:
  * PnP's `fs` would write into the archive.
@@ -96,13 +103,20 @@ export function componentIndexCacheFile(
   carbonRoot: string,
   carbonVersion: string,
   projectRoot: string = process.cwd(),
+  cacheDir?: string,
 ): string {
+  const fileName = `${carbonVersion}_${OWN_VERSION}.json`;
+
+  if (cacheDir !== undefined) {
+    return path.resolve(projectRoot, cacheDir, fileName);
+  }
+
   return path.join(
     ZIP_ARCHIVE_REGEX.test(carbonRoot)
       ? path.join(path.resolve(projectRoot), "node_modules")
       : path.dirname(carbonRoot),
     CACHE_DIRNAME,
-    `${carbonVersion}_${OWN_VERSION}.json`,
+    fileName,
   );
 }
 
@@ -133,6 +147,7 @@ export async function resolveComponentIndex(
         carbonRoot,
         await readCarbonVersion(carbonRoot),
         options?.projectRoot,
+        options?.cacheDir,
       );
 
   const cached = cacheFile && (await readCache(cacheFile));
@@ -163,24 +178,32 @@ const memoized = new Map<string, Promise<ComponentIndex | undefined>>();
  * safe, while pruning against an index for some other Carbon version drops
  * rules the installed markup still uses (#213).
  *
- * Memoized per project root for the life of the process, so every plugin
- * instance in a build triggers at most one indexing pass (or cache read),
- * and a failure warns once.
+ * Memoized per project root and cache directory for the life of the
+ * process, so every plugin instance in a build triggers at most one
+ * indexing pass (or cache read), and a failure warns once.
  */
 export function loadComponentIndex(
   projectRoot: string = process.cwd(),
+  options?: Pick<ComponentIndexOptions, "cacheDir">,
 ): Promise<ComponentIndex | undefined> {
   const root = path.resolve(projectRoot);
-  let pending = memoized.get(root);
+  const cacheDir =
+    options?.cacheDir === undefined
+      ? undefined
+      : path.resolve(root, options.cacheDir);
+  const key = cacheDir === undefined ? root : `${root}\0${cacheDir}`;
+  let pending = memoized.get(key);
 
   if (!pending) {
-    pending = resolveComponentIndex({ projectRoot: root }).catch((error) => {
-      console.warn(
-        `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving Carbon CSS unpruned.`,
-      );
-      return undefined;
-    });
-    memoized.set(root, pending);
+    pending = resolveComponentIndex({ projectRoot: root, cacheDir }).catch(
+      (error) => {
+        console.warn(
+          `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving Carbon CSS unpruned.`,
+        );
+        return undefined;
+      },
+    );
+    memoized.set(key, pending);
   }
 
   return pending;

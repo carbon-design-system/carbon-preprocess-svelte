@@ -173,7 +173,10 @@ export default class OptimizeCssPlugin {
               return;
             }
 
-            const components = await loadComponentIndex(compiler.context);
+            const components = await loadComponentIndex(
+              compiler.context,
+              options,
+            );
             // Already warned; leave this compilation's CSS unpruned.
             if (!components) return;
 

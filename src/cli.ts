@@ -29,6 +29,8 @@ Options:
                           Keep every IBM Plex @font-face rule.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
+  --cache-dir <dir>       Directory for the component index cache, relative to
+                          --cwd. Default: node_modules/.cache/carbon-preprocess-svelte
   --dry-run               Print sizes, write nothing.
   --report                Print detected components and allowlist summary.
   --silent                Suppress the per-file size log.
@@ -51,6 +53,7 @@ async function main() {
       safelist: { type: "string", multiple: true },
       "preserve-all-ibm-fonts": { type: "boolean" },
       cwd: { type: "string" },
+      "cache-dir": { type: "string" },
       "dry-run": { type: "boolean" },
       report: { type: "boolean" },
       silent: { type: "boolean" },
@@ -114,7 +117,9 @@ async function main() {
     );
   }
 
-  const index = await loadComponentIndex(cwd);
+  const index = await loadComponentIndex(cwd, {
+    cacheDir: values["cache-dir"],
+  });
   // Already warned; leave every file unpruned.
   if (!index) return;
 

@@ -83,6 +83,59 @@ describe("resolveComponentIndex", () => {
     );
   });
 
+  test("`cacheDir` replaces the default location, resolved from the project root", () => {
+    const fileName = `${CARBON_VERSION}_${OWN_VERSION}.json`;
+
+    expect(
+      componentIndexCacheFile(
+        carbonRoot,
+        CARBON_VERSION,
+        project.root,
+        ".ci-cache/carbon",
+      ),
+    ).toBe(path.join(project.root, ".ci-cache", "carbon", fileName));
+
+    const absolute = path.join(project.root, "elsewhere");
+    expect(
+      componentIndexCacheFile(
+        carbonRoot,
+        CARBON_VERSION,
+        project.root,
+        absolute,
+      ),
+    ).toBe(path.join(absolute, fileName));
+  });
+
+  test("`cacheDir`: the cache is written there and read back from there", async () => {
+    const cacheDir = path.join(project.root, ".ci-cache");
+    const configured = componentIndexCacheFile(
+      carbonRoot,
+      CARBON_VERSION,
+      project.root,
+      ".ci-cache",
+    );
+
+    const cold = await resolveComponentIndex({
+      projectRoot: project.root,
+      cacheDir: ".ci-cache",
+    });
+
+    expect(cold).toEqual(components);
+    expect(readdirSync(cacheDir)).toEqual([path.basename(configured)]);
+    expect(JSON.parse(await Bun.file(configured).text())).toEqual(cold);
+    expect(existsSync(cacheFile)).toBe(false);
+
+    const tampered = { Button: { path: "cached.svelte", classes: [".bx--x"] } };
+    writeFileSync(configured, JSON.stringify(tampered));
+
+    const warm = await resolveComponentIndex({
+      projectRoot: project.root,
+      cacheDir: ".ci-cache",
+    });
+
+    expect(warm).toEqual(tampered);
+  });
+
   test("cold: builds from the installed Carbon, matches a direct build, writes the cache", async () => {
     expect(existsSync(cacheFile)).toBe(false);
 
@@ -210,6 +263,33 @@ describe("loadComponentIndex", () => {
       expect(loadComponentIndex(`${project.root}/`)).toBe(first);
       expect(loadComponentIndex()).not.toBe(first);
       expect(await first).toEqual(components);
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("is memoized per cache directory", async () => {
+    const project = createFakeProject();
+    project.linkCarbon();
+
+    try {
+      const first = loadComponentIndex(project.root, { cacheDir: "a" });
+
+      expect(
+        loadComponentIndex(project.root, {
+          cacheDir: path.join(project.root, "a"),
+        }),
+      ).toBe(first);
+      const other = loadComponentIndex(project.root, { cacheDir: "b" });
+      const fallback = loadComponentIndex(project.root);
+      expect(other).not.toBe(first);
+      expect(fallback).not.toBe(first);
+      // Settle every pending build before `dispose` removes the project.
+      await Promise.all([other, fallback]);
+      expect(await first).toEqual(components);
+      expect(readdirSync(path.join(project.root, "a"))).toEqual([
+        `${CARBON_VERSION}_${OWN_VERSION}.json`,
+      ]);
     } finally {
       project.dispose();
     }

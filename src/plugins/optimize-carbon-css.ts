@@ -9,7 +9,7 @@ import { collectCarbonTokens, scanContent } from "./scan-content";
 
 type OptimizeCarbonCssOptions = Pick<
   OptimizeCssOptions,
-  "safelist" | "content" | "preserveAllIBMFonts"
+  "safelist" | "content" | "preserveAllIBMFonts" | "cacheDir"
 > & {
   /**
    * Carbon components used by the app, as names (`"Button"`) or paths to
@@ -48,7 +48,7 @@ export async function optimizeCarbonCss(
     return { css: toCssString(css), removed: 0 };
   }
 
-  const components = await loadComponentIndex(options.cwd);
+  const components = await loadComponentIndex(options.cwd, options);
   // Already warned; return the CSS unpruned.
   if (!components) return { css: toCssString(css), removed: 0 };
 

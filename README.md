@@ -424,6 +424,14 @@ optimizeCss({
    * @default true
    */
   scanModules: false,
+
+  /**
+   * Directory the component index cache is written to, relative to the
+   * project root. Point it at a directory your CI restores between runs.
+   * See [Component index](#component-index).
+   * @default "node_modules/.cache/carbon-preprocess-svelte"
+   */
+  cacheDir: ".cache/carbon-preprocess-svelte",
 });
 ```
 
@@ -563,6 +571,13 @@ optimizeCarbonCss(css, {
    * @default undefined
    */
   content: ["src/**/*.{svelte,js,ts}"],
+
+  /**
+   * Directory the component index cache is written to, relative to `cwd`.
+   * See [Component index](#component-index).
+   * @default "node_modules/.cache/carbon-preprocess-svelte"
+   */
+  cacheDir: ".cache/carbon-preprocess-svelte",
 });
 ```
 
@@ -634,6 +649,8 @@ Options:
                           Keep every IBM Plex @font-face rule.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
+  --cache-dir <dir>       Directory for the component index cache, relative to
+                          --cwd. Default: node_modules/.cache/carbon-preprocess-svelte
   --dry-run               Print sizes, write nothing.
   --report                Print detected components and allowlist summary.
   --silent                Suppress the per-file size log.
@@ -646,9 +663,28 @@ The CSS tools (`optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, and the 
 
 - Carbon's source is parsed with `svelte/compiler`, resolved from your project.
 - The index is built once (well under a second) and cached at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`. Bumping either package rebuilds it. A `carbon-components-svelte` linked from a local checkout (`bun link`, `npm link`, `workspace:`) isn't cached, so edits to its source are picked up on the next build.
+- Set `cacheDir` (`--cache-dir` for the CLI) to cache it somewhere else, relative to the project root. Anything that wipes `node_modules` (`npm ci`, a fresh CI runner, a Docker build without a cache mount) drops the default cache, and every such build re-indexes Carbon. A `cacheDir` your CI restores avoids that. The file name carries both versions, so a restored cache from an older install is never reused.
 - If it can't be built (for example, `carbon-components-svelte` or `svelte` can't be resolved), the build logs a warning and leaves Carbon CSS unpruned instead of failing.
 
 `optimizeImports` doesn't use this index: it reads import paths from Carbon's `src/index.js` directly.
+
+### Caching the index in CI
+
+```js
+// vite.config.js
+optimizeCss({ cacheDir: ".cache/carbon-preprocess-svelte" });
+```
+
+```yaml
+# GitHub Actions
+- uses: actions/cache@v4
+  with:
+    path: .cache/carbon-preprocess-svelte
+    key: carbon-index-${{ hashFiles('package-lock.json') }}
+    restore-keys: carbon-index-
+```
+
+Add the directory to `.gitignore`. A file for an older version pair stays behind after an upgrade (about 130 kB each) and is never read again, so clearing the directory now and then is enough.
 
 ## Examples
 
