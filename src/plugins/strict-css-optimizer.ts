@@ -49,7 +49,7 @@ function mayHaveFlatpickr(selector: string): boolean {
 /**
  * Anything the optimizer could remove: Carbon (`bx-`) selectors, flatpickr
  * selectors and keyframes, and IBM Plex `@font-face` rules. A stylesheet
- * with none of these is returned untouched without a PostCSS round-trip.
+ * with none of these is returned untouched without a parse.
  */
 const OPTIMIZABLE_CSS = new RegExp(
   `bx-|flatpickr|IBM Plex|${[...FLATPICKR_KEYFRAMES, ...FLATPICKR_CLASS_NAMES].join("|")}`,

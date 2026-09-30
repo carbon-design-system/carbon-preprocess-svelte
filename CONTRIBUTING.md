@@ -13,7 +13,7 @@ If you're not sure what to build or how to approach a change, [file an issue](ht
 
 [Bun](https://bun.sh/) is the package manager, test runner, and bundler. There is no separate Node toolchain for development. Run package scripts with `bun run <script>` and one-off binaries with `bunx <bin>`.
 
-The package has no runtime dependencies. Everything it needs (`postcss`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. The one thing that is neither bundled nor declared is `svelte/compiler`: the component index parses Carbon's source with it, so [`src/indexer/svelte-parser.ts`](src/indexer/svelte-parser.ts) loads it through a dynamic `import()` that runs only when an index is actually built, resolved from the consuming project first and this package's install location second. `scripts/build.ts` fails the build if a static `from "svelte…"` import ever lands in `dist/`. `carbon-components-svelte` is _also_ a `devDependency`, for tests and benchmarks; the published package reads the consumer's install instead.
+The package has no runtime dependencies. Everything it needs (`caligula`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. The one thing that is neither bundled nor declared is `svelte/compiler`: the component index parses Carbon's source with it, so [`src/indexer/svelte-parser.ts`](src/indexer/svelte-parser.ts) loads it through a dynamic `import()` that runs only when an index is actually built, resolved from the consuming project first and this package's install location second. `scripts/build.ts` fails the build if a static `from "svelte…"` import ever lands in `dist/`. `carbon-components-svelte` is _also_ a `devDependency`, for tests and benchmarks; the published package reads the consumer's install instead.
 
 ## Project set-up
 
@@ -173,7 +173,7 @@ After an optimizer change or a Carbon bump, regenerate and **review the `.report
 bun run test:fixtures:update
 ```
 
-Shared helpers (`buildAllowlist`, `matchesAllowlist`, `shouldKeepStrictSelector`, `resolveCarbonCss`, `prettifyCss`) live in [`tests/helpers/carbon-css.ts`](tests/helpers/carbon-css.ts). They mirror production matching logic so the test can re-derive what the optimizer should have done.
+Shared helpers (`buildAllowlist`, `matchesAllowlist`, `shouldKeepStrictSelector`, `resolveCarbonCss`) live in [`tests/helpers/carbon-css.ts`](tests/helpers/carbon-css.ts). They mirror production matching logic so the test can re-derive what the optimizer should have done.
 
 ### End-to-end tests
 
