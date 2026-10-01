@@ -4,7 +4,7 @@ import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
 import { CarbonSvelte } from "../constants";
 import type { ComponentIndex } from "./build-index";
-import { buildComponentIndex, resolveCarbonRoot } from "./build-index";
+import { resolveCarbonRoot } from "./resolve-carbon-root";
 
 const LOG_PREFIX = "[carbon-preprocess-svelte]";
 
@@ -76,10 +76,7 @@ async function writeCache(
 }
 
 export type ComponentIndexOptions = {
-  /**
-   * Directory the installed `carbon-components-svelte` and `svelte/compiler`
-   * are resolved from.
-   */
+  /** Directory the installed `carbon-components-svelte` is resolved from. */
   projectRoot?: string;
 };
 
@@ -138,10 +135,10 @@ export async function resolveComponentIndex(
   const cached = cacheFile && (await readCache(cacheFile));
   if (cached) return cached;
 
-  const index = await buildComponentIndex({
-    carbonRoot,
-    projectRoot: options?.projectRoot,
-  });
+  // Loaded only on a cache miss: the indexer bundles a Svelte parser that a
+  // build reading a cached index never needs.
+  const { buildComponentIndex } = await import("./build-index");
+  const index = await buildComponentIndex({ carbonRoot });
 
   if (!isComponentIndex(index)) {
     throw new Error(
@@ -158,8 +155,7 @@ const memoized = new Map<string, Promise<ComponentIndex | undefined>>();
 /**
  * The component index every CSS entry point prunes against, or `undefined`
  * with a warning when it can't be built (unresolvable
- * `carbon-components-svelte` or `svelte/compiler`, unexpected Carbon `src`
- * layout, etc.). Callers then leave CSS unpruned: a bigger stylesheet is
+ * `carbon-components-svelte`, unexpected Carbon `src` layout, etc.). Callers then leave CSS unpruned: a bigger stylesheet is
  * safe, while pruning against an index for some other Carbon version drops
  * rules the installed markup still uses (#213).
  *

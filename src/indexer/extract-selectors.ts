@@ -1,10 +1,10 @@
+import { type AST, walk } from "sveast";
 import {
   extractCarbonClassTokens,
   extractRuntimeClassesFromSource,
-  resolveRelativeImport,
+  relativeImports,
 } from "./extract-runtime-classes";
-import type { SvelteParser } from "./svelte-parser";
-import { type ANode, walk } from "./walk";
+import { parse } from "./parser";
 
 const WHITESPACE_REGEX = /\s+/;
 const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
@@ -12,7 +12,6 @@ const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
 type ExtractSelectorsProps = {
   code: string;
   filename: string;
-  parse: SvelteParser;
 };
 
 export type ExtractFromSvelteResult = {
@@ -31,7 +30,7 @@ export type ExtractFromSvelteResult = {
 
 /** Classes a string or template literal node names; `[]` for any other node. */
 function literalClasses(
-  node: ANode,
+  node: AST.SvelteNode,
   options?: { skipLookups?: boolean },
 ): string[] {
   if (node.type === "Literal" && typeof node.value === "string") {
@@ -43,67 +42,38 @@ function literalClasses(
   return [];
 }
 
-function nodeContainsDefaultSlot(node: {
-  type?: string;
-  name?: string;
-  fragment?: { nodes?: unknown[] };
-  children?: unknown[];
-}): boolean {
-  if (
-    node.type === "Slot" ||
-    node.type === "SlotElement" ||
-    (node.type === "Element" && node.name === "slot")
-  ) {
-    return true;
-  }
-
-  const children = node.fragment?.nodes ?? node.children ?? [];
-
-  for (const child of children) {
-    if (
-      child &&
-      typeof child === "object" &&
-      nodeContainsDefaultSlot(child as typeof node)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 export function extractFromSvelte(
   props: ExtractSelectorsProps,
 ): ExtractFromSvelteResult {
-  const { code, filename, parse } = props;
+  const { code, filename } = props;
   const moduleKey = filename.replace(/\\/g, "/");
-  const ast = parse(code, { filename });
+  const ast = parse(code, { comments: false });
   const selectors = new Set<string>();
   const components = new Set<string>();
-  const slotWrappers: string[] = [];
-  const imports: string[] = [];
+  const slotWrappers = new Set<string>();
+  const moduleClasses = new Set<string>();
+  // Elements with `bx--` class directives the walk is inside of. A `<slot>`
+  // anywhere under one, in any branch, makes its classes wrap slotted content.
+  const openWrappers: { node: AST.SvelteNode; classes: string[] }[] = [];
 
   walk(ast, {
     enter(node) {
-      if (node.type === "ImportDeclaration" && node.source?.value) {
-        const resolved = resolveRelativeImport(
-          moduleKey,
-          String(node.source.value),
-        );
-        if (resolved) {
-          imports.push(resolved);
-        }
+      if (node.type === "Component") {
+        components.add(node.name);
       }
 
-      if (node.type === "InlineComponent") {
-        if (node.name === "svelte:component") {
-          components.add(node.expression.name);
-        } else {
-          components.add(node.name);
-        }
+      if (
+        node.type === "SvelteComponent" &&
+        node.expression.type === "Identifier"
+      ) {
+        components.add(node.expression.name);
       }
 
-      if (node.type === "Attribute" && node.name === "class" && node.value) {
+      if (
+        node.type === "Attribute" &&
+        node.name === "class" &&
+        Array.isArray(node.value)
+      ) {
         for (const value of node.value) {
           if (value.type !== "Text") continue;
           for (const selector of value.data
@@ -114,7 +84,7 @@ export function extractFromSvelte(
         }
       }
 
-      if (node.type === "Class") {
+      if (node.type === "ClassDirective") {
         selectors.add(node.name);
       }
 
@@ -130,23 +100,35 @@ export function extractFromSvelte(
         selectors.add(cls);
       }
 
-      if (node.type === "Element") {
-        const wrapperClasses: string[] = [];
-
-        for (const attribute of node.attributes ?? []) {
-          if (attribute.type === "Class" && attribute.name.startsWith("bx--")) {
-            wrapperClasses.push(`.${attribute.name}`);
+      if (node.type === "RegularElement" || node.type === "SvelteElement") {
+        const classes: string[] = [];
+        for (const attribute of node.attributes) {
+          if (
+            attribute.type === "ClassDirective" &&
+            attribute.name.startsWith("bx--")
+          ) {
+            classes.push(`.${attribute.name}`);
           }
         }
+        if (classes.length > 0) {
+          openWrappers.push({ node, classes });
+        }
+      }
 
-        if (wrapperClasses.length > 0 && nodeContainsDefaultSlot(node)) {
-          slotWrappers.push(...wrapperClasses);
+      if (node.type === "SlotElement") {
+        for (const wrapper of openWrappers) {
+          for (const cls of wrapper.classes) {
+            slotWrappers.add(cls);
+          }
         }
       }
     },
+    leave(node) {
+      if (node === openWrappers.at(-1)?.node) {
+        openWrappers.pop();
+      }
+    },
   });
-
-  const moduleClasses = new Set<string>();
 
   if (ast.module) {
     walk(ast.module, {
@@ -168,8 +150,15 @@ export function extractFromSvelte(
   return {
     classes: [...new Set(classes)],
     components: [...new Set(components)],
-    slotWrappers: [...new Set(slotWrappers)],
-    imports: [...new Set(imports)],
+    slotWrappers: [...slotWrappers],
+    imports: [
+      ...new Set(
+        relativeImports(
+          [ast.module?.content, ast.instance?.content],
+          moduleKey,
+        ),
+      ),
+    ],
     runtimeClasses: extractRuntimeClassesFromSource(code),
     moduleClasses: [...moduleClasses],
   };
