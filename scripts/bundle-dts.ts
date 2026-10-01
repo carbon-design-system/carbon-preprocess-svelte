@@ -54,7 +54,9 @@ function emitDeclarations(
     rootDir: srcRoot,
     // Match project ambient types so Node builtins resolve; avoid pulling
     // nothing (`types: []`) which breaks `node:` imports during emit.
-    types: ["bun"],
+    // `svelte` declares `svelte/types/compiler/preprocess` as an ambient
+    // module, which only exists once svelte's types are loaded.
+    types: ["bun", "svelte"],
   };
 
   const files = new Map<string, string>();

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { CarbonSvelte } from "../constants";
+import { readCarbonExports } from "../preprocessors/carbon-exports";
 import { isSvelteFile } from "../utils";
 import {
   extractCssIndexAdditions,
@@ -14,12 +15,10 @@ import { extractFromSvelte } from "./extract-selectors";
 import { listJsAndSvelteFiles } from "./list-files";
 import { mergeSubComponentClasses } from "./merge-sub-component-classes";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
-import { loadSvelteParser } from "./svelte-parser";
-import { walk } from "./walk";
 
 export { resolveCarbonRoot } from "./resolve-carbon-root";
 
-const RELATIVE_SOURCE_PREFIX = /^\.\//;
+const SRC_PREFIX = `${CarbonSvelte.Components}/src/`;
 
 export type ComponentIndex = Record<
   string,
@@ -34,50 +33,33 @@ export type ComponentIndex = Record<
  */
 export async function buildComponentIndex(options?: {
   carbonRoot?: string;
-  /** Directory `svelte/compiler` is resolved from first. */
-  projectRoot?: string;
   onTiming?: (label: string, ms: number) => void;
 }): Promise<ComponentIndex> {
   const emit = options?.onTiming ?? (() => {});
   const carbon_path = options?.carbonRoot ?? resolveCarbonRoot();
   const carbon_src = path.join(carbon_path, "src");
-  const index_js = path.join(carbon_src, "index.js");
-  const [index_file, parse] = await Promise.all([
-    readFile(index_js, "utf8"),
-    loadSvelteParser(options?.projectRoot),
-  ]);
+  // export name -> its defining module, src-relative (Button -> Button/Button.svelte).
+  const exported_modules = new Map<string, string>();
+  for (const [name, target] of readCarbonExports(carbon_path)) {
+    exported_modules.set(name, target.path.slice(SRC_PREFIX.length));
+  }
+  const exported_keys = new Set(exported_modules.values());
 
   type Identifier = string;
   type IdentifierValue = { path: string; classes: string[] };
 
-  const exports_map = new Map<Identifier, null | IdentifierValue>();
-  const internal_components = new Map<Identifier, null | IdentifierValue>();
+  const exports_map = new Map<Identifier, IdentifierValue>();
+  const internal_components = new Map<Identifier, IdentifierValue>();
   const sub_components = new Map<Identifier, Identifier[]>();
   const slot_wrapper_classes = new Map<Identifier, string[]>();
   const module_to_component = new Map<string, string>();
-  // src-relative path -> scanned entry (for re-export lookup).
+  // src-relative path -> scanned entry.
   const file_entries = new Map<string, IdentifierValue>();
-  // export name -> index.js re-export source (filterTreeById -> ./utils/filterTreeNodes).
-  const export_sources = new Map<Identifier, string>();
 
   const moduleGraph: ModuleGraphCache = {
     importsByModule: new Map(),
     runtimeByModule: new Map(),
   };
-
-  walk(parse(`<script>${index_file}</script>`), {
-    enter(node) {
-      if (node.type === "Identifier") {
-        exports_map.set(node.name, null);
-      }
-
-      if (node.type === "ExportNamedDeclaration" && node.source) {
-        for (const specifier of node.specifiers) {
-          export_sources.set(specifier.exported.name, node.source.value);
-        }
-      }
-    },
-  });
 
   const scanStart = performance.now();
   const files = await listJsAndSvelteFiles(carbon_src);
@@ -93,7 +75,7 @@ export async function buildComponentIndex(options?: {
           const file_text = await readFile(path.join(carbon_src, file), "utf8");
           return [
             file,
-            extractFromSvelte({ code: file_text, filename: file, parse }),
+            extractFromSvelte({ code: file_text, filename: file }),
           ] as const;
         }),
       )
@@ -140,61 +122,29 @@ export async function buildComponentIndex(options?: {
       }
     }
 
-    if (exports_map.has(moduleName)) {
-      exports_map.set(moduleName, map);
-      module_to_component.set(moduleKey, moduleName);
-    } else if (isSvelteFile(file)) {
+    if (!exported_keys.has(moduleKey) && isSvelteFile(file)) {
       internal_components.set(moduleName, map);
     }
   }
 
+  for (const [name, moduleKey] of exported_modules) {
+    const entry = file_entries.get(moduleKey);
+    if (!entry) continue;
+    // A copy: aliases of one module merge classes independently.
+    exports_map.set(name, { path: entry.path, classes: [...entry.classes] });
+    module_to_component.set(moduleKey, name);
+  }
+
   emit("component scan", performance.now() - scanStart);
 
-  function resolveSource(source: string): IdentifierValue | undefined {
-    const base = source.replace(RELATIVE_SOURCE_PREFIX, "");
-    for (const candidate of [
-      base,
-      `${base}.js`,
-      `${base}.svelte`,
-      `${base}/index.js`,
-    ]) {
-      const entry = file_entries.get(candidate);
-      if (entry) return entry;
-    }
-    return undefined;
-  }
-
-  // Filename scan only catches exports named after their file (filterTreeNodes).
-  // Look up sibling re-exports from index.js or optimizeImports invents *.svelte.
-  for (const [name, entry] of exports_map.entries()) {
-    if (entry !== null) continue;
-
-    const source = export_sources.get(name);
-    if (!source) continue;
-
-    const resolved = resolveSource(source);
-    if (resolved) {
-      exports_map.set(name, {
-        path: resolved.path,
-        classes: [...resolved.classes],
-      });
-    }
-  }
-
-  const all_components = new Map(
-    [...exports_map, ...internal_components].filter(
-      (entry): entry is [Identifier, IdentifierValue] => entry[1] !== null,
-    ),
-  );
+  const all_components = new Map([...exports_map, ...internal_components]);
 
   mergeSubComponentClasses(sub_components, all_components);
 
   const markup_only_classes = new Map<string, Set<string>>();
 
-  for (const [name, entry] of exports_map.entries()) {
-    if (entry) {
-      markup_only_classes.set(name, new Set(entry.classes));
-    }
+  for (const [name, entry] of exports_map) {
+    markup_only_classes.set(name, new Set(entry.classes));
   }
 
   const [{ context: css_context, orphans: css_orphans }, runtime_classes] =
@@ -220,7 +170,6 @@ export async function buildComponentIndex(options?: {
           carbon_src,
           module_to_component,
           moduleGraph,
-          parse,
         );
         emit("runtime graph", performance.now() - runtimeStart);
         return runtime;
@@ -248,17 +197,11 @@ export async function buildComponentIndex(options?: {
   }
 
   for (const entry of exports_map.values()) {
-    if (entry) {
-      entry.classes.sort((a, b) => a.localeCompare(b));
-    }
+    entry.classes.sort((a, b) => a.localeCompare(b));
   }
 
   const components: ComponentIndex = Object.fromEntries(
-    [...exports_map.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .filter(
-        (entry): entry is [Identifier, IdentifierValue] => entry[1] !== null,
-      ),
+    [...exports_map].sort((a, b) => a[0].localeCompare(b[0])),
   );
 
   emit("total", performance.now() - scanStart);

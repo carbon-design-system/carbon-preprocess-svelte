@@ -13,7 +13,7 @@ If you're not sure what to build or how to approach a change, [file an issue](ht
 
 [Bun](https://bun.sh/) is the package manager, test runner, and bundler. There is no separate Node toolchain for development. Run package scripts with `bun run <script>` and one-off binaries with `bunx <bin>`.
 
-The package has no runtime dependencies. Everything it needs (`caligula`, `magic-string`, `estree-walker`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. The one thing that is neither bundled nor declared is `svelte/compiler`: the component index parses Carbon's source with it, so [`src/indexer/svelte-parser.ts`](src/indexer/svelte-parser.ts) loads it through a dynamic `import()` that runs only when an index is actually built, resolved from the consuming project first and this package's install location second. `scripts/build.ts` fails the build if a static `from "svelte…"` import ever lands in `dist/`. `carbon-components-svelte` is _also_ a `devDependency`, for tests and benchmarks; the published package reads the consumer's install instead.
+The package has no runtime dependencies. Everything it needs (`caligula`, `sveast`, …) is bundled into `dist/` at build time, which is why those packages sit in `devDependencies`. The component index parses Carbon's source with [`sveast`](https://github.com/metonym/sveast), not `svelte/compiler`, so the published package never loads `svelte`: `scripts/build.ts` fails the build if a `from "svelte…"` import ever lands in `dist/`. `carbon-components-svelte` is _also_ a `devDependency`, for tests and benchmarks; the published package reads the consumer's install instead.
 
 ## Project set-up
 
@@ -78,8 +78,8 @@ type ComponentIndex = Record<string, { path: string; classes: string[] }>;
 
 Nothing is checked in or shipped: the index is built at build time from *the consuming project's* installed `carbon-components-svelte`, so it always matches the installed version (#213 was an older install pruned against an index built from a newer one). [`src/indexer/build-index.ts`](src/indexer/build-index.ts) exports `buildComponentIndex()`, the core:
 
-1. Parse `src/index.js` (the barrel) to learn which names are public and how they re-export.
-2. List every `.svelte`/`.js` under `src/` ([`list-files.ts`](src/indexer/list-files.ts), a sorted Node-native walk), parsing markup with `svelte/compiler` + `estree-walker` to pull static classes, sub-components, slot wrappers, and imports.
+1. Read `src/index.js` (the barrel) with [`carbon-exports.ts`](src/preprocessors/carbon-exports.ts), the same resolver `optimizeImports` uses, to map each public name to the module that defines it.
+2. List every `.svelte`/`.js` under `src/` ([`list-files.ts`](src/indexer/list-files.ts), a sorted Node-native walk), parsing each component with `sveast` ([`parser.ts`](src/indexer/parser.ts)) into Svelte's modern AST and walking it with sveast's `walk` to pull static classes, sub-components, slot wrappers, and imports.
 3. Run three extractors. Each one gates what it adds so the index stays tight:
    - [`extract-selectors.ts`](src/indexer/extract-selectors.ts) pulls static `class` attributes and `:global(...)` selectors from markup.
    - [`extract-runtime-classes.ts`](src/indexer/extract-runtime-classes.ts) follows the module import graph from each component: `classList.add/remove/toggle("bx--…")` calls and module-script (`context="module"` / `module`) class literals in `.svelte` modules, and every `bx--` class a `.js` module applies (hoisted constants, class prefixes). So a component that imports a constant hoisted into another component's module script gets its classes without rendering that component. The walk follows all of an imported module's imports, so it can over-include; that only keeps extra rules. Lookup selectors in `.js` (`closest(".bx--modal")`) are skipped, since a shared utility would otherwise hand the looked-up component's classes to every importer.

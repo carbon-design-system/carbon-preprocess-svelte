@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import type { Program } from "sveast";
 import { RE_EXT_SVELTE } from "../constants";
 import { isSvelteFile } from "../utils";
-import type { SvelteParser } from "./svelte-parser";
-import { walk } from "./walk";
+import { parse, parseModule } from "./parser";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;
@@ -65,45 +65,34 @@ export function resolveRelativeImport(
   return `${joined}.js`;
 }
 
-/**
- * `import … from "…"` / `import "…"` sources in a plain JS module. Carbon's
- * utilities are simple enough that this matches a full Svelte-parser walk
- * exactly (checked against every module in carbon-components-svelte) at
- * ~1% of the cost. `.svelte` modules still go through the parser.
- */
-const JS_IMPORT_SOURCE =
-  /\bimport\s*(?:[\w$*{}\s,]+?\s*from\s*)?["']([^"']+)["']/g;
+/** Relative imports among `programs`' statements, as module keys. */
+export function relativeImports(
+  programs: (Program | undefined)[],
+  moduleKey: string,
+): string[] {
+  const imports: string[] = [];
+  for (const program of programs) {
+    for (const node of program?.body ?? []) {
+      if (node.type !== "ImportDeclaration") continue;
+      const resolved = resolveRelativeImport(moduleKey, node.source.value);
+      if (resolved) {
+        imports.push(resolved);
+      }
+    }
+  }
+  return imports;
+}
 
 function collectImportsFromCode(
   code: string,
   moduleKey: string,
   isSvelte: boolean,
-  parse: SvelteParser,
 ): string[] {
-  const imports: string[] = [];
-  const add = (spec: string) => {
-    const resolved = resolveRelativeImport(moduleKey, spec);
-    if (resolved) {
-      imports.push(resolved);
-    }
-  };
-
   if (!isSvelte) {
-    for (const match of code.matchAll(JS_IMPORT_SOURCE)) {
-      add(match[1]);
-    }
-    return imports;
+    return relativeImports([parseModule(code, { comments: false })], moduleKey);
   }
-
-  walk(parse(code, { filename: moduleKey }), {
-    enter(node) {
-      if (node.type === "ImportDeclaration" && node.source?.value) {
-        add(String(node.source.value));
-      }
-    },
-  });
-
-  return imports;
+  const { module, instance } = parse(code, { css: false, comments: false });
+  return relativeImports([module?.content, instance?.content], moduleKey);
 }
 
 export type ModuleGraphCache = {
@@ -174,7 +163,6 @@ export async function buildRuntimeClassMap(
   carbonSrcPath: string,
   moduleToComponent: Map<string, string>,
   cache: ModuleGraphCache,
-  parse: SvelteParser,
 ): Promise<Map<string, Set<string>>> {
   const { importsByModule, runtimeByModule, files } = cache;
   const reachableRuntime = new Map<string, Set<string>>();
@@ -222,12 +210,7 @@ export async function buildRuntimeClassMap(
 
       importsByModule.set(
         resolvedKey,
-        collectImportsFromCode(
-          code,
-          resolvedKey,
-          isSvelteFile(resolvedKey),
-          parse,
-        ),
+        collectImportsFromCode(code, resolvedKey, isSvelteFile(resolvedKey)),
       );
     })();
     loadPromises.set(resolvedKey, load);

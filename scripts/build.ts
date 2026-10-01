@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { $, build } from "bun";
 import { bundleDts } from "./bundle-dts";
 
-const STATIC_SVELTE_IMPORT = /\bfrom\s*["']svelte/;
+const SVELTE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*)["']svelte/;
 const SHEBANG = "#!/usr/bin/env node\n";
 const JS_FILE = /\.js$/;
 const STRIP_PKG_FIELDS = new Set(["devDependencies", "scripts", "files"]);
@@ -85,9 +85,7 @@ async function buildProject() {
     target: "node",
     minify: true,
     splitting: true,
-    // Every consumer already has svelte installed to run its own compiler,
-    // so resolve it at runtime instead of bundling svelte/compiler (and its
-    // acorn dependency) into dist/.
+    // Never bundle svelte: an import of it fails the check below instead.
     external: ["svelte", "svelte/*"],
   });
 
@@ -102,10 +100,10 @@ async function buildProject() {
     return;
   }
 
-  // `svelte/compiler` is loaded only through the component index's dynamic import
-  // (see src/indexer/svelte-parser.ts). A static import would load it when
-  // any consumer loads this package. Scan every emitted file because code
-  // splitting can put the import in a shared chunk.
+  // The component index parses Carbon with the bundled `sveast`, so nothing
+  // in dist/ may import svelte: it would load the consumer's compiler, or
+  // fail where none resolves. Scan every emitted file because code splitting
+  // can put the import in a shared chunk.
   const outFiles = await readdir(outDir);
   const jsFiles = outFiles.filter((file) => JS_FILE.test(file));
   const bundles = await Promise.all(
@@ -114,10 +112,10 @@ async function buildProject() {
       text: await readFile(resolve(outDir, file), "utf8"),
     })),
   );
-  const offender = bundles.find(({ text }) => STATIC_SVELTE_IMPORT.test(text));
+  const offender = bundles.find(({ text }) => SVELTE_IMPORT.test(text));
   if (offender) {
     console.error(
-      `Build failed: dist/${offender.file} statically imports svelte. Import it lazily via loadSvelteParser() instead.`,
+      `Build failed: dist/${offender.file} imports svelte. Parse with sveast instead.`,
     );
     if (!isWatchMode) {
       process.exit(1);

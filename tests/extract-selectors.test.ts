@@ -1,8 +1,6 @@
-import { parse } from "svelte/compiler";
 import { extractFromSvelte } from "../src/indexer/extract-selectors";
 
-const extract = (props: { code: string; filename: string }) =>
-  extractFromSvelte({ ...props, parse });
+const extract = extractFromSvelte;
 
 describe("extractFromSvelte", () => {
   test("extracts single class from class attribute", () => {
@@ -106,10 +104,10 @@ describe("extractFromSvelte", () => {
       ".bx--highlight",
       ".bx--aspect-ratio",
       ".bx--aspect-ratio--",
-      // The walk visits a template's expressions before its quasis.
-      ".bx--b",
+      // The walk visits a template's quasis before its expressions.
       ".bx--a",
       ".bx--c--",
+      ".bx--b",
     ]);
   });
 
@@ -165,5 +163,32 @@ describe("extractFromSvelte", () => {
       filename: "test.svelte",
     });
     expect(result.classes).toEqual([]);
+  });
+  test("treats an element with a bx-- class directive around a slot as a slot wrapper", () => {
+    const result = extract({
+      code: `
+        <button class:bx--btn={true} class:bx--btn--sm={small} class:other={x}>
+          {#if iconOnly}
+            <span class:bx--assistive-text={true}></span>
+          {:else}
+            <slot />
+          {/if}
+        </button>
+        <div class:bx--no-slot={true}><span></span></div>
+      `,
+      filename: "test.svelte",
+    });
+    expect(result.slotWrappers).toEqual([".bx--btn", ".bx--btn--sm"]);
+  });
+
+  test("names a dynamic component only when `this` is an identifier", () => {
+    const result = extract({
+      code: `
+        <svelte:component this={Icon} />
+        <svelte:component this={icons[kind]} />
+      `,
+      filename: "test.svelte",
+    });
+    expect(result.components).toEqual(["Icon"]);
   });
 });
