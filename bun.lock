@@ -13,7 +13,7 @@
         "carbon-components-svelte": "0.112.1",
         "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
         "ostia": "^0.2.7",
-        "sveast": "^0.5.0",
+        "sveast": "^0.7.0",
         "svelte": "^5.57.1",
         "vite": "^8.3.1",
         "webpack": "^5.111.1",
@@ -345,7 +345,7 @@
 
     "supports-color": ["supports-color@8.1.1", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-MpUEN2OodtUzxvKQl72cUF7RQ5EiHsGvSsVG0ia9c5RbWGL2CI4C7EpPS8UTBIplnlzZiNuV56w+FuNxy3ty2Q=="],
 
-    "sveast": ["sveast@0.5.0", "", {}, "sha512-/HmsVbcivoZmUoFKElkVuljGMiKuA3fwOXuwWvLUSLNenF47KpSWThwQC6AYRwqmaHT7pp0l4D7pFFA792unvA=="],
+    "sveast": ["sveast@0.7.0", "", {}, "sha512-GFdbOMuIeKwPpJS+ugUd1ZiW7GHGCA1uLdDpTeTDxeUkSALejcBw5BQDiTAIADwDLgMGKpAA9Zb3xJ9cDiX+Iw=="],
 
     "svelte": ["svelte@5.57.1", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "@jridgewell/sourcemap-codec": "^1.6.0", "@sveltejs/acorn-typescript": "^1.0.13", "@types/estree": "^1.0.9", "acorn": "^8.18.0", "aria-query": "5.3.1", "axobject-query": "^4.1.0", "clsx": "^2.1.1", "devalue": "^5.9.2", "esm-env": "^1.2.1", "esrap": "^2.3.6", "is-reference": "^3.0.3", "locate-character": "^3.0.0", "magic-string": "^0.30.11", "zimmerframe": "^1.1.2" } }, "sha512-Uqj49lWKB+iSSnneuwiYYJ7MZgkB+eXr0LXBhv4uDuAkXqnWmq65Sxflfvp0Lc6MdKjMUxGaeOKWJqz5SNiVIA=="],
 

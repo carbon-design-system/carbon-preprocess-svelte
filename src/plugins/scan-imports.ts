@@ -1,30 +1,31 @@
-const BARREL_IMPORT =
-  /import\s+(type\s+)?\{([^}]*)\}\s*from\s*["']carbon-components-svelte["']/g;
-const DIRECT_IMPORT =
-  /["']carbon-components-svelte\/src\/[^"']*?\/([A-Za-z0-9_]+)\.svelte["']/g;
-const TYPE_PREFIX = /^type\s+/;
-const AS_ALIAS = /\s+as\s+/;
+import { lexImportsExports } from "sveast/lexer";
+import { CarbonSvelte } from "../constants";
+
+const DIRECT_COMPONENT_PATH =
+  /^carbon-components-svelte\/src\/.+\/([A-Za-z0-9_]+)\.svelte$/;
 
 /**
  * Add the Carbon component names imported by `source` to `into`. Handles
  * both the barrel form and the direct-path form `optimizeImports` produces.
- * Type-only imports are skipped.
+ * Type-only imports are skipped. `source` may be a whole `.svelte` file:
+ * the lexer finds the imports in its `<script>` without splitting it out.
  */
 export function collectCarbonImports(source: string, into: Set<string>): void {
-  if (!source.includes("carbon-components-svelte")) return;
+  if (!source.includes(CarbonSvelte.Components)) return;
 
-  for (const match of source.matchAll(BARREL_IMPORT)) {
-    if (match[1]) continue;
+  for (const statement of lexImportsExports(source)) {
+    const from = statement.source?.value;
+    if (statement.kind !== "import" || !from || statement.typeOnly) continue;
 
-    for (const raw of match[2].split(",")) {
-      const specifier = raw.trim();
-      if (!specifier || TYPE_PREFIX.test(specifier)) continue;
-      const name = specifier.split(AS_ALIAS)[0].trim();
-      if (name) into.add(name);
+    if (from === CarbonSvelte.Components) {
+      for (const specifier of statement.specifiers) {
+        if (specifier.kind === "named" && !specifier.typeOnly) {
+          into.add(specifier.imported);
+        }
+      }
+    } else {
+      const direct = DIRECT_COMPONENT_PATH.exec(from);
+      if (direct) into.add(direct[1]);
     }
-  }
-
-  for (const match of source.matchAll(DIRECT_IMPORT)) {
-    into.add(match[1]);
   }
 }

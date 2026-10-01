@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { Program } from "sveast";
+import type { AST } from "sveast";
+import { lexImportsExports } from "sveast/lexer";
 import { RE_EXT_SVELTE } from "../constants";
 import { isSvelteFile } from "../utils";
-import { parse, parseModule } from "./parser";
+import { parse } from "./parser";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;
@@ -65,22 +66,33 @@ export function resolveRelativeImport(
   return `${joined}.js`;
 }
 
-/** Relative imports among `programs`' statements, as module keys. */
-export function relativeImports(
-  programs: (Program | undefined)[],
-  moduleKey: string,
-): string[] {
+/** Relative imports in a module's source, as module keys. */
+function relativeImports(code: string, moduleKey: string): string[] {
   const imports: string[] = [];
-  for (const program of programs) {
-    for (const node of program?.body ?? []) {
-      if (node.type !== "ImportDeclaration") continue;
-      const resolved = resolveRelativeImport(moduleKey, node.source.value);
-      if (resolved) {
-        imports.push(resolved);
-      }
+  for (const statement of lexImportsExports(code)) {
+    if (statement.kind !== "import" || !statement.source) continue;
+    const resolved = resolveRelativeImport(moduleKey, statement.source.value);
+    if (resolved) {
+      imports.push(resolved);
     }
   }
   return imports;
+}
+
+/** Relative imports in a component's `<script>`s, as module keys. */
+export function componentImports(
+  code: string,
+  ast: AST.Root,
+  moduleKey: string,
+): string[] {
+  return [ast.module, ast.instance].flatMap((script) =>
+    script
+      ? relativeImports(
+          code.slice(script.content.start, script.content.end),
+          moduleKey,
+        )
+      : [],
+  );
 }
 
 function collectImportsFromCode(
@@ -89,10 +101,10 @@ function collectImportsFromCode(
   isSvelte: boolean,
 ): string[] {
   if (!isSvelte) {
-    return relativeImports([parseModule(code, { comments: false })], moduleKey);
+    return relativeImports(code, moduleKey);
   }
-  const { module, instance } = parse(code, { css: false, comments: false });
-  return relativeImports([module?.content, instance?.content], moduleKey);
+  const ast = parse(code, { css: false, script: false });
+  return componentImports(code, ast, moduleKey);
 }
 
 export type ModuleGraphCache = {

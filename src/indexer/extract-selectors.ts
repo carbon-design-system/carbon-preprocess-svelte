@@ -1,8 +1,8 @@
-import { type AST, walk } from "sveast";
+import { type AST, walk } from "sveast/walk";
 import {
+  componentImports,
   extractCarbonClassTokens,
   extractRuntimeClassesFromSource,
-  relativeImports,
 } from "./extract-runtime-classes";
 import { parse } from "./parser";
 
@@ -151,14 +151,7 @@ export function extractFromSvelte(
     classes: [...new Set(classes)],
     components: [...new Set(components)],
     slotWrappers: [...slotWrappers],
-    imports: [
-      ...new Set(
-        relativeImports(
-          [ast.module?.content, ast.instance?.content],
-          moduleKey,
-        ),
-      ),
-    ],
+    imports: [...new Set(componentImports(code, ast, moduleKey))],
     runtimeClasses: extractRuntimeClassesFromSource(code),
     moduleClasses: [...moduleClasses],
   };
