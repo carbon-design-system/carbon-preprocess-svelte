@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { lexImportsExports } from "sveast/lexer";
 import { CarbonSvelte } from "../constants";
 
 /** Where a name exported by Carbon's barrel is defined. */
@@ -12,23 +13,34 @@ export type CarbonExport = {
 
 type ReExport = { local: string; source: string };
 
-// `export { a, b as c } from "./x"`, the only form Carbon's barrels use.
-// `[^}]` spans newlines, so multi-line specifier lists match too.
-const RE_EXPORT_REGEX = /export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
-const COMMENT_REGEX = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
-const AS_REGEX = /\s+as\s+/;
+const IDENTIFIER_NAME = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200c\u200d]*$/u;
+
+/** Whether `name` can be written without quotes in an import or export specifier. */
+export function isIdentifierName(name: string): boolean {
+  return IDENTIFIER_NAME.test(name);
+}
 
 /** Hops from the barrel to a definition; Carbon needs at most two. */
 const MAX_HOPS = 8;
 
+/** `export { a, b as c } from "./x"` statements in `file`, by exported name. */
 function readReExports(file: string): Map<string, ReExport> {
-  const code = readFileSync(file, "utf8").replace(COMMENT_REGEX, "");
   const reExports = new Map<string, ReExport>();
 
-  for (const [, specifiers, source] of code.matchAll(RE_EXPORT_REGEX)) {
-    for (const specifier of specifiers.split(",")) {
-      const [local, exported = local] = specifier.trim().split(AS_REGEX);
-      if (local) reExports.set(exported, { local, source });
+  for (const statement of lexImportsExports(readFileSync(file, "utf8"))) {
+    if (statement.kind !== "export" || !statement.source) continue;
+    for (const { kind, local, exported } of statement.specifiers) {
+      if (
+        kind === "named" &&
+        exported !== null &&
+        isIdentifierName(local) &&
+        isIdentifierName(exported)
+      ) {
+        reExports.set(exported, {
+          local,
+          source: statement.source.value,
+        });
+      }
     }
   }
 

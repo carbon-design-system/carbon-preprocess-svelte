@@ -7,4 +7,4 @@ import { typescript } from "sveast/typescript";
  * doesn't matter. TypeScript stays in, so a Carbon release that adds
  * `<script lang="ts">` still parses instead of throwing.
  */
-export const { parse, parseModule } = createParser({ typescript });
+export const { parse } = createParser({ typescript });

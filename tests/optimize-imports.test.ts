@@ -234,6 +234,24 @@ import { toHierarchy } from "carbon-components-svelte/src/utils/toHierarchy.js";
 import { NewComponent } from "carbon-components-svelte";`);
   });
 
+  test("imports in comments and strings are left alone", () => {
+    const content = `// import { Button } from "carbon-components-svelte";
+const example = \`
+import { Button } from "carbon-components-svelte";\`;`;
+    expect(preprocess({ content })).toEqual(content);
+  });
+
+  test("a default or namespace import stays on the barrel next to rewritten names", () => {
+    expect(
+      preprocess({
+        content: `import Carbon, { Button } from "carbon-components-svelte";
+import * as Icons from "carbon-icons-svelte";`,
+      }),
+    ).toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
+import Carbon from "carbon-components-svelte";
+import * as Icons from "carbon-icons-svelte";`);
+  });
+
   test("the script hook resolves synchronously", () => {
     const result = optimizeImports().script({
       attributes: {},

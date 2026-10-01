@@ -1,70 +1,23 @@
 import path from "node:path";
+import { type LexedImport, lexImportsExports } from "sveast/lexer";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { CarbonSvelte } from "../constants";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
-import { type CarbonExport, readCarbonExports } from "./carbon-exports";
+import {
+  type CarbonExport,
+  isIdentifierName,
+  readCarbonExports,
+} from "./carbon-exports";
 
 const LOG_PREFIX = "[carbon-preprocess-svelte]";
 
 const NODE_MODULES_REGEX = /node_modules/;
 
-// Import specifiers can't contain a semicolon, so bounding the clause with
-// `[^;]` keeps the lazy match from ever crossing into a later statement,
-// without needing a stateful parser to find each declaration's extent.
-//
-// Sticky rather than global: `nextImportDeclaration` jumps to each `import`
-// occurrence with `indexOf` and matches at that line's start only, instead of
-// letting the regex crawl the whole script body after the last import.
-const IMPORT_DECLARATION_REGEX =
-  /^([ \t]*)import\s+(type\s+)?(?:([^;]*?)\s+from\s+)?["']([^"']+)["']\s*;?/my;
-
-/** Where multiline `^` matches: after `\n`, `\r`, U+2028, U+2029. */
-function isLineTerminator(code: number): boolean {
-  return code === 10 || code === 13 || code === 0x2028 || code === 0x2029;
-}
-
-/**
- * The next import declaration starting at or after `from`, in the same
- * order a global `^[ \t]*import…` regex would find them: an `import` keyword
- * preceded only by spaces/tabs since its line start.
- */
-function nextImportDeclaration(
-  raw: string,
-  from: number,
-): RegExpExecArray | null {
-  let index = raw.indexOf("import", from);
-
-  while (index !== -1) {
-    let lineStart = index;
-    while (lineStart > from) {
-      const code = raw.charCodeAt(lineStart - 1);
-      if (code !== 32 && code !== 9) break;
-      lineStart--;
-    }
-
-    if (lineStart === 0 || isLineTerminator(raw.charCodeAt(lineStart - 1))) {
-      IMPORT_DECLARATION_REGEX.lastIndex = lineStart;
-      const match = IMPORT_DECLARATION_REGEX.exec(raw);
-      if (match !== null) return match;
-    }
-
-    index = raw.indexOf("import", index + 6);
-  }
-
-  return null;
-}
-const TYPE_SPECIFIER_PREFIX_REGEX = /^type\s+/;
-const AS_ALIAS_REGEX = /\s+as\s+/;
-const WHITESPACE_REGEX = /\s/;
-
-function isWhitespace(code: number): boolean {
-  // ASCII controls/space cover real-world source; anything non-ASCII defers
-  // to the regex so exotic Unicode spaces still trim like `String#trim`.
-  return (
-    code <= 32 ||
-    (code > 127 && WHITESPACE_REGEX.test(String.fromCharCode(code)))
-  );
-}
+const BARRELS = new Set<string>([
+  CarbonSvelte.Components,
+  CarbonSvelte.Icons,
+  CarbonSvelte.Pictograms,
+]);
 
 /**
  * Carbon's barrel exports, read on first use: files that only import icons
@@ -79,71 +32,42 @@ function directImport(local: string, path: string, name: string): string {
   return `import { ${binding} } from "${path}";`;
 }
 
+/** `name`, or `"name"` for an arbitrary-string module export name. */
+function exportName(name: string): string {
+  return isIdentifierName(name) ? name : JSON.stringify(name);
+}
+
 /**
  * Builds the direct-path replacement for one barrel import statement, or
- * returns `null` when nothing in it should change.
- *
- * `optimizeImports` only ever rewrites named specifiers from three known
- * barrel sources, so this only scans the `{ ... }` clause. Default/namespace
- * specifiers are never rewritten, so they're intentionally left alone.
+ * returns `null` when nothing in it should change. Type-only specifiers,
+ * default and namespace imports, and names the installed Carbon's barrel
+ * doesn't export stay on the barrel.
  */
 function rewriteImport(
-  source: string,
-  clause: string | undefined,
+  statement: LexedImport,
   loadExports: CarbonExportsLoader,
 ): string | null {
-  if (
-    source !== CarbonSvelte.Components &&
-    source !== CarbonSvelte.Icons &&
-    source !== CarbonSvelte.Pictograms
-  ) {
+  const source = statement.source?.value;
+  if (source === undefined || statement.typeOnly || !BARRELS.has(source)) {
     return null;
   }
-  if (!clause) return null;
-
-  const open = clause.indexOf("{");
-  if (open === -1) return null;
-  const close = clause.indexOf("}", open + 1);
-  if (close === -1) return null;
 
   let rewritten = "";
-  let preserved = "";
+  const kept: string[] = [];
+  const keptNamed: string[] = [];
 
-  // Walk the comma-separated entries in place: one slice per name instead
-  // of split + trim allocations for every specifier.
-  let index = open + 1;
-  while (index < close) {
-    while (index < close && isWhitespace(clause.charCodeAt(index))) index++;
-    if (index >= close) break;
+  for (const specifier of statement.specifiers) {
+    const local = specifier.local;
 
-    let entryEnd = clause.indexOf(",", index);
-    if (entryEnd === -1 || entryEnd > close) entryEnd = close;
-    let end = entryEnd;
-    while (end > index && isWhitespace(clause.charCodeAt(end - 1))) end--;
-
-    let imported: string;
-    let local: string;
-    let isType = false;
-
-    // Bare `Name` (the overwhelmingly common case) has no inner whitespace;
-    // only `type Name` and `Name as Alias` do.
-    let space = index;
-    while (space < end && !isWhitespace(clause.charCodeAt(space))) space++;
-    if (space === end) {
-      imported = local = clause.slice(index, end);
-    } else {
-      let entry = clause.slice(index, end);
-      isType = TYPE_SPECIFIER_PREFIX_REGEX.test(entry);
-      if (isType) entry = entry.replace(TYPE_SPECIFIER_PREFIX_REGEX, "");
-      const [importedPart, localPart] = entry.split(AS_ALIAS_REGEX);
-      imported = importedPart.trim();
-      local = (localPart ?? importedPart).trim();
+    if (specifier.kind !== "named") {
+      kept.push(specifier.kind === "default" ? local : `* as ${local}`);
+      continue;
     }
 
-    // Per-specifier type imports (`import { type X, Y }`) stay on the
-    // barrel, as do names the installed Carbon's barrel doesn't export.
+    const imported = exportName(specifier.imported);
+    const isType = specifier.typeOnly;
     let replacement: string | undefined;
-    if (!isType) {
+    if (!isType && isIdentifierName(specifier.imported)) {
       if (source !== CarbonSvelte.Components) {
         replacement = `import ${local} from "${source}/lib/${imported}.svelte";`;
       } else {
@@ -153,23 +77,20 @@ function rewriteImport(
     }
 
     if (replacement === undefined) {
-      // Keep specifier for barrel re-import below.
-      if (preserved) preserved += ", ";
-      if (isType) preserved += "type ";
-      preserved += imported === local ? local : `${imported} as ${local}`;
+      const binding = imported === local ? local : `${imported} as ${local}`;
+      keptNamed.push(isType ? `type ${binding}` : binding);
     } else {
       if (rewritten) rewritten += "\n";
       rewritten += replacement;
     }
-
-    index = entryEnd + 1;
   }
 
   if (!rewritten) return null;
 
   // Mixed imports: put preserved names back on the barrel next to rewritten paths.
-  if (preserved) {
-    rewritten += `\nimport { ${preserved} } from "${source}";`;
+  if (keptNamed.length > 0) kept.push(`{ ${keptNamed.join(", ")} }`);
+  if (kept.length > 0) {
+    rewritten += `\nimport ${kept.join(", ")} from "${source}";`;
   }
 
   return rewritten;
@@ -425,30 +346,18 @@ export function transformScript(
   let mappings: MappingsBuilder | undefined;
   let lastIndex = 0;
 
-  let match = nextImportDeclaration(raw, 0);
-  while (match !== null) {
-    const index = match.index;
-    // `match[2]` is the `type` keyword: type-only statements
-    // (`import type { ... }`) never reference a real `.svelte` file, so
-    // leave them entirely untouched.
-    const replacement = match[2]
-      ? null
-      : rewriteImport(match[4], match[3], loadExports);
+  for (const node of lexImportsExports(raw)) {
+    if (node.kind !== "import") continue;
+    const replacement = rewriteImport(node, loadExports);
+    if (replacement === null) continue;
 
-    if (replacement !== null) {
-      const start = index + match[1].length;
-      const end = index + match[0].length;
-      const unchanged = raw.slice(lastIndex, start);
+    const unchanged = raw.slice(lastIndex, node.start);
+    mappings ??= new MappingsBuilder();
+    mappings.copy(unchanged);
+    mappings.replace(replacement, raw, node.start, node.end);
 
-      mappings ??= new MappingsBuilder();
-      mappings.copy(unchanged);
-      mappings.replace(replacement, raw, start, end);
-
-      code += unchanged + replacement;
-      lastIndex = end;
-    }
-
-    match = nextImportDeclaration(raw, index + match[0].length);
+    code += unchanged + replacement;
+    lastIndex = node.end;
   }
 
   // Nothing rewritten: hand the content back as-is. Svelte treats a missing
