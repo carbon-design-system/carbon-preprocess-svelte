@@ -424,6 +424,14 @@ optimizeCss({
    * @default true
    */
   scanModules: false,
+
+  /**
+   * Opt-in features that may change or go away in a minor release.
+   * See "Prop-aware pruning" below.
+   */
+  experimental: {
+    propAware: true,
+  },
 });
 ```
 
@@ -446,6 +454,51 @@ optimizeCss({
 > - **`safelist`**: list selectors (or a `RegExp`) to keep: `safelist: [".bx--grid", /^\.bx--btn--/]`.
 > - **`content`**: scan additional files for literal `bx--` prefixes: `content: ["**/*.{md,html}"]`.
 > - **`report`**: set `report: true` to print which components and tokens were detected, then compare against the class you are missing.
+
+#### Prop-aware pruning (experimental)
+
+By default, importing a component keeps every style it could ever need: all of `Button`'s kinds, sizes, its skeleton, and its icon-only tooltip. `experimental.propAware` also reads the props your app passes and prunes the variants it never uses:
+
+```js
+optimizeCss({ experimental: { propAware: true } });
+```
+
+```svelte
+<Button kind="tertiary">Save</Button>
+<!-- keeps .bx--btn and .bx--btn--tertiary; prunes the other kinds,
+     sizes, .bx--skeleton, and the icon-only tooltip -->
+```
+
+Each `.svelte` file that imports Carbon is read from its source, and each Carbon component is walked with the values its call sites pass. Branches those values rule out (`{#if skeleton}`, `kind === "ghost" && …`, `class:bx--btn--sm={size === "small"}`) are skipped, along with the child components only they render. Values passed by Carbon components to the components they render are followed the same way.
+
+It errs toward keeping styles:
+
+- A prop set from an expression (`kind={kind}`), `bind:`, or a spread (`{...props}`) keeps every value.
+- A component used as a value (`<svelte:component this={Button}>`, passed as a prop, imported in a `.js`/`.ts` file) keeps everything.
+- A component imported but not rendered as a tag (for example, markup another preprocessor generates) keeps everything.
+- If the analysis fails (an unexpected Carbon source, a component in runes mode), the build warns and prunes without it.
+
+Pass an object to tune it:
+
+```js
+optimizeCss({
+  experimental: {
+    propAware: {
+      /** Components that keep every variant's styles. */
+      exclude: ["DataTable"],
+      /**
+       * Values for props set from expressions, by component then prop.
+       * A value the app passes that isn't listed loses its styles.
+       */
+      assume: { Button: { kind: ["primary", "danger"] } },
+    },
+  },
+});
+```
+
+`report: true` prints, per component, the prop values the analysis saw and why any call site kept every variant. The same option works with `OptimizeCssPlugin` and `optimizeCarbonCss` (which reads call sites from `content` and requires it), and as `--experimental-prop-aware` in the CLI.
+
+Across every Carbon component and prop value, plus the example apps in this repo, prop-aware pruning removed 37% more CSS than default pruning, and no class those apps render lost its rules (`bun run eval:prop-aware`). That check covers each app's first render, not states reached through interaction.
 
 ### `OptimizeCssPlugin`
 
@@ -563,6 +616,13 @@ optimizeCarbonCss(css, {
    * @default undefined
    */
   content: ["src/**/*.{svelte,js,ts}"],
+
+  /**
+   * See "Prop-aware pruning" under `optimizeCss`. Reads call sites from the
+   * `content` files, so `content` must cover every file that renders Carbon
+   * components; a listed component no file renders keeps every variant.
+   */
+  experimental: { propAware: true },
 });
 ```
 
@@ -632,6 +692,9 @@ Options:
                           slashes for a RegExp: --safelist "/^\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
+  --experimental-prop-aware
+                          Also prune styles for prop values, slots, and child
+                          components the --content files never use.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
   --dry-run               Print sizes, write nothing.

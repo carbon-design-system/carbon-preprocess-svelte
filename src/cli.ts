@@ -1,6 +1,7 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import type { PropAwareResult } from "./analyzer";
 import { loadComponentIndex } from "./indexer/load-index";
 import { createCssOptimizer } from "./plugins/create-optimized-css";
 import { logAssetDiff } from "./plugins/print-diff";
@@ -27,6 +28,9 @@ Options:
                           slashes for a RegExp: --safelist "/^\\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
+  --experimental-prop-aware
+                          Also prune styles for prop values, slots, and child
+                          components the --content files never use.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
   --dry-run               Print sizes, write nothing.
@@ -50,6 +54,7 @@ async function main() {
       components: { type: "string" },
       safelist: { type: "string", multiple: true },
       "preserve-all-ibm-fonts": { type: "boolean" },
+      "experimental-prop-aware": { type: "boolean" },
       cwd: { type: "string" },
       "dry-run": { type: "boolean" },
       report: { type: "boolean" },
@@ -91,6 +96,8 @@ async function main() {
   // same allowlist inputs the plugins collect from bundler hooks.
   const components = new Set<string>();
   const contentClasses = new Set<string>();
+  const propAware = values["experimental-prop-aware"] === true;
+  const sources: Array<{ file: string; code: string }> = [];
 
   for (const file of globSync(contentGlobs, { cwd })) {
     let text: string;
@@ -101,6 +108,7 @@ async function main() {
     }
     collectCarbonImports(text, components);
     collectCarbonTokens(text, contentClasses);
+    if (propAware) sources.push({ file: path.resolve(cwd, file), code: text });
   }
 
   for (const name of (values.components ?? "").split(",")) {
@@ -121,12 +129,27 @@ async function main() {
   const safelist = parseSafelist(values.safelist ?? []);
   const dryRun = values["dry-run"] === true;
   const silent = values.silent === true;
+
+  const analyzer = propAware ? await import("./analyzer") : undefined;
+  let usage: PropAwareResult | undefined;
+  if (analyzer) {
+    const result = await analyzer.analyzeFiles({
+      projectRoot: cwd,
+      files: sources,
+      components,
+      options: {},
+    });
+    if ("warning" in result) console.warn(result.warning);
+    else usage = result;
+  }
+
   const optimizer = createCssOptimizer({
     components: index,
     ids: components,
     contentClasses,
     safelist,
     preserveAllIBMFonts: values["preserve-all-ibm-fonts"] === true,
+    propAware: usage,
   });
   const assetReports: AssetReport[] = [];
 
@@ -156,6 +179,14 @@ async function main() {
       safelistEntries: safelist.length,
       assets: assetReports,
       dryRun,
+      extra:
+        analyzer && usage
+          ? analyzer.formatPropAwareReport(
+              usage,
+              optimizer.usage.prunedByProps,
+              cwd,
+            )
+          : undefined,
     });
   }
 }

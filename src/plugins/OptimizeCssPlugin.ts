@@ -1,7 +1,12 @@
+import type { PropAwareResult, UsageCollector } from "../analyzer";
 import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createCssOptimizer, isSilent } from "./create-optimized-css";
+import {
+  createCssOptimizer,
+  isSilent,
+  propAwareOptions,
+} from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
@@ -104,12 +109,15 @@ export default class OptimizeCssPlugin {
     } = compiler;
     const options = this.options;
     const silent = isSilent(options);
+    const propAware = propAwareOptions(options);
 
     compiler.hooks.thisCompilation.tap(
       OptimizeCssPlugin.name,
       (compilation) => {
         const ids = new Set<string>();
         const moduleClasses = new Set<string>();
+        /** `[resource, code]` of every module that may render Carbon. */
+        const propAwareModules: Array<[string, string]> = [];
         const warn = (message: string) => {
           if (!silent) compilation.warnings.push(new WebpackError(message));
         };
@@ -131,19 +139,20 @@ export default class OptimizeCssPlugin {
                 continue;
               }
 
-              if (
-                options.scanModules !== false &&
-                isScannableModule(resource)
-              ) {
-                let source: string | Buffer | undefined;
-                try {
-                  source = module.originalSource?.()?.source();
-                } catch {
-                  // Some module types throw when asked for a source.
-                }
-                if (typeof source === "string" || Buffer.isBuffer(source)) {
-                  collectCarbonTokens(source.toString(), moduleClasses);
-                }
+              if (!isScannableModule(resource)) continue;
+              const scan = options.scanModules !== false;
+              if (!(scan || propAware)) continue;
+
+              let source: string | Buffer | undefined;
+              try {
+                source = module.originalSource?.()?.source();
+              } catch {
+                // Some module types throw when asked for a source.
+              }
+              if (typeof source === "string" || Buffer.isBuffer(source)) {
+                const code = source.toString();
+                if (scan) collectCarbonTokens(code, moduleClasses);
+                if (propAware) propAwareModules.push([resource, code]);
               }
             }
           },
@@ -186,11 +195,34 @@ export default class OptimizeCssPlugin {
             if (warning) warn(warning);
 
             const contentClasses = scan.classes;
+
+            const analyzer = propAware
+              ? await import("../analyzer")
+              : undefined;
+            let usage: PropAwareResult | undefined;
+            if (analyzer && propAware) {
+              let collector: UsageCollector | undefined;
+              try {
+                collector = analyzer.createUsageCollector(compiler.context);
+              } catch (error) {
+                warn(
+                  `carbon-preprocess-svelte: experimental.propAware is off for this build (${(error as Error).message}).`,
+                );
+              }
+              for (const [resource, code] of propAwareModules) {
+                collector?.add(resource, code);
+              }
+              const result = await collector?.analyze(ids, propAware);
+              if (result && "warning" in result) warn(result.warning);
+              else usage = result;
+            }
+
             const optimizer = createCssOptimizer({
               ...options,
               components,
               ids,
               contentClasses: [...contentClasses, ...moduleClasses],
+              propAware: usage,
             });
             const assetReports: AssetReport[] = [];
 
@@ -228,6 +260,14 @@ export default class OptimizeCssPlugin {
                 safelistEntries: options.safelist?.length ?? 0,
                 assets: assetReports,
                 dryRun: options.dryRun,
+                extra:
+                  analyzer && usage
+                    ? analyzer.formatPropAwareReport(
+                        usage,
+                        optimizer.usage.prunedByProps,
+                        compiler.context,
+                      )
+                    : undefined,
               });
             }
           },

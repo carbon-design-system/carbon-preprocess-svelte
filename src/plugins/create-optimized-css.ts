@@ -1,5 +1,6 @@
 import path from "node:path";
-import { ALWAYS_ON_CLASSES } from "../constants";
+import type { PropAwareOptions } from "../analyzer/analyze-usage";
+import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import {
   type SpliceOptimizerOptions,
@@ -101,6 +102,46 @@ export type OptimizeCssOptions = {
    * @default true
    */
   scanModules?: boolean;
+
+  /**
+   * Opt-in features that may change or go away in a minor release.
+   */
+  experimental?: {
+    /**
+     * Also prune Carbon rules for prop values, slots, and child components
+     * the app never uses. With only `<Button kind="tertiary">`, the
+     * tertiary styles stay and the other kinds, sizes, the skeleton and the
+     * icon-only tooltip go.
+     *
+     * Each `.svelte` file that imports Carbon is analyzed from its source.
+     * A prop the analysis can't read (an expression, a spread, `bind:`)
+     * keeps every value, and a component used as a value keeps
+     * everything. If the analysis fails, CSS is pruned as without this
+     * option, with a warning.
+     *
+     * Pass an object to `exclude` components or `assume` values for
+     * props set from expressions.
+     * @default false
+     */
+    propAware?: boolean | PropAwareOptions;
+  };
+};
+
+/** `experimental.propAware`'s options, or `undefined` when it's off. */
+export function propAwareOptions(
+  options?: OptimizeCssOptions,
+): PropAwareOptions | undefined {
+  const propAware = options?.experimental?.propAware;
+  if (!propAware) return undefined;
+  return propAware === true ? {} : propAware;
+}
+
+/** What `experimental.propAware` found, as the optimizer consumes it. */
+export type PropAwareUsage = {
+  /** Names of the Carbon components that can render (`Button`, `ButtonSkeleton`). */
+  liveComponents: Set<string>;
+  /** Whether no rendered component can apply `cls` under the app's props. */
+  isPruned(cls: string): boolean;
 };
 
 /**
@@ -124,6 +165,8 @@ type CreateOptimizedCssOptions = OptimizeCssOptions & {
    * the allowlist with imported component classes.
    */
   contentClasses?: Iterable<string>;
+  /** Set by `experimental.propAware`. */
+  propAware?: PropAwareUsage;
 };
 
 /**
@@ -138,6 +181,7 @@ function buildUsage(
   componentIndex: ComponentIndex,
   ids: Iterable<string>,
   contentClasses?: Iterable<string>,
+  liveComponents?: Set<string>,
 ): {
   allowlist: Set<string>;
   preserveFlatpickr: boolean;
@@ -149,6 +193,8 @@ function buildUsage(
 
   for (const id of ids) {
     const { name } = path.parse(id);
+    // Bundled, but only rendered from branches the app's props rule out.
+    if (liveComponents && !liveComponents.has(name)) continue;
 
     if (name === "DatePicker") {
       preserveFlatpickr = true;
@@ -195,6 +241,41 @@ export function toCssString(
   ).toString();
 }
 
+const NEVER_PRUNED = new Set<string>([
+  ...ALWAYS_ON_CLASSES,
+  ...CONTEXT_ANCESTORS,
+]);
+
+/**
+ * `propAware.isPruned`, except for classes the app's own code names
+ * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class it
+ * prunes in `pruned`.
+ */
+function createPrunedCheck(
+  propAware: PropAwareUsage,
+  contentClasses: Iterable<string> | undefined,
+  pruned: Set<string>,
+): (cls: string) => boolean {
+  const exact = new Set<string>();
+  const prefixes: string[] = [];
+  for (const cls of contentClasses ?? []) {
+    if (cls.endsWith("-")) prefixes.push(cls);
+    else exact.add(cls);
+  }
+  return (cls) => {
+    if (
+      NEVER_PRUNED.has(cls) ||
+      exact.has(cls) ||
+      prefixes.some((prefix) => cls.startsWith(prefix)) ||
+      !propAware.isPruned(cls)
+    ) {
+      return false;
+    }
+    pruned.add(cls);
+    return true;
+  };
+}
+
 export function createCssOptimizer(
   options: Omit<CreateOptimizedCssOptions, "source">,
 ) {
@@ -202,17 +283,26 @@ export function createCssOptimizer(
     options.components,
     options.ids,
     options.contentClasses,
+    options.propAware?.liveComponents,
   );
+  const prunedByProps = new Set<string>();
   const optimizerOptions: SpliceOptimizerOptions = {
     allowlist,
     components: options.components,
     preserveAllIBMFonts: options.preserveAllIBMFonts === true,
     preserveFlatpickr,
     safelist: options.safelist ?? [],
+    isPruned:
+      options.propAware &&
+      createPrunedCheck(
+        options.propAware,
+        options.contentClasses,
+        prunedByProps,
+      ),
   };
 
   return {
-    usage: { components, allowlistSize: allowlist.size },
+    usage: { components, allowlistSize: allowlist.size, prunedByProps },
     run(source: CreateOptimizedCssOptions["source"]): OptimizedCssReport {
       // Bundlers hand every CSS asset to the plugin, including per-route
       // chunks with no Carbon styles at all. Parsing and re-serializing

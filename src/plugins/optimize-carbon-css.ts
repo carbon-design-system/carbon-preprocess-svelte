@@ -1,15 +1,19 @@
+import { globSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { loadComponentIndex } from "../indexer/load-index";
 import {
   type OptimizeCssOptions,
   type OptimizedCssReport,
   optimizeCssWithReport,
+  type PropAwareUsage,
+  propAwareOptions,
   toCssString,
 } from "./create-optimized-css";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 
 type OptimizeCarbonCssOptions = Pick<
   OptimizeCssOptions,
-  "safelist" | "content" | "preserveAllIBMFonts"
+  "safelist" | "content" | "preserveAllIBMFonts" | "experimental"
 > & {
   /**
    * Carbon components used by the app, as names (`"Button"`) or paths to
@@ -66,5 +70,44 @@ export async function optimizeCarbonCss(
     contentClasses,
     safelist: options.safelist,
     preserveAllIBMFonts: options.preserveAllIBMFonts,
+    propAware: await analyzePropAware(options, ids),
   });
+}
+
+/**
+ * `experimental.propAware` reads call sites from the `content` files, so it
+ * needs them; without `content` it's skipped with a warning.
+ */
+async function analyzePropAware(
+  options: OptimizeCarbonCssOptions,
+  ids: string[],
+): Promise<PropAwareUsage | undefined> {
+  const propAware = propAwareOptions(options);
+  if (!propAware) return undefined;
+  const cwd = path.resolve(options.cwd ?? process.cwd());
+  if (!options.content || options.content.length === 0) {
+    console.warn(
+      "carbon-preprocess-svelte: experimental.propAware needs `content` globs covering every file that renders Carbon components; CSS was pruned without it.",
+    );
+    return undefined;
+  }
+  const files: Array<{ file: string; code: string }> = [];
+  for (const file of globSync(options.content, { cwd })) {
+    const absolute = path.resolve(cwd, file);
+    try {
+      files.push({ file: absolute, code: readFileSync(absolute, "utf8") });
+    } catch {
+      // A directory, or gone since the glob ran.
+    }
+  }
+  const { analyzeFiles } = await import("../analyzer");
+  const result = await analyzeFiles({
+    projectRoot: cwd,
+    files,
+    components: ids,
+    options: propAware,
+  });
+  if (!("warning" in result)) return result;
+  console.warn(result.warning);
+  return undefined;
 }

@@ -23,6 +23,8 @@ export type OptimizeCssReportInput = {
   safelistEntries: number;
   assets: AssetReport[];
   dryRun?: boolean;
+  /** Lines printed after the asset table (`experimental.propAware`). */
+  extra?: string[];
 };
 
 /** Byte counts for one asset, from a string or Uint8Array source. */
@@ -63,6 +65,7 @@ export function printReport(input: OptimizeCssReportInput): void {
     safelistEntries,
     assets,
     dryRun,
+    extra,
   } = input;
 
   console.log("");
@@ -100,4 +103,6 @@ export function printReport(input: OptimizeCssReportInput): void {
       `    ${id}${COLUMN_GAP}${statuses[index]}${COLUMN_GAP}${sizes[index]}`,
     );
   }
+
+  for (const line of extra ?? []) console.log(line);
 }

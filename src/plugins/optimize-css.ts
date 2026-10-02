@@ -1,4 +1,5 @@
 import type { Plugin, Rollup } from "vite";
+import type { PropAwareResult, UsageCollector } from "../analyzer";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
@@ -6,6 +7,7 @@ import type { OptimizeCssOptions } from "./create-optimized-css";
 import {
   createCssOptimizer,
   isSilent,
+  propAwareOptions,
   toCssString,
 } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
@@ -69,6 +71,11 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const moduleClasses = new Map<string, Set<string>>();
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
   let components: ComponentIndex | undefined;
+  const propAware = propAwareOptions(options);
+  /** Call sites per module for `experimental.propAware`. */
+  let collector: UsageCollector | undefined;
+  /** Loaded in `buildStart`, so `transform` stays synchronous. */
+  let analyzer: typeof import("../analyzer") | undefined;
 
   return {
     name: "vite:carbon:optimize-css",
@@ -97,6 +104,18 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     async buildStart() {
       contentClasses = undefined;
       components = await loadComponentIndex(root);
+      if (propAware && !collector) {
+        analyzer = await import("../analyzer");
+        try {
+          collector = analyzer.createUsageCollector(root);
+        } catch (error) {
+          if (!silent) {
+            this.warn(
+              `carbon-preprocess-svelte: experimental.propAware is off for this build (${(error as Error).message}).`,
+            );
+          }
+        }
+      }
     },
     /**
      * The transform hook runs for every module. It does not change the
@@ -108,6 +127,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         ids.add(id);
         return;
       }
+      if (collector && isScannableModule(id)) collector.add(id, code);
       if (options?.scanModules !== false && isScannableModule(id)) {
         const tokens = new Set<string>();
         collectCarbonTokens(code, tokens);
@@ -137,6 +157,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         for (const id of moduleClasses.keys()) {
           if (!graph.has(id)) moduleClasses.delete(id);
         }
+        collector?.retain(graph);
       }
       const moduleTokens = new Set<string>();
       for (const tokens of moduleClasses.values()) {
@@ -157,11 +178,19 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         contentClasses = scan.classes;
       }
 
+      let usage: PropAwareResult | undefined;
+      if (collector && propAware) {
+        const result = await collector.analyze(ids, propAware);
+        if (!("warning" in result)) usage = result;
+        else if (!silent) this.warn(result.warning);
+      }
+
       const optimizer = createCssOptimizer({
         ...options,
         components,
         ids,
         contentClasses: [...contentClasses, ...moduleTokens],
+        propAware: usage,
       });
       const assetReports: AssetReport[] = [];
 
@@ -203,6 +232,14 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
           safelistEntries: options.safelist?.length ?? 0,
           assets: assetReports,
           dryRun: options.dryRun,
+          extra:
+            analyzer && usage
+              ? analyzer.formatPropAwareReport(
+                  usage,
+                  optimizer.usage.prunedByProps,
+                  root,
+                )
+              : undefined,
         });
       }
     },

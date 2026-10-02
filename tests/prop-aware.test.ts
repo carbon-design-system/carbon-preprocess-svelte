@@ -1,0 +1,325 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { optimizeCarbonCss } from "carbon-preprocess-svelte";
+import type { Rollup } from "vite";
+import type { PropAwareOptions } from "../src/analyzer/analyze-usage";
+import { analyzeUsage } from "../src/analyzer/analyze-usage";
+import {
+  collectScriptUsage,
+  collectSvelteUsage,
+  readCarbonComponents,
+} from "../src/analyzer/call-sites";
+import {
+  buildComponentModel,
+  UnsupportedComponentError,
+} from "../src/analyzer/component-model";
+import { UNKNOWN } from "../src/analyzer/values";
+import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import { optimizeCss } from "../src/plugins/optimize-css";
+
+const carbonRoot = resolveCarbonRoot();
+const carbon = readCarbonComponents(carbonRoot);
+const BUTTON = "Button/Button.svelte";
+
+function app(script: string, markup: string): string {
+  return `<script>\n${script}\n</script>\n\n${markup}\n`;
+}
+
+const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
+
+async function analyze(code: string, options?: PropAwareOptions) {
+  const usage = collectSvelteUsage(code, "/app/App.svelte", carbon);
+  return analyzeUsage({
+    carbonRoot,
+    carbon,
+    bundled: usage.sites.map((site) => site.component),
+    modules: [usage],
+    options,
+  });
+}
+
+describe("collectSvelteUsage", () => {
+  test("reads literal props and filled slots", () => {
+    const { sites } = collectSvelteUsage(
+      app(
+        IMPORT_BUTTON,
+        `<Button kind="tertiary" size={"small"} disabled>Hi</Button>`,
+      ),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(sites).toHaveLength(1);
+    const [site] = sites;
+    expect(site.component).toBe(BUTTON);
+    expect(site.open).toBe(false);
+    expect(site.props.get("kind")).toEqual(new Set(["tertiary"]));
+    expect(site.props.get("size")).toEqual(new Set(["small"]));
+    expect(site.props.get("disabled")).toEqual(new Set([true]));
+    expect(site.slots).toEqual(new Set(["default"]));
+    expect(site.location).toEqual({ file: "/app/App.svelte", line: 5 });
+  });
+
+  test("an expression, a bind, or a spread leaves props unknown", () => {
+    const { sites } = collectSvelteUsage(
+      app(
+        `${IMPORT_BUTTON}\nlet kind = "ghost"; let ref;`,
+        `<Button {kind} bind:ref /><Button {...$$restProps} />`,
+      ),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(sites[0].props.get("kind")).toBe(UNKNOWN);
+    expect(sites[0].props.get("ref")).toBe(UNKNOWN);
+    expect(sites[1].open).toBe(true);
+  });
+
+  test("a component used as a value, or never rendered as a tag, is open", () => {
+    const asValue = collectSvelteUsage(
+      app(IMPORT_BUTTON, `<svelte:component this={Button} />`),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(asValue.sites.map((site) => [site.open, site.reason])).toEqual([
+      [true, "used as a value"],
+    ]);
+
+    // Markup another preprocessor generates is invisible to the parser.
+    const unrendered = collectSvelteUsage(
+      `<script>${IMPORT_BUTTON}</script>\n<template lang="pug">Button</template>`,
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(unrendered.sites.every((site) => site.open)).toBe(true);
+    expect(unrendered.sites).toHaveLength(1);
+  });
+
+  test("direct-path and namespace imports", () => {
+    const direct = collectSvelteUsage(
+      app(
+        `import Button from "carbon-components-svelte/src/Button/Button.svelte";`,
+        `<Button kind="ghost" />`,
+      ),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(direct.sites[0].props.get("kind")).toEqual(new Set(["ghost"]));
+
+    const namespaced = collectSvelteUsage(
+      app(
+        `import * as C from "carbon-components-svelte";`,
+        `<C.Button kind="ghost" />`,
+      ),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(namespaced.openAll).toBe(false);
+    expect(namespaced.sites[0].component).toBe(BUTTON);
+
+    const namespaceAsValue = collectSvelteUsage(
+      app(
+        `import * as C from "carbon-components-svelte";`,
+        `<svelte:component this={C[name]} />`,
+      ),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(namespaceAsValue.openAll).toBe(true);
+  });
+
+  test("snippets make slots unknown; slot attributes name them", () => {
+    const { sites } = collectSvelteUsage(
+      app(
+        IMPORT_BUTTON,
+        `<Button><span slot="icon" /></Button><Button>{#snippet icon()}x{/snippet}</Button>`,
+      ),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(sites[0].slots).toEqual(new Set(["icon"]));
+    expect(sites[1].slots).toBeNull();
+  });
+});
+
+describe("collectScriptUsage", () => {
+  test("every import or re-export of a component is open", () => {
+    const usage = collectScriptUsage(
+      `import { Button } from "carbon-components-svelte";\nexport { Modal } from "carbon-components-svelte";`,
+      "/app/ui.js",
+      carbon,
+    );
+    expect(usage.sites.map((site) => [site.component, site.open])).toEqual([
+      [BUTTON, true],
+      ["Modal/Modal.svelte", true],
+    ]);
+    expect(
+      collectScriptUsage(
+        `export * from "carbon-components-svelte";`,
+        "/app/ui.js",
+        carbon,
+      ).openAll,
+    ).toBe(true);
+  });
+});
+
+describe("analyzeUsage", () => {
+  test("one tertiary button prunes other kinds, sizes, skeleton and tooltip", async () => {
+    const { isPruned, liveComponents } = await analyze(
+      app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
+    );
+    expect(isPruned(".bx--btn")).toBe(false);
+    expect(isPruned(".bx--btn--tertiary")).toBe(false);
+    for (const cls of [
+      ".bx--btn--danger",
+      ".bx--btn--primary",
+      ".bx--btn--sm",
+      ".bx--btn--icon-only",
+      ".bx--skeleton",
+      ".bx--tooltip__trigger",
+    ]) {
+      expect(isPruned(cls)).toBe(true);
+    }
+    expect([...liveComponents]).toEqual([BUTTON]);
+  });
+
+  test("a dynamic or spread prop keeps every value", async () => {
+    const dynamic = await analyze(
+      app(`${IMPORT_BUTTON}\nexport let kind;`, `<Button {kind}>Hi</Button>`),
+    );
+    expect(dynamic.isPruned(".bx--btn--danger")).toBe(false);
+
+    const spread = await analyze(app(IMPORT_BUTTON, `<Button {...props} />`));
+    expect(spread.isPruned(".bx--btn--danger")).toBe(false);
+    expect(spread.isPruned(".bx--skeleton")).toBe(false);
+  });
+
+  test("`assume` narrows a dynamic prop; `exclude` keeps everything", async () => {
+    const code = app(
+      `${IMPORT_BUTTON}\nexport let kind;`,
+      `<Button {kind}>Hi</Button>`,
+    );
+    const assumed = await analyze(code, {
+      assume: { Button: { kind: ["danger"] } },
+    });
+    expect(assumed.isPruned(".bx--btn--danger")).toBe(false);
+    expect(assumed.isPruned(".bx--btn--ghost")).toBe(true);
+
+    const excluded = await analyze(
+      app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
+      { exclude: ["Button"] },
+    );
+    expect(excluded.isPruned(".bx--btn--danger")).toBe(false);
+  });
+
+  test("props flow into the components a component renders", async () => {
+    // Pagination renders `<Button kind="ghost" …>`.
+    const pagination = await analyze(
+      app(
+        `import { Pagination } from "carbon-components-svelte";`,
+        `<Pagination totalItems={10} />`,
+      ),
+    );
+    expect(pagination.isPruned(".bx--btn--ghost")).toBe(false);
+    expect(pagination.isPruned(".bx--btn--danger")).toBe(true);
+
+    // Modal's danger prop picks its primary button's kind.
+    const IMPORT_MODAL = `import { Modal } from "carbon-components-svelte";`;
+    const danger = await analyze(
+      app(IMPORT_MODAL, `<Modal danger primaryButtonText="OK">Body</Modal>`),
+    );
+    expect(danger.isPruned(".bx--btn--danger")).toBe(false);
+  });
+
+  test("follows components imported through a `.js` barrel", async () => {
+    const { isPruned } = await analyze(
+      app(
+        `import { MultiSelect } from "carbon-components-svelte";`,
+        `<MultiSelect items={[{ id: "a", text: "A" }]} />`,
+      ),
+    );
+    // Rendered by ListBoxField, which MultiSelect imports from `../ListBox`.
+    expect(isPruned(".bx--list-box__field")).toBe(false);
+  });
+
+  test("runes-mode components are rejected, not guessed at", () => {
+    expect(() =>
+      buildComponentModel(
+        `<script>let { kind } = $props();</script>`,
+        "X/X.svelte",
+      ),
+    ).toThrow(UnsupportedComponentError);
+  });
+});
+
+describe("experimental.propAware", () => {
+  const BUTTON_CSS =
+    ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}.bx--accordion{a:5}";
+
+  test("optimizeCarbonCss prunes variants the `content` files never use", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
+    try {
+      writeFileSync(
+        join(dir, "App.svelte"),
+        app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
+      );
+      const options = {
+        components: ["Button"],
+        content: [join(dir, "*.svelte")],
+      };
+
+      const without = await optimizeCarbonCss(BUTTON_CSS, options);
+      expect(without.css).toContain(".bx--btn--danger");
+
+      const result = await optimizeCarbonCss(BUTTON_CSS, {
+        ...options,
+        experimental: { propAware: true },
+      });
+      expect(result.css).toBe(".bx--btn{a:1}.bx--btn--tertiary{a:2}");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("the Vite plugin reads call sites from each `.svelte` module's source", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
+    const appFile = join(dir, "App.svelte");
+    const buttonFile = join(carbonRoot, "src", BUTTON);
+    try {
+      writeFileSync(
+        appFile,
+        app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
+      );
+      const plugin = optimizeCss({
+        silent: true,
+        experimental: { propAware: true },
+      }) as unknown as {
+        buildStart(this: { warn: (message: string) => void }): Promise<void>;
+        transform(code: string, id: string): void;
+        generateBundle(
+          this: { warn: (message: string) => void },
+          options: unknown,
+          bundle: Rollup.OutputBundle,
+        ): Promise<void>;
+      };
+      const ctx = { warn: jest.fn() };
+      await plugin.buildStart.call(ctx);
+      // The plugin sees compiled JS; the source is read from disk.
+      plugin.transform(
+        `import { Button } from "carbon-components-svelte";`,
+        appFile,
+      );
+      plugin.transform("", buttonFile);
+      const bundle = {
+        "styles.css": { type: "asset", source: BUTTON_CSS },
+      } as unknown as Rollup.OutputBundle;
+      await plugin.generateBundle.call(ctx, {}, bundle);
+
+      expect((bundle["styles.css"] as Rollup.OutputAsset).source).toBe(
+        ".bx--btn{a:1}.bx--btn--tertiary{a:2}",
+      );
+      expect(ctx.warn).not.toHaveBeenCalled();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
