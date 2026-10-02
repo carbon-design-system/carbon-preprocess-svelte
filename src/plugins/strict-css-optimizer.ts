@@ -2,6 +2,7 @@ import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import {
   findSubjectStart,
+  HYPHEN,
   isClassTokenChar,
   splitSelectorList,
   stripNotPseudoClasses,
@@ -35,17 +36,13 @@ const FLATPICKR_SELECTOR = new RegExp(
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
 
 /**
- * Cheap necessary condition for `FLATPICKR_SELECTOR`: every class name it
- * matches contains an uppercase letter, except `flatpickr-*` and
- * `cur-month`. Carbon's own selectors are lowercase, so this skips the
- * alternation regex for nearly every rule in a Carbon theme. A single
- * regex pass is about twice as fast as a `charCodeAt` loop here.
+ * Cheap necessary condition for `FLATPICKR_SELECTOR`: its class names all
+ * contain an uppercase letter except `flatpickr-*` and `cur-month`, while
+ * Carbon's own selectors are lowercase. Skips the alternation regex for
+ * nearly every rule in a Carbon theme.
  */
 const MAY_HAVE_FLATPICKR = /[A-Z]|flatpickr|cur-month/;
 
-function mayHaveFlatpickr(selector: string): boolean {
-  return MAY_HAVE_FLATPICKR.test(selector);
-}
 /**
  * Anything the optimizer could remove: Carbon (`bx-`) selectors, flatpickr
  * selectors and keyframes, and IBM Plex `@font-face` rules. A stylesheet
@@ -63,7 +60,7 @@ export function hasOptimizableCss(css: string): boolean {
 
 export type StrictCssOptimizerOptions = {
   allowlist: Set<string>;
-  /** Index `allowlist` was built from; supplies the cross-component classes. */
+  /** Index `allowlist` was built from; supplies the classes shared between components. */
   components: ComponentIndex;
   preserveFlatpickr: boolean;
   safelist: readonly SafelistEntry[];
@@ -76,17 +73,16 @@ function getSharedClasses(components: ComponentIndex): Set<string> {
   const cached = sharedClassesCache.get(components);
   if (cached) return cached;
 
-  const counts = new Map<string, number>();
+  const seen = new Set<string>();
+  const shared = new Set<string>();
 
   for (const component of Object.values(components)) {
     for (const cls of component.classes) {
-      counts.set(cls, (counts.get(cls) ?? 0) + 1);
+      if (seen.has(cls)) shared.add(cls);
+      else seen.add(cls);
     }
   }
 
-  const shared = new Set(
-    [...counts].filter(([, count]) => count > 1).map(([cls]) => cls),
-  );
   sharedClassesCache.set(components, shared);
   return shared;
 }
@@ -96,9 +92,8 @@ type AllowlistIndex = {
   hyphenPrefixes: string[];
   shared: Set<string>;
   /**
-   * Per-class verdicts. Carbon's stylesheet repeats the same ~1.3k class
-   * names across ~14k selector positions, so the prefix/parent walk in
-   * `matchesAllowlist` only needs to run once per distinct class.
+   * Per-class verdicts: Carbon's stylesheet repeats ~1.3k class names across
+   * ~14k selector positions, so the walk runs once per distinct class.
    */
   verdicts: Map<string, boolean>;
 };
@@ -112,21 +107,13 @@ function getAllowlistIndex(
   const cached = allowlistIndexCache.get(allowlist);
   if (cached) return cached;
 
-  const shared = getSharedClasses(components);
-  const hyphenPrefixes: string[] = [];
-
-  for (const selector of allowlist) {
-    if (EXACT_ONLY_CLASSES.has(selector)) continue;
-    if (selector.endsWith("-")) {
-      hyphenPrefixes.push(selector);
-    }
-  }
-
-  const index = {
+  const index: AllowlistIndex = {
     exact: allowlist,
-    hyphenPrefixes,
-    shared,
-    verdicts: new Map<string, boolean>(),
+    hyphenPrefixes: [...allowlist].filter(
+      (selector) => selector.endsWith("-") && !EXACT_ONLY_CLASSES.has(selector),
+    ),
+    shared: getSharedClasses(components),
+    verdicts: new Map(),
   };
   allowlistIndexCache.set(allowlist, index);
   return index;
@@ -170,18 +157,14 @@ function classMatchesAllowlist(name: string, index: AllowlistIndex): boolean {
   return CONTEXT_ANCESTOR_SET.has(name) || matchesAllowlist(name, index);
 }
 
-const HYPHEN = 45;
-
 const CLASSES_NONE = 0;
 const CLASSES_MATCH = 1;
 const CLASSES_MISS = 2;
 
 /**
- * Runs the allowlist over every Carbon class token in
- * `normalized[from, to)` (legacy `.bx-x` read as `.bx--x`), stopping at the
- * first miss. Same tokens `getCarbonClassesFromNormalized` yields for the
- * compounds in that range, without materializing them: a class token never
- * spans a combinator, so a range of whole compounds scans the same.
+ * Runs the allowlist over every Carbon class token in `normalized[from, to)`
+ * (legacy `.bx-x` read as `.bx--x`), stopping at the first miss. Yields the
+ * same tokens as `getCarbonClassesFromNormalized` without materializing them.
  */
 function scanCarbonClasses(
   normalized: string,
@@ -221,21 +204,15 @@ function scanCarbonClasses(
 }
 
 /**
- * Whether to keep this selector in strict mode.
- *
- * Allowlist hits use Set lookup; otherwise prefix-match BEM children
- * (`.bx--btn--primary`, `.bx--btn__icon`).
- *
- * Descendant selectors require every subject class to match. Ancestor classes
- * may match CONTEXT_ANCESTORS without being imported. Same-element compounds
- * still require every class to match.
+ * Whether to keep a selector: every subject class must match the allowlist
+ * (exactly, as a hyphen prefix, or as a BEM child of an allowed class), and
+ * ancestor classes must too, or be one of `CONTEXT_ANCESTORS`.
  */
 function shouldKeepSelector(selector: string, index: AllowlistIndex): boolean {
   const normalized = stripNotPseudoClasses(selector);
   const subjectStart = findSubjectStart(normalized);
 
-  // Most pruned rules fail on their subject, so ancestor classes are only
-  // checked once the subject has passed (or has no Carbon class at all).
+  // Most pruned rules fail on their subject, so check ancestors second.
   if (
     scanCarbonClasses(
       normalized,
@@ -262,9 +239,9 @@ export type PrunedSelector = {
 };
 
 /**
- * Decides what strict mode does to a rule's selector list: `undefined` when
- * nothing changes, otherwise the pruned list (or `null` to drop the rule)
- * with the number of Carbon selectors removed.
+ * What pruning does to a rule's selector list: `undefined` when nothing
+ * changes, else the pruned list (`null` drops the rule) and how many
+ * selectors went.
  */
 export function pruneRuleSelector(
   selector: string,
@@ -273,50 +250,34 @@ export function pruneRuleSelector(
   const { allowlist, components, preserveFlatpickr, safelist } = options;
   const index = getAllowlistIndex(allowlist, components);
 
-  // `bx-` is either followed by another hyphen (Carbon) or not (legacy), so
-  // one substring check covers both prefixes. A flatpickr match inside any
-  // selectee is also a match on the whole list, so one test on the list rules
-  // it out for every selectee.
+  // `bx-` covers both the Carbon (`bx--`) and legacy (`bx-`) prefixes. One
+  // flatpickr test on the whole list rules it out for every selectee.
   const hasCarbon = selector.includes("bx-");
   const hasFlatpickr =
-    mayHaveFlatpickr(selector) && FLATPICKR_SELECTOR.test(selector);
+    MAY_HAVE_FLATPICKR.test(selector) && FLATPICKR_SELECTOR.test(selector);
 
-  if (!(hasCarbon || hasFlatpickr)) {
-    return undefined;
-  }
+  if (!(hasCarbon || hasFlatpickr)) return undefined;
 
   const dropFlatpickr = hasFlatpickr && !preserveFlatpickr;
 
   // Single selectee (the common case): no list to split or rebuild.
   if (!selector.includes(",")) {
-    const selectee = selector.trim();
-    if (selectee === "") return { removed: 0, selector: null };
-    return keepSelectee(selectee, safelist, dropFlatpickr, index)
+    return keepSelectee(selector.trim(), safelist, dropFlatpickr, index)
       ? undefined
       : { removed: 1, selector: null };
   }
 
   const selectors = splitSelectorList(selector);
-  const keptSelectors: string[] = [];
+  const kept = selectors.filter((selectee) =>
+    keepSelectee(selectee, safelist, dropFlatpickr, index),
+  );
 
-  for (const selectee of selectors) {
-    if (keepSelectee(selectee, safelist, dropFlatpickr, index)) {
-      keptSelectors.push(selectee);
-    }
-  }
+  if (kept.length === selectors.length) return undefined;
 
-  if (keptSelectors.length === 0) {
-    return { removed: selectors.length, selector: null };
-  }
-
-  if (keptSelectors.length < selectors.length) {
-    return {
-      removed: selectors.length - keptSelectors.length,
-      selector: keptSelectors.join(", "),
-    };
-  }
-
-  return undefined;
+  return {
+    removed: selectors.length - kept.length,
+    selector: kept.length === 0 ? null : kept.join(", "),
+  };
 }
 
 function keepSelectee(
@@ -325,14 +286,8 @@ function keepSelectee(
   dropFlatpickr: boolean,
   index: AllowlistIndex,
 ): boolean {
-  if (isSafelisted(selectee, safelist)) {
-    return true;
-  }
-
-  if (dropFlatpickr && FLATPICKR_SELECTOR.test(selectee)) {
-    return false;
-  }
-
+  if (isSafelisted(selectee, safelist)) return true;
+  if (dropFlatpickr && FLATPICKR_SELECTOR.test(selectee)) return false;
   return !selectee.includes("bx-") || shouldKeepSelector(selectee, index);
 }
 
@@ -351,17 +306,13 @@ export function isFlatpickrKeyframes(
 
 const IBM_PLEX_SANS_WEIGHTS = ["300", "400", "600"];
 
-/** Class `<Text italic>` renders; the only Carbon rule that asks for italic Plex. */
+/** Class `<Text italic>` renders: the only Carbon rule that uses italic Plex. */
 const ITALIC_TYPE_CLASS = ".bx--type-italic";
 
 /**
  * Whether an IBM Plex `@font-face` rule is one no Carbon Svelte component
- * uses. Only these faces are kept:
- * - IBM Plex Sans: weights 300/400/600 in normal style, plus italic style
- *   when `.bx--type-italic` (`<Text italic>`) is in the allowlist
- * - IBM Plex Mono: weight 400 in normal style (for code snippets)
- *
- * Non-IBM Plex faces are never dropped.
+ * uses. Kept: Plex Sans 300/400/600 normal (italic only if `.bx--type-italic`
+ * is allowlisted) and Plex Mono 400 normal. Other families are never dropped.
  */
 export function isUnusedIbmPlexFontFace(
   family: string,
@@ -369,14 +320,12 @@ export function isUnusedIbmPlexFontFace(
   weight: string,
   options: Pick<StrictCssOptimizerOptions, "allowlist" | "components">,
 ): boolean {
-  if (!family.startsWith("IBM Plex")) {
-    return false;
-  }
+  if (!family.startsWith("IBM Plex")) return false;
 
-  const is_mono =
+  const isMono =
     style === "normal" && family === "IBM Plex Mono" && weight === "400";
 
-  const is_sans =
+  const isSans =
     family === "IBM Plex Sans" &&
     IBM_PLEX_SANS_WEIGHTS.includes(weight) &&
     (style === "normal" ||
@@ -386,5 +335,5 @@ export function isUnusedIbmPlexFontFace(
           getAllowlistIndex(options.allowlist, options.components),
         )));
 
-  return !(is_sans || is_mono);
+  return !(isSans || isMono);
 }

@@ -1,13 +1,14 @@
 import { join } from "node:path";
-import { forEachRuleSelector } from "../plugins/css-splice-optimizer";
+import { filterCss } from "caligula";
 import {
+  findSubjectStart,
   getCarbonClassesFromNormalized,
   splitSelectorList,
-  splitSelectorParts,
+  stripNotPseudoClasses,
 } from "./css-selector-utils";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
 
-/** Ancestors we must never auto-propagate (strict bundle pairs stay manual). */
+/** Ancestors never auto-propagated: these bundle pairs stay manual. */
 const LAYOUT_ANCESTOR_DENYLIST = new Set([
   ".bx--modal",
   ".bx--form--fluid",
@@ -65,6 +66,23 @@ function setsDisjoint(a: Set<string>, b: Set<string>): boolean {
   return true;
 }
 
+/** Calls `onRule` with each rule's selector; throws on CSS caligula can't model. */
+function forEachRuleSelector(
+  css: string,
+  onRule: (selector: string) => void,
+): void {
+  const { skipped } = filterCss(css, {
+    rule({ selector }) {
+      onRule(selector);
+    },
+  });
+  if (skipped) {
+    throw new Error(
+      "forEachRuleSelector: input is outside the shape caligula models",
+    );
+  }
+}
+
 function isSlotWrapperGate(
   ancestor: string,
   ancestorOwners: Set<string>,
@@ -107,7 +125,8 @@ export type CssIndexAdditions = {
 };
 
 /**
- * Walk Carbon CSS once and infer context ancestors plus CSS-orphan classes.
+ * Walks Carbon CSS once, inferring context ancestors (classes a component's
+ * rules need on an ancestor) and orphans (CSS-only classes of a component).
  */
 export function extractCssIndexAdditions(
   options: CssContextOptions,
@@ -121,15 +140,14 @@ export function extractCssIndexAdditions(
 
   forEachRuleSelector(css, (selectorList) => {
     for (const branch of splitSelectorList(selectorList)) {
-      const parts = splitSelectorParts(branch);
-
-      // `parts.subject`/`parts.ancestors` are already `:not(...)`-stripped
-      // substrings of `branch` (see `splitSelectorParts`), so classes can be
-      // read straight off them without re-stripping/re-matching `branch`.
-      const ancestorClasses = parts.ancestors.flatMap((part) =>
-        getCarbonClassesFromNormalized(part),
+      const normalized = stripNotPseudoClasses(branch);
+      const subjectStart = findSubjectStart(normalized);
+      const ancestorClasses = getCarbonClassesFromNormalized(
+        normalized.slice(0, subjectStart),
       );
-      const subjectClasses = getCarbonClassesFromNormalized(parts.subject);
+      const subjectClasses = getCarbonClassesFromNormalized(
+        normalized.slice(subjectStart),
+      );
 
       if (ancestorClasses.length > 0 && subjectClasses.length > 0) {
         for (const ancestor of ancestorClasses) {
@@ -167,8 +185,6 @@ export function extractCssIndexAdditions(
         }
       }
 
-      // Reuse the parts above instead of re-deriving classes from `branch`;
-      // ancestors + subject cover the same set of Carbon classes.
       const classes = [...new Set([...ancestorClasses, ...subjectClasses])];
       const branchOrphans = classes.filter((cls) => !markupClasses.has(cls));
 

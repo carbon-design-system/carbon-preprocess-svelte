@@ -1,13 +1,23 @@
 import {
   createCssOptimizer,
-  createOptimizedCss,
   optimizeCssWithReport,
 } from "carbon-preprocess-svelte/plugins/create-optimized-css";
 import { components } from "./helpers/component-index";
+import { createOptimizedCss } from "./helpers/create-optimized-css";
 
 const BTN_VARIANT_RE = /^\.bx--btn--/;
 
 describe("create-optimized-css", () => {
+  test("ignores ids that only name an Object.prototype member", () => {
+    const { css, removed } = optimizeCssWithReport({
+      components,
+      source: ".bx--btn { color: red }",
+      ids: ["constructor", "toString"],
+    });
+    expect(removed).toBe(1);
+    expect(css).not.toContain(".bx--btn");
+  });
+
   test("removes unused selectors", () => {
     const result = createOptimizedCss({
       components,

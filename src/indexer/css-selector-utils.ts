@@ -1,4 +1,4 @@
-const HYPHEN = 45;
+export const HYPHEN = 45;
 const OPEN_PAREN = 40;
 const CLOSE_PAREN = 41;
 
@@ -13,14 +13,11 @@ export function isClassTokenChar(code: number): boolean {
   );
 }
 
-/**
- * `/[\s>+~]/`'s practical range for selector text: whitespace plus the three
- * combinator symbols. Indexed by char code in a hot loop below.
- */
+/** Whitespace and the combinators `>+~`, indexed by char code. */
 const COMBINATOR_CHARS = new Uint8Array(128);
 for (const ch of " \t\n\r\f\v>+~") COMBINATOR_CHARS[ch.charCodeAt(0)] = 1;
 
-/** Split on commas at parenthesis depth 0. */
+/** Splits on commas at parenthesis depth 0. */
 export function splitSelectorList(selector: string): string[] {
   if (!selector.includes(",")) {
     return [selector.trim()].filter(Boolean);
@@ -48,7 +45,7 @@ export function splitSelectorList(selector: string): string[] {
   return selectors.filter(Boolean);
 }
 
-/** Drop `:not(...)` subtrees before class extraction. */
+/** Drops `:not(...)` subtrees before class extraction. */
 export function stripNotPseudoClasses(selector: string): string {
   let index = selector.indexOf(":not(");
   if (index === -1) return selector;
@@ -59,7 +56,7 @@ export function stripNotPseudoClasses(selector: string): string {
   while (index !== -1) {
     result += selector.slice(start, index);
 
-    // Skip to just past the parenthesis that closes this `:not(`.
+    // Skip past the parenthesis that closes this `:not(`.
     let depth = 1;
     let i = index + 5;
     for (; i < selector.length && depth > 0; i++) {
@@ -76,12 +73,9 @@ export function stripNotPseudoClasses(selector: string): string {
 }
 
 /**
- * `normalized` must already be free of `:not(...)` subtrees.
- *
- * Returns every `.bx--*` class token in order, then every legacy `.bx-*`
- * token rewritten to `.bx--*`, deduplicated by first occurrence. Runs on
- * every selector in a Carbon stylesheet, so it scans by index instead of
- * running the two class regexes and merging their matches.
+ * Every `.bx--*` class token in a `:not(...)`-free selector, then every
+ * legacy `.bx-*` token rewritten to `.bx--*`, deduplicated by first
+ * occurrence. Scans by index: it runs on every selector in a Carbon theme.
  */
 export function getCarbonClassesFromNormalized(normalized: string): string[] {
   let index = normalized.indexOf(".bx-");
@@ -124,10 +118,8 @@ export function getCarbonClassesFromNormalized(normalized: string): string[] {
 
 /**
  * Offset where the subject compound starts in a `:not(...)`-free selector:
- * the last compound after a depth-0 combinator, skipping empty compounds
- * (runs of combinator characters), exactly as `splitSelectorParts` picks its
- * `subject`. Everything before it is the ancestor compounds and the
- * combinators between them; `0` when the selector is a single compound.
+ * the last compound after a depth-0 combinator. Everything before it is the
+ * ancestor compounds; `0` for a single compound.
  */
 export function findSubjectStart(normalized: string): number {
   const length = normalized.length;
@@ -152,48 +144,4 @@ export function findSubjectStart(normalized: string): number {
   }
 
   return subjectStart;
-}
-
-/** Split a selector branch into ancestor compounds and the subject compound. */
-export function splitSelectorParts(selector: string): {
-  ancestors: string[];
-  subject: string;
-} {
-  const normalized = stripNotPseudoClasses(selector);
-  const length = normalized.length;
-  let ancestors: string[] | undefined;
-  let last: string | undefined;
-  let depth = 0;
-  let start = 0;
-
-  for (let i = 0; i <= length; i++) {
-    const code = i < length ? normalized.charCodeAt(i) : -1;
-
-    if (code === OPEN_PAREN) {
-      depth++;
-    } else if (code === CLOSE_PAREN) {
-      if (depth > 0) depth--;
-    } else if (
-      i === length ||
-      (depth === 0 && code < 128 && COMBINATOR_CHARS[code] === 1)
-    ) {
-      if (i > start) {
-        const part = normalized.slice(start, i).trim();
-        if (part) {
-          if (last !== undefined) {
-            if (ancestors === undefined) ancestors = [last];
-            else ancestors.push(last);
-          }
-          last = part;
-        }
-      }
-      start = i + 1;
-    }
-  }
-
-  if (last === undefined) {
-    return { ancestors: [], subject: normalized };
-  }
-
-  return { ancestors: ancestors === undefined ? [] : ancestors, subject: last };
 }

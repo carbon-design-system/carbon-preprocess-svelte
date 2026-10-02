@@ -6,7 +6,7 @@ import {
   CONTEXT_ANCESTORS,
 } from "carbon-preprocess-svelte/constants";
 import {
-  splitSelectorParts,
+  findSubjectStart,
   stripNotPseudoClasses,
 } from "../../src/indexer/css-selector-utils";
 import { components } from "./component-index";
@@ -63,11 +63,10 @@ export function shouldKeepStrictSelector(
   selector: string,
   allowlist: Set<string>,
 ): boolean {
-  const parts = splitSelectorParts(selector);
-  const subjectClasses = carbonClassesIn(parts.subject);
-  const ancestorClasses = parts.ancestors.flatMap((part) =>
-    carbonClassesIn(part),
-  );
+  const normalized = stripNotPseudoClasses(selector);
+  const subjectStart = findSubjectStart(normalized);
+  const subjectClasses = carbonClassesIn(normalized.slice(subjectStart));
+  const ancestorClasses = carbonClassesIn(normalized.slice(0, subjectStart));
 
   if (subjectClasses.length === 0 && ancestorClasses.length === 0) {
     return true;

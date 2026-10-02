@@ -6,22 +6,20 @@ import {
   type StrictCssOptimizerOptions,
 } from "./strict-css-optimizer";
 
-/**
- * Carbon's pruning rules on top of caligula, which edits the source text
- * instead of round-tripping it through an AST. Input caligula can't
- * reproduce exactly (a syntax error, or an ambiguous `@font-face` descriptor)
- * comes back unchanged with `removed: 0`.
- */
-
 export type SpliceOptimizerOptions = StrictCssOptimizerOptions & {
   preserveAllIBMFonts: boolean;
 };
 
-// `@font-face` descriptors are always validated, whether or not
-// `preserveAllIBMFonts` means they get read, so the set of inputs that pass
-// through unchanged doesn't depend on options.
+// Always validated, so which inputs pass through unchanged doesn't depend on
+// `preserveAllIBMFonts`.
 const READ_DECLS = ["font-face"];
 
+/**
+ * Carbon's pruning rules on top of caligula, which edits the source text
+ * instead of round-tripping it through an AST. Input caligula can't
+ * reproduce exactly (a syntax error, an ambiguous `@font-face` descriptor)
+ * comes back unchanged with `removed: 0`.
+ */
 export function spliceOptimizeCss(
   css: string,
   options: SpliceOptimizerOptions,
@@ -60,25 +58,4 @@ export function spliceOptimizeCss(
   });
 
   return { css: result.css, removed };
-}
-
-/**
- * Calls `onRule` with each rule's selector, in pre-order document order.
- * Throws for input caligula would skip: a build-time indexing pass has no
- * "unchanged" to fall back to.
- */
-export function forEachRuleSelector(
-  css: string,
-  onRule: (selector: string) => void,
-): void {
-  const { skipped } = filterCss(css, {
-    rule({ selector }) {
-      onRule(selector);
-    },
-  });
-  if (skipped) {
-    throw new Error(
-      "forEachRuleSelector: input is outside the shape caligula models",
-    );
-  }
 }

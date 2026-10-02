@@ -9,10 +9,7 @@ type PnpApi = {
   resolveToUnqualified(request: string, issuer: string): string | null;
 };
 
-/**
- * Carbon's directory according to Yarn Plug'n'Play, which has no
- * `node_modules` to search, or `undefined` outside PnP.
- */
+/** Carbon's directory according to Yarn Plug'n'Play, or `undefined` outside PnP. */
 function resolveWithPnp(from: string): string | undefined {
   const { findPnpApi } = Module as {
     findPnpApi?: (lookupSource: string) => PnpApi | null;
@@ -33,21 +30,14 @@ function resolveWithPnp(from: string): string | undefined {
 }
 
 /**
- * Directory of the installed `carbon-components-svelte` package.
+ * Directory of the installed `carbon-components-svelte`, searched from the
+ * consuming project (`from`) first, then from this package's own location:
+ * in a monorepo this package may be hoisted to the root while Carbon is
+ * installed only under the app.
  *
- * Searched from the consuming project first (`from`, defaulting to the
- * working directory), then from this package's own install location. The
- * project has to come first: in a monorepo where this package is hoisted to
- * the root but Carbon is installed only under the app, a search anchored on
- * `import.meta.url` never sees the app's `node_modules`.
- *
- * Deliberately doesn't `require.resolve("carbon-components-svelte/package.json")`
- * (or any subpath): Carbon's `exports` map only declares conditional entries
- * for `.`, `./css/*.css`, and `./src/*`, so a plain Node subpath resolution
- * for `package.json` throws (`ERR_PACKAGE_PATH_NOT_EXPORTED`) even though the
- * file is right there on disk. `require.resolve.paths` returns the ordinary
- * `node_modules` search path list -- the pre-`exports` algorithm -- so it
- * isn't subject to that gate.
+ * Walks `require.resolve.paths` instead of resolving
+ * `carbon-components-svelte/package.json`, which Carbon's `exports` map
+ * blocks (`ERR_PACKAGE_PATH_NOT_EXPORTED`).
  */
 export function resolveCarbonRoot(from: string = process.cwd()): string {
   const pnp = resolveWithPnp(from);

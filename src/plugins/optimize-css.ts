@@ -1,67 +1,52 @@
 import type { Plugin, Rollup } from "vite";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
-import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
-import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createCssOptimizer, toCssString } from "./create-optimized-css";
+import {
+  isCarbonSvelteImport,
+  isCssFile,
+  isScannableModule,
+  toCssString,
+} from "../utils";
+import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
-import { logAssetDiff } from "./print-diff";
-import type { AssetReport } from "./print-report";
-import { printReport, toAssetReport } from "./print-report";
+import { optimizeAssets } from "./optimize-assets";
+import type { OptimizeCssOptions } from "./options";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
 /** True if any emitted CSS asset has Carbon rules the optimizer can prune. */
 function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
-  for (const id in bundle) {
-    const file = bundle[id];
-    if (
+  return Object.entries(bundle).some(
+    ([id, file]) =>
       file.type === "asset" &&
       isCssFile(id) &&
-      hasOptimizableCss(toCssString(file.source))
-    ) {
-      return true;
-    }
-  }
-  return false;
+      hasOptimizableCss(toCssString(file.source)),
+  );
 }
 
 /**
- * Vite/Rollup plugin that removes unused Carbon CSS classes from production builds.
+ * Vite/Rollup plugin that removes unused Carbon CSS from production builds.
  *
- * Unlike the Webpack plugin which uses module dependency tracking, this plugin
- * collects component IDs during the `transform` hook as modules are processed.
- * The actual CSS optimization happens in `generateBundle` after all modules
- * have been transformed and the bundle structure is finalized.
- *
- * `apply: "build"` limits it to production builds. `enforce: "post"` runs
- * it after other plugins have transformed modules.
+ * `transform` records which Carbon components are imported; `generateBundle`
+ * then splices unused rules out of the CSS assets in place.
  */
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   const silent = options?.silent === true;
   /**
-   * Absolute file paths of Carbon Svelte components seen by `transform`, in
-   * this build or an earlier `vite build --watch` build. Not cleared per
-   * build: on a rebuild Rollup serves unchanged modules from its cache
-   * without calling `transform`, so only the ids still in the module graph
-   * (`this.getModuleIds()`) count at `generateBundle`.
+   * Carbon component files seen by `transform`, across `vite build --watch`
+   * rebuilds. Rollup serves unchanged modules from cache without calling
+   * `transform`, so `generateBundle` keeps only ids still in the module graph.
    */
   const ids = new Set<string>();
   let root = process.cwd();
   /**
-   * Set by `configResolved`, which only Vite calls. Plain Rollup and
-   * Rolldown never call it, so this stays `undefined` and `printDiff`
-   * writes to the console instead. Rollup's CLI writes plugin logs to
-   * stderr, which would move the size block off stdout.
+   * Set by `configResolved`, which only Vite calls. Plain Rollup and Rolldown
+   * log to the console instead: their CLI writes plugin logs to stderr.
    */
   let logInfo: ((message: string) => void) | undefined;
-  /** Classes from `content` globs. Cached after first scan. */
+  /** Classes from `content` globs; cached after the first scan of a build. */
   let contentClasses: string[] | undefined;
-  /**
-   * Literal `bx--` classes found in each scanned module's code, keyed by
-   * module id. Per module for the same reason as `ids`: a cached module
-   * keeps its last scan, and a re-transformed one replaces it.
-   */
+  /** Literal `bx--` classes in each scanned module, kept per module like `ids`. */
   const moduleClasses = new Map<string, Set<string>>();
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
   let components: ComponentIndex | undefined;
@@ -70,35 +55,19 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
     name: "vite:carbon:optimize-css",
     apply: "build",
     enforce: "post",
-    /**
-     * Vite calls this with the resolved project root; plain Rollup never
-     * calls it, so `root` stays at `process.cwd()`.
-     */
     configResolved(config) {
       root = config.root;
-      // Not `this.info`: it prefixes the plugin name, is absent on Rollup 2
-      // contexts, and writes to stderr under the Rollup CLI.
+      // Not `this.info`: it prefixes the plugin name and is absent on Rollup 2.
       logInfo = (message) => config.logger.info(message);
     },
     /**
-     * Runs once before any module is transformed. Resets the content scan
-     * so `vite build --watch` rebuilds (which reuse this same plugin
-     * instance) re-read `content` files from disk. `ids` and
-     * `moduleClasses` are kept; `generateBundle` drops modules that left the
-     * graph. Also loads the component index for the project's installed
-     * `carbon-components-svelte` (built once, then read from cache), so it's
-     * ready before `generateBundle` consults it. If it can't be built, this
-     * build's CSS is left unpruned.
+     * Re-reads `content` on `--watch` rebuilds (the plugin instance is
+     * reused) and loads the component index while modules transform.
      */
     async buildStart() {
       contentClasses = undefined;
       components = await loadComponentIndex(root);
     },
-    /**
-     * The transform hook runs for every module. It does not change the
-     * code. It records which Carbon components are imported so later
-     * passes know which CSS classes to keep.
-     */
     transform(code, id) {
       if (isCarbonSvelteImport(id)) {
         ids.add(id);
@@ -112,23 +81,15 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         else moduleClasses.delete(id);
       }
     },
-    /**
-     * generateBundle runs after all chunks and assets have been created.
-     * Splices unused Carbon rules out of CSS assets. Mutating
-     * `file.source` updates the bundle output in place.
-     */
-    async generateBundle(_, bundle) {
-      // Already warned by `loadComponentIndex`.
+    generateBundle(_, bundle) {
+      // `loadComponentIndex` already warned.
       if (!components) return;
 
-      // Includes modules served from Rollup's cache. Absent on the bare
-      // contexts unit tests pass, where everything collected counts.
+      // Absent on the bare contexts unit tests pass, where everything counts.
       const graph = this.getModuleIds
         ? new Set(this.getModuleIds())
         : undefined;
       if (graph) {
-        // Forget modules the app no longer bundles, so a removed component
-        // or class stops keeping CSS alive.
         for (const id of ids) if (!graph.has(id)) ids.delete(id);
         for (const id of moduleClasses.keys()) {
           if (!graph.has(id)) moduleClasses.delete(id);
@@ -140,8 +101,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       }
 
       if (ids.size === 0) {
-        // Warn only when this build emitted Carbon CSS. A secondary build
-        // that never imports Carbon has nothing to prune.
+        // A secondary build that never imports Carbon has nothing to prune.
         if (!silent && hasCarbonCss(bundle)) this.warn(NO_CARBON_IMPORTS);
         return;
       }
@@ -159,48 +119,27 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         ids,
         contentClasses: [...contentClasses, ...moduleTokens],
       });
-      const assetReports: AssetReport[] = [];
 
-      for (const id in bundle) {
-        const file = bundle[id];
-
-        if (file.type === "asset" && isCssFile(id)) {
-          const original_css = file.source;
-          const { css: optimized_css, removed } = optimizer.run(original_css);
-
-          if (!options?.dryRun) {
-            file.source = optimized_css;
-          }
-
-          if (!silent && removed > 0) {
-            logAssetDiff({
-              original_css,
-              optimized_css,
-              id,
-              dryRun: options?.dryRun,
-              log: logInfo,
-            });
-          }
-
-          if (options?.report) {
-            assetReports.push(
-              toAssetReport(id, original_css, optimized_css, removed),
-            );
-          }
-        }
-      }
-
-      if (options?.report) {
-        printReport({
-          components: optimizer.usage.components,
-          allowlistSize: optimizer.usage.allowlistSize,
-          moduleTokens: moduleTokens.size,
-          contentTokens: contentClasses.length,
-          safelistEntries: options.safelist?.length ?? 0,
-          assets: assetReports,
-          dryRun: options.dryRun,
-        });
-      }
+      optimizeAssets({
+        assets: Object.entries(bundle).flatMap(([id, file]) =>
+          file.type === "asset" && isCssFile(id)
+            ? [
+                {
+                  id,
+                  source: file.source,
+                  write: (css: string) => {
+                    file.source = css;
+                  },
+                },
+              ]
+            : [],
+        ),
+        optimizer,
+        options: options ?? {},
+        moduleTokens: moduleTokens.size,
+        contentTokens: contentClasses.length,
+        log: logInfo,
+      });
     },
   };
 };

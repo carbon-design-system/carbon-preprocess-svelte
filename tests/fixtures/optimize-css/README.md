@@ -2,7 +2,7 @@
 
 Do not edit by hand. tests/optimize-css-fixtures.test.ts writes these.
 
-The test runs createOptimizedCss on Carbon's compiled stylesheet (carbon-components-svelte/css/white.css) for several import sets and checks the result.
+The test runs the optimizer on Carbon's compiled stylesheet (carbon-components-svelte/css/white.css) for several import sets and checks the result.
 
 Each scenario name has two files:
 

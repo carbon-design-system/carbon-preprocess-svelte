@@ -5,11 +5,9 @@ import path from "node:path";
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;
 
 /**
- * Add every literal `bx--` token in `source` to `into` as a class selector.
- * Shared by the `content` glob scan and the bundler module scan. The
- * `includes` check is the fast path: most modules (vendor code, app logic)
- * contain no Carbon token, and a substring search is far cheaper than
- * running the regex.
+ * Adds every literal `bx--` token in `source` to `into` as a class selector.
+ * The `includes` check is the fast path: most modules contain no Carbon
+ * token, and a substring search is far cheaper than the regex.
  */
 export function collectCarbonTokens(source: string, into: Set<string>): void {
   if (!source.includes("bx--")) return;
@@ -19,29 +17,36 @@ export function collectCarbonTokens(source: string, into: Set<string>): void {
   }
 }
 
-/** Result of scanning `content` globs. */
+/** Contents of each file in `files` (relative to `cwd`), skipping unreadable ones. */
+export function* readSources(
+  files: readonly string[],
+  cwd: string,
+): Generator<string> {
+  for (const file of files) {
+    try {
+      yield readFileSync(path.resolve(cwd, file), "utf-8");
+    } catch {
+      // A directory or an unreadable match.
+    }
+  }
+}
+
 export type ContentScan = {
   /** Class selectors found (`.bx--grid`). */
   classes: string[];
   /** Files the globs matched (readable or not). */
   matchedFiles: number;
-  /** Message from a glob failure, if any. Undefined when the globs ran. */
+  /** Message from a glob failure, if any. */
   error?: string;
 };
 
 /**
- * Scan files matched by `content` globs for literal `bx--`-prefixed tokens.
- * Returns them as class selectors (`.bx--token`), plus how many files the
- * globs matched and any glob failure, so callers can warn on a
- * misconfigured `content` option.
+ * Scans files matched by `content` globs (relative to `cwd`) for literal
+ * `bx--` tokens. Also reports how many files matched and any glob failure so
+ * callers can warn on a misconfigured `content`.
  *
- * For ``class={`bx--btn--${kind}`}``, the importer-based allowlist only sees
- * the prefix in your source (`bx--btn--`). Prefix matching then keeps
- * `.bx--btn--primary` and similar at runtime.
- *
- * Globs resolve relative to `cwd` (the bundler's project root;
- * `process.cwd()` when not provided). Returns no classes when `content` is
- * omitted or globbing fails.
+ * For ``class={`bx--btn--${kind}`}`` only the prefix `bx--btn--` is found;
+ * prefix matching then keeps `.bx--btn--primary` and similar.
  */
 export function scanContent(
   content?: readonly string[],
@@ -59,15 +64,7 @@ export function scanContent(
 
   const classes = new Set<string>();
 
-  for (const file of files) {
-    let source: string;
-    try {
-      source = readFileSync(path.resolve(cwd, file), "utf-8");
-    } catch {
-      // Skip directories and unreadable matches.
-      continue;
-    }
-
+  for (const source of readSources(files, cwd)) {
     collectCarbonTokens(source, classes);
   }
 
