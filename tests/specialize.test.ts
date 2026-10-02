@@ -137,7 +137,7 @@ describe("specializeComponent", () => {
 <p><b />{#if a}A{/if}<i /></p>`,
     );
     // Between whitespace: a placeholder keeps the two from merging.
-    expect(code).toContain("{#if false}{/if}\n  <slot />");
+    expect(code).toContain("{#if false}<!---->{/if}\n  <slot />");
     // Between elements: removed outright.
     expect(code).toContain("<p><b /><i /></p>");
   });
@@ -154,6 +154,36 @@ describe("specializeComponent", () => {
     const code = specialize(`<script>export let a = "x"; $: { a; }</script>`);
     expect(code).toContain("$: { a; }");
   });
+});
+
+test("marks props nothing reads anymore so Svelte doesn't warn", () => {
+  const code = specialize(
+    `<script>
+  export let warn = false;
+  export let warnText = "";
+  let className = undefined;
+  export { className as class };
+</script>
+<div class={className}>{#if warn}<p>{warnText}</p>{/if}</div>`,
+  );
+  const ignore = "// svelte-ignore unused-export-let export_let_unused";
+  expect(code).toContain(`${ignore}\n  export let warn = false;`);
+  expect(code).toContain(`${ignore}\n  export let warnText = "";`);
+  // Svelte 5 reports a renamed export at the `let`, Svelte 3/4 at `export`.
+  expect(code).toContain(`${ignore}\n  let className = undefined;`);
+  expect(code).toContain(`${ignore}\n  export { className as class };`);
+});
+
+test("a renamed export is a prop: `class` sets `className`", () => {
+  const code = specialize(
+    `<script>
+  let className = undefined;
+  export { className as class };
+</script>
+<div class={className} />`,
+    { class: "custom" },
+  );
+  expect(code).toContain(`<div class={"custom"} />`);
 });
 
 describe("dropUnusedDeclarations", () => {

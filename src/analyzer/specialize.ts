@@ -1,4 +1,4 @@
-import { isReference, walk } from "sveast/walk";
+import { type AST, isReference, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
 import { childEntries, type Node } from "./ast";
 import { evaluate, type Scope } from "./evaluate";
@@ -224,7 +224,9 @@ export type SpecializeOptions = {
    * sits on both sides of it: removing it would merge the two, and Svelte
    * collapses them to one space instead of two (or trims them at a
    * fragment's start). Elsewhere the block is removed outright.
-   * @default "{#if false}{/if}"
+   * @default "{#if false}<!---->{/if}"
+   * (not empty: Svelte 3/4 warn about an empty block; not text: Svelte 5
+   * rejects text in elements like `<colgroup>`)
    */
   emptyBlock?: string;
   /**
@@ -251,7 +253,7 @@ export function specializeComponent(
   options?: SpecializeOptions,
 ): Specialization {
   const { code, ast } = scope.model;
-  const emptyBlock = options?.emptyBlock ?? "{#if false}{/if}";
+  const emptyBlock = options?.emptyBlock ?? "{#if false}<!---->{/if}";
   const unwrap = options?.unwrap ?? false;
   const edits: Edit[] = [];
   let preserveDepth = 0;
@@ -596,7 +598,11 @@ export function specializeComponent(
     options?.dropUnused === false
       ? { code: folded, dropped: 0 }
       : dropUnusedDeclarations(folded);
-  return { code: cleaned, edits: applied, dropped };
+  return {
+    code: applied > 0 ? silenceUnusedProps(cleaned) : cleaned,
+    edits: applied,
+    dropped,
+  };
 }
 
 /** Whether `node` can be removed without losing a side effect (no scope facts). */
@@ -651,6 +657,124 @@ const MAX_CLEANUP_PASSES = 8;
  * no side effects. Svelte compiles `$:` into effects a minifier must keep,
  * so this is the only way they go. Repeats until nothing more is removed.
  */
+/**
+ * How often each name is read anywhere in the component, not counting the
+ * `owned` identifier nodes (the names being declared).
+ */
+function countReads(
+  ast: AST.Root,
+  owned: ReadonlySet<Node>,
+  /** Count `export { a }` as a read of `a` (it keeps `a` declared). */
+  exportsRead = true,
+): Map<string, number> {
+  const reads = new Map<string, number>();
+  const count = (name: string) => reads.set(name, (reads.get(name) ?? 0) + 1);
+  walk(ast, {
+    enter(node, parent, key) {
+      if (
+        node.type === "Identifier" &&
+        !owned.has(node) &&
+        !isDeclaredName(parent, key) &&
+        (exportsRead || parent?.type !== "ExportSpecifier") &&
+        isReference(node, parent)
+      ) {
+        count(node.name);
+        // `$store` reads `store`.
+        if (node.name.startsWith("$") && !node.name.startsWith("$$")) {
+          count(node.name.slice(1));
+        }
+      }
+      // `class:x` and `{x}` shorthands, `bind:x`, `let:x`: names without
+      // an Identifier of their own in some shapes.
+      if (
+        node.type === "ClassDirective" ||
+        node.type === "BindDirective" ||
+        node.type === "LetDirective" ||
+        node.type === "StyleDirective"
+      ) {
+        count(node.name);
+      }
+    },
+  });
+  return reads;
+}
+
+/** Whether the child at `key` of `parent` declares a name rather than reading it. */
+function isDeclaredName(parent: Node | null, key: string | null): boolean {
+  switch (parent?.type) {
+    case "VariableDeclarator":
+    case "FunctionDeclaration":
+    case "FunctionExpression":
+    case "ClassDeclaration":
+    case "ClassExpression":
+      return key === "id";
+    default:
+      return false;
+  }
+}
+
+const IGNORE_UNUSED_PROP =
+  "// svelte-ignore unused-export-let export_let_unused\n  ";
+
+/**
+ * Marks props nothing reads anymore with `svelte-ignore`, so Svelte (3–5)
+ * doesn't warn that they're unused. They stay declared: a prop the
+ * component stops declaring would land in `$$restProps`.
+ */
+function silenceUnusedProps(code: string): string {
+  const ast = parse(code, { comments: false });
+  const statements = (ast.instance?.content.body ?? []) as Node[];
+  // `export let a`, and `let a; export { a as b }`.
+  const exported = statements.flatMap((statement) => {
+    if (statement.type !== "ExportNamedDeclaration" || statement.source) {
+      return [];
+    }
+    const { declaration, specifiers } = statement;
+    if (
+      declaration?.type === "VariableDeclaration" &&
+      declaration.kind === "let"
+    ) {
+      return [
+        { statement, names: declaration.declarations.map((d) => d.id as Node) },
+      ];
+    }
+    return declaration
+      ? []
+      : [
+          {
+            statement,
+            names: specifiers.map((specifier) => specifier.local as Node),
+          },
+        ];
+  });
+  const reads = countReads(ast, new Set(), false);
+  let result = code;
+  // Svelte 5 reports `let a; export { a as b }` at the `let`, Svelte 3/4
+  // at the export: mark both.
+  const declaredAt = new Map<string, number>();
+  for (const statement of statements) {
+    if (statement.type !== "VariableDeclaration") continue;
+    for (const declarator of statement.declarations) {
+      if (declarator.id.type === "Identifier") {
+        declaredAt.set(declarator.id.name, statement.start);
+      }
+    }
+  }
+  const marks = new Set<number>();
+  for (const { statement, names } of exported) {
+    for (const name of names) {
+      if (name.type !== "Identifier" || reads.has(name.name)) continue;
+      marks.add((statement as unknown as Span).start);
+      const declaration = declaredAt.get(name.name);
+      if (declaration !== undefined) marks.add(declaration);
+    }
+  }
+  for (const start of [...marks].sort((a, b) => b - a)) {
+    result = result.slice(0, start) + IGNORE_UNUSED_PROP + result.slice(start);
+  }
+  return result;
+}
+
 export function dropUnusedDeclarations(source: string): {
   code: string;
   dropped: number;
@@ -706,34 +830,10 @@ export function dropUnusedDeclarations(source: string): {
     }
     if (candidates.length === 0) break;
 
-    const owned = new Set(candidates.flatMap((c) => [...c.own]));
-    const reads = new Map<string, number>();
-    const count = (name: string) => reads.set(name, (reads.get(name) ?? 0) + 1);
-    walk(ast, {
-      enter(node, parent) {
-        if (
-          node.type === "Identifier" &&
-          !owned.has(node) &&
-          isReference(node, parent)
-        ) {
-          count(node.name);
-          // `$store` reads `store`.
-          if (node.name.startsWith("$") && !node.name.startsWith("$$")) {
-            count(node.name.slice(1));
-          }
-        }
-        // `class:x` and `{x}` shorthands, `bind:x`, `let:x`: names without
-        // an Identifier of their own in some shapes.
-        if (
-          node.type === "ClassDirective" ||
-          node.type === "BindDirective" ||
-          node.type === "LetDirective" ||
-          node.type === "StyleDirective"
-        ) {
-          count(node.name);
-        }
-      },
-    });
+    const reads = countReads(
+      ast,
+      new Set(candidates.flatMap((c) => [...c.own])),
+    );
 
     // Count a declaration's own reads (`$: x = x + 1`) as reads too: only
     // `owned` nodes (the declared names) are excluded above.
