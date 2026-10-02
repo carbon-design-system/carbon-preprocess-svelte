@@ -4,7 +4,7 @@ import { listJsAndSvelteFiles } from "../indexer/list-files";
 import { collectCarbonTokens } from "../plugins/scan-content";
 import type { CarbonComponents, ModuleUsage } from "./call-sites";
 import { loadComponentModel } from "./component-model";
-import { type ContextResolver, createScope } from "./evaluate";
+import { type ContextResolver, createScope, type Scope } from "./evaluate";
 import { walkLive } from "./live-walk";
 import {
   addCallSite,
@@ -38,6 +38,11 @@ export type UsageAnalysis = {
    * though a bundled one could under some props.
    */
   isPruned(cls: string): boolean;
+  /**
+   * The scope `key` was last walked in: its merged usage and the final
+   * context facts. `undefined` for a component that can't render.
+   */
+  scopeFor(key: string): Scope | undefined;
 };
 
 const SRC_SEGMENT = /(?:^|[\\/])carbon-components-svelte[\\/]src[\\/](.+)$/;
@@ -84,6 +89,8 @@ async function readCarbonSources(carbonSrc: string): Promise<CarbonSources> {
 
 type Pass = {
   usages: Map<string, ComponentUsage>;
+  /** The context resolver of the final iteration. */
+  resolver: ContextResolver;
   classes: Set<string>;
   prefixes: Set<string>;
 };
@@ -148,7 +155,7 @@ function runPass(
         for (const cls of result.classes) classes.add(cls);
         for (const prefix of result.prefixes) prefixes.add(prefix);
       }
-      return { usages, classes, prefixes };
+      return { usages, resolver, classes, prefixes };
     }
     provided = next;
   }
@@ -281,5 +288,15 @@ export async function analyzeUsage(input: {
     liveComponents: new Set(precise.usages.keys()),
     usages: precise.usages,
     isPruned,
+    scopeFor(key) {
+      const usage = precise.usages.get(key);
+      return usage
+        ? createScope(
+            loadComponentModel(carbonSrc, key),
+            usage,
+            precise.resolver,
+          )
+        : undefined;
+    },
   };
 }

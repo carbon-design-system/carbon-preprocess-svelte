@@ -15,6 +15,8 @@ export const FUNCTION_DECLARATION = "function";
 export type ComponentModel = {
   /** Path relative to Carbon's `src`, e.g. `Button/Button.svelte`. */
   key: string;
+  /** The source `ast` was parsed from. */
+  code: string;
   ast: AST.Root;
   /** `export let` props and their default expressions. */
   props: Map<string, Expression | null>;
@@ -120,6 +122,7 @@ export function buildComponentModel(
   const ast = parse(code, { comments: false });
   const model: ComponentModel = {
     key,
+    code,
     ast,
     props: new Map(),
     declarations: new Map(),

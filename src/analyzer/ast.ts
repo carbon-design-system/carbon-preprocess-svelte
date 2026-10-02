@@ -15,19 +15,24 @@ function isNode(value: unknown): value is Node {
   );
 }
 
-/** A node's child nodes, in source order. */
-export function childNodes(node: Node): Node[] {
-  const children: Node[] = [];
+/** A node's child nodes with the field holding each, in source order. */
+export function childEntries(node: Node): Array<[field: string, child: Node]> {
+  const children: Array<[string, Node]> = [];
   const fields = node as unknown as Record<string, unknown>;
   for (const key of keysByType[node.type] ?? []) {
     const value = fields[key];
     if (Array.isArray(value)) {
-      for (const item of value) if (isNode(item)) children.push(item);
+      for (const item of value) if (isNode(item)) children.push([key, item]);
     } else if (isNode(value)) {
-      children.push(value);
+      children.push([key, value]);
     }
   }
   return children;
+}
+
+/** A node's child nodes, in source order. */
+export function childNodes(node: Node): Node[] {
+  return childEntries(node).map(([, child]) => child);
 }
 
 /** Calls `visit` on `node` and every descendant, depth-first. */
