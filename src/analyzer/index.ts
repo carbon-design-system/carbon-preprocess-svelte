@@ -138,7 +138,10 @@ export async function analyzeFiles(input: {
     const carbon = readCarbonComponents(carbonRoot);
     const modules: ModuleUsage[] = [];
     for (const { file, code } of input.files) {
-      const usage = readModuleUsage(file, code, carbon);
+      // `code` is the file's source here, not a bundler's output.
+      const usage = isSvelteFile(file)
+        ? collectSvelteUsage(code, file, carbon)
+        : readModuleUsage(file, code, carbon);
       if (usage) modules.push(usage);
     }
 
