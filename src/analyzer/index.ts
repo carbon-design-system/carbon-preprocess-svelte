@@ -2,7 +2,7 @@
  * Entry point the CSS plugins load lazily for `experimental.propAware`, so
  * builds without it never evaluate the analyzer.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { CarbonSvelte } from "../constants";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
@@ -21,6 +21,7 @@ import {
   type ModuleUsage,
   readCarbonComponents,
 } from "./call-sites";
+import { type SpecializeOptions, specializeComponent } from "./specialize";
 import { formatValue } from "./values";
 
 export type PropAwareResult = PropAwareUsage & {
@@ -30,9 +31,21 @@ export type PropAwareResult = PropAwareUsage & {
 
 const WARN_PREFIX = "carbon-preprocess-svelte:";
 
-function failure(error: unknown): string {
+const PROP_AWARE_FAILURE = {
+  feature: "experimental.propAware",
+  fallback: "Carbon CSS was pruned without it",
+};
+const SPECIALIZE_FAILURE = {
+  feature: "optimizeComponents",
+  fallback: "Carbon components were bundled unchanged",
+};
+
+function failure(
+  error: unknown,
+  { feature, fallback } = PROP_AWARE_FAILURE,
+): string {
   const message = error instanceof Error ? error.message : String(error);
-  return `${WARN_PREFIX} experimental.propAware could not analyze this build (${message}); Carbon CSS was pruned without it.`;
+  return `${WARN_PREFIX} ${feature} could not analyze this build (${message}); ${fallback}.`;
 }
 
 /** What a module contributes, read from its source when it's a `.svelte` file. */
@@ -132,6 +145,8 @@ export async function analyzeFiles(input: {
   files: Iterable<{ file: string; code: string }>;
   components: Iterable<string>;
   options: PropAwareOptions;
+  /** Names the feature in the warning when analysis fails. */
+  failure?: typeof PROP_AWARE_FAILURE;
 }): Promise<PropAwareResult | { warning: string }> {
   try {
     const carbonRoot = resolveCarbonRoot(input.projectRoot);
@@ -181,7 +196,7 @@ export async function analyzeFiles(input: {
       carbon,
     );
   } catch (error) {
-    return { warning: failure(error) };
+    return { warning: failure(error, input.failure) };
   }
 }
 
@@ -227,4 +242,62 @@ export function formatPropAwareReport(
 
   lines.push(`    Classes pruned by props: ${prunedClasses.size}`);
   return lines;
+}
+
+/** Carbon components rewritten for an app, by real path of their source. */
+export type SpecializedComponents = {
+  sources: Map<string, string>;
+  edits: number;
+};
+
+/**
+ * Analyzes `files` (every file that renders Carbon) and rewrites each
+ * Carbon component they render for the props they pass it.
+ */
+export async function specializeFiles(input: {
+  projectRoot: string;
+  files: Array<{ file: string; code: string }>;
+  options?: SpecializeOptions;
+}): Promise<SpecializedComponents | { warning: string }> {
+  let carbon: CarbonComponents;
+  try {
+    carbon = readCarbonComponents(resolveCarbonRoot(input.projectRoot));
+  } catch (error) {
+    return { warning: failure(error, SPECIALIZE_FAILURE) };
+  }
+  const components = new Set<string>();
+  for (const { file, code } of input.files) {
+    const usage = isSvelteFile(file)
+      ? collectSvelteUsage(code, file, carbon)
+      : collectScriptUsage(code, file, carbon);
+    for (const site of usage.sites) components.add(site.component);
+  }
+  const result = await analyzeFiles({
+    projectRoot: input.projectRoot,
+    files: input.files,
+    components: [...components].map(
+      (key) => `${CarbonSvelte.Components}/src/${key}`,
+    ),
+    options: {},
+    failure: SPECIALIZE_FAILURE,
+  });
+  if ("warning" in result) return result;
+
+  const carbonSrc = realpathSync(
+    path.join(resolveCarbonRoot(input.projectRoot), "src"),
+  );
+  const sources = new Map<string, string>();
+  let edits = 0;
+  try {
+    for (const key of result.analysis.liveComponents) {
+      const scope = result.analysis.scopeFor(key);
+      if (!scope) continue;
+      const specialized = specializeComponent(scope, input.options);
+      edits += specialized.edits;
+      sources.set(path.join(carbonSrc, key), specialized.code);
+    }
+  } catch (error) {
+    return { warning: failure(error, SPECIALIZE_FAILURE) };
+  }
+  return { sources, edits };
 }
