@@ -51,6 +51,7 @@ bun install
 | `bun run lint` | `biome ci --error-on-warnings` (lint + format check, no write). |
 | `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
 | `bun run upgrade-examples` | `bun update` inside each `examples/*` project. |
+| `bun run eval:prop-aware` | Accuracy check for `experimental.propAware`: SSR-renders an app per Carbon component and prop value (plus random mixes), and fails if a selector matching rendered classes was pruned. `--apps <glob>` runs it on existing app files; `--control` prunes everything to prove the check catches it. |
 
 Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds seven real apps.
 
