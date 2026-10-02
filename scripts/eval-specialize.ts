@@ -47,7 +47,8 @@ const { values: args } = parseArgs({
     "empty-block": { type: "string" },
     "skip-size": { type: "boolean" },
     "no-drop": { type: "boolean" },
-    "no-unwrap": { type: "boolean" },
+    // Unwrap branches known to run (Svelte 5 only).
+    unwrap: { type: "boolean" },
     project: { type: "string" },
   },
 });
@@ -248,7 +249,7 @@ for (const [n, testCase] of cases.entries()) {
     const specialized = specializeComponent(scope, {
       emptyBlock,
       dropUnused: !args["no-drop"],
-      unwrap: !args["no-unwrap"],
+      unwrap: args.unwrap,
     });
     edits += specialized.edits;
     try {

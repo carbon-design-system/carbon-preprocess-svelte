@@ -53,14 +53,18 @@ jobs:
           path: eval.json
 
   specialize:
-    name: specialize (svelte ${{ matrix.svelte }}, unwrap ${{ matrix.unwrap }})
+    name: specialize (svelte ${{ matrix.svelte }}${{ matrix.unwrap && ', unwrap' || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         svelte: [3, 4, 5]
-        unwrap: [true, false]
+        unwrap: [false]
+        # Unwrapping branches is only exact with Svelte 5.
+        include:
+          - svelte: 5
+            unwrap: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -89,7 +93,7 @@ jobs:
         run: |
           set -o pipefail
           bun scripts/eval-specialize.ts --project .eval-project --combos 500 \
-            ${{ matrix.unwrap == false && '--no-unwrap' || '' }} \
+            ${{ matrix.unwrap && '--unwrap' || '' }} \
             --json eval.json | tee eval.log
 
       - name: Summary

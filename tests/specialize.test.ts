@@ -6,6 +6,7 @@ import { buildComponentModel } from "../src/analyzer/component-model";
 import { createScope } from "../src/analyzer/evaluate";
 import {
   dropUnusedDeclarations,
+  type SpecializeOptions,
   specializeComponent,
 } from "../src/analyzer/specialize";
 import { addCallSite, newComponentUsage } from "../src/analyzer/usage";
@@ -17,6 +18,7 @@ function specialize(
   code: string,
   props: Record<string, string | number | boolean | undefined> = {},
   slots: string[] = [],
+  options?: SpecializeOptions,
 ) {
   const model = buildComponentModel(code, "X/X.svelte");
   const usage = newComponentUsage();
@@ -32,6 +34,7 @@ function specialize(
   );
   const result = specializeComponent(
     createScope(model, usage, () => possible(undefined)),
+    options,
   );
   parse(result.code);
   return result.code;
@@ -49,9 +52,32 @@ describe("specializeComponent", () => {
       { kind: "tertiary" },
     );
     expect(code).toContain(`export let kind = "primary";`);
-    expect(code).toContain(`<button class={"b"}>{"tertiary"}</button>`);
+    // The live branch keeps a block around it, so whitespace renders the
+    // same in Svelte 3/4.
+    expect(code).toContain(
+      `{#if true}<button class={"b"}>{"tertiary"}</button>{/if}`,
+    );
     expect(code).not.toContain("Skeleton");
-    expect(code).not.toContain("{#if");
+  });
+
+  test("`unwrap` replaces a block with its live branch (Svelte 5)", () => {
+    const code = specialize(
+      `<script>export let a = true;</script>
+<p>
+  {#if a}
+    <!-- svelte-ignore a11y-missing-attribute -->
+    <img />
+  {:else}
+    <b />
+  {/if}
+</p>`,
+      {},
+      [],
+      { unwrap: true },
+    );
+    expect(code).toContain(
+      "<p>\n  <!-- svelte-ignore a11y-missing-attribute --><img />\n</p>",
+    );
   });
 
   test("keeps props declared and never folds what's written", () => {

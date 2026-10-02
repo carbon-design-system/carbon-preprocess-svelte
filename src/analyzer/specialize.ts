@@ -235,8 +235,11 @@ export type SpecializeOptions = {
   /**
    * Replace an `{#if}` whose only live branch is known with that branch's
    * content. Off, the branch keeps an `{#if true}` around it: a little more
-   * code, but block boundaries (and so whitespace) stay as they were.
-   * @default true
+   * code, but block boundaries (and so rendered whitespace) stay as they
+   * were. Only Svelte 5 renders unwrapped branches identically; Svelte 3/4
+   * trim whitespace inside elements differently once the block is gone. It
+   * saves under a point of minified JS.
+   * @default false
    */
   unwrap?: boolean;
   /** Debugging: apply only the top-level edits this accepts (by index). */
@@ -249,7 +252,7 @@ export function specializeComponent(
 ): Specialization {
   const { code, ast } = scope.model;
   const emptyBlock = options?.emptyBlock ?? "{#if false}{/if}";
-  const unwrap = options?.unwrap ?? true;
+  const unwrap = options?.unwrap ?? false;
   const edits: Edit[] = [];
   let preserveDepth = 0;
 
@@ -522,10 +525,10 @@ export function specializeComponent(
         if (kept.length === 0) {
           const content = body(rewrite, finalElse);
           if (content.replace(EDGE_WHITESPACE, "") === "") return placeholder;
-          // `{@const}` and `{#snippet}` are scoped to the branch they're
-          // in; keep a block around them. Without `unwrap`, keep one around
-          // every live branch: block boundaries decide how Svelte 3/4 trim
-          // whitespace inside the elements a branch holds.
+          // Keep a block around the live branch unless `unwrap` (Svelte 5
+          // only): block boundaries decide how Svelte 3/4 trim whitespace
+          // inside the elements a branch holds. `{@const}` and `{#snippet}`
+          // are scoped to their branch, so they always keep one.
           if (
             !unwrap ||
             finalElse?.nodes.some(
@@ -536,9 +539,9 @@ export function specializeComponent(
             return `{#if true}${content}{/if}`;
           }
           // Unwrap: the block's own edges were trimmed; the whitespace
-          // around it stays where it was. Comments at the edges (like
-          // `svelte-ignore`) don't stop that trimming inside the block, so
-          // the whitespace between them goes too.
+          // around it stays where it was. Svelte 5 trims through comments at
+          // the edges (like `svelte-ignore`) inside the block, so the
+          // whitespace between them goes too.
           return trim
             ? content
                 .replace(EDGE_WHITESPACE, "")
