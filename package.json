@@ -21,7 +21,8 @@
     "lint": "biome ci --error-on-warnings",
     "lint:fix": "biome check --write --unsafe .",
     "upgrade-examples": "bun scripts/upgrade-examples.ts",
-    "eval:prop-aware": "bun scripts/eval-prop-aware.ts"
+    "eval:prop-aware": "bun scripts/eval-prop-aware.ts",
+    "eval:specialize": "bun scripts/eval-specialize.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
