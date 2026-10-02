@@ -61,11 +61,13 @@ function resolve(name: string, scope: Scope): Value {
     if (usage.open) return UNKNOWN;
     const fallback = model.props.get(name);
     const defaultValue = fallback ? evaluate(fallback, scope) : UNDEFINED;
-    const given = usage.props.get(name);
+    // The name the parent passes it by (`class` for `className`).
+    const passedAs = model.propNames.get(name) ?? name;
+    const given = usage.props.get(passedAs);
     if (given === undefined) return defaultValue;
     // A prop passed as `undefined` falls back to its default.
     const passesUndefined = given === UNKNOWN || given.has(undefined);
-    return usage.omitted.has(name) || passesUndefined
+    return usage.omitted.has(passedAs) || passesUndefined
       ? join(given, defaultValue)
       : given;
   }

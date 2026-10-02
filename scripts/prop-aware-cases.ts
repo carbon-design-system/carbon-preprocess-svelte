@@ -196,6 +196,12 @@ export function buildCases(options: CaseOptions): Case[] {
       components: deps,
       markup: element(name, ""),
     });
+    // `class` is often a renamed export (`export { className as class }`).
+    cases.push({
+      id: `${name}/class`,
+      components: deps,
+      markup: element(name, 'class="custom"'),
+    });
     for (const [prop, values] of propVariants(name, carbon, carbonSrc)) {
       for (const value of values) {
         cases.push({

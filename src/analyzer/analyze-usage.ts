@@ -124,7 +124,7 @@ function runPass(
         usages.set(site.component, usage);
       }
       const merged = forceOpen ? { ...site, open: true } : site;
-      if (addCallSite(usage, merged, model.props.keys())) {
+      if (addCallSite(usage, merged, model.propNames.values())) {
         queue.push(site.component);
       }
     };

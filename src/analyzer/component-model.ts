@@ -20,6 +20,11 @@ export type ComponentModel = {
   ast: AST.Root;
   /** `export let` props and their default expressions. */
   props: Map<string, Expression | null>;
+  /**
+   * Each prop's local name -> the name a parent passes it by: the same for
+   * `export let kind`, `class` for `let className; export { className as class }`.
+   */
+  propNames: Map<string, string>;
   /** Top-level `let`/`const`, functions, and `$: x = …` declarations. */
   declarations: Map<string, Expression | null | typeof FUNCTION_DECLARATION>;
   /** The `$: x = …` assignments that define a declaration above. */
@@ -125,6 +130,7 @@ export function buildComponentModel(
     code,
     ast,
     props: new Map(),
+    propNames: new Map(),
     declarations: new Map(),
     reactiveDeclarations: new WeakSet(),
     unknownNames: new Set(),
@@ -137,6 +143,8 @@ export function buildComponentModel(
     throw new UnsupportedComponentError(`${key} uses runes mode`);
   }
 
+  /** Instance-script `let` names: a later `export { … }` can make them props. */
+  const letDeclarations = new Set<string>();
   for (const script of [ast.module, ast.instance]) {
     if (!script) continue;
     const isInstance = script === ast.instance;
@@ -146,7 +154,36 @@ export function buildComponentModel(
         statement as Node,
         isInstance,
         resolveImport,
+        isInstance ? letDeclarations : new Set(),
       );
+    }
+  }
+
+  // `let a; export { a as b }` declares prop `b`.
+  for (const statement of ast.instance?.content.body ?? []) {
+    if (statement.type !== "ExportNamedDeclaration" || statement.declaration) {
+      continue;
+    }
+    if (statement.source) continue;
+    for (const specifier of statement.specifiers) {
+      if (
+        specifier.local.type !== "Identifier" ||
+        !letDeclarations.has(specifier.local.name)
+      ) {
+        continue;
+      }
+      const local = specifier.local.name;
+      const exported =
+        specifier.exported.type === "Identifier"
+          ? specifier.exported.name
+          : String(specifier.exported.value);
+      const init = model.declarations.get(local);
+      model.declarations.delete(local);
+      model.props.set(
+        local,
+        init === FUNCTION_DECLARATION ? null : (init ?? null),
+      );
+      model.propNames.set(local, exported);
     }
   }
 
@@ -198,6 +235,8 @@ function readTopLevelStatement(
   statement: Node,
   isInstance: boolean,
   resolveImport: ImportResolver,
+  /** Collects top-level `let` names. */
+  lets: Set<string>,
 ): void {
   if (statement.type === "ImportDeclaration") {
     const source = String(statement.source.value);
@@ -232,8 +271,10 @@ function readTopLevelStatement(
       const init = declarator.init ?? null;
       if (isExport && isInstance && declaration.kind !== "const") {
         model.props.set(declarator.id.name, init);
+        model.propNames.set(declarator.id.name, declarator.id.name);
       } else {
         model.declarations.set(declarator.id.name, init);
+        if (declaration.kind === "let") lets.add(declarator.id.name);
       }
     }
     return;
