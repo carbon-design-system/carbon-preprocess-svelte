@@ -3,11 +3,7 @@ import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import {
-  createCssOptimizer,
-  isSilent,
-  toCssString,
-} from "./create-optimized-css";
+import { createCssOptimizer, toCssString } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
@@ -42,7 +38,7 @@ function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
  * it after other plugins have transformed modules.
  */
 export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
-  const silent = isSilent(options);
+  const silent = options?.silent === true;
   /**
    * Absolute file paths of Carbon Svelte components seen by `transform`, in
    * this build or an earlier `vite build --watch` build. Not cleared per

@@ -1,7 +1,7 @@
 import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
 import type { OptimizeCssOptions } from "./create-optimized-css";
-import { createCssOptimizer, isSilent } from "./create-optimized-css";
+import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { logAssetDiff } from "./print-diff";
 import type { AssetReport } from "./print-report";
@@ -103,7 +103,7 @@ export default class OptimizeCssPlugin {
       },
     } = compiler;
     const options = this.options;
-    const silent = isSilent(options);
+    const silent = options.silent === true;
 
     compiler.hooks.thisCompilation.tap(
       OptimizeCssPlugin.name,
