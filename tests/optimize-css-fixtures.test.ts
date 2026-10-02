@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { filterCss } from "caligula";
-import { createOptimizedCss } from "carbon-preprocess-svelte/plugins/create-optimized-css";
 import {
   buildAllowlist,
   carbonClassesIn,
@@ -10,6 +9,7 @@ import {
   shouldKeepStrictSelector,
 } from "./helpers/carbon-css";
 import { components } from "./helpers/component-index";
+import { createOptimizedCss } from "./helpers/create-optimized-css";
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/optimize-css");
 const UPDATE_FIXTURES = process.env.UPDATE_FIXTURES === "true";

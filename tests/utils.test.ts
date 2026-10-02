@@ -49,6 +49,14 @@ describe("isCarbonSvelteImport", () => {
     ).toBe(true);
   });
 
+  test("accepts backslash paths, as webpack reports on Windows", () => {
+    expect(
+      isCarbonSvelteImport(
+        `C:\\app\\node_modules\\${CarbonSvelte.Components}\\src\\Button\\Button.svelte`,
+      ),
+    ).toBe(true);
+  });
+
   test("returns false for non-Carbon Svelte imports", () => {
     expect(isCarbonSvelteImport("Button.svelte")).toBe(false);
     expect(isCarbonSvelteImport(`${CarbonSvelte.Icons}/Button.svelte`)).toBe(

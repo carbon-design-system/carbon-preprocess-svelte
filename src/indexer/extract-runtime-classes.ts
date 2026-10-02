@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { AST } from "sveast";
@@ -12,20 +11,17 @@ const CLASSLIST_LITERAL =
 const JS_EXT = /\.js$/;
 
 /**
- * A `bx--` class name, not preceded by a class-name character: matches each
- * class in `"bx--a bx--b"`, `".bx--a .bx--b"`, or
- * `'<strong class="bx--a">'`, and a trailing-hyphen prefix like the
- * `bx--btn--` in `` `bx--btn--${kind}` ``. A bare `bx--` (as in
- * `/^bx--(overflow-menu|checkbox)/`) is not a class: as a prefix it would
- * keep every Carbon rule.
+ * A `bx--` class name not preceded by a class-name character, including a
+ * trailing-hyphen prefix like the `bx--btn--` in `` `bx--btn--${kind}` ``. A
+ * bare `bx--` (as in `/^bx--(overflow-menu|checkbox)/`) is not a class: as a
+ * prefix it would keep every Carbon rule.
  */
 const CARBON_CLASS_TOKEN = /(?<![\w-])bx--[\w-]+/g;
 
 /**
  * Every `bx--` class name in `text`, as `.bx--…` selectors. With
- * `skipLookups`, a class written as a selector (`closest(".bx--modal")`,
- * `":not(.bx--hidden)"`) is skipped: it finds an element rendered
- * elsewhere rather than applying the class.
+ * `skipLookups`, classes written as selectors (`closest(".bx--modal")`) are
+ * skipped: they find an element rendered elsewhere instead of applying it.
  */
 export function extractCarbonClassTokens(
   text: string,
@@ -49,10 +45,7 @@ export function extractRuntimeClassesFromSource(code: string): string[] {
   return [...classes];
 }
 
-export function resolveRelativeImport(
-  from: string,
-  spec: string,
-): string | null {
+function resolveRelativeImport(from: string, spec: string): string | null {
   if (!spec.startsWith(".")) {
     return null;
   }
@@ -110,13 +103,8 @@ function collectImportsFromCode(
 export type ModuleGraphCache = {
   importsByModule: Map<string, string[]>;
   runtimeByModule: Map<string, Set<string>>;
-  /**
-   * Every `.js`/`.svelte` module key under the Carbon `src` directory, when
-   * the caller has already listed them. Import resolution then never touches
-   * the filesystem; without it, each candidate path is checked with
-   * `existsSync`.
-   */
-  files?: Set<string>;
+  /** Every `.js`/`.svelte` module key under Carbon's `src`. */
+  files: Set<string>;
 };
 
 function importCandidates(spec: string): string[] {
@@ -128,48 +116,15 @@ function importCandidates(spec: string): string[] {
 }
 
 /**
- * `existsSync` is a blocking syscall and the same `moduleKey` gets re-resolved
- * repeatedly: once per BFS queue entry, again inside `ensureModuleLoaded`, and
- * again from every component whose import graph reaches a shared module (e.g.
- * a common utility). The filesystem doesn't change mid-build, so cache by
- * input string across the whole `buildRuntimeClassMap` call.
- */
-function resolveExistingModuleKey(
-  carbonSrcPath: string,
-  moduleKey: string,
-  cache: Map<string, string | null>,
-  files: Set<string> | undefined,
-): string | null {
-  const cached = cache.get(moduleKey);
-  if (cached !== undefined) return cached;
-
-  let resolved: string | null = null;
-
-  for (const candidate of importCandidates(moduleKey)) {
-    const exists = files
-      ? files.has(candidate)
-      : existsSync(path.join(carbonSrcPath, candidate));
-    if (exists) {
-      resolved = candidate;
-      break;
-    }
-  }
-
-  cache.set(moduleKey, resolved);
-  return resolved;
-}
-
-/**
- * Trace Carbon classes through relative imports reachable from exported
- * components: whatever `cache.runtimeByModule` holds for `.svelte` modules,
- * and every `bx--` class a `.js` module applies (a hoisted
- * `const HIGHLIGHT = "bx--…"`, a `classList` call, a class prefix). Only
- * loads `.js` modules lazily along import paths.
+ * Traces Carbon classes through the relative imports reachable from each
+ * exported component: what `cache.runtimeByModule` holds for `.svelte`
+ * modules, and every `bx--` class a `.js` module applies (a hoisted
+ * `const HIGHLIGHT = "bx--…"`, a `classList` call, a class prefix). `.js`
+ * modules load lazily along import paths.
  *
  * `.js` lookups (`closest(".bx--modal")`) are skipped: a shared utility is
- * imported by many components, and each would keep the looked-up
- * component's rules. Comments are scanned too; an extra class there only
- * keeps an extra rule.
+ * imported by many components, and each would keep the looked-up component's
+ * rules. Comments are scanned too; a stray class only keeps an extra rule.
  */
 export async function buildRuntimeClassMap(
   carbonSrcPath: string,
@@ -178,94 +133,56 @@ export async function buildRuntimeClassMap(
 ): Promise<Map<string, Set<string>>> {
   const { importsByModule, runtimeByModule, files } = cache;
   const reachableRuntime = new Map<string, Set<string>>();
-  const resolveCache = new Map<string, string | null>();
   const loadPromises = new Map<string, Promise<void>>();
-  const missingModules = new Set<string>();
 
-  async function ensureModuleLoaded(moduleKey: string): Promise<void> {
-    if (missingModules.has(moduleKey)) {
-      return;
+  /** The module `moduleKey` names (`.js` or `.svelte` either way), if it exists. */
+  const resolveModule = (moduleKey: string) =>
+    importCandidates(moduleKey).find((candidate) => files.has(candidate));
+
+  /** Loads a resolved module's imports and runtime classes once. */
+  function ensureModuleLoaded(key: string): Promise<void> {
+    if (importsByModule.has(key)) return Promise.resolve();
+
+    let load = loadPromises.get(key);
+    if (!load) {
+      load = (async () => {
+        const code = await readFile(path.join(carbonSrcPath, key), "utf8");
+        const isSvelte = isSvelteFile(key);
+        const runtime = isSvelte
+          ? extractRuntimeClassesFromSource(code)
+          : extractCarbonClassTokens(code, { skipLookups: true });
+
+        if (runtime.length > 0) runtimeByModule.set(key, new Set(runtime));
+
+        importsByModule.set(key, collectImportsFromCode(code, key, isSvelte));
+      })();
+      loadPromises.set(key, load);
     }
-
-    const resolvedKey = resolveExistingModuleKey(
-      carbonSrcPath,
-      moduleKey,
-      resolveCache,
-      files,
-    );
-
-    if (!resolvedKey) {
-      missingModules.add(moduleKey);
-      return;
-    }
-
-    if (importsByModule.has(resolvedKey)) {
-      return;
-    }
-
-    const pending = loadPromises.get(resolvedKey);
-    if (pending) {
-      await pending;
-      return;
-    }
-
-    const load = (async () => {
-      const filePath = path.join(carbonSrcPath, resolvedKey);
-      const code = await readFile(filePath, "utf8");
-      const runtime = isSvelteFile(resolvedKey)
-        ? extractRuntimeClassesFromSource(code)
-        : extractCarbonClassTokens(code, { skipLookups: true });
-
-      if (runtime.length > 0) {
-        runtimeByModule.set(resolvedKey, new Set(runtime));
-      }
-
-      importsByModule.set(
-        resolvedKey,
-        collectImportsFromCode(code, resolvedKey, isSvelteFile(resolvedKey)),
-      );
-    })();
-    loadPromises.set(resolvedKey, load);
-    await load;
+    return load;
   }
 
   async function collectRuntime(start: string): Promise<Set<string>> {
     const cached = reachableRuntime.get(start);
-    if (cached) {
-      return cached;
-    }
+    if (cached) return cached;
 
     const collected = new Set<string>();
     const visited = new Set<string>();
     const queue = [start];
 
     for (let head = 0; head < queue.length; head++) {
-      const current = queue[head];
+      const current = resolveModule(queue[head]);
 
-      const resolvedCurrent = resolveExistingModuleKey(
-        carbonSrcPath,
-        current,
-        resolveCache,
-        files,
-      );
+      if (!current || visited.has(current)) continue;
 
-      if (!resolvedCurrent || visited.has(resolvedCurrent)) {
-        continue;
-      }
-
-      visited.add(resolvedCurrent);
+      visited.add(current);
       // biome-ignore lint/performance/noAwaitInLoops: graph walk is intentionally sequential
-      await ensureModuleLoaded(resolvedCurrent);
+      await ensureModuleLoaded(current);
 
-      for (const cls of runtimeByModule.get(resolvedCurrent) ?? []) {
-        collected.add(cls);
-      }
+      for (const cls of runtimeByModule.get(current) ?? []) collected.add(cls);
 
-      for (const next of importsByModule.get(resolvedCurrent) ?? []) {
+      for (const next of importsByModule.get(current) ?? []) {
         for (const candidate of importCandidates(next)) {
-          if (!visited.has(candidate)) {
-            queue.push(candidate);
-          }
+          if (!visited.has(candidate)) queue.push(candidate);
         }
       }
     }

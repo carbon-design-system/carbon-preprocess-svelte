@@ -63,7 +63,6 @@ for (const scenario of SCENARIOS) {
         components,
         source,
         ids: scenario.ids,
-        silent: true,
       });
     });
   });
@@ -80,7 +79,6 @@ group("per-asset paths (small bundle)", () => {
   const optimizer = createCssOptimizer({
     components,
     ids: BUNDLE_IDS,
-    silent: true,
   });
 
   task("non-Carbon chunk (skip, ~25kb)", () => {
@@ -107,7 +105,6 @@ group("options (small bundle)", () => {
       components,
       source,
       ids: BUNDLE_IDS,
-      silent: true,
       safelist: [".bx--grid", ".bx--row", ".bx--col", ".bx--aspect-ratio"],
     });
   });
@@ -117,7 +114,6 @@ group("options (small bundle)", () => {
       components,
       source,
       ids: BUNDLE_IDS,
-      silent: true,
       safelist: SAFELIST_REGEXPS,
     });
   });
@@ -127,7 +123,6 @@ group("options (small bundle)", () => {
       components,
       source,
       ids: BUNDLE_IDS,
-      silent: true,
       contentClasses: CONTENT_CLASSES,
     });
   });
@@ -137,7 +132,6 @@ group("options (small bundle)", () => {
       components,
       source,
       ids: [...BUNDLE_IDS, "DatePicker", "DatePickerInput"],
-      silent: true,
     });
   });
 
@@ -146,7 +140,6 @@ group("options (small bundle)", () => {
       components,
       source,
       ids: BUNDLE_IDS,
-      silent: true,
       preserveAllIBMFonts: true,
     });
   });
@@ -165,7 +158,6 @@ group("full build (small bundle, 4 assets)", () => {
     const optimizer = createCssOptimizer({
       components,
       ids: BUNDLE_IDS,
-      silent: true,
     });
     for (const [_id, css] of assets) {
       optimizer.run(css);

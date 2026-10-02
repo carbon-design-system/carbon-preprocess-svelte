@@ -7,7 +7,7 @@ import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
 } from "../src/plugins/messages";
-import OptimizeCssPlugin from "../src/plugins/OptimizeCssPlugin";
+import { OptimizeCssPlugin } from "../src/plugins/OptimizeCssPlugin";
 import { createFakeProject } from "./helpers/fake-project";
 
 type ModuleResource =
@@ -98,9 +98,7 @@ const getOptions = (plugin: OptimizeCssPlugin): unknown =>
 describe("OptimizeCssPlugin", () => {
   test("constructor sets default options correctly", () => {
     const plugin = new OptimizeCssPlugin();
-    expect(getOptions(plugin)).toEqual({
-      preserveAllIBMFonts: false,
-    } as const);
+    expect(getOptions(plugin)).toEqual({});
   });
 
   test("constructor respects provided options", () => {

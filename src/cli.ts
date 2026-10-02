@@ -1,14 +1,14 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { LOG_PREFIX } from "./constants";
 import { loadComponentIndex } from "./indexer/load-index";
 import { createCssOptimizer } from "./plugins/create-optimized-css";
-import { logAssetDiff } from "./plugins/print-diff";
-import type { AssetReport } from "./plugins/print-report";
-import { printReport, toAssetReport } from "./plugins/print-report";
+import { optimizeAssets } from "./plugins/optimize-assets";
 import type { SafelistEntry } from "./plugins/safelist";
-import { collectCarbonTokens } from "./plugins/scan-content";
+import { collectCarbonTokens, readSources } from "./plugins/scan-content";
 import { collectCarbonImports } from "./plugins/scan-imports";
+import { isCssFile } from "./utils";
 
 const REGEXP_SAFELIST_ENTRY = /^\/(.+)\/([a-z]*)$/;
 
@@ -60,22 +60,21 @@ async function main() {
 
   if (values.help) {
     console.log(USAGE);
-    process.exit(0);
+    return;
   }
 
   const [subcommand, ...cssPatterns] = positionals;
 
   if (subcommand !== "optimize-css") {
-    console.log(USAGE);
-    process.exit(1);
+    console.error(USAGE);
+    process.exitCode = 1;
+    return;
   }
 
   const cwd = path.resolve(values.cwd ?? process.cwd());
 
   const cssFiles = [
-    ...new Set(
-      globSync(cssPatterns, { cwd }).filter((file) => file.endsWith(".css")),
-    ),
+    ...new Set(globSync(cssPatterns, { cwd }).filter(isCssFile)),
   ].sort();
 
   if (cssFiles.length === 0) {
@@ -87,20 +86,12 @@ async function main() {
       ? values.content
       : DEFAULT_CONTENT_GLOBS;
 
-  // Scan sources once for Carbon imports and literal `bx--` tokens, the
-  // same allowlist inputs the plugins collect from bundler hooks.
   const components = new Set<string>();
   const contentClasses = new Set<string>();
 
-  for (const file of globSync(contentGlobs, { cwd })) {
-    let text: string;
-    try {
-      text = readFileSync(path.resolve(cwd, file), "utf-8");
-    } catch {
-      continue;
-    }
-    collectCarbonImports(text, components);
-    collectCarbonTokens(text, contentClasses);
+  for (const source of readSources(globSync(contentGlobs, { cwd }), cwd)) {
+    collectCarbonImports(source, components);
+    collectCarbonTokens(source, contentClasses);
   }
 
   for (const name of (values.components ?? "").split(",")) {
@@ -115,53 +106,47 @@ async function main() {
   }
 
   const index = await loadComponentIndex(cwd);
-  // Already warned; leave every file unpruned.
-  if (!index) return;
+  // `loadComponentIndex` already warned; the files stay unpruned.
+  if (!index) {
+    process.exitCode = 1;
+    return;
+  }
 
   const safelist = parseSafelist(values.safelist ?? []);
-  const dryRun = values["dry-run"] === true;
-  const silent = values.silent === true;
-  const optimizer = createCssOptimizer({
-    components: index,
-    ids: components,
-    contentClasses,
+  const options = {
     safelist,
     preserveAllIBMFonts: values["preserve-all-ibm-fonts"] === true,
+    dryRun: values["dry-run"] === true,
+    report: values.report === true,
+    silent: values.silent === true,
+  };
+
+  optimizeAssets({
+    assets: cssFiles.map((id) => {
+      const file = path.resolve(cwd, id);
+      const source = readFileSync(file, "utf-8");
+      return {
+        id,
+        source,
+        write(css) {
+          if (css !== source) writeFileSync(file, css);
+        },
+      };
+    }),
+    optimizer: createCssOptimizer({
+      ...options,
+      components: index,
+      ids: components,
+      contentClasses,
+    }),
+    options,
+    contentTokens: contentClasses.size,
   });
-  const assetReports: AssetReport[] = [];
-
-  for (const id of cssFiles) {
-    const css = readFileSync(path.resolve(cwd, id), "utf-8");
-    const { css: optimized, removed } = optimizer.run(css);
-
-    if (!dryRun && removed > 0) {
-      writeFileSync(path.resolve(cwd, id), optimized);
-    }
-
-    if (!silent && removed > 0) {
-      logAssetDiff({ original_css: css, optimized_css: optimized, id, dryRun });
-    }
-
-    if (values.report) {
-      assetReports.push(toAssetReport(id, css, optimized, removed));
-    }
-  }
-
-  if (values.report) {
-    printReport({
-      components: optimizer.usage.components,
-      allowlistSize: optimizer.usage.allowlistSize,
-      moduleTokens: 0,
-      contentTokens: contentClasses.size,
-      safelistEntries: safelist.length,
-      assets: assetReports,
-      dryRun,
-    });
-  }
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`carbon-preprocess-svelte: ${message}`);
-  process.exit(1);
+  console.error(
+    `${LOG_PREFIX} ${error instanceof Error ? error.message : error}`,
+  );
+  process.exitCode = 1;
 });

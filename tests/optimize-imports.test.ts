@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { optimizeImports } from "carbon-preprocess-svelte";
-import { readCarbonExports } from "carbon-preprocess-svelte/preprocessors/carbon-exports";
+import { readCarbonExports } from "carbon-preprocess-svelte/indexer/carbon-exports";
 import { transformScript } from "carbon-preprocess-svelte/preprocessors/optimize-imports";
 import type { Preprocessor, Processed } from "svelte/compiler";
 import { createFakeProject } from "./helpers/fake-project";

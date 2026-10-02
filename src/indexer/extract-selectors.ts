@@ -9,11 +9,6 @@ import { parse } from "./parser";
 const WHITESPACE_REGEX = /\s+/;
 const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
 
-type ExtractSelectorsProps = {
-  code: string;
-  filename: string;
-};
-
 export type ExtractFromSvelteResult = {
   classes: string[];
   components: string[];
@@ -42,9 +37,10 @@ function literalClasses(
   return [];
 }
 
-export function extractFromSvelte(
-  props: ExtractSelectorsProps,
-): ExtractFromSvelteResult {
+export function extractFromSvelte(props: {
+  code: string;
+  filename: string;
+}): ExtractFromSvelteResult {
   const { code, filename } = props;
   const moduleKey = filename.replace(/\\/g, "/");
   const ast = parse(code, { comments: false });
@@ -52,8 +48,8 @@ export function extractFromSvelte(
   const components = new Set<string>();
   const slotWrappers = new Set<string>();
   const moduleClasses = new Set<string>();
-  // Elements with `bx--` class directives the walk is inside of. A `<slot>`
-  // anywhere under one, in any branch, makes its classes wrap slotted content.
+  // Elements with `bx--` class directives the walk is inside of: a `<slot>`
+  // anywhere under one makes its classes wrap slotted content.
   const openWrappers: { node: AST.SvelteNode; classes: string[] }[] = [];
 
   walk(ast, {
@@ -94,39 +90,27 @@ export function extractFromSvelte(
         selectors.add(cleanSelector);
       }
 
-      // A string may hold several classes (`"bx--a bx--b"`), a selector
-      // (`".bx--a .bx--b"`), or markup, so add each class it names.
-      for (const cls of literalClasses(node)) {
-        selectors.add(cls);
-      }
+      // A string may hold several classes, a selector, or markup.
+      for (const cls of literalClasses(node)) selectors.add(cls);
 
       if (node.type === "RegularElement" || node.type === "SvelteElement") {
-        const classes: string[] = [];
-        for (const attribute of node.attributes) {
-          if (
-            attribute.type === "ClassDirective" &&
-            attribute.name.startsWith("bx--")
-          ) {
-            classes.push(`.${attribute.name}`);
-          }
-        }
-        if (classes.length > 0) {
-          openWrappers.push({ node, classes });
-        }
+        const classes = node.attributes.flatMap((attribute) =>
+          attribute.type === "ClassDirective" &&
+          attribute.name.startsWith("bx--")
+            ? [`.${attribute.name}`]
+            : [],
+        );
+        if (classes.length > 0) openWrappers.push({ node, classes });
       }
 
       if (node.type === "SlotElement") {
         for (const wrapper of openWrappers) {
-          for (const cls of wrapper.classes) {
-            slotWrappers.add(cls);
-          }
+          for (const cls of wrapper.classes) slotWrappers.add(cls);
         }
       }
     },
     leave(node) {
-      if (node === openWrappers.at(-1)?.node) {
-        openWrappers.pop();
-      }
+      if (node === openWrappers.at(-1)?.node) openWrappers.pop();
     },
   });
 
@@ -140,16 +124,16 @@ export function extractFromSvelte(
     });
   }
 
-  const classes: string[] = [];
+  const classes = new Set<string>();
 
   for (const raw of selectors) {
     const value = raw.trim();
-    classes.push(value.startsWith(".") ? value : `.${value}`);
+    classes.add(value.startsWith(".") ? value : `.${value}`);
   }
 
   return {
-    classes: [...new Set(classes)],
-    components: [...new Set(components)],
+    classes: [...classes],
+    components: [...components],
     slotWrappers: [...slotWrappers],
     imports: [...new Set(componentImports(code, ast, moduleKey))],
     runtimeClasses: extractRuntimeClassesFromSource(code),

@@ -494,13 +494,11 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(consoleSpy.mock.calls).toContainEqual([
       "Dry run: styles.css left unchanged",
     ]);
-    expect(consoleSpy.mock.calls).toContainEqual(["Optimized", "styles.css"]);
-    expect(consoleSpy.mock.calls.some((call) => call[0] === "Before:")).toEqual(
-      true,
-    );
-    expect(consoleSpy.mock.calls.some((call) => call[0] === "After: ")).toEqual(
-      true,
-    );
+    expect(
+      consoleSpy.mock.calls.some((call) =>
+        String(call[0]).includes("Optimized styles.css\nBefore: "),
+      ),
+    ).toEqual(true);
 
     consoleSpy.mockRestore();
   });
@@ -608,8 +606,8 @@ describe("optimizeCss (Vite plugin)", () => {
     const ctx = { warn: jest.fn() };
     await plugin.generateBundle.call(ctx, {}, bundle);
 
-    expect(consoleSpy).toHaveBeenCalledTimes(4);
-    expect(consoleSpy.mock.calls[1]).toEqual(["Optimized", "styles.css"]);
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(consoleSpy.mock.calls[0][0]).toContain("Optimized styles.css\n");
   });
 
   test("silent suppresses the logger path too", async () => {

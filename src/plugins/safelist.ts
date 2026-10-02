@@ -5,11 +5,8 @@ export type SafelistEntry = string | RegExp;
 const CLASS_TOKEN_CHAR = /[A-Za-z0-9_-]/;
 
 /**
- * Whether `klass` appears as a complete class token in `selector`.
- *
- * `.bx--grid` matches `.bx--grid`, `.bx--grid:hover`, `div.bx--grid`, and
- * `.bx--grid .bx--row`, but not `.bx--grid-narrow` or `.bx--grid--wide`
- * (use a RegExp entry to keep BEM children).
+ * Whether `klass` appears as a complete class token in `selector`: `.bx--grid`
+ * matches `.bx--grid:hover` and `div.bx--grid` but not `.bx--grid-narrow`.
  */
 function hasClassToken(selector: string, klass: string): boolean {
   let from = 0;
@@ -25,22 +22,20 @@ function hasClassToken(selector: string, klass: string): boolean {
   }
 }
 
+function matches(selector: string, entry: SafelistEntry): boolean {
+  if (typeof entry === "string") return hasClassToken(selector, entry);
+  // A `g`/`y` RegExp carries `lastIndex` between `test` calls.
+  entry.lastIndex = 0;
+  return entry.test(selector);
+}
+
 /**
- * Whether a single selector is safelisted and must be kept regardless of the
- * importer-derived allowlist. String entries match a class token literally;
- * RegExp entries are tested against the whole selector.
+ * Whether a selector must be kept regardless of the allowlist. Strings match
+ * a class token literally; RegExps are tested against the whole selector.
  */
 export function isSafelisted(
   selector: string,
   safelist: readonly SafelistEntry[],
 ): boolean {
-  for (const entry of safelist) {
-    if (typeof entry === "string") {
-      if (hasClassToken(selector, entry)) return true;
-    } else if (entry.test(selector)) {
-      return true;
-    }
-  }
-
-  return false;
+  return safelist.some((entry) => matches(selector, entry));
 }

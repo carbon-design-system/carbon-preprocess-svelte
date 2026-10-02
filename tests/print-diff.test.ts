@@ -1,154 +1,92 @@
 import {
   formatDiff,
-  printDiff,
+  logAssetDiff,
 } from "carbon-preprocess-svelte/plugins/print-diff";
 
-/** Everything `printDiff` wrote to `console.log`, as one string. */
-function printDiffOutput(props: Parameters<typeof printDiff>[0]): string {
-  const log = jest.spyOn(console, "log").mockImplementation(() => {});
-  printDiff(props);
-  const output = log.mock.calls.map((args) => `${args.join(" ")}\n`).join("");
-  log.mockRestore();
-  return output;
-}
-
 describe("print-diff", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  test("output", () => {
-    const log = jest.spyOn(console, "log");
-
+  test("formats the size block", () => {
     expect(
-      printDiff({
-        original_css: "body { color: red; } .bx--btn {}",
-        optimized_css: "body { color: red; }",
+      formatDiff({
         id: "id",
+        originalCss: "body { color: red; } .bx--btn {}",
+        optimizedCss: "body { color: red; }",
       }),
-    );
-    expect(log.mock.calls).toEqual([
-      ["\n"],
-      ["Optimized", "id"],
-      ["Before:", "0.03 kB"],
-      ["After: ", "0.02 kB", "(-37.5%)\n"],
-    ]);
+    ).toBe("\n\nOptimized id\nBefore: 0.03 kB\nAfter:  0.02 kB (-37.5%)\n");
   });
 
-  test("no diff", () => {
-    const log = jest.spyOn(console, "log");
-
+  test("returns null when nothing changed", () => {
     expect(
-      printDiff({
-        original_css: "body { color: red; }",
-        optimized_css: "body { color: red; }",
+      formatDiff({
         id: "id",
+        originalCss: "body { color: red; }",
+        optimizedCss: "body { color: red; }",
       }),
-    );
-
-    expect(log.mock.calls).toEqual([]);
+    ).toBeNull();
   });
 
   test("handles MB-scale files", () => {
-    const log = jest.spyOn(console, "log");
-    const largeString = "x".repeat(2_000_000); // ~2MB
-    const smallerString = "x".repeat(1_500_000); // ~1.5MB
-
-    printDiff({
-      original_css: largeString,
-      optimized_css: smallerString,
-      id: "large-file",
-    });
-
-    expect(log.mock.calls).toEqual([
-      ["\n"],
-      ["Optimized", "large-file"],
-      ["Before:", "  2 MB"],
-      ["After: ", "1.5 MB", "(-25%)\n"],
-    ]);
+    expect(
+      formatDiff({
+        id: "large-file",
+        originalCss: "x".repeat(2_000_000),
+        optimizedCss: "x".repeat(1_500_000),
+      }),
+    ).toBe("\n\nOptimized large-file\nBefore:   2 MB\nAfter:  1.5 MB (-25%)\n");
   });
 
-  test("handles empty strings", () => {
-    const log = jest.spyOn(console, "log");
-
-    printDiff({
-      original_css: "body { }",
-      optimized_css: "",
-      id: "empty",
-    });
-
-    expect(log.mock.calls).toEqual([
-      ["\n"],
-      ["Optimized", "empty"],
-      ["Before:", "0.01 kB"],
-      ["After: ", "   0 kB", "(-100%)\n"],
-    ]);
-  });
-
-  test("handles Buffer input", () => {
-    const log = jest.spyOn(console, "log");
-    const buffer = Buffer.from("body { color: red; }");
-
-    printDiff({
-      original_css: buffer,
-      optimized_css: "body{color:red}",
-      id: "buffer-input",
-    });
-
-    expect(log.mock.calls).toEqual([
-      ["\n"],
-      ["Optimized", "buffer-input"],
-      ["Before:", "0.02 kB"],
-      ["After: ", "0.02 kB", "(-25%)\n"],
-    ]);
+  test("handles empty output", () => {
+    expect(
+      formatDiff({ id: "empty", originalCss: "body { }", optimizedCss: "" }),
+    ).toBe("\n\nOptimized empty\nBefore: 0.01 kB\nAfter:     0 kB (-100%)\n");
   });
 
   test("measures a Uint8Array source as bytes, not as a joined array", () => {
     const original = "body { color: red; } .bx--btn {}";
-    const optimized_css = "body { color: red; }";
-    const asBytes = printDiffOutput({
-      original_css: new TextEncoder().encode(original),
-      optimized_css,
+    const optimizedCss = "body { color: red; }";
+    const asBytes = formatDiff({
       id: "id",
-    });
-    const asString = printDiffOutput({
-      original_css: original,
-      optimized_css,
-      id: "id",
+      originalCss: new TextEncoder().encode(original),
+      optimizedCss,
     });
 
     expect(asBytes).toContain("Before: 0.03 kB");
-    expect(asBytes).toEqual(asString);
+    expect(asBytes).toEqual(
+      formatDiff({ id: "id", originalCss: original, optimizedCss }),
+    );
   });
 
-  test("formatDiff matches printDiff byte for byte", () => {
-    const log = jest.spyOn(console, "log");
+  describe("logAssetDiff", () => {
     const props = {
-      original_css: "body { color: red; } .bx--btn {}",
-      optimized_css: "body { color: red; }",
       id: "id",
+      originalCss: "body { color: red; } .bx--btn {}",
+      optimizedCss: "body { color: red; }",
     };
 
-    printDiff(props);
+    test("writes the block to console.log by default", () => {
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      logAssetDiff(props);
+      expect(log.mock.calls).toEqual([[formatDiff(props)]]);
+      log.mockRestore();
+    });
 
-    const fromConsole = log.mock.calls
-      .map((args) => `${args.join(" ")}\n`)
-      .join("");
+    test("writes the dry-run notice first, through `log` when given", () => {
+      const messages: string[] = [];
+      logAssetDiff({ ...props, dryRun: true, log: (m) => messages.push(m) });
+      expect(messages).toEqual([
+        "Dry run: id left unchanged",
+        formatDiff(props),
+      ]);
+    });
 
-    expect(`${formatDiff(props)}\n`).toEqual(fromConsole);
-  });
-
-  test("formatDiff returns null when nothing changed", () => {
-    expect(
-      formatDiff({
-        original_css: "body { color: red; }",
-        optimized_css: "body { color: red; }",
+    test("logs nothing when the size is unchanged", () => {
+      const messages: string[] = [];
+      logAssetDiff({
         id: "id",
-      }),
-    ).toBeNull();
+        originalCss: "a",
+        optimizedCss: "a",
+        log: (m) => messages.push(m),
+      });
+      expect(messages).toEqual([]);
+    });
   });
 });

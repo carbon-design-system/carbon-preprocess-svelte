@@ -2,11 +2,9 @@ import { realpathSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
-import { CarbonSvelte } from "../constants";
+import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "./build-index";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
-
-const LOG_PREFIX = "[carbon-preprocess-svelte]";
 
 const CACHE_DIRNAME = ".cache/carbon-preprocess-svelte";
 
@@ -20,9 +18,8 @@ async function readCarbonVersion(carbonRoot: string): Promise<string> {
 }
 
 /**
- * Structural check on whatever came off disk. `JSON.parse` succeeding is not
- * enough: an empty object or a differently-shaped file would be handed to
- * `optimizeCss` as an empty allowlist and silently prune every Carbon rule.
+ * Structural check on whatever came off disk: an empty or differently-shaped
+ * index would become an empty allowlist and prune every Carbon rule.
  */
 export function isComponentIndex(value: unknown): value is ComponentIndex {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -56,10 +53,9 @@ async function readCache(
 }
 
 /**
- * Best-effort, atomic: a sibling temp file is renamed into place so a
- * concurrent build (e.g. parallel client/server builds sharing one
- * `node_modules`) never observes a half-written file. A failed write
- * means the next build re-indexes.
+ * Best-effort and atomic: a temp file is renamed into place so a concurrent
+ * build never reads a half-written one. A failed write means the next build
+ * re-indexes.
  */
 async function writeCache(
   cacheFile: string,
@@ -75,19 +71,11 @@ async function writeCache(
   }
 }
 
-export type ComponentIndexOptions = {
-  /** Directory the installed `carbon-components-svelte` is resolved from. */
-  projectRoot?: string;
-};
-
 /**
- * Cache file for one (Carbon version, preprocessor version) pair under the
- * consuming project's `node_modules/.cache/carbon-preprocess-svelte/`.
- * Keyed by both so a bump on either side misses and rebuilds: a new Carbon
- * changes the input, a new preprocessor may change the extraction.
- *
- * A Carbon zipped by Yarn PnP uses the project's `node_modules` instead:
- * PnP's `fs` would write into the archive.
+ * Cache file for one (Carbon version, this package's version) pair under
+ * `node_modules/.cache/carbon-preprocess-svelte/`: a bump on either side
+ * misses. A Carbon zipped by Yarn PnP uses the project's `node_modules`
+ * instead, since writing there would write into the archive.
  */
 export function componentIndexCacheFile(
   carbonRoot: string,
@@ -103,10 +91,7 @@ export function componentIndexCacheFile(
   );
 }
 
-/**
- * A checkout linked in (`bun link`, `workspace:`, ...) rather than installed.
- * Its source changes under a fixed version, so a cached index would go stale.
- */
+/** A checkout linked in (`bun link`, `workspace:`) rather than installed: its source changes under a fixed version, so a cache would go stale. */
 function isLinkedCheckout(carbonRoot: string): boolean {
   try {
     return !realpathSync(carbonRoot).split(path.sep).includes("node_modules");
@@ -116,13 +101,13 @@ function isLinkedCheckout(carbonRoot: string): boolean {
 }
 
 /**
- * Builds (or reads a cached copy of) the component index for whichever
- * `carbon-components-svelte` is actually installed in the consuming
- * project. Throws if it can't; see `loadComponentIndex`.
+ * Builds (or reads the cached) component index for the
+ * `carbon-components-svelte` installed in the project. Throws if it can't.
  */
-export async function resolveComponentIndex(
-  options?: ComponentIndexOptions,
-): Promise<ComponentIndex> {
+export async function resolveComponentIndex(options?: {
+  /** Directory the installed `carbon-components-svelte` is resolved from. */
+  projectRoot?: string;
+}): Promise<ComponentIndex> {
   const carbonRoot = resolveCarbonRoot(options?.projectRoot);
   const cacheFile = isLinkedCheckout(carbonRoot)
     ? undefined
@@ -135,8 +120,7 @@ export async function resolveComponentIndex(
   const cached = cacheFile && (await readCache(cacheFile));
   if (cached) return cached;
 
-  // Loaded only on a cache miss: the indexer bundles a Svelte parser that a
-  // build reading a cached index never needs.
+  // Only on a cache miss: a build reading the cache never needs the parser.
   const { buildComponentIndex } = await import("./build-index");
   const index = await buildComponentIndex({ carbonRoot });
 
@@ -154,14 +138,13 @@ const memoized = new Map<string, Promise<ComponentIndex | undefined>>();
 
 /**
  * The component index every CSS entry point prunes against, or `undefined`
- * with a warning when it can't be built (unresolvable
- * `carbon-components-svelte`, unexpected Carbon `src` layout, etc.). Callers then leave CSS unpruned: a bigger stylesheet is
- * safe, while pruning against an index for some other Carbon version drops
- * rules the installed markup still uses (#213).
+ * with a warning when it can't be built (unresolvable Carbon, unexpected
+ * `src` layout). Callers then leave CSS unpruned: a bigger stylesheet is
+ * safe, while pruning against another Carbon version's index drops rules the
+ * installed markup still uses (#213).
  *
- * Memoized per project root for the life of the process, so every plugin
- * instance in a build triggers at most one indexing pass (or cache read),
- * and a failure warns once.
+ * Memoized per project root, so a build indexes at most once and a failure
+ * warns once.
  */
 export function loadComponentIndex(
   projectRoot: string = process.cwd(),
@@ -172,7 +155,7 @@ export function loadComponentIndex(
   if (!pending) {
     pending = resolveComponentIndex({ projectRoot: root }).catch((error) => {
       console.warn(
-        `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${(error as Error)?.message ?? error}); leaving Carbon CSS unpruned.`,
+        `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${error instanceof Error ? error.message : error}); leaving Carbon CSS unpruned.`,
       );
       return undefined;
     });
