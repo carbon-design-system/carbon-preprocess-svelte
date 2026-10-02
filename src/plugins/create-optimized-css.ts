@@ -19,13 +19,6 @@ export type OptimizeCssOptions = {
   silent?: boolean;
 
   /**
-   * Set to `false` to disable verbose logging.
-   * @default true
-   * @deprecated Use `silent` instead.
-   */
-  verbose?: boolean;
-
-  /**
    * Run the whole pipeline and print the size log, but leave every CSS
    * asset unchanged. Use it to preview the reduction and check the output
    * before enabling pruning in a production build.
@@ -102,16 +95,6 @@ export type OptimizeCssOptions = {
    */
   scanModules?: boolean;
 };
-
-/**
- * Resolves the `silent` / `verbose` options into a single boolean.
- * `silent` takes precedence when provided; otherwise falls back
- * to inverting `verbose` (which defaults to `true`).
- */
-export function isSilent(options?: OptimizeCssOptions): boolean {
-  if (options?.silent !== undefined) return options.silent;
-  return options?.verbose === false;
-}
 
 type CreateOptimizedCssOptions = OptimizeCssOptions & {
   source: Uint8Array | string;
