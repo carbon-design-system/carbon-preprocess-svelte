@@ -1,0 +1,109 @@
+name: Evaluate
+
+# Accuracy checks for prop-aware CSS pruning and component specialization.
+# Slow (minutes per job), so they run only when the analyzer or the
+# evaluation scripts change.
+on:
+  pull_request:
+    paths:
+      - "src/analyzer/**"
+      - "scripts/eval-*.ts"
+      - "scripts/prop-aware-cases.ts"
+      - ".github/workflows/eval.yml"
+  push:
+    branches-ignore: [main]
+    paths:
+      - "src/analyzer/**"
+      - "scripts/eval-*.ts"
+      - "scripts/prop-aware-cases.ts"
+      - ".github/workflows/eval.yml"
+  workflow_dispatch:
+
+jobs:
+  prop-aware:
+    name: prop-aware CSS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Evaluate
+        run: |
+          set -o pipefail
+          bun run eval:prop-aware --combos 500 --json eval.json | tee eval.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### prop-aware CSS'
+            echo '```'
+            sed -n '/prop-aware accuracy/,$p' eval.log | head -60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: prop-aware
+          path: eval.json
+
+  specialize:
+    name: specialize (svelte ${{ matrix.svelte }}, unwrap ${{ matrix.unwrap }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        svelte: [3, 4, 5]
+        unwrap: [true, false]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install dependencies
+        run: bun ci
+
+      # A project with this Svelte major and the latest Carbon: the harness
+      # compiles and renders with its `svelte` and analyzes its Carbon.
+      - name: Install Svelte ${{ matrix.svelte }} and the latest Carbon
+        run: |
+          mkdir -p .eval-project
+          cat > .eval-project/package.json <<EOF
+          {
+            "private": true,
+            "type": "module",
+            "dependencies": {
+              "svelte": "^${{ matrix.svelte }}",
+              "carbon-components-svelte": "latest"
+            }
+          }
+          EOF
+          cd .eval-project && bun install
+
+      - name: Evaluate
+        run: |
+          set -o pipefail
+          bun scripts/eval-specialize.ts --project .eval-project --combos 500 \
+            ${{ matrix.unwrap == false && '--no-unwrap' || '' }} \
+            --json eval.json | tee eval.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### specialize: svelte ${{ matrix.svelte }}, unwrap ${{ matrix.unwrap }}'
+            echo '```'
+            sed -n '/specialize accuracy/,$p' eval.log | head -60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: specialize-svelte${{ matrix.svelte }}-unwrap-${{ matrix.unwrap }}
+          path: eval.json
