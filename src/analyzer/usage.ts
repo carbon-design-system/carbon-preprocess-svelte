@@ -26,7 +26,10 @@ export type ComponentUsage = {
   props: Map<string, Value>;
   /** Props some site leaves out, so their default applies too. */
   omitted: Set<string>;
-  /** Per slot name, whether sites fill it (`true`), leave it empty, or both. */
+  /**
+   * Per slot name, `$$slots[name]` across sites: `true` where it's filled,
+   * `undefined` where it isn't (Svelte only sets filled slots' keys).
+   */
   slots: Map<string, Value>;
   slotsUnknown: boolean;
   siteCount: number;
@@ -97,8 +100,11 @@ export function addCallSite(
       const before = usage.slots.get(name);
       // A slot first filled here was empty at every earlier site.
       const base =
-        before ?? (usage.siteCount > 0 ? possible(false) : possible());
-      const after = join(base, possible(site.slots.has(name)));
+        before ?? (usage.siteCount > 0 ? possible(undefined) : possible());
+      const after = join(
+        base,
+        possible(site.slots.has(name) ? true : undefined),
+      );
       if (!sameValue(before, after)) {
         usage.slots.set(name, after);
         changed = true;

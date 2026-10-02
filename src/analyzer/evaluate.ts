@@ -230,7 +230,7 @@ function evaluateMember(
     ) {
       const { usage } = scope;
       if (usage.open || usage.slotsUnknown) return UNKNOWN;
-      return usage.slots.get(property.name) ?? possible(false);
+      return usage.slots.get(property.name) ?? UNDEFINED;
     }
     if (object.name === "$$props" || object.name === "$$restProps") {
       return UNKNOWN;
