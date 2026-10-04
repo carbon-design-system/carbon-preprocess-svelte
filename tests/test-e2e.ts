@@ -5,6 +5,8 @@ import { name } from "../package.json";
 
 const SNAPSHOT_PATH = join(import.meta.dirname, "__snapshots__/e2e.json");
 const UPDATE_SNAPSHOTS = process.env.UPDATE_SNAPSHOTS === "true";
+/** Comma-separated example names to build (`vite,vite@svelte-5`); all by default. */
+const ONLY_EXAMPLES = process.env.EXAMPLES?.split(",").filter(Boolean);
 
 const OPTIMIZED_REGEX = /Optimized\s+(.+\.css)/;
 const BEFORE_REGEX = /Before:\s*([\d,.]+)\s*(kB|MB)/;
@@ -364,7 +366,14 @@ async function main() {
 
   const examples: string[] = [];
   for await (const dir of $`find examples -maxdepth 1 -mindepth 1 -type d`.lines()) {
-    if (dir) examples.push(dir);
+    if (!dir) continue;
+    if (
+      ONLY_EXAMPLES &&
+      !ONLY_EXAMPLES.includes(dir.replace("examples/", ""))
+    ) {
+      continue;
+    }
+    examples.push(dir);
   }
 
   for (const dir of examples) {
@@ -399,7 +408,10 @@ async function main() {
       "\n\x1b[31mSnapshots not updated: fix the warnings first.\x1b[0m",
     );
   } else if (UPDATE_SNAPSHOTS) {
-    saveSnapshots(newSnapshots);
+    // A filtered run only rebuilt some examples; keep the others' snapshots.
+    saveSnapshots(
+      ONLY_EXAMPLES ? { ...snapshots, ...newSnapshots } : newSnapshots,
+    );
     console.log(`\n\x1b[33mSnapshots updated: ${SNAPSHOT_PATH}\x1b[0m`);
   }
 

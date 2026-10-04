@@ -46,7 +46,7 @@ bun install
 | `bun run build` | Bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
 | `bun run typecheck` | `tsc6 --noEmit` over `bench/`, `scripts/`, `src/`, `tests/`. |
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
-| `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). |
+| `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). Set `EXAMPLES=vite,vite@svelte-5` to build (and update) only those examples. |
 | `bun run test:fixtures:update` | Rewrite the `optimize-css` fixture baselines under [`tests/fixtures/`](tests/fixtures/optimize-css). |
 | `bun run lint` | `biome ci --error-on-warnings` (lint + format check, no write). |
 | `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
