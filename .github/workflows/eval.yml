@@ -10,6 +10,9 @@ on:
       - "src/analyzer/**"
       - "src/plugins/optimize-components.ts"
       - "examples/vite-matrix@*/**"
+      - "examples/sveltekit-matrix@*/**"
+      - "examples/rollup/**"
+      - "examples/rolldown/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
       - ".github/workflows/eval.yml"
@@ -19,6 +22,9 @@ on:
       - "src/analyzer/**"
       - "src/plugins/optimize-components.ts"
       - "examples/vite-matrix@*/**"
+      - "examples/sveltekit-matrix@*/**"
+      - "examples/rollup/**"
+      - "examples/rolldown/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
       - ".github/workflows/eval.yml"
@@ -118,7 +124,7 @@ jobs:
           path: eval.json
 
   interactions:
-    name: interactions (vite-matrix examples)
+    name: interactions (examples)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -132,7 +138,8 @@ jobs:
         run: |
           bun run build
           bun link
-          for example in examples/vite-matrix@svelte-4 examples/vite-matrix@svelte-5; do
+          for example in examples/vite-matrix@svelte-4 examples/vite-matrix@svelte-5 \
+            examples/sveltekit-matrix@svelte-5 examples/rollup examples/rolldown; do
             (cd "$example" && bun link carbon-preprocess-svelte && bun install)
           done
 
