@@ -1,3 +1,4 @@
+import { lexStrings } from "sveast/lexer";
 import { type AST, walk } from "sveast/walk";
 import {
   componentImports,
@@ -24,17 +25,32 @@ export type ExtractFromSvelteResult = {
 };
 
 /** Classes a string or template literal node names; `[]` for any other node. */
-function literalClasses(
-  node: AST.SvelteNode,
-  options?: { skipLookups?: boolean },
-): string[] {
+function literalClasses(node: AST.SvelteNode): string[] {
   if (node.type === "Literal" && typeof node.value === "string") {
-    return extractCarbonClassTokens(node.value, options);
+    return extractCarbonClassTokens(node.value);
   }
   if (node.type === "TemplateElement") {
-    return extractCarbonClassTokens(node.value.raw, options);
+    return extractCarbonClassTokens(node.value.raw);
   }
   return [];
+}
+
+/**
+ * The text of each string and template literal in a script, as
+ * `literalClasses` reads it: a string's value, a template's raw text.
+ * Lexed instead of parsed, since the indexer needs nothing else from the
+ * script's AST.
+ */
+function scriptStrings(code: string, script: AST.Script | null | undefined) {
+  if (!script) return [];
+  const text = code.slice(script.content.start, script.content.end);
+  return lexStrings(text).flatMap((string) =>
+    string.kind === "template"
+      ? [text.slice(string.start, string.end)]
+      : string.value === null
+        ? []
+        : [string.value],
+  );
 }
 
 export function extractFromSvelte(props: {
@@ -43,7 +59,7 @@ export function extractFromSvelte(props: {
 }): ExtractFromSvelteResult {
   const { code, filename } = props;
   const moduleKey = filename.replace(/\\/g, "/");
-  const ast = parse(code, { comments: false });
+  const ast = parse(code, { comments: false, script: false });
   const selectors = new Set<string>();
   const components = new Set<string>();
   const slotWrappers = new Set<string>();
@@ -51,6 +67,17 @@ export function extractFromSvelte(props: {
   // Elements with `bx--` class directives the walk is inside of: a `<slot>`
   // anywhere under one makes its classes wrap slotted content.
   const openWrappers: { node: AST.SvelteNode; classes: string[] }[] = [];
+
+  const moduleStrings = scriptStrings(code, ast.module);
+  // The walk visits the module script, then the instance, before the markup.
+  for (const text of [...moduleStrings, ...scriptStrings(code, ast.instance)]) {
+    for (const cls of extractCarbonClassTokens(text)) selectors.add(cls);
+  }
+  for (const text of moduleStrings) {
+    for (const cls of extractCarbonClassTokens(text, { skipLookups: true })) {
+      moduleClasses.add(cls);
+    }
+  }
 
   walk(ast, {
     enter(node) {
@@ -113,16 +140,6 @@ export function extractFromSvelte(props: {
       if (node === openWrappers.at(-1)?.node) openWrappers.pop();
     },
   });
-
-  if (ast.module) {
-    walk(ast.module, {
-      enter(node) {
-        for (const cls of literalClasses(node, { skipLookups: true })) {
-          moduleClasses.add(cls);
-        }
-      },
-    });
-  }
 
   const classes = new Set<string>();
 

@@ -104,10 +104,9 @@ describe("extractFromSvelte", () => {
       ".bx--highlight",
       ".bx--aspect-ratio",
       ".bx--aspect-ratio--",
-      // The walk visits a template's quasis before its expressions.
       ".bx--a",
-      ".bx--c--",
       ".bx--b",
+      ".bx--c--",
     ]);
   });
 
