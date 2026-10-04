@@ -66,29 +66,31 @@ Component paths are read from your installed `carbon-components-svelte`'s own `s
 
 #### SvelteKit
 
-See [examples/sveltekit](examples/sveltekit).
+See [examples/sveltekit](examples/sveltekit). SvelteKit 3 takes its options in the `sveltekit()` Vite plugin:
 
 ```js
-// svelte.config.js
+// vite.config.js
 import adapter from "@sveltejs/adapter-static";
+import { sveltekit } from "@sveltejs/kit/vite";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { optimizeImports } from "carbon-preprocess-svelte";
 
-/** @type {import('@sveltejs/kit').Config} */
-const config = {
-  preprocess: [
-    // Preprocessors are run in sequence.
-    // If using TypeScript, the code must be transpiled first.
-    vitePreprocess(),
-    optimizeImports(),
+export default {
+  plugins: [
+    sveltekit({
+      preprocess: [
+        // Preprocessors are run in sequence.
+        // If using TypeScript, the code must be transpiled first.
+        vitePreprocess(),
+        optimizeImports(),
+      ],
+      adapter: adapter(),
+    }),
   ],
-  kit: {
-    adapter: adapter(),
-  },
 };
-
-export default config;
 ```
+
+With SvelteKit 2, pass the same `preprocess` in `svelte.config.js` (and the adapter under `kit`).
 
 #### Vite
 
