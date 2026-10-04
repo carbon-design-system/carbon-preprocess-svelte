@@ -8,6 +8,7 @@ const suites = [
   fileURLToPath(import.meta.resolve("./optimize-css.bench.ts")),
   fileURLToPath(import.meta.resolve("./optimize-imports.bench.ts")),
   fileURLToPath(import.meta.resolve("./build-index.bench.ts")),
+  fileURLToPath(import.meta.resolve("./analyzer.bench.ts")),
 ];
 
 const root = fileURLToPath(new URL("..", import.meta.url));
