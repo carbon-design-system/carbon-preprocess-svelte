@@ -4,7 +4,10 @@
   "scripts": {
     "dev": "mkdir -p public && (rollup -cw & deserved public --watch --open)",
     "build": "rollup -c",
-    "preview": "deserved public --open"
+    "preview": "deserved public --open",
+    "build:default": "rollup -c",
+    "build:optimized": "OPTIMIZE=1 rollup -c",
+    "preview:optimized": "deserved public-optimized --open"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "latest",

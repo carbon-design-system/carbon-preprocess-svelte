@@ -1,10 +1,19 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { optimizeCss, optimizeImports } from "carbon-preprocess-svelte";
+import {
+  optimizeComponents,
+  optimizeCss,
+  optimizeImports,
+} from "carbon-preprocess-svelte";
 import { defineConfig } from "rolldown";
 import svelte from "rollup-plugin-svelte";
 
 const production = process.env.NODE_ENV === "production";
+// `OPTIMIZE=1` adds the experimental optimizations: `optimizeComponents`
+// rewrites Carbon components for the props the app passes, and prop-aware
+// `optimizeCss` prunes their unused styles. Built to `public-optimized/`.
+const optimize = production && process.env.OPTIMIZE === "1";
+const outDir = optimize ? "public-optimized" : "public";
 
 // Minimal stand-in for rollup-plugin-css-only: collects the virtual `.css`
 // modules that rollup-plugin-svelte emits (one per component, in import
@@ -51,7 +60,7 @@ const htmlTemplatePath = fileURLToPath(
   new URL("./index.html", import.meta.url),
 );
 const htmlOutputPath = fileURLToPath(
-  new URL("./public/index.html", import.meta.url),
+  new URL(`./${outDir}/index.html`, import.meta.url),
 );
 const emitHtml = {
   name: "emit-html",
@@ -72,7 +81,7 @@ const emitHtml = {
 export default defineConfig({
   input: "src/index.ts",
   output: {
-    dir: "public/build",
+    dir: `${outDir}/build`,
     format: "iife",
     name: "app",
     entryFileNames: production ? "bundle-[hash].js" : "bundle.js",
@@ -86,13 +95,15 @@ export default defineConfig({
   // intercept them instead of Rolldown's built-in css handling.
   moduleTypes: { ".css": "js" },
   plugins: [
+    // Before `svelte`: it rewrites Carbon's source before it's compiled.
+    optimize && optimizeComponents(),
     svelte({
       preprocess: [optimizeImports()],
       compilerOptions: { dev: !production },
     }),
     emitCss,
     // Only apply the plugin when building for production.
-    production && optimizeCss(),
+    production && optimizeCss({ experimental: { propAware: optimize } }),
     emitHtml,
   ],
 });

@@ -2,10 +2,19 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import resolve from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
-import { optimizeCss, optimizeImports } from "carbon-preprocess-svelte";
+import {
+  optimizeComponents,
+  optimizeCss,
+  optimizeImports,
+} from "carbon-preprocess-svelte";
 import svelte from "rollup-plugin-svelte";
 
 const production = !process.env.ROLLUP_WATCH;
+// `OPTIMIZE=1` adds the experimental optimizations: `optimizeComponents`
+// rewrites Carbon components for the props the app passes, and prop-aware
+// `optimizeCss` prunes their unused styles. Built to `public-optimized/`.
+const optimize = production && process.env.OPTIMIZE === "1";
+const outDir = optimize ? "public-optimized" : "public";
 
 // Minimal stand-in for rollup-plugin-css-only: collects the virtual `.css`
 // modules that rollup-plugin-svelte emits (one per component, in import
@@ -47,7 +56,7 @@ const htmlTemplatePath = fileURLToPath(
   new URL("./index.html", import.meta.url),
 );
 const htmlOutputPath = fileURLToPath(
-  new URL("./public/index.html", import.meta.url),
+  new URL(`./${outDir}/index.html`, import.meta.url),
 );
 const emitHtml = {
   name: "emit-html",
@@ -71,12 +80,14 @@ export default {
     sourcemap: !production,
     format: "iife",
     name: "app",
-    dir: "public/build",
+    dir: `${outDir}/build`,
     entryFileNames: production ? "bundle-[hash].js" : "bundle.js",
     assetFileNames: production ? "[name]-[hash][extname]" : "[name][extname]",
     inlineDynamicImports: true,
   },
   plugins: [
+    // Before `svelte`: it rewrites Carbon's source before it's compiled.
+    optimize && optimizeComponents(),
     svelte({
       preprocess: [optimizeImports()],
       compilerOptions: { dev: !production },
@@ -84,7 +95,7 @@ export default {
     resolve({ browser: true, dedupe: ["svelte"] }),
     emitCss,
     production && terser(),
-    production && optimizeCss(),
+    production && optimizeCss({ experimental: { propAware: optimize } }),
     emitHtml,
   ],
 };

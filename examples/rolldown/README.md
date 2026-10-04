@@ -34,6 +34,13 @@ Build the app for production. This should run both the `optimizeImports` and `op
 bun run build
 ```
 
+Build with the experimental optimizations too: `optimizeComponents` rewrites Carbon components for the props the app passes, and prop-aware `optimizeCss` prunes their unused styles. Output goes to `public-optimized/`.
+
+```sh
+bun run build:optimized
+bun run preview:optimized
+```
+
 Serve the production build.
 
 ```sh
