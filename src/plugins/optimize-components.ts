@@ -34,7 +34,7 @@ const DEFAULT_CONTENT = ["src/**/*.svelte"];
 const PATH_SEPARATOR = /[\\/]/;
 
 /**
- * **Experimental.** Vite/Rollup plugin that rewrites each Carbon component
+ * **Experimental.** Vite, Rollup and Rolldown plugin that rewrites each Carbon component
  * the app renders for the props it passes: values that never change become
  * literals, and branches that can't run go, along with the components only
  * they render. Pair it with `optimizeCss({ experimental: { propAware: true } })`,

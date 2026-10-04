@@ -4,7 +4,10 @@
   "scripts": {
     "dev": "mkdir -p public && (rolldown -c -w & deserved public --watch --open)",
     "build": "NODE_ENV=production rolldown -c",
-    "preview": "deserved public --open"
+    "preview": "deserved public --open",
+    "build:default": "NODE_ENV=production rolldown -c",
+    "build:optimized": "NODE_ENV=production OPTIMIZE=1 rolldown -c",
+    "preview:optimized": "deserved public-optimized --open"
   },
   "devDependencies": {
     "carbon-components-svelte": "latest",

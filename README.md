@@ -31,7 +31,7 @@ This package has six independent tools; pick the one matching your bundler or pi
 | :--- | :--- | :--- | :--- |
 | [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports straight to source, for faster dev and build times |
 | [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Prunes unused Carbon styles at build time, shrinking CSS bundles up to 90% |
-| [`optimizeComponents`](#optimizecomponents-experimental) | Build plugin (experimental) | Vite, Rollup | Rewrites Carbon components for the props your app passes, removing code it never runs |
+| [`optimizeComponents`](#optimizecomponents-experimental) | Build plugin (experimental) | Vite, Rollup, Rolldown | Rewrites Carbon components for the props your app passes, removing code it never runs |
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss` for Webpack and Rspack |
 | [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, Bun.build, any post-build script | Programmatic version of the same CSS optimization engine, for any pipeline |
 | [CLI](#cli) | Command-line tool | esbuild, Bun, any pipeline without a plugin hook | Prunes unused Carbon styles from built CSS files with a single command |
@@ -507,7 +507,7 @@ Across every Carbon component and prop value, plus the example apps in this repo
 
 #### `optimizeComponents` (experimental)
 
-`optimizeComponents` is a Vite/Rollup plugin that rewrites each Carbon component your app renders for the props it passes. Values that never change become literals, and branches that can't run are removed, along with child components only they render (a skeleton, a tooltip portal). It's the JavaScript counterpart of prop-aware CSS pruning and uses the same analysis.
+`optimizeComponents` is a Vite, Rollup and Rolldown plugin that rewrites each Carbon component your app renders for the props it passes. Values that never change become literals, and branches that can't run are removed, along with child components only they render (a skeleton, a tooltip portal). It's the JavaScript counterpart of prop-aware CSS pruning and uses the same analysis.
 
 ```js
 // vite.config.js
@@ -546,7 +546,9 @@ optimizeComponents({
 });
 ```
 
-It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS. Rewritten components have no source maps yet: devtools show the rewritten source.
+Under Rollup and Rolldown, list it before the Svelte plugin (Vite orders it first on its own) and add it only to production builds; `content` resolves from the working directory. Under SvelteKit it rewrites the server and client builds alike, so prerendered pages hydrate as before.
+
+It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), and 28% in the Rollup and Rolldown examples. Rewritten components have no source maps yet: devtools show the rewritten source.
 
 ### `OptimizeCssPlugin`
 
@@ -770,6 +772,7 @@ Full, runnable set-ups for every supported bundler live under [examples](example
 - [examples/vite@svelte-5](examples/vite@svelte-5): Vite with Svelte 5
 - [examples/vite@carbon-0.85](examples/vite@carbon-0.85): Vite pinned to an older Carbon (0.85.0)
 - [examples/vite-matrix@svelte-4](examples/vite-matrix@svelte-4) and [examples/vite-matrix@svelte-5](examples/vite-matrix@svelte-5): one app built with no optimization, `optimizeCss`, prop-aware CSS, and `optimizeComponents`, with a size table
+- [examples/sveltekit-matrix@svelte-5](examples/sveltekit-matrix@svelte-5): the same app and comparison, prerendered by SvelteKit and hydrated
 - [examples/astro](examples/astro): Astro
 - [examples/rollup](examples/rollup): Rollup
 - [examples/rolldown](examples/rolldown): Rolldown

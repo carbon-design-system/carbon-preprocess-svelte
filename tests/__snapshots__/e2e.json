@@ -6,16 +6,32 @@
     "reduction_percent": 93.02
   },
   "rolldown": {
-    "file": "bundle-*.css",
-    "before_kb": 709.84,
-    "after_kb": 49.42,
-    "reduction_percent": 93.04
+    "default": {
+      "file": "bundle-*.css",
+      "before_kb": 709.84,
+      "after_kb": 49.42,
+      "reduction_percent": 93.04
+    },
+    "optimized": {
+      "file": "bundle-*.css",
+      "before_kb": 709.84,
+      "after_kb": 34.14,
+      "reduction_percent": 95.19
+    }
   },
   "rollup": {
-    "file": "bundle-*.css",
-    "before_kb": 709.84,
-    "after_kb": 49.42,
-    "reduction_percent": 93.04
+    "default": {
+      "file": "bundle-*.css",
+      "before_kb": 709.84,
+      "after_kb": 49.42,
+      "reduction_percent": 93.04
+    },
+    "optimized": {
+      "file": "bundle-*.css",
+      "before_kb": 709.84,
+      "after_kb": 34.14,
+      "reduction_percent": 95.19
+    }
   },
   "rspack": {
     "file": "build/bundle.*.css",
@@ -28,6 +44,26 @@
     "before_kb": 695.03,
     "after_kb": 49.32,
     "reduction_percent": 92.9
+  },
+  "sveltekit-matrix@svelte-5": {
+    "css": {
+      "file": "_app/immutable/assets/2.*.css",
+      "before_kb": 557.37,
+      "after_kb": 314.97,
+      "reduction_percent": 43.49
+    },
+    "full": {
+      "file": "_app/immutable/assets/2.*.css",
+      "before_kb": 557.37,
+      "after_kb": 230.47,
+      "reduction_percent": 58.65
+    },
+    "prop-aware": {
+      "file": "_app/immutable/assets/2.*.css",
+      "before_kb": 557.37,
+      "after_kb": 230.47,
+      "reduction_percent": 58.65
+    }
   },
   "vite": {
     "file": "assets/index-*.css",

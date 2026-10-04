@@ -1,0 +1,25 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "bun scripts/compare.ts",
+    "build:baseline": "VARIANT=baseline vite build",
+    "build:css": "VARIANT=css vite build",
+    "build:prop-aware": "VARIANT=prop-aware vite build",
+    "build:full": "VARIANT=full vite build",
+    "preview:baseline": "VARIANT=baseline vite preview",
+    "preview:css": "VARIANT=css vite preview",
+    "preview:prop-aware": "VARIANT=prop-aware vite preview",
+    "preview:full": "VARIANT=full vite preview"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "latest",
+    "@sveltejs/kit": "latest",
+    "@sveltejs/vite-plugin-svelte": "latest",
+    "carbon-components-svelte": "latest",
+    "carbon-preprocess-svelte": "link:carbon-preprocess-svelte",
+    "svelte": "^5.57.1",
+    "vite": "latest"
+  }
+}
