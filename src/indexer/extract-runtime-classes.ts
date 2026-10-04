@@ -1,10 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { AST } from "sveast";
-import { lexImportsExports } from "sveast/lexer";
+import { lexComponent, lexImportsExports } from "sveast/lexer";
 import { RE_EXT_SVELTE } from "../constants";
 import { isSvelteFile } from "../utils";
-import { parse } from "./parser";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;
@@ -72,13 +70,18 @@ function relativeImports(code: string, moduleKey: string): string[] {
   return imports;
 }
 
+type Scripts = {
+  module?: { content: { start: number; end: number } } | null;
+  instance?: { content: { start: number; end: number } } | null;
+};
+
 /** Relative imports in a component's `<script>`s, as module keys. */
 export function componentImports(
   code: string,
-  ast: AST.Root,
+  scripts: Scripts,
   moduleKey: string,
 ): string[] {
-  return [ast.module, ast.instance].flatMap((script) =>
+  return [scripts.module, scripts.instance].flatMap((script) =>
     script
       ? relativeImports(
           code.slice(script.content.start, script.content.end),
@@ -96,8 +99,7 @@ function collectImportsFromCode(
   if (!isSvelte) {
     return relativeImports(code, moduleKey);
   }
-  const ast = parse(code, { css: false, script: false });
-  return componentImports(code, ast, moduleKey);
+  return componentImports(code, lexComponent(code), moduleKey);
 }
 
 export type ModuleGraphCache = {
