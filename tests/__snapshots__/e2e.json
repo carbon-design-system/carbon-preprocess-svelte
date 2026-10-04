@@ -35,6 +35,46 @@
     "after_kb": 49.68,
     "reduction_percent": 93.01
   },
+  "vite-matrix@svelte-4": {
+    "css": {
+      "file": "assets/index-*.css",
+      "before_kb": 562.26,
+      "after_kb": 316.6,
+      "reduction_percent": 43.69
+    },
+    "full": {
+      "file": "assets/index-*.css",
+      "before_kb": 562.26,
+      "after_kb": 231.98,
+      "reduction_percent": 58.74
+    },
+    "prop-aware": {
+      "file": "assets/index-*.css",
+      "before_kb": 562.26,
+      "after_kb": 231.98,
+      "reduction_percent": 58.74
+    }
+  },
+  "vite-matrix@svelte-5": {
+    "css": {
+      "file": "assets/index-*.css",
+      "before_kb": 557.37,
+      "after_kb": 314.97,
+      "reduction_percent": 43.49
+    },
+    "full": {
+      "file": "assets/index-*.css",
+      "before_kb": 557.37,
+      "after_kb": 230.47,
+      "reduction_percent": 58.65
+    },
+    "prop-aware": {
+      "file": "assets/index-*.css",
+      "before_kb": 557.37,
+      "after_kb": 230.47,
+      "reduction_percent": 58.65
+    }
+  },
   "vite@carbon-0.85": {
     "file": "assets/index-*.css",
     "before_kb": 606.42,

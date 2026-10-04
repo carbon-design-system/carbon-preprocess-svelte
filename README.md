@@ -542,7 +542,7 @@ optimizeComponents({
 });
 ```
 
-It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Rewritten components have no source maps yet: devtools show the rewritten source.
+It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS. Rewritten components have no source maps yet: devtools show the rewritten source.
 
 ### `OptimizeCssPlugin`
 
@@ -765,6 +765,7 @@ Full, runnable set-ups for every supported bundler live under [examples](example
 - [examples/vite](examples/vite): Vite with Svelte 4
 - [examples/vite@svelte-5](examples/vite@svelte-5): Vite with Svelte 5
 - [examples/vite@carbon-0.85](examples/vite@carbon-0.85): Vite pinned to an older Carbon (0.85.0)
+- [examples/vite-matrix@svelte-4](examples/vite-matrix@svelte-4) and [examples/vite-matrix@svelte-5](examples/vite-matrix@svelte-5): one app built with no optimization, `optimizeCss`, prop-aware CSS, and `optimizeComponents`, with a size table
 - [examples/astro](examples/astro): Astro
 - [examples/rollup](examples/rollup): Rollup
 - [examples/rolldown](examples/rolldown): Rolldown
