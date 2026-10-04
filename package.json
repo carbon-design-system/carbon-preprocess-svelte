@@ -20,7 +20,10 @@
     "typecheck": "tsc6 --noEmit",
     "lint": "biome ci --error-on-warnings",
     "lint:fix": "biome check --write --unsafe .",
-    "upgrade-examples": "bun scripts/upgrade-examples.ts"
+    "upgrade-examples": "bun scripts/upgrade-examples.ts",
+    "eval:prop-aware": "bun scripts/eval-prop-aware.ts",
+    "eval:specialize": "bun scripts/eval-specialize.ts",
+    "eval:interactions": "bun scripts/eval-interactions.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
@@ -31,6 +34,7 @@
     "carbon-components-svelte": "0.112.1",
     "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
     "ostia": "^0.2.7",
+    "playwright": "1.63.0",
     "sveast": "^0.9.2",
     "svelte": "^5.57.1",
     "vite": "^8.3.1",

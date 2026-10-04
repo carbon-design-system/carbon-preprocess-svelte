@@ -51,6 +51,9 @@ bun install
 | `bun run lint` | `biome ci --error-on-warnings` (lint + format check, no write). |
 | `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
 | `bun run upgrade-examples` | `bun update` inside each `examples/*` project. |
+| `bun run eval:prop-aware` | Accuracy check for `experimental.propAware`: SSR-renders an app per Carbon component and prop value (plus random mixes), and fails if a selector matching rendered classes was pruned. `--apps <glob>` runs it on existing app files; `--control` prunes everything to prove the check catches it. |
+| `bun run eval:specialize` | Accuracy and size check for component specialization (`src/analyzer/specialize.ts`): rewrites the Carbon components each app renders for its props, then requires byte-identical SSR HTML against the originals (`Math.random` seeded, hydration comments removed) and reports minified JS savings. Same `--only`/`--apps`/`--combos` flags. |
+| `bun run eval:interactions` | Builds the `vite-matrix` examples' variants and drives each through the same clicks, typing, hovers and key presses as `baseline` in Chromium (Playwright), requiring identical DOM and pixels after every step. Catches what SSR can't: effects, hydration, interactive states. Needs each example installed with the package linked (see its README). |
 
 Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds seven real apps.
 

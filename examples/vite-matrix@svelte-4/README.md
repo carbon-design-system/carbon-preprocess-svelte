@@ -36,6 +36,10 @@ bun install
 # Build every variant and print a size table against baseline
 bun run build
 
+# From the repository root: click through every variant in a browser and
+# compare its DOM and pixels with baseline after each step
+bun run eval:interactions
+
 # Serve one variant to compare by hand
 bun run build:full && bun run preview:full
 bun run build:baseline && bun run preview:baseline

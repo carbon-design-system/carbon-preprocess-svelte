@@ -501,6 +501,8 @@ To also remove the code for those branches, add [`optimizeComponents`](#optimize
 
 `report: true` prints, per component, the prop values the analysis saw and why any call site kept every variant. The same option works with `OptimizeCssPlugin` and `optimizeCarbonCss` (which reads call sites from `content` and requires it), and as `--experimental-prop-aware` in the CLI.
 
+Across every Carbon component and prop value, plus the example apps in this repo, prop-aware pruning removed 37% more CSS than default pruning, and no class those apps render lost its rules (`bun run eval:prop-aware`). The [vite-matrix](examples/vite-matrix@svelte-4) examples also render the same DOM and pixels as an unoptimized build through scripted clicks, typing and menus (`bun run eval:interactions`).
+
 #### `optimizeComponents` (experimental)
 
 `optimizeComponents` is a Vite/Rollup plugin that rewrites each Carbon component your app renders for the props it passes. Values that never change become literals, and branches that can't run are removed, along with child components only they render (a skeleton, a tooltip portal). It's the JavaScript counterpart of prop-aware CSS pruning and uses the same analysis.
@@ -542,7 +544,7 @@ optimizeComponents({
 });
 ```
 
-It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS. Rewritten components have no source maps yet: devtools show the rewritten source.
+It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS. Rewritten components have no source maps yet: devtools show the rewritten source.
 
 ### `OptimizeCssPlugin`
 

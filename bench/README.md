@@ -1,19 +1,22 @@
 # Benchmarks
 
-[ostia](https://github.com/metonym/ostia) benchmarks for the three hot paths in this package:
+[ostia](https://github.com/metonym/ostia) benchmarks for the hot paths in this package:
 
 - `optimize-css.bench.ts` — `optimizeCssWithReport` against Carbon's real compiled stylesheet (`carbon-components-svelte/css/white.css`), across a small/medium/large import bundle. Runs on every build, once per CSS asset. Further groups cover every branch a CSS asset can take through `createCssOptimizer().run` (a non-Carbon chunk that is skipped, Carbon concatenated with app CSS on the splice path, an `@layer` stylesheet on the same splice path, and a `Uint8Array` source), the options that add per-selector work (`safelist` strings and RegExps, `contentClasses`, `DatePicker`, `preserveAllIBMFonts`), one optimizer run over a whole four-asset bundle, `scanContent` over 200 generated source files, `collectCarbonTokens` (the module scan shared by `scanModules` and `scanContent`) over 200 in-memory compiled-module strings plus a 300 kB vendor module with no `bx--` substring to measure the `includes` fast path, and `collectCarbonImports` (the CLI's import scan) over 200 barrel-import sources, the same sources rewritten to direct component paths, and a 300 kB file with no `carbon-components-svelte` substring for its fast path.
 - `optimize-imports.bench.ts` — the `optimizeImports` script preprocessor, across a no-op skip path, a `carbon-` file that is already rewritten, small/medium/large import counts, and mixed specifiers (aliases, `type`, un-indexed utilities). Runs on every `.svelte` file with a `carbon-` substring, on every build and HMR update. The second group appends a 300-line script body: the source map covers every line after the rewritten imports, so on real files the body length dominates, not the import count.
 - `build-index.bench.ts` — `buildComponentIndex`, a full re-scan of an installed `carbon-components-svelte` (file scan + CSS indexing + runtime-class graph). Coarser than the other two: it does real file I/O, so treat it as an end-to-end baseline rather than a tight microbenchmark. A second group runs each phase on its own (the `src` walk, `extractFromSvelte` on a small and a large component, `extractCssIndexAdditions` on the real stylesheet, and `buildRuntimeClassMap` with the Svelte import graph pre-scanned, as the full build hands it over). Also prints a one-off phase breakdown (scan / css index / runtime graph) to point at where time goes; the CSS index and runtime graph run concurrently there, so their numbers overlap.
 
+- `analyzer.bench.ts` — the usage analysis behind `experimental.propAware` and `optimizeComponents`, for a one-Button app, a form with a modal, and the [vite-matrix](../examples/vite-matrix@svelte-5) app (about 90 components rendered): `analyzeFiles` (what `propAware` runs per build) and `specializeFiles` (analysis plus rewriting every rendered component). Component models are cached by path and mtime, so these are warm, as on a watch rebuild; a separate group times modeling every component the large app renders from scratch, which a cold build adds once. A last group runs `optimizeCss` on the real stylesheet with and without prop-aware pruning.
+
 ## Running
 
 ```sh
-bun run bench          # all three
+bun run bench          # every suite
 
 ostia bench bench/optimize-css.bench.ts
 ostia bench bench/optimize-imports.bench.ts
 ostia bench bench/build-index.bench.ts
+ostia bench bench/analyzer.bench.ts
 
 ostia bench bench/optimize-imports.bench.ts --filter "medium|large"  # run a subset by group/name
 ```
