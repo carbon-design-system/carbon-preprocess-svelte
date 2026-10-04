@@ -31,7 +31,7 @@
     "carbon-components-svelte": "0.112.1",
     "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
     "ostia": "^0.2.7",
-    "sveast": "^0.7.0",
+    "sveast": "^0.9.1",
     "svelte": "^5.57.1",
     "vite": "^8.3.1",
     "webpack": "^5.111.1"
