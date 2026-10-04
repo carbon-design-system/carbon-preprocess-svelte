@@ -25,6 +25,8 @@ export type OptimizeCssReportInput = {
   safelistEntries: number;
   assets: AssetReport[];
   dryRun?: boolean;
+  /** Lines printed after the asset table (`experimental.propAware`). */
+  extra?: string[];
 };
 
 export function toAssetReport(
@@ -92,4 +94,6 @@ export function printReport(input: OptimizeCssReportInput): void {
       `    ${id}${COLUMN_GAP}${statuses[index]}${COLUMN_GAP}${sizes[index]}`,
     );
   }
+
+  for (const line of input.extra ?? []) console.log(line);
 }

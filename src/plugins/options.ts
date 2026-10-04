@@ -1,3 +1,4 @@
+import type { PropAwareOptions } from "../analyzer/analyze-usage";
 import type { SafelistEntry } from "./safelist";
 
 export type OptimizeCssOptions = {
@@ -86,4 +87,36 @@ export type OptimizeCssOptions = {
    * @default true
    */
   scanModules?: boolean;
+
+  /**
+   * Opt-in features that may change or go away in a minor release.
+   */
+  experimental?: {
+    /**
+     * Also prune Carbon rules for prop values, slots, and child components
+     * the app never uses. With only `<Button kind="tertiary">`, the
+     * tertiary styles stay and the other kinds, sizes, the skeleton and the
+     * icon-only tooltip go.
+     *
+     * Each `.svelte` file that imports Carbon is analyzed from its source.
+     * A prop the analysis can't read (an expression, a spread, `bind:`)
+     * keeps every value, and a component used as a value keeps
+     * everything. If the analysis fails, CSS is pruned as without this
+     * option, with a warning.
+     *
+     * Pass an object to `exclude` components or `assume` values for
+     * props set from expressions.
+     * @default false
+     */
+    propAware?: boolean | PropAwareOptions;
+  };
 };
+
+/** `experimental.propAware`'s options, or `undefined` when it's off. */
+export function propAwareOptions(
+  options?: OptimizeCssOptions,
+): PropAwareOptions | undefined {
+  const propAware = options?.experimental?.propAware;
+  if (!propAware) return undefined;
+  return propAware === true ? {} : propAware;
+}

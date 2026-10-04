@@ -9,6 +9,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const KIND_TERTIARY = /kind\s+"tertiary"/;
+
 const CLI_PATH = join(import.meta.dirname, "../src/cli.ts");
 
 /**
@@ -112,6 +114,39 @@ describe("cli optimize-css", () => {
       const result = runCli(dir, ["dist/app.css", "--report"]);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("Detected components (1): Button");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("--experimental-prop-aware prunes variants the content never uses", () => {
+    const dir = createTempProject();
+    try {
+      writeFileSync(
+        join(dir, "src", "App.svelte"),
+        '<script>\n  import { Button } from "carbon-components-svelte";\n</script>\n<Button kind="tertiary">Save</Button>\n',
+      );
+      const css =
+        ".bx--btn{a:1}\n.bx--btn--tertiary{a:2}\n.bx--btn--danger{a:3}\n";
+      writeFileSync(join(dir, "dist", "app.css"), css);
+
+      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
+      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
+        ".bx--btn--danger",
+      );
+
+      writeFileSync(join(dir, "dist", "app.css"), css);
+      const result = runCli(dir, [
+        "dist/app.css",
+        "--experimental-prop-aware",
+        "--report",
+      ]);
+      expect(result.status).toBe(0);
+      const pruned = readFileSync(join(dir, "dist", "app.css"), "utf-8");
+      expect(pruned).toContain(".bx--btn--tertiary");
+      expect(pruned).not.toContain(".bx--btn--danger");
+      expect(result.stdout).toContain("Prop-aware (experimental):");
+      expect(result.stdout).toMatch(KIND_TERTIARY);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

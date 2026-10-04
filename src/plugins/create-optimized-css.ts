@@ -1,5 +1,5 @@
 import path from "node:path";
-import { ALWAYS_ON_CLASSES } from "../constants";
+import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { toCssString } from "../utils";
 import {
@@ -15,6 +15,14 @@ export type PruneOptions = Pick<
   "safelist" | "preserveAllIBMFonts"
 >;
 
+/** What `experimental.propAware` found, as the optimizer consumes it. */
+export type PropAwareUsage = {
+  /** Names of the Carbon components that can render (`Button`, `ButtonSkeleton`). */
+  liveComponents: Set<string>;
+  /** Whether no rendered component can apply `cls` under the app's props. */
+  isPruned(cls: string): boolean;
+};
+
 export type CssOptimizerOptions = PruneOptions & {
   /** Index of the installed Carbon; see `loadComponentIndex`. */
   components: ComponentIndex;
@@ -22,6 +30,8 @@ export type CssOptimizerOptions = PruneOptions & {
   ids: Iterable<string>;
   /** Class selectors (`.bx--*`) to keep; pre-scanned so no I/O happens here. */
   contentClasses?: Iterable<string>;
+  /** Set by `experimental.propAware`. */
+  propAware?: PropAwareUsage;
 };
 
 export type OptimizedCssReport = {
@@ -39,6 +49,7 @@ function buildUsage(
   componentIndex: ComponentIndex,
   ids: Iterable<string>,
   contentClasses: Iterable<string> = [],
+  liveComponents?: Set<string>,
 ) {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
   const usedComponents = new Set<string>();
@@ -46,6 +57,8 @@ function buildUsage(
 
   for (const id of ids) {
     const { name } = path.parse(id);
+    // Bundled, but only rendered from branches the app's props rule out.
+    if (liveComponents && !liveComponents.has(name)) continue;
 
     if (name === "DatePicker") preserveFlatpickr = true;
 
@@ -64,6 +77,41 @@ function buildUsage(
   };
 }
 
+const NEVER_PRUNED = new Set<string>([
+  ...ALWAYS_ON_CLASSES,
+  ...CONTEXT_ANCESTORS,
+]);
+
+/**
+ * `propAware.isPruned`, except for classes the app's own code names
+ * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class it
+ * prunes in `pruned`.
+ */
+function createPrunedCheck(
+  propAware: PropAwareUsage,
+  contentClasses: Iterable<string> | undefined,
+  pruned: Set<string>,
+): (cls: string) => boolean {
+  const exact = new Set<string>();
+  const prefixes: string[] = [];
+  for (const cls of contentClasses ?? []) {
+    if (cls.endsWith("-")) prefixes.push(cls);
+    else exact.add(cls);
+  }
+  return (cls) => {
+    if (
+      NEVER_PRUNED.has(cls) ||
+      exact.has(cls) ||
+      prefixes.some((prefix) => cls.startsWith(prefix)) ||
+      !propAware.isPruned(cls)
+    ) {
+      return false;
+    }
+    pruned.add(cls);
+    return true;
+  };
+}
+
 export type CssOptimizer = ReturnType<typeof createCssOptimizer>;
 
 export function createCssOptimizer(options: CssOptimizerOptions) {
@@ -71,17 +119,26 @@ export function createCssOptimizer(options: CssOptimizerOptions) {
     options.components,
     options.ids,
     options.contentClasses,
+    options.propAware?.liveComponents,
   );
+  const prunedByProps = new Set<string>();
   const optimizerOptions: SpliceOptimizerOptions = {
     allowlist,
     components: options.components,
     preserveAllIBMFonts: options.preserveAllIBMFonts === true,
     preserveFlatpickr,
     safelist: options.safelist ?? [],
+    isPruned:
+      options.propAware &&
+      createPrunedCheck(
+        options.propAware,
+        options.contentClasses,
+        prunedByProps,
+      ),
   };
 
   return {
-    usage: { components, allowlistSize: allowlist.size },
+    usage: { components, allowlistSize: allowlist.size, prunedByProps },
     run(source: Uint8Array | string): OptimizedCssReport {
       // Bundlers hand over every CSS asset, including chunks with no Carbon
       // styles; skip the parse unless something removable could be present.

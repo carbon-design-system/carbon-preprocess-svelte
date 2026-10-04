@@ -64,6 +64,12 @@ export type StrictCssOptimizerOptions = {
   components: ComponentIndex;
   preserveFlatpickr: boolean;
   safelist: readonly SafelistEntry[];
+  /**
+   * Classes no rendered component can apply under the app's props
+   * (`experimental.propAware`). A selector that needs one is dropped even
+   * when the allowlist matches it.
+   */
+  isPruned?: (cls: string) => boolean;
 };
 
 const sharedClassesCache = new WeakMap<ComponentIndex, Set<string>>();
@@ -247,7 +253,8 @@ export function pruneRuleSelector(
   selector: string,
   options: StrictCssOptimizerOptions,
 ): PrunedSelector | undefined {
-  const { allowlist, components, preserveFlatpickr, safelist } = options;
+  const { allowlist, components, preserveFlatpickr, safelist, isPruned } =
+    options;
   const index = getAllowlistIndex(allowlist, components);
 
   // `bx-` covers both the Carbon (`bx--`) and legacy (`bx-`) prefixes. One
@@ -262,14 +269,20 @@ export function pruneRuleSelector(
 
   // Single selectee (the common case): no list to split or rebuild.
   if (!selector.includes(",")) {
-    return keepSelectee(selector.trim(), safelist, dropFlatpickr, index)
+    return keepSelectee(
+      selector.trim(),
+      safelist,
+      dropFlatpickr,
+      index,
+      isPruned,
+    )
       ? undefined
       : { removed: 1, selector: null };
   }
 
   const selectors = splitSelectorList(selector);
   const kept = selectors.filter((selectee) =>
-    keepSelectee(selectee, safelist, dropFlatpickr, index),
+    keepSelectee(selectee, safelist, dropFlatpickr, index, isPruned),
   );
 
   if (kept.length === selectors.length) return undefined;
@@ -285,10 +298,45 @@ function keepSelectee(
   safelist: readonly SafelistEntry[],
   dropFlatpickr: boolean,
   index: AllowlistIndex,
+  isPruned: ((cls: string) => boolean) | undefined,
 ): boolean {
   if (isSafelisted(selectee, safelist)) return true;
+  if (isPruned && needsPrunedClass(selectee, isPruned)) return false;
   if (dropFlatpickr && FLATPICKR_SELECTOR.test(selectee)) return false;
   return !selectee.includes("bx-") || shouldKeepSelector(selectee, index);
+}
+
+const DOT = 46;
+const OPEN_PAREN = 40;
+const CLOSE_PAREN = 41;
+
+/**
+ * Whether `selectee` only matches an element with a class `isPruned`
+ * rejects. Classes inside `:not(…)`, `:is(…)`, `:where(…)`, `:has(…)` are
+ * skipped: those don't require the class.
+ */
+function needsPrunedClass(
+  selectee: string,
+  isPruned: (cls: string) => boolean,
+): boolean {
+  let depth = 0;
+  for (let i = 0; i < selectee.length; i++) {
+    const code = selectee.charCodeAt(i);
+    if (code === OPEN_PAREN) depth++;
+    else if (code === CLOSE_PAREN) depth = Math.max(0, depth - 1);
+    else if (code === DOT && depth === 0 && selectee.startsWith(".bx--", i)) {
+      let end = i + 5;
+      while (
+        end < selectee.length &&
+        isClassTokenChar(selectee.charCodeAt(end))
+      ) {
+        end++;
+      }
+      if (isPruned(selectee.slice(i, end))) return true;
+      i = end - 1;
+    }
+  }
+  return false;
 }
 
 /** Whether an at-rule is the flatpickr `@keyframes` block to drop. */
