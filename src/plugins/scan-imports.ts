@@ -5,10 +5,9 @@ const DIRECT_COMPONENT_PATH =
   /^carbon-components-svelte\/src\/.+\/([A-Za-z0-9_]+)\.svelte$/;
 
 /**
- * Add the Carbon component names imported by `source` to `into`. Handles
- * both the barrel form and the direct-path form `optimizeImports` produces.
- * Type-only imports are skipped. `source` may be a whole `.svelte` file:
- * the lexer finds the imports in its `<script>` without splitting it out.
+ * Adds the Carbon component names imported by `source` (a whole `.svelte`
+ * file is fine) to `into`, from the barrel or from the direct paths
+ * `optimizeImports` produces. Type-only imports are skipped.
  */
 export function collectCarbonImports(source: string, into: Set<string>): void {
   if (!source.includes(CarbonSvelte.Components)) return;

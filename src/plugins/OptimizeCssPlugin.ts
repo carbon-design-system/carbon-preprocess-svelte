@@ -1,21 +1,16 @@
 import { loadComponentIndex } from "../indexer/load-index";
 import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
-import type { OptimizeCssOptions } from "./create-optimized-css";
 import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
-import { logAssetDiff } from "./print-diff";
-import type { AssetReport } from "./print-report";
-import { printReport, toAssetReport } from "./print-report";
+import { optimizeAssets } from "./optimize-assets";
+import type { OptimizeCssOptions } from "./options";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
- * used by this plugin. Rspack's compiler exposes the same `compiler.webpack`
- * namespace (`Compilation`, `sources`, etc.) for plugin compatibility, so
- * typing against this shape, instead of importing from the `webpack`
- * package, lets the same plugin instance be used with either bundler without
- * adding a dependency on either one.
+ * this plugin uses, so it works with either bundler without depending on
+ * either package.
  */
 type WebpackAssetSource = {
   source(): string | Buffer;
@@ -23,7 +18,7 @@ type WebpackAssetSource = {
 
 type WebpackModule = {
   resource?: unknown;
-  /** Present on NormalModule (webpack and Rspack): the loader output for this module. */
+  /** On `NormalModule`: the loader output. */
   originalSource?: () => WebpackAssetSource | null | undefined;
 };
 
@@ -65,35 +60,21 @@ type WebpackCompiler = {
 };
 
 /**
- * Webpack/Rspack plugin that removes unused Carbon CSS classes from production builds.
+ * Webpack/Rspack plugin that removes unused Carbon CSS from production
+ * builds.
  *
- * Rspack aims for webpack plugin API compatibility, so this single plugin works
- * with both bundlers unchanged.
- *
- * The plugin operates in two phases:
- * 1. During module processing, it collects all Carbon Svelte component file paths
- *    by inspecting each module's `resource` in the `finishModules` hook, which
- *    fires once every module in the graph has resolved.
- * 2. During asset processing, it splices out CSS rules that don't match any
- *    classes used by the collected components.
- *
- * Carbon's stylesheet includes every component. The plugin drops rules for
- * components the app does not import.
+ * `finishModules` collects the Carbon components in the module graph;
+ * `processAssets` then splices unused rules out of the CSS assets.
  */
-export default class OptimizeCssPlugin {
+export class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
 
   public constructor(options?: OptimizeCssOptions) {
-    this.options = {
-      preserveAllIBMFonts: false,
-      ...options,
-    };
+    this.options = { ...options };
   }
 
   public apply(compiler: WebpackCompiler) {
-    if (compiler.options.mode !== "production") {
-      return;
-    }
+    if (compiler.options.mode !== "production") return;
 
     const {
       webpack: {
@@ -114,11 +95,6 @@ export default class OptimizeCssPlugin {
           if (!silent) compilation.warnings.push(new WebpackError(message));
         };
 
-        /**
-         * `finishModules` fires once every module in the graph has resolved,
-         * so each imported Carbon Svelte component already exists as its own
-         * module with a `resource` (its resolved file path) set.
-         */
         compilation.hooks.finishModules.tap(
           OptimizeCssPlugin.name,
           (modules) => {
@@ -149,11 +125,8 @@ export default class OptimizeCssPlugin {
           },
         );
 
-        /**
-         * Process assets at OPTIMIZE_SIZE, after CSS extraction and
-         * concatenation and before minification, so unused rules are gone
-         * before a minifier sees the CSS.
-         */
+        // OPTIMIZE_SIZE runs after CSS extraction and before minification, so
+        // a minifier never sees the unused rules.
         compilation.hooks.processAssets.tapPromise(
           {
             name: OptimizeCssPlugin.name,
@@ -163,9 +136,7 @@ export default class OptimizeCssPlugin {
             const cssIds = Object.keys(assets).filter(isCssFile);
 
             if (ids.size === 0) {
-              // Warn only when this compiler emitted Carbon CSS. A second
-              // compiler in a multi-config setup that never imports Carbon
-              // has nothing to prune.
+              // A second compiler that never imports Carbon has nothing to prune.
               const hasCarbonCss = cssIds.some((id) =>
                 hasOptimizableCss(assets[id].source().toString()),
               );
@@ -174,7 +145,7 @@ export default class OptimizeCssPlugin {
             }
 
             const components = await loadComponentIndex(compiler.context);
-            // Already warned; leave this compilation's CSS unpruned.
+            // `loadComponentIndex` already warned.
             if (!components) return;
 
             const scan = scanContent(options.content, compiler.context);
@@ -185,51 +156,22 @@ export default class OptimizeCssPlugin {
             );
             if (warning) warn(warning);
 
-            const contentClasses = scan.classes;
-            const optimizer = createCssOptimizer({
-              ...options,
-              components,
-              ids,
-              contentClasses: [...contentClasses, ...moduleClasses],
+            optimizeAssets({
+              assets: cssIds.map((id) => ({
+                id,
+                source: assets[id].source().toString(),
+                write: (css) => compilation.updateAsset(id, new RawSource(css)),
+              })),
+              optimizer: createCssOptimizer({
+                ...options,
+                components,
+                ids,
+                contentClasses: [...scan.classes, ...moduleClasses],
+              }),
+              options,
+              moduleTokens: moduleClasses.size,
+              contentTokens: scan.classes.length,
             });
-            const assetReports: AssetReport[] = [];
-
-            for (const id of cssIds) {
-              const original_css = assets[id].source().toString();
-              const { css: optimized_css, removed } =
-                optimizer.run(original_css);
-
-              if (!options.dryRun) {
-                compilation.updateAsset(id, new RawSource(optimized_css));
-              }
-
-              if (!silent && removed > 0) {
-                logAssetDiff({
-                  original_css,
-                  optimized_css,
-                  id,
-                  dryRun: options.dryRun,
-                });
-              }
-
-              if (options.report) {
-                assetReports.push(
-                  toAssetReport(id, original_css, optimized_css, removed),
-                );
-              }
-            }
-
-            if (options.report) {
-              printReport({
-                components: optimizer.usage.components,
-                allowlistSize: optimizer.usage.allowlistSize,
-                moduleTokens: moduleClasses.size,
-                contentTokens: contentClasses.length,
-                safelistEntries: options.safelist?.length ?? 0,
-                assets: assetReports,
-                dryRun: options.dryRun,
-              });
-            }
           },
         );
       },

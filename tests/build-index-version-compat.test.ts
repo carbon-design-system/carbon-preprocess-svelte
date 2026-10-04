@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { buildComponentIndex } from "../src/indexer/build-index";
-import { createOptimizedCss } from "../src/plugins/create-optimized-css";
+import { createOptimizedCss } from "./helpers/create-optimized-css";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 

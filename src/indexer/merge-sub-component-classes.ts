@@ -1,15 +1,16 @@
+import { LOG_PREFIX } from "../constants";
+
 const MAX_PASSES = 10;
 
 /**
  * Propagates each sub-component's classes up into every ancestor that
- * renders it, in place, regardless of `subComponents` insertion order.
+ * renders it, in place.
  *
  * `componentClasses` maps a component name (exported or internal) to the
- * entry mutated with its merged classes; a parent absent from this map is
- * skipped as a merge target (but can still be read as a child's source).
- * Runs to a fixed point since a parent may need classes from a child that
- * hasn't itself absorbed its own children yet; a hard pass cap guards
- * against a malformed, non-DAG `subComponents` graph.
+ * entry mutated with its merged classes; a parent absent from it is skipped
+ * as a merge target but can still be a child's source. Runs to a fixed point
+ * (a parent may need a child's classes before the child has absorbed its
+ * own), capped to guard against a cyclic `subComponents` graph.
  */
 export function mergeSubComponentClasses(
   subComponents: Map<string, string[]>,
@@ -18,19 +19,17 @@ export function mergeSubComponentClasses(
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     let changed = false;
 
-    for (const [parent, children] of subComponents.entries()) {
-      const parent_entry = componentClasses.get(parent);
-      if (!parent_entry) continue;
+    for (const [parent, children] of subComponents) {
+      const parentEntry = componentClasses.get(parent);
+      if (!parentEntry) continue;
 
-      const sub_classes = children.flatMap(
-        (component) => componentClasses.get(component)?.classes ?? [],
+      const subClasses = children.flatMap(
+        (child) => componentClasses.get(child)?.classes ?? [],
       );
+      const merged = new Set([...parentEntry.classes, ...subClasses]);
 
-      if (sub_classes.length === 0) continue;
-
-      const merged = new Set([...parent_entry.classes, ...sub_classes]);
-      if (merged.size > parent_entry.classes.length) {
-        parent_entry.classes = [...merged];
+      if (merged.size > parentEntry.classes.length) {
+        parentEntry.classes = [...merged];
         changed = true;
       }
     }
@@ -39,7 +38,6 @@ export function mergeSubComponentClasses(
   }
 
   console.warn(
-    `[index] mergeSubComponentClasses: hit ${MAX_PASSES}-pass cap without converging; ` +
-      "subComponents graph may contain a cycle.",
+    `${LOG_PREFIX} mergeSubComponentClasses hit the ${MAX_PASSES}-pass cap without converging; the sub-component graph may contain a cycle.`,
   );
 }

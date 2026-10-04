@@ -7,7 +7,7 @@ import { CarbonSvelte } from "../constants";
 export type CarbonExport = {
   /** Direct import path, e.g. `carbon-components-svelte/src/Button/Button.svelte`. */
   path: string;
-  /** Binding to import from `path`: `"default"`, or a named export. */
+  /** Binding to import from `path`: `"default"` or a named export. */
   name: string;
 };
 
@@ -15,12 +15,12 @@ type ReExport = { local: string; source: string };
 
 const IDENTIFIER_NAME = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200c\u200d]*$/u;
 
-/** Whether `name` can be written without quotes in an import or export specifier. */
+/** Whether `name` can be written unquoted in an import or export specifier. */
 export function isIdentifierName(name: string): boolean {
   return IDENTIFIER_NAME.test(name);
 }
 
-/** Hops from the barrel to a definition; Carbon needs at most two. */
+/** Carbon needs at most two hops from the barrel to a definition. */
 const MAX_HOPS = 8;
 
 /** `export { a, b as c } from "./x"` statements in `file`, by exported name. */
@@ -51,7 +51,7 @@ function isFile(file: string): boolean {
   return statSync(file, { throwIfNoEntry: false })?.isFile() === true;
 }
 
-/** Node-style resolution of a relative specifier, as Carbon's barrels write them. */
+/** Node-style resolution of a relative specifier. */
 function resolveModule(from: string, source: string): string | undefined {
   const base = path.resolve(path.dirname(from), source);
   return [
@@ -63,12 +63,10 @@ function resolveModule(from: string, source: string): string | undefined {
 }
 
 /**
- * Maps every name `carbon-components-svelte`'s `src/index.js` exports to the
- * module that defines it, following re-export chains: older releases
- * re-export each component through its folder's `index.js`
- * (`export { Button } from "./Button"`), newer ones point straight at the
- * `.svelte` file. Reads only the barrel and the modules it re-exports from,
- * synchronously, with no Svelte compiler involved.
+ * Maps every name exported by `carbon-components-svelte`'s `src/index.js` to
+ * the module that defines it, following re-export chains: older releases go
+ * through each folder's `index.js` (`export { Button } from "./Button"`),
+ * newer ones point straight at the `.svelte` file.
  */
 export function readCarbonExports(
   carbonRoot: string,
@@ -93,8 +91,7 @@ export function readCarbonExports(
     let name = reExport.local;
 
     for (let hop = 0; file && hop < MAX_HOPS; hop++) {
-      // `.svelte` modules only have a default export, and a default export
-      // is where the chain ends: it is the definition.
+      // A default export, or any `.svelte` module, is the definition.
       if (name === "default" || !file.endsWith(".js")) break;
       const next = reExportsOf(file).get(name);
       if (!next) break;

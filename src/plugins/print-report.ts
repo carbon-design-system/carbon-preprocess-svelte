@@ -1,4 +1,5 @@
-import { BITS_DENOM } from "../constants";
+import { BYTES_PER_KB } from "../constants";
+import { byteLength } from "../utils";
 
 const countFormatter = new Intl.NumberFormat("en-US");
 const sizeFormatter = new Intl.NumberFormat("en-US", {
@@ -18,66 +19,57 @@ export type AssetReport = {
 export type OptimizeCssReportInput = {
   components: string[];
   allowlistSize: number;
-  moduleTokens: number;
+  /** Tokens from the bundler module scan; omitted by the CLI, which has none. */
+  moduleTokens?: number;
   contentTokens: number;
   safelistEntries: number;
   assets: AssetReport[];
   dryRun?: boolean;
 };
 
-/** Byte counts for one asset, from a string or Uint8Array source. */
 export function toAssetReport(
   id: string,
-  original_css: Uint8Array | string,
-  optimized_css: string,
+  originalCss: Uint8Array | string,
+  optimizedCss: string,
   removed: number,
 ): AssetReport {
   return {
     id,
     removed,
-    beforeBytes:
-      typeof original_css === "string"
-        ? Buffer.byteLength(original_css)
-        : original_css.byteLength,
-    afterBytes: Buffer.byteLength(optimized_css),
+    beforeBytes: byteLength(originalCss),
+    afterBytes: byteLength(optimizedCss),
   };
 }
 
 function toKB(bytes: number): string {
-  return `${sizeFormatter.format(bytes / BITS_DENOM)} kB`;
+  return `${sizeFormatter.format(bytes / BYTES_PER_KB)} kB`;
 }
 
 /** Right-pads every value to the width of the longest one in the column. */
 function padColumn(values: string[]): string[] {
-  if (values.length === 0) return [];
-  const width = Math.max(...values.map((value) => value.length));
+  const width = Math.max(0, ...values.map((value) => value.length));
   return values.map((value) => value.padEnd(width));
 }
 
 export function printReport(input: OptimizeCssReportInput): void {
-  const {
-    components,
-    allowlistSize,
-    moduleTokens,
-    contentTokens,
-    safelistEntries,
-    assets,
-    dryRun,
-  } = input;
+  const { components, allowlistSize, moduleTokens, assets, dryRun } = input;
+  const count = (n: number) => countFormatter.format(n);
+
+  const sources = [
+    ...(moduleTokens === undefined
+      ? []
+      : [`module scan ${count(moduleTokens)} tokens`]),
+    `content ${count(input.contentTokens)} tokens`,
+    `safelist ${count(input.safelistEntries)} entries`,
+  ];
 
   console.log("");
   console.log("carbon-preprocess-svelte report");
   console.log(
-    `  Detected components (${components.length}): ${
-      components.length === 0 ? "none" : components.join(", ")
-    }`,
+    `  Detected components (${components.length}): ${components.join(", ") || "none"}`,
   );
   console.log(
-    `  Allowlist: ${countFormatter.format(allowlistSize)} classes (module scan ${countFormatter.format(
-      moduleTokens,
-    )} tokens, content ${countFormatter.format(
-      contentTokens,
-    )} tokens, safelist ${countFormatter.format(safelistEntries)} entries)`,
+    `  Allowlist: ${count(allowlistSize)} classes (${sources.join(", ")})`,
   );
   console.log(`  Assets:${dryRun ? " (dry run, assets unchanged)" : ""}`);
 
@@ -85,7 +77,7 @@ export function printReport(input: OptimizeCssReportInput): void {
   const statuses = padColumn(
     assets.map((asset) =>
       asset.removed > 0
-        ? `${countFormatter.format(asset.removed)} rules removed`
+        ? `${count(asset.removed)} rules removed`
         : "nothing to prune",
     ),
   );
