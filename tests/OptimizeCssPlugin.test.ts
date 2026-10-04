@@ -10,6 +10,8 @@ import {
 import { OptimizeCssPlugin } from "../src/plugins/OptimizeCssPlugin";
 import { createFakeProject } from "./helpers/fake-project";
 
+const KIND_TERTIARY = /kind\s+"tertiary"/;
+
 type ModuleResource =
   | string
   | { resource: string; source?: string; throwOnSource?: boolean };
@@ -231,6 +233,54 @@ describe("OptimizeCssPlugin", () => {
       "styles.css",
       expect.any(Object),
     );
+  });
+
+  test("experimental.propAware reads call sites from each .svelte module's source", async () => {
+    const consoleSpy = jest.spyOn(console, "log").mockImplementation();
+    const dir = mkdtempSync(join(tmpdir(), "cps-webpack-prop-aware-"));
+    try {
+      const app = join(dir, "App.svelte");
+      writeFileSync(
+        app,
+        '<script>\n  import { Button } from "carbon-components-svelte";\n</script>\n<Button kind="tertiary">Save</Button>\n',
+      );
+      const plugin = new OptimizeCssPlugin({
+        silent: true,
+        report: true,
+        experimental: { propAware: true },
+      });
+      const mockCompiler = createMockCompiler({
+        assets: {
+          "styles.css": {
+            source: () =>
+              ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}",
+          },
+        },
+        moduleResources: [
+          // The loader's output; the plugin reads the source from disk.
+          {
+            resource: app,
+            source:
+              'import Button from "carbon-components-svelte/src/Button/Button.svelte";',
+          },
+          `node_modules/${CarbonSvelte.Components}/src/Button/Button.svelte`,
+        ],
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      expect(mockCompiler.compilation.warnings).toEqual([]);
+      const [, updated] = mockCompiler.compilation.updateAsset.mock.calls[0];
+      expect(updated.source()).toBe(".bx--btn{a:1}.bx--btn--tertiary{a:2}");
+      const printed = consoleSpy.mock.calls.flat().join("\n");
+      expect(printed).toContain("Prop-aware (experimental):");
+      expect(printed).toMatch(KIND_TERTIARY);
+      expect(printed).toContain("Classes pruned by props: 1");
+    } finally {
+      consoleSpy.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("handles Buffer input correctly", async () => {

@@ -1,12 +1,13 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import type { PropAwareResult } from "./analyzer";
 import { LOG_PREFIX } from "./constants";
 import { loadComponentIndex } from "./indexer/load-index";
 import { createCssOptimizer } from "./plugins/create-optimized-css";
 import { optimizeAssets } from "./plugins/optimize-assets";
 import type { SafelistEntry } from "./plugins/safelist";
-import { collectCarbonTokens, readSources } from "./plugins/scan-content";
+import { collectCarbonTokens, readFiles } from "./plugins/scan-content";
 import { collectCarbonImports } from "./plugins/scan-imports";
 import { isCssFile } from "./utils";
 
@@ -27,6 +28,9 @@ Options:
                           slashes for a RegExp: --safelist "/^\\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
+  --experimental-prop-aware
+                          Also prune styles for prop values, slots, and child
+                          components the --content files never use.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
   --dry-run               Print sizes, write nothing.
@@ -50,6 +54,7 @@ async function main() {
       components: { type: "string" },
       safelist: { type: "string", multiple: true },
       "preserve-all-ibm-fonts": { type: "boolean" },
+      "experimental-prop-aware": { type: "boolean" },
       cwd: { type: "string" },
       "dry-run": { type: "boolean" },
       report: { type: "boolean" },
@@ -88,10 +93,13 @@ async function main() {
 
   const components = new Set<string>();
   const contentClasses = new Set<string>();
+  const propAware = values["experimental-prop-aware"] === true;
+  const sources: Array<{ file: string; code: string }> = [];
 
-  for (const source of readSources(globSync(contentGlobs, { cwd }), cwd)) {
-    collectCarbonImports(source, components);
-    collectCarbonTokens(source, contentClasses);
+  for (const source of readFiles(globSync(contentGlobs, { cwd }), cwd)) {
+    collectCarbonImports(source.code, components);
+    collectCarbonTokens(source.code, contentClasses);
+    if (propAware) sources.push(source);
   }
 
   for (const name of (values.components ?? "").split(",")) {
@@ -121,6 +129,27 @@ async function main() {
     silent: values.silent === true,
   };
 
+  const analyzer = propAware ? await import("./analyzer") : undefined;
+  let usage: PropAwareResult | undefined;
+  if (analyzer) {
+    const result = await analyzer.analyzeFiles({
+      projectRoot: cwd,
+      files: sources,
+      components,
+      options: {},
+    });
+    if ("warning" in result) console.warn(result.warning);
+    else usage = result;
+  }
+
+  const optimizer = createCssOptimizer({
+    ...options,
+    components: index,
+    ids: components,
+    contentClasses,
+    propAware: usage,
+  });
+
   optimizeAssets({
     assets: cssFiles.map((id) => {
       const file = path.resolve(cwd, id);
@@ -133,14 +162,17 @@ async function main() {
         },
       };
     }),
-    optimizer: createCssOptimizer({
-      ...options,
-      components: index,
-      ids: components,
-      contentClasses,
-    }),
+    optimizer,
     options,
     contentTokens: contentClasses.size,
+    reportExtra: () =>
+      analyzer && usage
+        ? analyzer.formatPropAwareReport(
+            usage,
+            optimizer.usage.prunedByProps,
+            cwd,
+          )
+        : [],
   });
 }
 

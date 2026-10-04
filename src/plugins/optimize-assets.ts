@@ -22,6 +22,7 @@ export function optimizeAssets({
   moduleTokens,
   contentTokens,
   log,
+  reportExtra,
 }: {
   assets: Iterable<CssAsset>;
   optimizer: CssOptimizer;
@@ -31,6 +32,8 @@ export function optimizeAssets({
   contentTokens: number;
   /** Where size logs go; `console.log` when unset. */
   log?: (message: string) => void;
+  /** Lines appended to the report, read after every asset has run. */
+  reportExtra?: () => string[];
 }): void {
   const silent = options.silent === true;
   const reports: AssetReport[] = [];
@@ -62,6 +65,7 @@ export function optimizeAssets({
       safelistEntries: options.safelist?.length ?? 0,
       assets: reports,
       dryRun: options.dryRun,
+      extra: reportExtra?.(),
     });
   }
 }

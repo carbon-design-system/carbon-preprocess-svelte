@@ -22,9 +22,18 @@ export function* readSources(
   files: readonly string[],
   cwd: string,
 ): Generator<string> {
+  for (const { code } of readFiles(files, cwd)) yield code;
+}
+
+/** Each readable file in `files` (relative to `cwd`), by absolute path. */
+export function* readFiles(
+  files: readonly string[],
+  cwd: string,
+): Generator<{ file: string; code: string }> {
   for (const file of files) {
+    const absolute = path.resolve(cwd, file);
     try {
-      yield readFileSync(path.resolve(cwd, file), "utf-8");
+      yield { file: absolute, code: readFileSync(absolute, "utf-8") };
     } catch {
       // A directory or an unreadable match.
     }
