@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { filterCss } from "caligula";
 import {
@@ -26,11 +27,24 @@ const LAYOUT_ANCESTOR_DENYLIST = new Set([
   ".bx--toast-notification",
 ]);
 
+/**
+ * Theme stylesheets the index can read, in order of preference: each
+ * holds every component's rules. Carbon's 1.0 prereleases ship no
+ * `white.css`.
+ */
+const INDEXED_THEMES = ["white", "g10", "g90", "g100", "all"];
+
+/** `css/<theme>.css`, or by default the first indexed theme Carbon ships. */
 export function resolveCarbonCssPath(
   carbonRoot: string = resolveCarbonRoot(),
-  theme = "white",
+  theme?: string,
 ): string {
-  return join(carbonRoot, "css", `${theme}.css`);
+  const path = (name: string) => join(carbonRoot, "css", `${name}.css`);
+  if (theme) return path(theme);
+  return (
+    INDEXED_THEMES.map(path).find((file) => existsSync(file)) ??
+    path(INDEXED_THEMES[0])
+  );
 }
 
 function addToSet(

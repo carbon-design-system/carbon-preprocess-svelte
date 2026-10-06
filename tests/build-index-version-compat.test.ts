@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { buildComponentIndex } from "../src/indexer/build-index";
+import { resolveCarbonCssPath } from "../src/indexer/extract-css-context";
 import { createOptimizedCss } from "./helpers/create-optimized-css";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
@@ -124,6 +125,33 @@ export { default as Bar } from "./Bar/Bar.svelte";`,
       );
       expect(index.Bar?.classes).toContain(".bx--foo--sm");
       expect(index.Bar?.classes).not.toContain(".bx--modal");
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
+
+describe("buildComponentIndex without `css/white.css`", () => {
+  // Carbon's 1.0 prereleases ship `all`, `g10`, `g90` and `g100` only.
+  test("indexes the first theme stylesheet Carbon ships", async () => {
+    const fixture = createMockCarbonPackage({
+      "index.js": `export { default as Button } from "./Button/Button.svelte";`,
+      "Button/Button.svelte": `<button class="bx--btn"><slot /></button>`,
+    });
+    try {
+      const css = path.join(fixture.root, "css");
+      rmSync(path.join(css, "white.css"));
+      writeFileSync(path.join(css, "all.css"), ".bx--btn{color:red}");
+      expect(resolveCarbonCssPath(fixture.root)).toBe(
+        path.join(css, "all.css"),
+      );
+      writeFileSync(path.join(css, "g10.css"), ".bx--btn{color:red}");
+      expect(resolveCarbonCssPath(fixture.root)).toBe(
+        path.join(css, "g10.css"),
+      );
+
+      const index = await buildComponentIndex({ carbonRoot: fixture.root });
+      expect(index.Button?.classes).toContain(".bx--btn");
     } finally {
       fixture.dispose();
     }
