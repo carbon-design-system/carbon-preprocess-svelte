@@ -51,10 +51,42 @@ export type ComponentModel = {
   escapingNames: Set<string>;
 };
 
-/** Thrown for a component the analysis doesn't model (runes mode). */
+/** Thrown for a component the analysis can't model. */
 export class UnsupportedComponentError extends Error {}
 
-const RUNES = new Set(["$props", "$state", "$derived", "$effect", "$bindable"]);
+/** Runes whose argument is the value they declare. */
+const VALUE_RUNES = new Set(["$state", "$state.raw", "$derived"]);
+
+/** `$state`, `$state.raw`, … for a rune callee; `undefined` otherwise. */
+function runeName(callee: Node): string | undefined {
+  if (callee.type === "Identifier") {
+    return callee.name.startsWith("$") ? callee.name : undefined;
+  }
+  if (
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object.type === "Identifier" &&
+    callee.object.name.startsWith("$") &&
+    callee.property.type === "Identifier"
+  ) {
+    return `${callee.object.name}.${callee.property.name}`;
+  }
+  return undefined;
+}
+
+/** The rune `init` calls, if it's a call to one. */
+function runeCall(
+  init: Expression | null,
+): { rune: string; argument: Expression | null } | undefined {
+  if (init?.type !== "CallExpression") return undefined;
+  const rune = runeName(init.callee as Node);
+  if (!rune) return undefined;
+  const [first] = init.arguments;
+  return {
+    rune,
+    argument: first && first.type !== "SpreadElement" ? first : null,
+  };
+}
 
 const cache = new Map<string, { mtimeMs: number; model: ComponentModel }>();
 
@@ -148,10 +180,6 @@ export function buildComponentModel(
     escapingNames: escapingNames(ast),
   };
 
-  if (ast.options?.runes) {
-    throw new UnsupportedComponentError(`${key} uses runes mode`);
-  }
-
   /** Instance-script `let` names: a later `export { … }` can make them props. */
   const letDeclarations = new Set<string>();
   for (const script of [ast.module, ast.instance]) {
@@ -220,9 +248,6 @@ export function buildComponentModel(
         break;
       case "CallExpression":
         if (node.callee.type === "Identifier") {
-          if (RUNES.has(node.callee.name)) {
-            throw new UnsupportedComponentError(`${key} uses runes`);
-          }
           const [first] = node.arguments;
           if (
             node.callee.name === "setContext" &&
@@ -273,11 +298,21 @@ function readTopLevelStatement(
 
   if (declaration.type === "VariableDeclaration") {
     for (const declarator of declaration.declarations) {
+      const rune = runeCall(declarator.init ?? null);
+      if (rune?.rune === "$props" && isInstance) {
+        readPropsRune(model, declarator.id as Node);
+        continue;
+      }
       if (declarator.id.type !== "Identifier") {
         patternNames(declarator.id, model.unknownNames);
         continue;
       }
-      const init = declarator.init ?? null;
+      // `$state(x)`, `$state.raw(x)` and `$derived(x)` hold `x`; any
+      // other rune (`$derived.by`, `$props.id`) evaluates as unknown.
+      const init =
+        rune && VALUE_RUNES.has(rune.rune)
+          ? rune.argument
+          : (declarator.init ?? null);
       if (isExport && isInstance && declaration.kind !== "const") {
         model.props.set(declarator.id.name, init);
         model.propNames.set(declarator.id.name, declarator.id.name);
@@ -387,6 +422,50 @@ function isLengthRead(
       return grandparent.operator !== "delete";
     default:
       return true;
+  }
+}
+
+/**
+ * `let { kind = "primary", class: className, ...rest } = $props()`: each
+ * property is a prop, its default unwrapped from `$bindable(…)`. A rest
+ * element, a nested pattern or `let props = $props()` reads props the
+ * analysis doesn't model, so those names are unknown.
+ */
+function readPropsRune(model: ComponentModel, pattern: Node): void {
+  if (pattern.type !== "ObjectPattern") {
+    patternNames(pattern, model.unknownNames);
+    return;
+  }
+  for (const property of pattern.properties) {
+    if (property.type === "RestElement") {
+      patternNames(property.argument as Node, model.unknownNames);
+      continue;
+    }
+    if (property.computed) {
+      patternNames(property.value as Node, model.unknownNames);
+      continue;
+    }
+    const passedAs =
+      property.key.type === "Identifier"
+        ? property.key.name
+        : property.key.type === "Literal"
+          ? String(property.key.value)
+          : undefined;
+    const value = property.value as Node;
+    const [local, fallback] =
+      value.type === "AssignmentPattern"
+        ? [value.left as Node, value.right as Expression]
+        : [value, null];
+    if (passedAs === undefined || local.type !== "Identifier") {
+      patternNames(value, model.unknownNames);
+      continue;
+    }
+    const bindable = runeCall(fallback);
+    model.props.set(
+      local.name,
+      bindable?.rune === "$bindable" ? bindable.argument : fallback,
+    );
+    model.propNames.set(local.name, passedAs);
   }
 }
 
