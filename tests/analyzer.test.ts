@@ -7,11 +7,10 @@ import {
   collectSvelteUsage,
   readCarbonComponents,
 } from "../src/analyzer/call-sites";
-import {
-  buildComponentModel,
-  UnsupportedComponentError,
-} from "../src/analyzer/component-model";
-import { UNKNOWN } from "../src/analyzer/values";
+import { buildComponentModel } from "../src/analyzer/component-model";
+import { createScope, evaluate } from "../src/analyzer/evaluate";
+import { addCallSite, newComponentUsage } from "../src/analyzer/usage";
+import { possible, UNKNOWN } from "../src/analyzer/values";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 
 const carbonRoot = resolveCarbonRoot();
@@ -296,12 +295,44 @@ describe("analyzeUsage", () => {
     expect(isPruned(".bx--list-box__field")).toBe(false);
   });
 
-  test("runes-mode components are rejected, not guessed at", () => {
-    expect(() =>
-      buildComponentModel(
-        `<script>let { kind } = $props();</script>`,
-        "X/X.svelte",
-      ),
-    ).toThrow(UnsupportedComponentError);
+  test("models runes: `$props`, `$bindable`, `$state` and `$derived`", () => {
+    const model = buildComponentModel(
+      `<script>
+  let { kind = "primary", size, class: className = "", value = $bindable(""), ...rest } = $props();
+  let count = $state(0);
+  let open = $state(false);
+  const label = $derived(kind === "ghost" ? "Ghost" : "Other");
+  const late = $derived.by(() => kind);
+  function toggle() { open = !open; }
+</script>
+<button class={className} onclick={toggle}>{label}{count}{late}</button>`,
+      "X/X.svelte",
+    );
+    const usage = newComponentUsage();
+    addCallSite(
+      usage,
+      {
+        component: model.key,
+        open: false,
+        props: new Map([["kind", possible("ghost")]]),
+        slots: new Set(),
+      },
+      model.propNames.values(),
+    );
+    const scope = createScope(model, usage, () => UNKNOWN);
+    const value = (name: string) =>
+      evaluate({ type: "Identifier", name } as never, scope);
+    expect(model.propNames.get("className")).toBe("class");
+    expect(value("kind")).toEqual(possible("ghost"));
+    expect(value("size")).toEqual(possible(undefined));
+    expect(value("className")).toEqual(possible(""));
+    expect(value("value")).toEqual(possible(""));
+    expect(value("label")).toEqual(possible("Ghost"));
+    expect(value("count")).toEqual(possible(0));
+    // Reassigned by a handler, read through a rest element, or derived by
+    // a function: unknown.
+    expect(value("open")).toBe(UNKNOWN);
+    expect(value("rest")).toBe(UNKNOWN);
+    expect(value("late")).toBe(UNKNOWN);
   });
 });
