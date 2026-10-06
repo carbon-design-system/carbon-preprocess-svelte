@@ -17,10 +17,10 @@ With carbon-components-svelte 0.113.0, `bun run build` printed (client assets on
 
 | Variant | CSS | CSS gzip | JS | JS gzip |
 | --- | --- | --- | --- | --- |
-| baseline | 557.37 kB | 65.81 kB | 431.26 kB | 129.49 kB |
-| css | 314.97 kB (-43.5%) | 36.33 kB (-44.8%) | 431.26 kB | 129.49 kB |
-| prop-aware | 221.54 kB (-60.3%) | 26.18 kB (-60.2%) | 431.26 kB | 129.49 kB |
-| full | 221.54 kB (-60.3%) | 26.18 kB (-60.2%) | 352.62 kB (-18.2%) | 112.57 kB (-13.1%) |
+| baseline | 557.37 kB | 65.81 kB | 431.50 kB | 129.29 kB |
+| css | 314.97 kB (-43.5%) | 36.33 kB (-44.8%) | 431.50 kB | 129.29 kB |
+| prop-aware | 221.54 kB (-60.3%) | 26.18 kB (-60.2%) | 431.50 kB | 129.29 kB |
+| full | 221.54 kB (-60.3%) | 26.18 kB (-60.2%) | 352.90 kB (-18.2%) | 112.65 kB (-12.9%) |
 
 ## Usage
 
