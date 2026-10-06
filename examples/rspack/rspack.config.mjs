@@ -1,13 +1,21 @@
 // @ts-check
 import path from "node:path";
 import { rspack } from "@rspack/core";
-import { OptimizeCssPlugin, optimizeImports } from "carbon-preprocess-svelte";
+import {
+  OptimizeComponentsPlugin,
+  OptimizeCssPlugin,
+  optimizeImports,
+} from "carbon-preprocess-svelte";
 import { sveltePreprocess } from "svelte-preprocess";
 
 /** @type {"development" | "production"} */
 const NODE_ENV =
   process.env.NODE_ENV === "production" ? "production" : "development";
 const PROD = NODE_ENV === "production";
+// `OPTIMIZE=1` adds the experimental optimizations: `OptimizeComponentsPlugin`
+// rewrites Carbon components for the props the app passes, and prop-aware
+// `OptimizeCssPlugin` prunes their unused styles. Built to `public-optimized/`.
+const OPTIMIZE = PROD && process.env.OPTIMIZE === "1";
 
 /** @type {import("@rspack/core").Configuration} */
 export default {
@@ -18,7 +26,7 @@ export default {
   },
   output: {
     publicPath: "/",
-    path: path.resolve("./public"),
+    path: path.resolve(OPTIMIZE ? "./public-optimized" : "./public"),
     filename: PROD ? "[name].[contenthash].js" : "[name].js",
     chunkFilename: "[name].[id].js",
     cssFilename: PROD ? "[name].[contenthash].css" : "[name].css",
@@ -50,7 +58,8 @@ export default {
   },
   mode: NODE_ENV,
   plugins: [
-    new OptimizeCssPlugin(),
+    OPTIMIZE && new OptimizeComponentsPlugin(),
+    new OptimizeCssPlugin({ experimental: { propAware: OPTIMIZE } }),
     new rspack.HtmlRspackPlugin({
       templateContent: `
       <!DOCTYPE html>

@@ -1,6 +1,10 @@
 // @ts-check
 import path from "node:path";
-import { OptimizeCssPlugin, optimizeImports } from "carbon-preprocess-svelte";
+import {
+  OptimizeComponentsPlugin,
+  OptimizeCssPlugin,
+  optimizeImports,
+} from "carbon-preprocess-svelte";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
 import { sveltePreprocess } from "svelte-preprocess";
 import webpack from "webpack";
@@ -9,6 +13,10 @@ import webpack from "webpack";
 const NODE_ENV =
   process.env.NODE_ENV === "production" ? "production" : "development";
 const PROD = NODE_ENV === "production";
+// `OPTIMIZE=1` adds the experimental optimizations: `OptimizeComponentsPlugin`
+// rewrites Carbon components for the props the app passes, and prop-aware
+// `OptimizeCssPlugin` prunes their unused styles. Built to `public-optimized/`.
+const OPTIMIZE = PROD && process.env.OPTIMIZE === "1";
 
 // Minimal stand-in for html-webpack-plugin: writes a static HTML shell,
 // injecting the entry's actual (possibly hashed) script/link tags.
@@ -55,7 +63,7 @@ export default {
   },
   output: {
     publicPath: "/",
-    path: path.resolve("./public"),
+    path: path.resolve(OPTIMIZE ? "./public-optimized" : "./public"),
     filename: PROD ? "[name].[contenthash].js" : "[name].js",
     chunkFilename: "[name].[id].js",
     clean: true,
@@ -85,7 +93,8 @@ export default {
   },
   mode: NODE_ENV,
   plugins: [
-    new OptimizeCssPlugin(),
+    OPTIMIZE && new OptimizeComponentsPlugin(),
+    new OptimizeCssPlugin({ experimental: { propAware: OPTIMIZE } }),
     new MiniCssExtractPlugin({
       filename: PROD ? "[name].[chunkhash].css" : "[name].css",
     }),

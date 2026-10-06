@@ -3,7 +3,9 @@
   "type": "module",
   "scripts": {
     "dev": "rspack dev",
-    "build": "NODE_ENV=production rspack build"
+    "build": "NODE_ENV=production rspack build",
+    "build:default": "NODE_ENV=production rspack build",
+    "build:optimized": "NODE_ENV=production OPTIMIZE=1 rspack build"
   },
   "devDependencies": {
     "@rspack/cli": "latest",

@@ -12,9 +12,10 @@
  *   hydrated. Also requires the same prerendered HTML, the same console
  *   messages, and no extra DOM removed while hydrating (a hydration mismatch
  *   throws the server markup away and renders again).
- * - `rollup`, `rolldown`: `default` vs `optimized`, on a DataTable app.
+ * - `rollup`, `rolldown`, `webpack`, `webpack@svelte-5`, `rspack`:
+ *   `default` vs `optimized`, on a DataTable app.
  *
- *   bun scripts/eval-interactions.ts [--examples rollup,rolldown] [--no-build]
+ *   bun scripts/eval-interactions.ts [--examples rollup,rspack] [--no-build]
  *
  * Each example needs its dependencies installed, with this package linked
  * (see the example's README). Builds every variant unless `--no-build`.
@@ -172,7 +173,7 @@ const MATRIX_STEPS: Step[] = [
   },
 ];
 
-/** The rollup/rolldown examples' app: a sortable, selectable DataTable. */
+/** The Rollup, Rolldown, webpack and Rspack examples' app: a sortable, selectable DataTable. */
 const DATATABLE_STEPS: Step[] = [
   { name: "load", run: async () => {} },
   {
@@ -242,20 +243,20 @@ const EXAMPLE_SPECS: Record<string, Example> = {
     steps: MATRIX_STEPS,
     ssr: true,
   },
-  rollup: {
-    variants: ["default", "optimized"],
-    outDir: (variant) =>
-      variant === "default" ? "public" : `public-${variant}`,
-    ready: ".bx--data-table",
-    steps: DATATABLE_STEPS,
-  },
-  rolldown: {
-    variants: ["default", "optimized"],
-    outDir: (variant) =>
-      variant === "default" ? "public" : `public-${variant}`,
-    ready: ".bx--data-table",
-    steps: DATATABLE_STEPS,
-  },
+  ...Object.fromEntries(
+    ["rollup", "rolldown", "webpack", "webpack@svelte-5", "rspack"].map(
+      (name): [string, Example] => [
+        name,
+        {
+          variants: ["default", "optimized"],
+          outDir: (variant) =>
+            variant === "default" ? "public" : `public-${variant}`,
+          ready: ".bx--data-table",
+          steps: DATATABLE_STEPS,
+        },
+      ],
+    ),
+  ),
 };
 
 const EXAMPLES = args.examples
