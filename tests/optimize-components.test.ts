@@ -89,6 +89,28 @@ describe("optimizeComponents", () => {
     }
   });
 
+  test.each([
+    ["4.2.19", true],
+    ["5.0.0", false],
+  ])("with Svelte %s, keeps `{#if true}` blocks: %p", async (version, kept) => {
+    const { project, carbon, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button kind="tertiary">Save</Button>`,
+    );
+    try {
+      const svelte = path.join(project.root, "node_modules", "svelte");
+      mkdirSync(svelte);
+      writeFileSync(
+        path.join(svelte, "package.json"),
+        JSON.stringify({ name: "svelte", version }),
+      );
+      await plugin.buildStart.call(context());
+      const button = plugin.load(path.join(carbon, "src/Button/Button.svelte"));
+      expect(button?.code.includes("{#if true}")).toBe(kept);
+    } finally {
+      project.dispose();
+    }
+  });
+
   test("fails the build when a module outside `content` renders Carbon", async () => {
     const { project, plugin } = setUp(
       `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,

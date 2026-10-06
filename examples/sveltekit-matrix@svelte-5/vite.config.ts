@@ -21,7 +21,7 @@ const variant = process.env.VARIANT ?? "full";
 
 export default defineConfig({
   plugins: [
-    variant === "full" && optimizeComponents({ unwrap: true }),
+    variant === "full" && optimizeComponents(),
     sveltekit({
       preprocess: [optimizeImports()],
       // One output directory per variant.

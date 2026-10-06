@@ -537,9 +537,9 @@ optimizeComponents({
    * Replace an `{#if}` whose live branch is known with that branch instead
    * of keeping an `{#if true}` around it. Svelte 5 only. Saves under a
    * point of JS.
-   * @default false
+   * @default true when the installed Svelte is 5 or later
    */
-  unwrap: false,
+  unwrap: true,
 
   /** Skip the per-build summary. @default false */
   silent: false,
