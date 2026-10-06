@@ -169,8 +169,8 @@ export class MappingsBuilder {
     this.skip(original, start, end);
   }
 
-  /** Advances the original cursor past `original[start, end)`. */
-  private skip(original: string, start: number, end: number): void {
+  /** Advances the original cursor past `original[start, end)` (removed text). */
+  skip(original: string, start: number, end: number): void {
     let lastNewline = -1;
     let newline = original.indexOf("\n", start);
     while (newline !== -1 && newline < end) {

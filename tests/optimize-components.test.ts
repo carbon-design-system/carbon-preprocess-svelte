@@ -14,7 +14,7 @@ type ResolvedPlugin = {
   enforce: string;
   configResolved(config: { root: string }): void;
   buildStart(this: Context): Promise<void>;
-  load(id: string): string | undefined;
+  load(id: string): { code: string; map: { mappings: string } } | undefined;
   transform(code: string, id: string): void;
   buildEnd(this: Context): void;
 };
@@ -73,8 +73,9 @@ describe("optimizeComponents", () => {
       expect(rewritten).toBeDefined();
       expect(plugin.load(realpathSync(button))).toBe(rewritten);
       expect(plugin.load(`${button}?v=1234`)).toBe(rewritten);
-      expect(rewritten).toContain(`"bx--btn--tertiary"`);
-      expect(rewritten).not.toContain("<ButtonSkeleton");
+      expect(rewritten?.code).toContain(`"bx--btn--tertiary"`);
+      expect(rewritten?.code).not.toContain("<ButtonSkeleton");
+      expect(rewritten?.map.mappings).not.toBe("");
 
       // Svelte's style sub-module and unrelated files are left alone.
       expect(

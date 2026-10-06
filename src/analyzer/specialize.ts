@@ -3,6 +3,14 @@ import { parse } from "../indexer/parser";
 import { childEntries, type Node } from "./ast";
 import { evaluate, type Scope } from "./evaluate";
 import {
+  concat,
+  type MappedText,
+  removeMatches,
+  type Splice,
+  sliceOf,
+  splice,
+} from "./mapped-text";
+import {
   isNeverNullish,
   isNullish,
   OBJECT,
@@ -26,16 +34,20 @@ import {
  */
 export type Specialization = {
   code: string;
+  /** `code`, with where each part of it came from (for a source map). */
+  mapped: MappedText;
   /** Edits applied (nested edits inside a removed range aren't counted). */
   edits: number;
   /** Declarations removed because nothing read them after the edits. */
   dropped: number;
 };
 
+type Rewrite = (start: number, end: number) => MappedText;
+
 type Edit = {
   start: number;
   end: number;
-  print: (rewrite: (start: number, end: number) => string) => string;
+  print: (rewrite: Rewrite) => MappedText | string;
 };
 
 /** TypeScript nodes that hold a value; every other `TS*` node is a type. */
@@ -210,8 +222,8 @@ function span(node: Node): Span {
 const EDGE_WHITESPACE = /^[ \t\r\n]+|[ \t\r\n]+$/g;
 const LEADING_COMMENTS = /^(?:<!--[\s\S]*?-->[ \t\r\n]*)+/;
 const TRAILING_COMMENTS = /(?:[ \t\r\n]*<!--[\s\S]*?-->)+$/;
-const COMMENT_GAPS = /-->[ \t\r\n]+/g;
-const GAPS_BEFORE_COMMENT = /[ \t\r\n]+<!--/g;
+const COMMENT_GAPS = /(?<=-->)[ \t\r\n]+/g;
+const GAPS_BEFORE_COMMENT = /[ \t\r\n]+(?=<!--)/g;
 const ENDS_WITH_WHITESPACE = /[ \t\r\n]$/;
 const STARTS_WITH_WHITESPACE = /^[ \t\r\n]/;
 const ONLY_WHITESPACE = /^[ \t\r\n]*$/;
@@ -335,7 +347,8 @@ export function specializeComponent(
           edits.push({
             start: node.start,
             end: node.end,
-            print: (rewrite) => `(${rewrite(right.start, right.end)})`,
+            print: (rewrite) =>
+              concat("(", rewrite(right.start, right.end), ")"),
           });
           visit(right, node, "right");
         } else {
@@ -353,7 +366,7 @@ export function specializeComponent(
           edits.push({
             start: node.start,
             end: node.end,
-            print: (rewrite) => `(${rewrite(live.start, live.end)})`,
+            print: (rewrite) => concat("(", rewrite(live.start, live.end), ")"),
           });
         } else {
           replace(
@@ -511,13 +524,10 @@ export function specializeComponent(
     if (!(changed || kept.length === 0)) return;
 
     const trim = preserveDepth === 0;
-    const body = (
-      rewrite: (start: number, end: number) => string,
-      fragment: typeof elseBody,
-    ) =>
+    const body = (rewrite: Rewrite, fragment: typeof elseBody) =>
       fragment && fragment.nodes.length > 0
         ? rewrite(fragment.nodes[0].start, fragment.nodes.at(-1)?.end ?? 0)
-        : "";
+        : concat();
     const finalElse = elseBody;
 
     edits.push({
@@ -526,7 +536,9 @@ export function specializeComponent(
       print: (rewrite) => {
         if (kept.length === 0) {
           const content = body(rewrite, finalElse);
-          if (content.replace(EDGE_WHITESPACE, "") === "") return placeholder;
+          if (content.text.replace(EDGE_WHITESPACE, "") === "") {
+            return placeholder;
+          }
           // Keep a block around the live branch unless `unwrap` (Svelte 5
           // only): block boundaries decide how Svelte 3/4 trim whitespace
           // inside the elements a branch holds. `{@const}` and `{#snippet}`
@@ -538,32 +550,47 @@ export function specializeComponent(
                 child.type === "ConstTag" || child.type === "SnippetBlock",
             )
           ) {
-            return `{#if true}${content}{/if}`;
+            return concat("{#if true}", content, "{/if}");
           }
           // Unwrap: the block's own edges were trimmed; the whitespace
           // around it stays where it was. Svelte 5 trims through comments at
           // the edges (like `svelte-ignore`) inside the block, so the
           // whitespace between them goes too.
-          return trim
-            ? content
-                .replace(EDGE_WHITESPACE, "")
-                .replace(LEADING_COMMENTS, (m) =>
-                  m.replace(COMMENT_GAPS, "-->"),
-                )
-                .replace(TRAILING_COMMENTS, (m) =>
-                  m.replace(GAPS_BEFORE_COMMENT, "<!--"),
-                )
-            : content;
+          if (!trim) return content;
+          let trimmed = removeMatches(content, EDGE_WHITESPACE);
+          const leading = LEADING_COMMENTS.exec(trimmed.text);
+          if (leading) {
+            trimmed = removeMatches(
+              trimmed,
+              COMMENT_GAPS,
+              0,
+              leading[0].length,
+            );
+          }
+          const trailing = TRAILING_COMMENTS.exec(trimmed.text);
+          if (trailing) {
+            trimmed = removeMatches(
+              trimmed,
+              GAPS_BEFORE_COMMENT,
+              trailing.index,
+            );
+          }
+          return trimmed;
         }
-        let text = "";
+        const parts: Array<MappedText | string> = [];
         for (const [i, branch] of kept.entries()) {
-          text += `{${i === 0 ? "#if" : ":else if"} ${rewrite(span(branch.test).start, span(branch.test).end)}}`;
-          text += body(rewrite, branch.body);
+          const test = span(branch.test);
+          parts.push(
+            `{${i === 0 ? "#if" : ":else if"} `,
+            rewrite(test.start, test.end),
+            "}",
+            body(rewrite, branch.body),
+          );
         }
         if (finalElse && finalElse.nodes.length > 0) {
-          text += `{:else}${body(rewrite, finalElse)}`;
+          parts.push("{:else}", body(rewrite, finalElse));
         }
-        return `${text}{/if}`;
+        return concat(...parts, "{/if}");
       },
     });
   }
@@ -581,28 +608,26 @@ export function specializeComponent(
     .sort((a, b) => a.start - b.start || b.end - a.end)
     .filter((edit, i) => options?.editFilter?.(i, edit) ?? true);
   let applied = 0;
-  const rewrite = (start: number, end: number): string => {
-    let text = "";
+  const rewrite: Rewrite = (start, end) => {
+    const parts: Array<MappedText | string> = [];
     let cursor = start;
     for (const edit of sorted) {
       if (edit.start < cursor || edit.end > end || edit.start >= end) continue;
-      text += code.slice(cursor, edit.start) + edit.print(rewrite);
+      parts.push(sliceOf(code, cursor, edit.start), edit.print(rewrite));
       cursor = edit.end;
       applied++;
     }
-    return text + code.slice(cursor, end);
+    parts.push(sliceOf(code, cursor, end));
+    return concat(...parts);
   };
 
   const folded = rewrite(0, code.length);
-  const { code: cleaned, dropped } =
+  const { mapped: cleaned, dropped } =
     options?.dropUnused === false
-      ? { code: folded, dropped: 0 }
-      : dropUnusedDeclarations(folded);
-  return {
-    code: applied > 0 ? silenceUnusedProps(cleaned) : cleaned,
-    edits: applied,
-    dropped,
-  };
+      ? { mapped: folded, dropped: 0 }
+      : dropUnused(folded);
+  const mapped = applied > 0 ? silenceUnusedProps(cleaned) : cleaned;
+  return { code: mapped.text, mapped, edits: applied, dropped };
 }
 
 /** Whether `node` can be removed without losing a side effect (no scope facts). */
@@ -721,8 +746,8 @@ const IGNORE_UNUSED_PROP =
  * doesn't warn that they're unused. They stay declared: a prop the
  * component stops declaring would land in `$$restProps`.
  */
-function silenceUnusedProps(code: string): string {
-  const ast = parse(code, { comments: false });
+function silenceUnusedProps(input: MappedText): MappedText {
+  const ast = parse(input.text, { comments: false });
   const statements = (ast.instance?.content.body ?? []) as Node[];
   // `export let a`, and `let a; export { a as b }`.
   const exported = statements.flatMap((statement) => {
@@ -748,7 +773,6 @@ function silenceUnusedProps(code: string): string {
         ];
   });
   const reads = countReads(ast, new Set(), false);
-  let result = code;
   // Svelte 5 reports `let a; export { a as b }` at the `let`, Svelte 3/4
   // at the export: mark both.
   const declaredAt = new Map<string, number>();
@@ -769,20 +793,30 @@ function silenceUnusedProps(code: string): string {
       if (declaration !== undefined) marks.add(declaration);
     }
   }
-  for (const start of [...marks].sort((a, b) => b - a)) {
-    result = result.slice(0, start) + IGNORE_UNUSED_PROP + result.slice(start);
-  }
-  return result;
+  return splice(
+    input,
+    [...marks]
+      .sort((a, b) => a - b)
+      .map((start) => ({ start, end: start, text: IGNORE_UNUSED_PROP })),
+  );
 }
 
 export function dropUnusedDeclarations(source: string): {
   code: string;
   dropped: number;
 } {
-  let code = source;
+  const { mapped, dropped } = dropUnused(sliceOf(source, 0, source.length));
+  return { code: mapped.text, dropped };
+}
+
+function dropUnused(input: MappedText): {
+  mapped: MappedText;
+  dropped: number;
+} {
+  let mapped = input;
   let dropped = 0;
   for (let pass = 0; pass < MAX_CLEANUP_PASSES; pass++) {
-    const ast = parse(code, { comments: false });
+    const ast = parse(mapped.text, { comments: false });
     const script = ast.instance?.content;
     if (!script) break;
 
@@ -861,11 +895,11 @@ export function dropUnusedDeclarations(source: string): {
     // `owned` nodes (the declared names) are excluded above.
     const unused = candidates.filter((c) => !reads.has(c.name));
     if (unused.length === 0) break;
-    unused.sort((a, b) => b.start - a.start);
-    for (const candidate of unused) {
-      code = code.slice(0, candidate.start) + code.slice(candidate.end);
-      dropped++;
-    }
+    const removals: Splice[] = unused
+      .map(({ start, end }) => ({ start, end }))
+      .sort((a, b) => a.start - b.start);
+    mapped = splice(mapped, removals);
+    dropped += removals.length;
   }
-  return { code, dropped };
+  return { mapped, dropped };
 }

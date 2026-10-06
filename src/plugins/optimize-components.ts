@@ -1,6 +1,7 @@
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
+import type { SpecializedComponents } from "../analyzer";
 import { isCarbonSvelteImport, isScannableModule, stripQuery } from "../utils";
 import { collectCarbonImports } from "./scan-imports";
 
@@ -41,14 +42,14 @@ const PATH_SEPARATOR = /[\\/]/;
  * which prunes the styles of the same branches.
  *
  * Runs on production builds only, before Svelte compiles. Rewritten
- * components have no source maps yet: devtools show the rewritten source.
+ * components come with source maps back to Carbon's source.
  */
 export const optimizeComponents = (
   options?: OptimizeComponentsOptions,
 ): Plugin => {
   let root = process.cwd();
   /** Rewritten sources by the real path of the Carbon file. */
-  let sources = new Map<string, string>();
+  let sources: SpecializedComponents["sources"] = new Map();
   /** Real paths of the files analyzed before the build. */
   const analyzed = new Set<string>();
   /** Modules that render Carbon but weren't analyzed. */

@@ -21,6 +21,7 @@ import {
   type ModuleUsage,
   readCarbonComponents,
 } from "./call-sites";
+import { type SourceMap, toSourceMap } from "./mapped-text";
 import { type SpecializeOptions, specializeComponent } from "./specialize";
 import { formatValue } from "./values";
 
@@ -246,7 +247,7 @@ export function formatPropAwareReport(
 
 /** Carbon components rewritten for an app, by real path of their source. */
 export type SpecializedComponents = {
-  sources: Map<string, string>;
+  sources: Map<string, { code: string; map: SourceMap }>;
   edits: number;
 };
 
@@ -286,7 +287,7 @@ export async function specializeFiles(input: {
   const carbonSrc = realpathSync(
     path.join(resolveCarbonRoot(input.projectRoot), "src"),
   );
-  const sources = new Map<string, string>();
+  const sources: SpecializedComponents["sources"] = new Map();
   let edits = 0;
   try {
     for (const key of result.analysis.liveComponents) {
@@ -294,7 +295,15 @@ export async function specializeFiles(input: {
       if (!scope) continue;
       const specialized = specializeComponent(scope, input.options);
       edits += specialized.edits;
-      sources.set(path.join(carbonSrc, key), specialized.code);
+      const file = path.join(carbonSrc, key);
+      sources.set(file, {
+        code: specialized.code,
+        map: toSourceMap(
+          specialized.mapped,
+          scope.model.code,
+          path.basename(file),
+        ),
+      });
     }
   } catch (error) {
     return { warning: failure(error, SPECIALIZE_FAILURE) };
