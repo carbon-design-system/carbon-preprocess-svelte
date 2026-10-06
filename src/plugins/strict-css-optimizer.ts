@@ -66,7 +66,7 @@ export type StrictCssOptimizerOptions = {
   safelist: readonly SafelistEntry[];
   /**
    * Classes no rendered component can apply under the app's props
-   * (`experimental.propAware`). A selector that needs one is dropped even
+   * (`propAware`). A selector that needs one is dropped even
    * when the allowlist matches it.
    */
   isPruned?: (cls: string) => boolean;

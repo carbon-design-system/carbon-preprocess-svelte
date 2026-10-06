@@ -235,7 +235,7 @@ describe("OptimizeCssPlugin", () => {
     );
   });
 
-  test("experimental.propAware reads call sites from each .svelte module's source", async () => {
+  test("propAware reads call sites from each .svelte module's source", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
     const dir = mkdtempSync(join(tmpdir(), "cps-webpack-prop-aware-"));
     try {
@@ -247,7 +247,7 @@ describe("OptimizeCssPlugin", () => {
       const plugin = new OptimizeCssPlugin({
         silent: true,
         report: true,
-        experimental: { propAware: true },
+        propAware: true,
       });
       const mockCompiler = createMockCompiler({
         assets: {
@@ -274,7 +274,7 @@ describe("OptimizeCssPlugin", () => {
       const [, updated] = mockCompiler.compilation.updateAsset.mock.calls[0];
       expect(updated.source()).toBe(".bx--btn{a:1}.bx--btn--tertiary{a:2}");
       const printed = consoleSpy.mock.calls.flat().join("\n");
-      expect(printed).toContain("Prop-aware (experimental):");
+      expect(printed).toContain("Prop-aware:");
       expect(printed).toMatch(KIND_TERTIARY);
       expect(printed).toContain("Classes pruned by props: 1");
     } finally {

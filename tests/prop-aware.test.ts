@@ -14,7 +14,7 @@ function app(script: string, markup: string): string {
   return `<script>\n${script}\n</script>\n\n${markup}\n`;
 }
 
-describe("experimental.propAware", () => {
+describe("propAware", () => {
   const BUTTON_CSS =
     ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}.bx--accordion{a:5}";
 
@@ -35,7 +35,7 @@ describe("experimental.propAware", () => {
 
       const result = await optimizeCarbonCss(BUTTON_CSS, {
         ...options,
-        experimental: { propAware: true },
+        propAware: true,
       });
       expect(result.css).toBe(".bx--btn{a:1}.bx--btn--tertiary{a:2}");
     } finally {
@@ -54,7 +54,7 @@ describe("experimental.propAware", () => {
       );
       const plugin = optimizeCss({
         silent: true,
-        experimental: { propAware: true },
+        propAware: true,
       }) as unknown as {
         buildStart(this: { warn: (message: string) => void }): Promise<void>;
         transform(code: string, id: string): void;

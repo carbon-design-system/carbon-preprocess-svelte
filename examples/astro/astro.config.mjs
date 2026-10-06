@@ -3,7 +3,7 @@ import svelte from "@astrojs/svelte";
 import { defineConfig } from "astro/config";
 import { optimizeComponents, optimizeCss } from "carbon-preprocess-svelte";
 
-// `OPTIMIZE=1` adds the experimental optimizations: `optimizeComponents`
+// `OPTIMIZE=1` adds the component optimizations: `optimizeComponents`
 // rewrites Carbon components for the props the app passes, and prop-aware
 // `optimizeCss` prunes their unused styles. Built to `dist-optimized/`.
 const optimize = process.env.OPTIMIZE === "1";
@@ -18,7 +18,7 @@ export default defineConfig({
   vite: {
     plugins: [
       optimize && optimizeComponents(),
-      optimizeCss({ experimental: { propAware: optimize } }),
+      optimizeCss({ propAware: optimize }),
     ],
   },
 });

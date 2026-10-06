@@ -13,7 +13,7 @@ import { type OptimizeCssOptions, propAwareOptions } from "./options";
 import { collectCarbonTokens, readFiles, scanContent } from "./scan-content";
 
 type OptimizeCarbonCssOptions = PruneOptions &
-  Pick<OptimizeCssOptions, "content" | "experimental"> & {
+  Pick<OptimizeCssOptions, "content" | "propAware"> & {
     /**
      * Carbon components used by the app, as names (`"Button"`) or paths to
      * their `.svelte` source. Classes referenced by these components are kept.
@@ -68,7 +68,7 @@ export async function optimizeCarbonCss(
 }
 
 /**
- * `experimental.propAware` reads call sites from the `content` files, so it
+ * `propAware` reads call sites from the `content` files, so it
  * needs them; without `content` it's skipped with a warning.
  */
 async function analyzePropAware(
@@ -80,7 +80,7 @@ async function analyzePropAware(
   const cwd = path.resolve(options.cwd ?? process.cwd());
   if (!options.content || options.content.length === 0) {
     console.warn(
-      `${LOG_PREFIX} experimental.propAware needs \`content\` globs covering every file that renders Carbon components; CSS was pruned without it.`,
+      `${LOG_PREFIX} propAware needs \`content\` globs covering every file that renders Carbon components; CSS was pruned without it.`,
     );
     return undefined;
   }

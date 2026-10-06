@@ -25,7 +25,7 @@ export type OptimizeCssReportInput = {
   safelistEntries: number;
   assets: AssetReport[];
   dryRun?: boolean;
-  /** Lines printed after the asset table (`experimental.propAware`). */
+  /** Lines printed after the asset table (`propAware`). */
   extra?: string[];
 };
 

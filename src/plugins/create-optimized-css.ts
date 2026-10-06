@@ -15,7 +15,7 @@ export type PruneOptions = Pick<
   "safelist" | "preserveAllIBMFonts"
 >;
 
-/** What `experimental.propAware` found, as the optimizer consumes it. */
+/** What `propAware` found, as the optimizer consumes it. */
 export type PropAwareUsage = {
   /** Names of the Carbon components that can render (`Button`, `ButtonSkeleton`). */
   liveComponents: Set<string>;
@@ -30,7 +30,7 @@ export type CssOptimizerOptions = PruneOptions & {
   ids: Iterable<string>;
   /** Class selectors (`.bx--*`) to keep; pre-scanned so no I/O happens here. */
   contentClasses?: Iterable<string>;
-  /** Set by `experimental.propAware`. */
+  /** Set by `propAware`. */
   propAware?: PropAwareUsage;
 };
 

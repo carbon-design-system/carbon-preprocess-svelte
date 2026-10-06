@@ -28,8 +28,7 @@ Options:
                           slashes for a RegExp: --safelist "/^\\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
-  --experimental-prop-aware
-                          Also prune styles for prop values, slots, and child
+  --prop-aware            Also prune styles for prop values, slots, and child
                           components the --content files never use.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
@@ -54,7 +53,7 @@ async function main() {
       components: { type: "string" },
       safelist: { type: "string", multiple: true },
       "preserve-all-ibm-fonts": { type: "boolean" },
-      "experimental-prop-aware": { type: "boolean" },
+      "prop-aware": { type: "boolean" },
       cwd: { type: "string" },
       "dry-run": { type: "boolean" },
       report: { type: "boolean" },
@@ -93,7 +92,7 @@ async function main() {
 
   const components = new Set<string>();
   const contentClasses = new Set<string>();
-  const propAware = values["experimental-prop-aware"] === true;
+  const propAware = values["prop-aware"] === true;
   const sources: Array<{ file: string; code: string }> = [];
 
   for (const source of readFiles(globSync(contentGlobs, { cwd }), cwd)) {

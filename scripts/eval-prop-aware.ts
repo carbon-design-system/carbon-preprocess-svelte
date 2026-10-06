@@ -1,5 +1,5 @@
 /**
- * Accuracy check for `experimental.propAware`.
+ * Accuracy check for `propAware`.
  *
  * Generates one tiny app per (Carbon component, prop value): every string
  * literal value a prop's JSDoc `@type` lists, every boolean flipped from its

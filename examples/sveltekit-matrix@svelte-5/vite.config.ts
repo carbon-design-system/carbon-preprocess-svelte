@@ -32,7 +32,7 @@ export default defineConfig({
     }),
     variant !== "baseline" &&
       optimizeCss({
-        experimental: { propAware: variant !== "css" },
+        propAware: variant !== "css",
       }),
   ],
   optimizeDeps: {

@@ -119,7 +119,7 @@ describe("cli optimize-css", () => {
     }
   });
 
-  test("--experimental-prop-aware prunes variants the content never uses", () => {
+  test("--prop-aware prunes variants the content never uses", () => {
     const dir = createTempProject();
     try {
       writeFileSync(
@@ -136,16 +136,12 @@ describe("cli optimize-css", () => {
       );
 
       writeFileSync(join(dir, "dist", "app.css"), css);
-      const result = runCli(dir, [
-        "dist/app.css",
-        "--experimental-prop-aware",
-        "--report",
-      ]);
+      const result = runCli(dir, ["dist/app.css", "--prop-aware", "--report"]);
       expect(result.status).toBe(0);
       const pruned = readFileSync(join(dir, "dist", "app.css"), "utf-8");
       expect(pruned).toContain(".bx--btn--tertiary");
       expect(pruned).not.toContain(".bx--btn--danger");
-      expect(result.stdout).toContain("Prop-aware (experimental):");
+      expect(result.stdout).toContain("Prop-aware:");
       expect(result.stdout).toMatch(KIND_TERTIARY);
     } finally {
       rmSync(dir, { recursive: true, force: true });
