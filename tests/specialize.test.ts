@@ -10,8 +10,24 @@ import {
   specializeComponent,
 } from "../src/analyzer/specialize";
 import { addCallSite, newComponentUsage } from "../src/analyzer/usage";
-import { possible } from "../src/analyzer/values";
+import { OBJECT, possible, type Value } from "../src/analyzer/values";
 import { parse } from "../src/indexer/parser";
+
+/** Specializes `code` as a component whose one call site passes `props` (as values). */
+function specializeWith(code: string, props: Map<string, Value>) {
+  const model = buildComponentModel(code, "X/X.svelte");
+  const usage = newComponentUsage();
+  addCallSite(
+    usage,
+    { component: model.key, open: false, props, slots: new Set() },
+    model.props.keys(),
+  );
+  const result = specializeComponent(
+    createScope(model, usage, () => possible(undefined)),
+  );
+  parse(result.code);
+  return result.code;
+}
 
 /** Specializes `code` as a component whose one call site passes `props`. */
 function specialize(
@@ -178,6 +194,39 @@ describe("specializeComponent", () => {
     // run is gone, and `{x}` folds to its one value.
     expect(code).toContain('$: x = (log(), true) ? "yes" : void 0;');
     expect(code).toContain('<p>{"yes"}</p>');
+  });
+
+  test("an array that stays empty renders no `{#each}` body", () => {
+    const code = specialize(
+      `<script>export let items = [];</script>
+<div>{#if items.length > 0}{#each items as item}<b>{item}</b>{/each}{/if}</div>
+<ul>{#each items as item}<li>{item}</li>{:else}<p>None</p>{/each}</ul>`,
+    );
+    expect(code).toContain("<div>{#if false}<!---->{/if}</div>");
+    expect(code).toContain("<ul>{#if true}<p>None</p>{/if}</ul>");
+  });
+
+  test.each([
+    ["mutated", "onMount(() => items.push(1));"],
+    ["aliased", "const copy = items;"],
+    ["handed to a function", "load(items);"],
+    ["truncated through `length`", "items.length = 0;"],
+    ["reached through `$$props`", "const all = $$props;"],
+  ])("an array %s may not stay empty", (_, statement) => {
+    const code = specialize(
+      `<script>export let items = []; ${statement}</script>
+<ul>{#each items as item}<li>{item}</li>{/each}</ul>`,
+    );
+    expect(code).toContain("{#each items as item}");
+  });
+
+  test("an array a parent passes may hold items", () => {
+    const code = specializeWith(
+      `<script>export let items = []; $: label = $$props["aria-label"];</script>
+<ul aria-label={label}>{#each items as item}<li>{item}</li>{/each}</ul>`,
+      new Map([["items", possible(OBJECT)]]),
+    );
+    expect(code).toContain("{#each items as item}");
   });
 
   test("leaves expression statements' own value alone", () => {

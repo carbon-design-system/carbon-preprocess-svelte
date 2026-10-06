@@ -8,6 +8,13 @@
 /** Some object, array, or function: truthy, never nullish, never `===` a primitive. */
 export const OBJECT = Symbol("object");
 
+/**
+ * A `[]` the component never mutates or lets escape (see
+ * `ComponentModel.escapingNames`): an object with no items. Everything
+ * but `.length` and `{#each}` treats it as `OBJECT`.
+ */
+export const EMPTY_ARRAY = Symbol("empty array");
+
 /** A value the analysis can't bound. */
 export const UNKNOWN = Symbol("unknown");
 
@@ -17,7 +24,8 @@ export type Primitive =
   | boolean
   | null
   | undefined
-  | typeof OBJECT;
+  | typeof OBJECT
+  | typeof EMPTY_ARRAY;
 
 export type Value = ReadonlySet<Primitive> | typeof UNKNOWN;
 
@@ -51,8 +59,22 @@ export function flatMap(value: Value, map: (p: Primitive) => Value): Value {
   return result;
 }
 
+/** `OBJECT` or `EMPTY_ARRAY`. */
+export function isObject(
+  p: Primitive,
+): p is typeof OBJECT | typeof EMPTY_ARRAY {
+  return p === OBJECT || p === EMPTY_ARRAY;
+}
+
+/** Whether every possible value is an `EMPTY_ARRAY`. */
+export function isEmptyArray(value: Value): boolean {
+  if (value === UNKNOWN || value.size === 0) return false;
+  for (const p of value) if (p !== EMPTY_ARRAY) return false;
+  return true;
+}
+
 export function isTruthy(p: Primitive): boolean {
-  return p === OBJECT || Boolean(p);
+  return isObject(p) || Boolean(p);
 }
 
 export function isNullish(p: Primitive): boolean {
@@ -78,19 +100,40 @@ export function isNeverNullish(value: Value): boolean {
 }
 
 const EQUALITY = new Set(["===", "!==", "==", "!="]);
+const RELATIONAL = new Set(["<", ">", "<=", ">="]);
 
 /** `a <operator> b` over every pair of possible values. */
 export function binary(operator: string, a: Value, b: Value): Value {
   if (a === UNKNOWN || b === UNKNOWN) return UNKNOWN;
   return flatMap(a, (x) =>
     flatMap(b, (y) => {
-      if (x === OBJECT || y === OBJECT) {
+      if (isObject(x) || isObject(y)) {
         // Two objects may or may not be the same one; an object never
         // equals a primitive (`==` coercion of objects is not modeled).
-        if (!EQUALITY.has(operator) || (x === OBJECT && y === OBJECT)) {
+        if (!EQUALITY.has(operator) || (isObject(x) && isObject(y))) {
           return UNKNOWN;
         }
         return possible(operator.startsWith("!"));
+      }
+      if (RELATIONAL.has(operator)) {
+        // Numbers with numbers and strings with strings; no coercion.
+        if (
+          !(typeof x === "number" && typeof y === "number") &&
+          !(typeof x === "string" && typeof y === "string")
+        ) {
+          return UNKNOWN;
+        }
+        const [a, b] = [x, y] as [number, number];
+        switch (operator) {
+          case "<":
+            return possible(a < b);
+          case ">":
+            return possible(a > b);
+          case "<=":
+            return possible(a <= b);
+          default:
+            return possible(a >= b);
+        }
       }
       switch (operator) {
         case "===":
@@ -116,7 +159,7 @@ export function binary(operator: string, a: Value, b: Value): Value {
 
 /** `String(value)` for every possible value, as a template literal would. */
 export function stringify(value: Value): Value {
-  return flatMap(value, (p) => (p === OBJECT ? UNKNOWN : possible(String(p))));
+  return flatMap(value, (p) => (isObject(p) ? UNKNOWN : possible(String(p))));
 }
 
 /** For reports: `"primary", "ghost"`, `true`, or `dynamic`. */
@@ -126,9 +169,11 @@ export function formatValue(value: Value): string {
     .map((p) =>
       p === OBJECT
         ? "object"
-        : p === undefined
-          ? "undefined"
-          : JSON.stringify(p),
+        : p === EMPTY_ARRAY
+          ? "[]"
+          : p === undefined
+            ? "undefined"
+            : JSON.stringify(p),
     )
     .sort()
     .join(", ");

@@ -6,7 +6,14 @@ import { parse } from "../indexer/parser";
 import { childNodes, lineAt, type Node } from "./ast";
 import { callSiteFromElement } from "./live-walk";
 import type { CallSite } from "./usage";
-import { OBJECT, possible, UNDEFINED, UNKNOWN, type Value } from "./values";
+import {
+  EMPTY_ARRAY,
+  OBJECT,
+  possible,
+  UNDEFINED,
+  UNKNOWN,
+  type Value,
+} from "./values";
 
 /** Carbon component export name -> module key (`Button` -> `Button/Button.svelte`). */
 export type CarbonComponents = Map<string, string>;
@@ -231,6 +238,7 @@ function staticValue(expression: Expression, objects: Set<string>): Value {
       if (expression.name === "undefined") return UNDEFINED;
       return objects.has(expression.name) ? possible(OBJECT) : UNKNOWN;
     case "ArrayExpression":
+      return possible(expression.elements.length === 0 ? EMPTY_ARRAY : OBJECT);
     case "ObjectExpression":
     case "ArrowFunctionExpression":
     case "FunctionExpression":

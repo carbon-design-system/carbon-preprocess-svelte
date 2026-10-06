@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
-import type { AST, Expression } from "sveast/walk";
+import { type AST, type Expression, isReference, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
 import { forEachNode, type Node, patternNames, rootName } from "./ast";
 
@@ -41,6 +41,14 @@ export type ComponentModel = {
   otherImports: Set<string>;
   /** Keys this component passes to `setContext` as string literals. */
   providedContexts: Set<string>;
+  /**
+   * Names read anywhere but `{#each name}` or `name.length`: an array
+   * they hold may be mutated (`push`), aliased or handed to code that
+   * mutates it, so it's not known to stay empty. `$$props.x` adds
+   * `"$$props.x"` (the prop passed as `x`), and any other use of `$$props`
+   * adds `"*"`: it reaches every prop.
+   */
+  escapingNames: Set<string>;
 };
 
 /** Thrown for a component the analysis doesn't model (runes mode). */
@@ -137,6 +145,7 @@ export function buildComponentModel(
     componentImports: new Map(),
     otherImports: new Set(),
     providedContexts: new Set(),
+    escapingNames: escapingNames(ast),
   };
 
   if (ast.options?.runes) {
@@ -308,6 +317,76 @@ function readTopLevelStatement(
     }
     model.declarations.set(name, assignment.right);
     model.reactiveDeclarations.add(assignment);
+  }
+}
+
+/** See `ComponentModel.escapingNames`. */
+function escapingNames(ast: AST.Root): Set<string> {
+  const names = new Set<string>();
+  const stack: Node[] = [];
+  walk(ast, {
+    enter(node, parent, key) {
+      stack.push(node as Node);
+      if (node.type !== "Identifier" || !isReference(node, parent)) return;
+      if (node.name === "$$props") {
+        const key = memberKey(parent as Node | null);
+        names.add(key === undefined ? "*" : `$$props.${key}`);
+        return;
+      }
+      if (
+        // Declaring or exporting a name doesn't hand its value anywhere.
+        (parent?.type === "VariableDeclarator" && key === "id") ||
+        parent?.type === "ExportSpecifier" ||
+        (parent?.type === "EachBlock" && key === "expression") ||
+        isLengthRead(parent as Node | null, key, stack.at(-3))
+      ) {
+        return;
+      }
+      names.add(node.name);
+    },
+    leave() {
+      stack.pop();
+    },
+  });
+  return names;
+}
+
+/** `x` in `<object>.x` or `<object>["x"]`, if `parent` is such a member. */
+function memberKey(parent: Node | null): string | undefined {
+  if (parent?.type !== "MemberExpression") return undefined;
+  const { property, computed } = parent;
+  if (!computed && property.type === "Identifier") return property.name;
+  return computed &&
+    property.type === "Literal" &&
+    typeof property.value === "string"
+    ? property.value
+    : undefined;
+}
+
+/** Whether `parent` reads `<object>.length` without writing it. */
+function isLengthRead(
+  parent: Node | null,
+  key: string | null,
+  grandparent: Node | undefined,
+): boolean {
+  if (
+    parent?.type !== "MemberExpression" ||
+    key !== "object" ||
+    parent.computed ||
+    parent.property.type !== "Identifier" ||
+    parent.property.name !== "length"
+  ) {
+    return false;
+  }
+  switch (grandparent?.type) {
+    case "AssignmentExpression":
+      return grandparent.left !== parent;
+    case "UpdateExpression":
+      return false;
+    case "UnaryExpression":
+      return grandparent.operator !== "delete";
+    default:
+      return true;
   }
 }
 

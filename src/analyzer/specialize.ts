@@ -11,9 +11,10 @@ import {
   splice,
 } from "./mapped-text";
 import {
+  isEmptyArray,
   isNeverNullish,
   isNullish,
-  OBJECT,
+  isObject,
   type Truth,
   truthOf,
   UNKNOWN,
@@ -128,7 +129,7 @@ const MAX_SAFE_LITERAL = Number.MAX_SAFE_INTEGER;
 function literalText(value: Value): string | null {
   if (value === UNKNOWN || value.size !== 1) return null;
   const [p] = value;
-  if (p === OBJECT) return null;
+  if (isObject(p)) return null;
   if (p === undefined) return "void 0";
   if (typeof p === "number") {
     if (
@@ -177,6 +178,14 @@ function isPure(node: Node, scope: Scope): boolean {
         return !node.computed;
       }
       const target = evaluate(node.object, scope);
+      if (
+        isEmptyArray(target) &&
+        !node.computed &&
+        node.property.type === "Identifier" &&
+        node.property.name === "length"
+      ) {
+        return isPure(node.object, scope);
+      }
       return (
         target !== UNKNOWN &&
         target.size > 0 &&
@@ -399,6 +408,26 @@ export function specializeComponent(
         visitIfChain(node, parent);
         return;
 
+      case "EachBlock": {
+        // Over an array known to stay empty: only `{:else}` renders.
+        if (
+          !isPure(node.expression, scope) ||
+          !isEmptyArray(valueAt(node.expression))
+        ) {
+          break;
+        }
+        const placeholder = placeholderFor(node, parent);
+        const trim = preserveDepth === 0;
+        const fallback = node.fallback ?? null;
+        if (fallback) visit(fallback, node, "fallback");
+        edits.push({
+          start: node.start,
+          end: node.end,
+          print: (rewrite) => printOnly(rewrite, fallback, placeholder, trim),
+        });
+        return;
+      }
+
       case "ClassDirective": {
         const truth = truthIfPure(node.expression);
         if (truth === "falsy") {
@@ -461,13 +490,16 @@ export function specializeComponent(
     visitChildren(node);
   }
 
-  /** Rebuilds an `{#if}…{:else if}…{:else}…{/if}` chain from its live branches. */
-  function visitIfChain(
-    block: Extract<Node, { type: "IfBlock" }>,
-    parent: Node | null,
-  ): void {
+  type Fragment = Extract<Node, { type: "Fragment" }>;
+
+  /**
+   * What replaces a block that renders nothing: removing it would merge
+   * the whitespace on both sides, so between whitespace (or inside
+   * `<pre>`) it leaves `emptyBlock`.
+   */
+  function placeholderFor(block: Node, parent: Node | null): string {
     const siblings = parent?.type === "Fragment" ? parent.nodes : [];
-    const index = siblings.indexOf(block);
+    const index = siblings.indexOf(block as never);
     const before = siblings[index - 1];
     const after = siblings[index + 1];
     // At a fragment's start, Svelte trims leading whitespace; a block there
@@ -481,10 +513,67 @@ export function specializeComponent(
     const whitespaceAfter =
       index === siblings.length - 1 ||
       (after?.type === "Text" && STARTS_WITH_WHITESPACE.test(after.data));
-    const placeholder =
-      preserveDepth > 0 || (whitespaceBefore && whitespaceAfter)
-        ? emptyBlock
-        : "";
+    return preserveDepth > 0 || (whitespaceBefore && whitespaceAfter)
+      ? emptyBlock
+      : "";
+  }
+
+  function fragmentText(rewrite: Rewrite, fragment: Fragment | null) {
+    return fragment && fragment.nodes.length > 0
+      ? rewrite(fragment.nodes[0].start, fragment.nodes.at(-1)?.end ?? 0)
+      : concat();
+  }
+
+  /**
+   * A block that only ever renders `fragment`: its content, kept in a
+   * block unless `unwrap`, or `placeholder` if it renders nothing.
+   * `trim` is whether whitespace at the block's edges is insignificant.
+   */
+  function printOnly(
+    rewrite: Rewrite,
+    fragment: Fragment | null,
+    placeholder: string,
+    trim: boolean,
+  ): MappedText | string {
+    const content = fragmentText(rewrite, fragment);
+    if (content.text.replace(EDGE_WHITESPACE, "") === "") {
+      return placeholder;
+    }
+    // Keep a block around the live branch unless `unwrap` (Svelte 5
+    // only): block boundaries decide how Svelte 3/4 trim whitespace
+    // inside the elements a branch holds. `{@const}` and `{#snippet}`
+    // are scoped to their branch, so they always keep one.
+    if (
+      !unwrap ||
+      fragment?.nodes.some(
+        (child) => child.type === "ConstTag" || child.type === "SnippetBlock",
+      )
+    ) {
+      return concat("{#if true}", content, "{/if}");
+    }
+    // Unwrap: the block's own edges were trimmed; the whitespace
+    // around it stays where it was. Svelte 5 trims through comments at
+    // the edges (like `svelte-ignore`) inside the block, so the
+    // whitespace between them goes too.
+    if (!trim) return content;
+    let trimmed = removeMatches(content, EDGE_WHITESPACE);
+    const leading = LEADING_COMMENTS.exec(trimmed.text);
+    if (leading) {
+      trimmed = removeMatches(trimmed, COMMENT_GAPS, 0, leading[0].length);
+    }
+    const trailing = TRAILING_COMMENTS.exec(trimmed.text);
+    if (trailing) {
+      trimmed = removeMatches(trimmed, GAPS_BEFORE_COMMENT, trailing.index);
+    }
+    return trimmed;
+  }
+
+  /** Rebuilds an `{#if}…{:else if}…{:else}…{/if}` chain from its live branches. */
+  function visitIfChain(
+    block: Extract<Node, { type: "IfBlock" }>,
+    parent: Node | null,
+  ): void {
+    const placeholder = placeholderFor(block, parent);
 
     type Branch = { test: Node; body: Extract<Node, { type: "Fragment" }> };
     const branches: Branch[] = [];
@@ -526,10 +615,6 @@ export function specializeComponent(
     if (!(changed || kept.length === 0)) return;
 
     const trim = preserveDepth === 0;
-    const body = (rewrite: Rewrite, fragment: typeof elseBody) =>
-      fragment && fragment.nodes.length > 0
-        ? rewrite(fragment.nodes[0].start, fragment.nodes.at(-1)?.end ?? 0)
-        : concat();
     const finalElse = elseBody;
 
     edits.push({
@@ -537,47 +622,7 @@ export function specializeComponent(
       end: block.end,
       print: (rewrite) => {
         if (kept.length === 0) {
-          const content = body(rewrite, finalElse);
-          if (content.text.replace(EDGE_WHITESPACE, "") === "") {
-            return placeholder;
-          }
-          // Keep a block around the live branch unless `unwrap` (Svelte 5
-          // only): block boundaries decide how Svelte 3/4 trim whitespace
-          // inside the elements a branch holds. `{@const}` and `{#snippet}`
-          // are scoped to their branch, so they always keep one.
-          if (
-            !unwrap ||
-            finalElse?.nodes.some(
-              (child) =>
-                child.type === "ConstTag" || child.type === "SnippetBlock",
-            )
-          ) {
-            return concat("{#if true}", content, "{/if}");
-          }
-          // Unwrap: the block's own edges were trimmed; the whitespace
-          // around it stays where it was. Svelte 5 trims through comments at
-          // the edges (like `svelte-ignore`) inside the block, so the
-          // whitespace between them goes too.
-          if (!trim) return content;
-          let trimmed = removeMatches(content, EDGE_WHITESPACE);
-          const leading = LEADING_COMMENTS.exec(trimmed.text);
-          if (leading) {
-            trimmed = removeMatches(
-              trimmed,
-              COMMENT_GAPS,
-              0,
-              leading[0].length,
-            );
-          }
-          const trailing = TRAILING_COMMENTS.exec(trimmed.text);
-          if (trailing) {
-            trimmed = removeMatches(
-              trimmed,
-              GAPS_BEFORE_COMMENT,
-              trailing.index,
-            );
-          }
-          return trimmed;
+          return printOnly(rewrite, finalElse, placeholder, trim);
         }
         const parts: Array<MappedText | string> = [];
         for (const [i, branch] of kept.entries()) {
@@ -586,11 +631,11 @@ export function specializeComponent(
             `{${i === 0 ? "#if" : ":else if"} `,
             rewrite(test.start, test.end),
             "}",
-            body(rewrite, branch.body),
+            fragmentText(rewrite, branch.body),
           );
         }
         if (finalElse && finalElse.nodes.length > 0) {
-          parts.push("{:else}", body(rewrite, finalElse));
+          parts.push("{:else}", fragmentText(rewrite, finalElse));
         }
         return concat(...parts, "{/if}");
       },

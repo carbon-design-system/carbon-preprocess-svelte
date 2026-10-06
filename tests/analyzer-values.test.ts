@@ -42,9 +42,13 @@ describe("analyzer values", () => {
     expect(binary("+", possible("bx--btn--"), possible("ghost"))).toEqual(
       possible("bx--btn--ghost"),
     );
+    // Comparisons of numbers with numbers, or strings with strings.
+    expect(binary("<", possible(1), possible(2))).toEqual(possible(true));
+    expect(binary(">", possible(0, 3), possible(0))).toEqual(BOOLEAN);
+    expect(binary(">=", possible("b"), possible("a"))).toEqual(possible(true));
+    expect(binary("<", possible(1), possible("2"))).toBe(UNKNOWN);
     // Numbers added, and anything else, aren't modeled.
     expect(binary("+", possible(1), possible(2))).toBe(UNKNOWN);
-    expect(binary("<", possible(1), possible(2))).toBe(UNKNOWN);
     // An object never equals a primitive; two objects might be the same.
     expect(binary("===", possible(OBJECT), possible("a"))).toEqual(
       possible(false),
