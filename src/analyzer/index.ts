@@ -205,10 +205,23 @@ export function formatPropAwareReport(
   prunedClasses: ReadonlySet<string>,
   root: string,
 ): string[] {
-  const lines = ["  Prop-aware (experimental):"];
-  const names = new Map(
-    [...result.carbon].map(([name, key]) => [key, name] as const),
-  );
+  return [
+    "  Prop-aware (experimental):",
+    ...formatCallSites(result, root),
+    `    Classes pruned by props: ${prunedClasses.size}`,
+  ];
+}
+
+/** A Carbon component's export name, from its module key. */
+function nameOf(result: PropAwareResult, key: string): string {
+  for (const [name, component] of result.carbon) {
+    if (component === key) return name;
+  }
+  return path.posix.parse(key).name;
+}
+
+function formatCallSites(result: PropAwareResult, root: string): string[] {
+  const lines: string[] = [];
   const relative = (file: string) =>
     path.isAbsolute(file) ? path.relative(root, file) : file;
 
@@ -217,7 +230,7 @@ export function formatPropAwareReport(
     .sort(([a], [b]) => a.localeCompare(b));
 
   for (const [key, usage] of entries) {
-    const name = names.get(key) ?? path.posix.parse(key).name;
+    const name = nameOf(result, key);
     const sites = usage.appSites.length;
     lines.push(`    ${name} (${sites} call site${sites === 1 ? "" : "s"})`);
     const open = usage.appSites.find((site) => site.open);
@@ -238,8 +251,6 @@ export function formatPropAwareReport(
       lines.push(`      ${prop.padEnd(16)} ${formatValue(value)}${omitted}`);
     }
   }
-
-  lines.push(`    Classes pruned by props: ${prunedClasses.size}`);
   return lines;
 }
 
@@ -247,6 +258,8 @@ export function formatPropAwareReport(
 export type SpecializedComponents = {
   sources: Map<string, { code: string; map: SourceMap }>;
   edits: number;
+  /** Lines for `optimizeComponents({ report: true })`. */
+  report: () => string[];
 };
 
 /**
@@ -285,12 +298,26 @@ export async function specializeFiles(input: {
   );
   const sources: SpecializedComponents["sources"] = new Map();
   let edits = 0;
+  const rewrites: Array<{
+    key: string;
+    edits: number;
+    dropped: number;
+    unrendered: string[];
+  }> = [];
   try {
     for (const key of result.analysis.liveComponents) {
       const scope = result.analysis.scopeFor(key);
       if (!scope) continue;
       const specialized = specializeComponent(scope, input.options);
       edits += specialized.edits;
+      rewrites.push({
+        key,
+        edits: specialized.edits,
+        dropped: specialized.dropped,
+        unrendered: specialized.unrendered.map((source) =>
+          path.posix.join(path.posix.dirname(key), source),
+        ),
+      });
       const file = path.join(carbonSrc, key);
       sources.set(file, {
         code: specialized.code,
@@ -304,5 +331,54 @@ export async function specializeFiles(input: {
   } catch (error) {
     return { warning: failure(error, SPECIALIZE_FAILURE) };
   }
-  return { sources, edits };
+  return {
+    sources,
+    edits,
+    report: () => formatSpecializeReport(result, rewrites, input.projectRoot),
+  };
+}
+
+function formatSpecializeReport(
+  result: PropAwareResult,
+  rewrites: Array<{
+    key: string;
+    edits: number;
+    dropped: number;
+    unrendered: string[];
+  }>,
+  root: string,
+): string[] {
+  const name = (key: string) => nameOf(result, key);
+  const changed = rewrites
+    .filter((rewrite) => rewrite.edits > 0)
+    .sort((a, b) => b.edits - a.edits || a.key.localeCompare(b.key));
+  const edits = changed.reduce((sum, rewrite) => sum + rewrite.edits, 0);
+  const dropped = changed.reduce((sum, rewrite) => sum + rewrite.dropped, 0);
+  const width = Math.max(0, ...changed.map(({ key }) => name(key).length));
+  const unbundled = new Set(
+    changed.flatMap(({ unrendered }) =>
+      unrendered.filter((key) => !result.analysis.liveComponents.has(key)),
+    ),
+  );
+
+  const lines = [
+    "",
+    "carbon-preprocess-svelte optimizeComponents report",
+    `  Rewrote ${changed.length} of ${rewrites.length} Carbon components (${edits} edits, ${dropped} declarations dropped):`,
+  ];
+  for (const rewrite of changed) {
+    const stops =
+      rewrite.unrendered.length > 0
+        ? `   no longer renders ${rewrite.unrendered.map(name).join(", ")}`
+        : "";
+    lines.push(
+      `    ${name(rewrite.key).padEnd(width)}   ${String(rewrite.edits).padStart(4)} edit${rewrite.edits === 1 ? " " : "s"}${stops}`,
+    );
+  }
+  lines.push(
+    `  No longer bundled (${unbundled.size}): ${[...unbundled].map(name).sort().join(", ") || "none"}`,
+    "  Call sites:",
+    ...formatCallSites(result, root),
+  );
+  return lines;
 }

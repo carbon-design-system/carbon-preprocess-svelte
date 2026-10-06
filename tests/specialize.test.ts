@@ -288,6 +288,7 @@ describe("Carbon Button for kind=tertiary", () => {
       expect(specialized.code).not.toContain("<PortalTooltip");
       expect(specialized.code).toContain("<button");
       expect(specialized.code).toContain(`"bx--btn--tertiary"`);
+      expect(specialized.unrendered).toContain("./ButtonSkeleton.svelte");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
