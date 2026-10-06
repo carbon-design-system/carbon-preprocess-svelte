@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "build:default": "astro build",
+    "build:optimized": "OPTIMIZE=1 astro build"
   },
   "devDependencies": {
     "@astrojs/svelte": "latest",

@@ -14,6 +14,8 @@
  *   throws the server markup away and renders again).
  * - `rollup`, `rolldown`, `webpack`, `webpack@svelte-5`, `rspack`:
  *   `default` vs `optimized`, on a DataTable app.
+ * - `astro`: the same, prerendered by Astro and hydrated (`client:load`),
+ *   with the SvelteKit example's SSR checks.
  *
  *   bun scripts/eval-interactions.ts [--examples rollup,rspack] [--no-build]
  *
@@ -243,6 +245,13 @@ const EXAMPLE_SPECS: Record<string, Example> = {
     steps: MATRIX_STEPS,
     ssr: true,
   },
+  astro: {
+    variants: ["default", "optimized"],
+    outDir: (variant) => (variant === "default" ? "dist" : `dist-${variant}`),
+    ready: ".bx--data-table",
+    steps: DATATABLE_STEPS,
+    ssr: true,
+  },
   ...Object.fromEntries(
     ["rollup", "rolldown", "webpack", "webpack@svelte-5", "rspack"].map(
       (name): [string, Example] => [
@@ -288,6 +297,8 @@ const COMMENT = /<!--[\s\S]*?-->/g;
 const CARBON_ID = /\bccs-[a-z0-9]+/g;
 const CLASS_ATTR = /class="([^"]*)"/g;
 const WHITESPACE = /\s+/;
+/** Astro's island attributes that name hashed files or a random id. */
+const ASTRO_ISLAND_ATTR = /\s(?:component-url|renderer-url|uid)="[^"]*"/g;
 
 /**
  * `document.body` (or `html`'s body) serialized without scripts and with
@@ -322,6 +333,7 @@ function normalizeDom(html: string): string {
   const ids = new Map<string, string>();
   return html
     .replace(COMMENT, "")
+    .replace(ASTRO_ISLAND_ATTR, "")
     .replace(CARBON_ID, (id) => {
       let stable = ids.get(id);
       if (!stable) {

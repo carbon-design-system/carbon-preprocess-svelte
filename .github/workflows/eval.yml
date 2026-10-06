@@ -19,6 +19,7 @@ on:
       - "examples/webpack/**"
       - "examples/webpack@svelte-5/**"
       - "examples/rspack/**"
+      - "examples/astro/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
       - ".github/workflows/eval.yml"
@@ -37,6 +38,7 @@ on:
       - "examples/webpack/**"
       - "examples/webpack@svelte-5/**"
       - "examples/rspack/**"
+      - "examples/astro/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
       - ".github/workflows/eval.yml"
@@ -152,7 +154,7 @@ jobs:
           bun link
           for example in examples/vite-matrix@svelte-4 examples/vite-matrix@svelte-5 \
             examples/sveltekit-matrix@svelte-5 examples/rollup examples/rolldown \
-            examples/webpack examples/webpack@svelte-5 examples/rspack; do
+            examples/webpack examples/webpack@svelte-5 examples/rspack examples/astro; do
             (cd "$example" && bun link carbon-preprocess-svelte && bun install)
           done
 
