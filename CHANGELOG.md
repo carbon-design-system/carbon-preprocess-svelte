@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.49](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.49) - 2026-10-06
+
+**Breaking Changes**
+
+- `optimizeCss`: remove the deprecated `verbose` option (use `silent: true` instead)
+
+**Features**
+
+- `optimizeCss`: add prop-aware pruning (`propAware`)
+- add `optimizeComponents` for Vite, Rollup, and Rolldown
+- add `OptimizeComponentsPlugin` for webpack and Rspack
+- `optimizeComponents`: add `report`, emit source maps, and unwrap live branches by default on Svelte 5
+- analyzer: follow props through app constants and wrappers; model runes components
+
+**Fixes**
+
+- `indexer`: index another theme when Carbon ships no `white.css`
+- `optimizeCss`: handle backslash paths from webpack on Windows
+- `optimizeCss`: support global-flag RegExp safelist entries
+- `optimizeCss`: handle ids that name `Object.prototype` members
+
+**Performance**
+
+- `index`: lex script strings for a ~1.4× faster index build
+- `index`: parse Carbon components ~7–10% faster with sveast 0.9.1
+
 ## [0.11.48](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.48) - 2026-10-01
 
 **Fixes**
