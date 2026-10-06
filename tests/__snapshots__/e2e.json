@@ -1,9 +1,17 @@
 {
   "astro": {
-    "file": "_astro/index.*.css",
-    "before_kb": 707.04,
-    "after_kb": 49.34,
-    "reduction_percent": 93.02
+    "default": {
+      "file": "_astro/index.*.css",
+      "before_kb": 707.04,
+      "after_kb": 49.34,
+      "reduction_percent": 93.02
+    },
+    "optimized": {
+      "file": "_astro/index.*.css",
+      "before_kb": 707.04,
+      "after_kb": 34.1,
+      "reduction_percent": 95.18
+    }
   },
   "rolldown": {
     "default": {
