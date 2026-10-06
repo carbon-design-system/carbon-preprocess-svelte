@@ -320,7 +320,8 @@ export async function specializeFiles(input: {
     key: string;
     edits: number;
     dropped: number;
-    unrendered: string[];
+    /** Module keys of the children it no longer renders. */
+    unrendered: () => string[];
   }> = [];
   try {
     for (const key of result.analysis.liveComponents) {
@@ -332,9 +333,10 @@ export async function specializeFiles(input: {
         key,
         edits: specialized.edits,
         dropped: specialized.dropped,
-        unrendered: specialized.unrendered.map((source) =>
-          path.posix.join(path.posix.dirname(key), source),
-        ),
+        unrendered: () =>
+          specialized
+            .unrendered()
+            .map((source) => path.posix.join(path.posix.dirname(key), source)),
       });
       const file = path.join(carbonSrc, key);
       sources.set(file, {
@@ -363,7 +365,8 @@ function formatSpecializeReport(
     key: string;
     edits: number;
     dropped: number;
-    unrendered: string[];
+    /** Module keys of the children it no longer renders. */
+    unrendered: () => string[];
   }>,
   root: string,
 ): string[] {
@@ -376,7 +379,7 @@ function formatSpecializeReport(
   const width = Math.max(0, ...changed.map(({ key }) => name(key).length));
   const unbundled = new Set(
     changed.flatMap(({ unrendered }) =>
-      unrendered.filter((key) => !result.analysis.liveComponents.has(key)),
+      unrendered().filter((key) => !result.analysis.liveComponents.has(key)),
     ),
   );
 
@@ -387,8 +390,8 @@ function formatSpecializeReport(
   ];
   for (const rewrite of changed) {
     const stops =
-      rewrite.unrendered.length > 0
-        ? `   no longer renders ${rewrite.unrendered.map(name).join(", ")}`
+      rewrite.unrendered().length > 0
+        ? `   no longer renders ${rewrite.unrendered().map(name).join(", ")}`
         : "";
     lines.push(
       `    ${name(rewrite.key).padEnd(width)}   ${String(rewrite.edits).padStart(4)} edit${rewrite.edits === 1 ? " " : "s"}${stops}`,

@@ -41,8 +41,12 @@ export type Specialization = {
   edits: number;
   /** Declarations removed because nothing read them after the edits. */
   dropped: number;
-  /** `.svelte` imports nothing renders anymore, so the bundler drops them. */
-  unrendered: string[];
+  /**
+   * `.svelte` imports nothing renders anymore, so the bundler drops them.
+   * Computed on the first call: it parses the rewritten code again, and
+   * only `report` needs it.
+   */
+  unrendered: () => string[];
 };
 
 type Rewrite = (start: number, end: number) => MappedText;
@@ -674,12 +678,16 @@ export function specializeComponent(
       ? { mapped: folded, dropped: 0 }
       : dropUnused(folded);
   const mapped = applied > 0 ? silenceUnusedProps(cleaned) : cleaned;
+  let unrendered: string[] | undefined;
   return {
     code: mapped.text,
     mapped,
     edits: applied,
     dropped,
-    unrendered: applied > 0 ? unrenderedImports(mapped.text) : [],
+    unrendered: () => {
+      unrendered ??= applied > 0 ? unrenderedImports(mapped.text) : [];
+      return unrendered;
+    },
   };
 }
 
