@@ -16,11 +16,22 @@ type ResolvedPlugin = {
   buildStart(this: Context): Promise<void>;
   load(id: string): { code: string; map: { mappings: string } } | undefined;
   transform(code: string, id: string): void;
-  buildEnd(this: Context): void;
+  buildEnd(this: Context & GraphContext): void;
 };
 
-function context(): Context {
+type GraphContext = {
+  getModuleIds(): IterableIterator<string>;
+  getModuleInfo(id: string): {
+    importers: string[];
+    dynamicImporters: string[];
+    isEntry: boolean;
+  } | null;
+};
+
+function context(): Context & GraphContext {
   return {
+    getModuleIds: () => [][Symbol.iterator](),
+    getModuleInfo: () => null,
     warn: jest.fn(),
     info: jest.fn(),
     error: (message: string) => {
@@ -37,6 +48,8 @@ const ANALYSIS_FAILED =
 const VIRTUAL_MODULE = /can't analyze \0virtual:toolbar.*no file on disk/;
 const BUTTON_REPORT =
   /Button +\d+ edits +no longer renders .*ButtonSkeleton[\s\S]*No longer bundled \(\d+\): .*ButtonSkeleton/;
+const WRAPPER_ESCAPED =
+  /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]Page\.svelte also render/;
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 
 /** A project with `src/App.svelte` and Carbon linked into its `node_modules`. */
@@ -210,6 +223,44 @@ describe("optimizeComponents", () => {
       ).toBeDefined();
       const button = plugin.load(path.join(carbon, "src/Button/Button.svelte"));
       expect(button?.code).not.toContain(`"bx--btn--tertiary"`);
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("checks a wrapper's importers against the module graph", async () => {
+    const { project, plugin } = setUp(
+      `<script>import Card from "./Card.svelte";</script>\n<Card tone="danger" />`,
+      { silent: true },
+    );
+    try {
+      const src = path.join(project.root, "src");
+      const card = path.join(src, "Card.svelte");
+      writeFileSync(
+        card,
+        `<script>${IMPORT_BUTTON}\nexport let tone = "primary";</script>\n<Button kind={tone} />`,
+      );
+      writeFileSync(
+        path.join(src, "main.ts"),
+        `import App from "./App.svelte";`,
+      );
+      await plugin.buildStart.call(context());
+      const graph = (importers: string[], dynamic: string[] = []) => ({
+        ...context(),
+        getModuleIds: () => [card][Symbol.iterator](),
+        getModuleInfo: () => ({
+          importers,
+          dynamicImporters: dynamic,
+          isEntry: false,
+        }),
+      });
+
+      const app = path.join(src, "App.svelte");
+      expect(() => plugin.buildEnd.call(graph([app]))).not.toThrow();
+      const other = path.join(project.root, "lib", "Page.svelte");
+      expect(() => plugin.buildEnd.call(graph([app, other]))).toThrow(
+        WRAPPER_ESCAPED,
+      );
     } finally {
       project.dispose();
     }

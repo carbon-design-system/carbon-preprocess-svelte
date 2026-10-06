@@ -14,11 +14,9 @@ import {
   type PropAwareOptions,
   type UsageAnalysis,
 } from "./analyze-usage";
+import { type AppUsage, collectAppUsage } from "./app-usage";
 import {
   type CarbonComponents,
-  collectScriptUsage,
-  collectSourceUsage,
-  collectSvelteUsage,
   type ModuleUsage,
   readCarbonComponents,
 } from "./call-sites";
@@ -50,24 +48,33 @@ function failure(
   return `${WARN_PREFIX} ${feature} could not analyze this build (${message}); ${fallback}.`;
 }
 
-/** What a module contributes, read from its source when it's a `.svelte` file. */
-export function readModuleUsage(
+const NODE_MODULES = /[\\/]node_modules[\\/]/;
+
+/**
+ * A bundled module as the analysis reads it: a `.svelte` file's source
+ * from disk, anything else as the bundler hands it over. Returns
+ * `undefined` for a `.svelte` file's sub-module (`?svelte&type=style`).
+ */
+export function readModuleSource(
   id: string,
   code: string,
-  carbon: CarbonComponents,
-): ModuleUsage | undefined {
-  if (!code.includes(CarbonSvelte.Components)) return undefined;
+): { file: string; code: string } | undefined {
   const file = stripQuery(id);
-  if (file === id && isSvelteFile(file)) {
-    let source: string | undefined;
-    try {
-      source = readFileSync(file, "utf8");
-    } catch {
-      // Virtual or generated: fall through to the module's code.
+  if (!isSvelteFile(file)) {
+    // A dependency can't import the app's own components, and its
+    // computed `import()`s aren't the app's: read it for Carbon only.
+    if (NODE_MODULES.test(file) && !code.includes(CarbonSvelte.Components)) {
+      return undefined;
     }
-    if (source !== undefined) return collectSvelteUsage(source, file, carbon);
+    return { file, code };
   }
-  return collectScriptUsage(code, file, carbon);
+  if (file !== id) return undefined;
+  try {
+    return { file, code: readFileSync(file, "utf8") };
+  } catch {
+    // Virtual or generated: read its compiled code as a script.
+    return { file: `${file}.js`, code };
+  }
 }
 
 /**
@@ -77,13 +84,13 @@ export function readModuleUsage(
 export function createUsageCollector(projectRoot: string) {
   const carbonRoot = resolveCarbonRoot(projectRoot);
   const carbon = readCarbonComponents(carbonRoot);
-  const modules = new Map<string, ModuleUsage>();
+  const modules = new Map<string, { file: string; code: string }>();
 
   return {
     /** Records module `id`; `code` is what the bundler hands the plugin. */
     add(id: string, code: string): void {
-      const usage = readModuleUsage(id, code, carbon);
-      if (usage) modules.set(id, usage);
+      const source = readModuleSource(id, code);
+      if (source) modules.set(id, source);
       else modules.delete(id);
     },
     /** Forgets modules no longer in the build (`vite build --watch`). */
@@ -109,7 +116,7 @@ export function createUsageCollector(projectRoot: string) {
             carbonRoot,
             carbon,
             bundled,
-            modules: modules.values(),
+            modules: collectAppUsage(modules.values(), carbon).modules,
             options,
           }),
           carbon,
@@ -149,15 +156,14 @@ export async function analyzeFiles(input: {
   options: PropAwareOptions;
   /** Names the feature in the warning when analysis fails. */
   failure?: typeof PROP_AWARE_FAILURE;
+  /** `collectAppUsage(files)`, if the caller already has it. */
+  appUsage?: AppUsage;
 }): Promise<PropAwareResult | { warning: string }> {
   try {
     const carbonRoot = resolveCarbonRoot(input.projectRoot);
     const carbon = readCarbonComponents(carbonRoot);
-    const modules: ModuleUsage[] = [];
-    for (const { file, code } of input.files) {
-      // `code` is the file's source here, not a bundler's output.
-      modules.push(collectSourceUsage(code, file, carbon));
-    }
+    // `code` is each file's source here, not a bundler's output.
+    const { modules } = input.appUsage ?? collectAppUsage(input.files, carbon);
 
     const rendered = new Set(
       modules.flatMap((module) => module.sites.map((site) => site.component)),
@@ -258,6 +264,11 @@ function formatCallSites(result: PropAwareResult, root: string): string[] {
 export type SpecializedComponents = {
   sources: Map<string, { code: string; map: SourceMap }>;
   edits: number;
+  /**
+   * The app's own components whose props came from their call sites in
+   * the analyzed files: nothing else may render them.
+   */
+  closed: Set<string>;
   /** Lines for `optimizeComponents({ report: true })`. */
   report: () => string[];
 };
@@ -277,11 +288,17 @@ export async function specializeFiles(input: {
   } catch (error) {
     return { warning: failure(error, SPECIALIZE_FAILURE) };
   }
-  const components = new Set<string>();
-  for (const { file, code } of input.files) {
-    const usage = collectSourceUsage(code, file, carbon);
-    for (const site of usage.sites) components.add(site.component);
+  let appUsage: AppUsage;
+  try {
+    appUsage = collectAppUsage(input.files, carbon);
+  } catch (error) {
+    return { warning: failure(error, SPECIALIZE_FAILURE) };
   }
+  const components = new Set(
+    appUsage.modules.flatMap((module) =>
+      module.sites.map((site) => site.component),
+    ),
+  );
   const result = await analyzeFiles({
     projectRoot: input.projectRoot,
     files: input.files,
@@ -290,6 +307,7 @@ export async function specializeFiles(input: {
     ),
     options: {},
     failure: SPECIALIZE_FAILURE,
+    appUsage,
   });
   if ("warning" in result) return result;
 
@@ -334,6 +352,7 @@ export async function specializeFiles(input: {
   return {
     sources,
     edits,
+    closed: appUsage.closed,
     report: () => formatSpecializeReport(result, rewrites, input.projectRoot),
   };
 }

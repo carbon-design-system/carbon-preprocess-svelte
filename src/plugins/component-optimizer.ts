@@ -78,6 +78,14 @@ function importsCarbon(file: string, code: string): boolean {
   return imported.size > 0;
 }
 
+/** `file` relative to `root`, through symlinks when `file` exists. */
+function relativeTo(root: string, file: string): string {
+  const real = realpath(file);
+  return real
+    ? path.relative(realpath(root) ?? root, real)
+    : path.relative(root, file);
+}
+
 function realpath(file: string): string | undefined {
   try {
     return realpathSync(file);
@@ -111,6 +119,10 @@ export function createComponentOptimizer(
   const missed = new Set<string>();
   /** Modules with no file that render Carbon: never analyzable. */
   const virtual = new Set<string>();
+  /** Real paths of app components whose props came from analyzed call sites. */
+  let closed = new Set<string>();
+  /** Those rendered from somewhere else, and by what. */
+  const escaped = new Map<string, string>();
   /**
    * The last analysis and a hash of the `content` it read: watch rebuilds
    * and SvelteKit's second (server or client) build reuse it unless a
@@ -132,6 +144,8 @@ export function createComponentOptimizer(
       analyzed.clear();
       missed.clear();
       virtual.clear();
+      closed = new Set();
+      escaped.clear();
 
       const files: Array<{ file: string; code: string }> = [];
       const hash = createHash("sha1");
@@ -167,6 +181,9 @@ export function createComponentOptimizer(
       const { result } = last;
       if ("warning" in result) return { warning: result.warning };
       sources = result.sources;
+      closed = new Set(
+        [...result.closed].map((file) => realpath(file) ?? file),
+      );
       return {
         info: options?.silent
           ? undefined
@@ -199,15 +216,57 @@ export function createComponentOptimizer(
       if (analyzed.has(real ?? file)) return;
       if (!importsCarbon(file, code)) return;
       if (id.startsWith("\0") || !path.isAbsolute(file)) virtual.add(id);
-      else {
-        const base = real ? (realpath(root) ?? root) : root;
-        missed.add(path.relative(base, real ?? file));
-      }
+      else missed.add(relativeTo(root, file));
+    },
+
+    /** Whether module `id` is an app component whose props were read from its call sites. */
+    isClosed(id: string): boolean {
+      if (closed.size === 0 || id.includes("?")) return false;
+      return closed.has(realpath(id) ?? id);
+    },
+
+    /**
+     * Records the modules that import app component `id` (see `isClosed`):
+     * its props are only known if the analyzed files are all that render
+     * it. `undefined` stands for an importer with no file (an entry, a
+     * `require.context`); `dynamic` for any `import()` of it.
+     */
+    checkImporters(
+      id: string,
+      importers: Array<string | undefined>,
+      dynamic: boolean,
+      root: string,
+    ): void {
+      const name = relativeTo(root, id);
+      const outside = importers.filter((importer) => {
+        if (importer === undefined) return true;
+        const file = stripQuery(importer);
+        return !analyzed.has(realpath(file) ?? file);
+      });
+      if (dynamic) outside.push("a dynamic import");
+      if (outside.length === 0) return;
+      escaped.set(
+        name,
+        [...new Set(outside)]
+          .map((importer) =>
+            importer === undefined
+              ? "the bundler"
+              : path.isAbsolute(stripQuery(importer))
+                ? relativeTo(root, stripQuery(importer))
+                : importer,
+          )
+          .join(", "),
+      );
     },
 
     /** The build error for the modules `check` recorded, if any. */
     error(): string | undefined {
       const errors: string[] = [];
+      for (const [component, importers] of escaped) {
+        errors.push(
+          `${name} read the props of ${component} from its call sites in \`content\`, but ${importers} also render(s) it. Add those files to \`content\`.`,
+        );
+      }
       if (missed.size > 0) {
         errors.push(
           `${name} rewrote Carbon components before seeing ${[...missed].join(", ")}, which import(s) them. Add those files to \`content\` (now ${JSON.stringify(content)}); only a pattern that names \`node_modules\` reaches inside it.`,

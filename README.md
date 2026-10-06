@@ -475,12 +475,14 @@ optimizeCss({ experimental: { propAware: true } });
 
 Each `.svelte` file that imports Carbon is read from its source, and each Carbon component is walked with the values its call sites pass. Branches those values rule out (`{#if skeleton}`, `kind === "ghost" && …`, `class:bx--btn--sm={size === "small"}`) are skipped, along with the child components only they render. Values passed by Carbon components to the components they render are followed the same way.
 
+The app's own code is read the same way. A constant, or state no code reassigns (`const kind = "ghost"`, `let size = $state("small")`), passes its value. So does a wrapper component: `<ActionButton primary>` passes `primary` into the `kind={primary ? "tertiary" : "ghost"}` its `Button` gets. A wrapper's props come from its call sites only if every file that imports it is analyzed; a component a route, an entry or a script mounts, or one imported through an alias or `import.meta.glob`, renders with any props.
+
 It errs toward keeping styles:
 
-- A prop set from an expression (`kind={kind}`), `bind:`, or a spread (`{...props}`) keeps every value.
+- A prop set from something the analysis can't read (a reassigned variable, a store, a function call), `bind:`, or a spread (`{...props}`) keeps every value.
 - A component used as a value (`<svelte:component this={Button}>`, passed as a prop, imported in a `.js`/`.ts` file) keeps everything.
 - A component imported but not rendered as a tag (for example, markup another preprocessor generates) keeps everything.
-- If the analysis fails (an unexpected Carbon source, a component in runes mode), the build warns and prunes without it.
+- If the analysis fails (an unexpected Carbon source), the build warns and prunes without it.
 
 Pass an object to tune it:
 
@@ -558,7 +560,7 @@ optimizeComponents({
 
 Under Rollup and Rolldown, list it before the Svelte plugin (Vite orders it first on its own) and add it only to production builds; `content` resolves from the working directory. Under SvelteKit and Astro (in `vite.plugins`) it rewrites the server and client builds alike, so prerendered pages hydrate as before. In watch mode (`vite build --watch`, `rollup -w`), a rebuild reanalyzes `content` when a file in it changed.
 
-It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), 14% in [Astro](examples/astro), 26–28% in the Rollup, Rolldown and webpack examples with Svelte 4, and 9–12% in the webpack and Rspack examples with Svelte 5, whose runtime is a larger share of a small app. Rewritten components come with source maps, so devtools and stack traces show Carbon's original source.
+It runs on production builds only, before Svelte compiles. It reads the app's constants and wrapper components like prop-aware CSS does, and a prop it can't read, `bind:`, or a spread keeps every value. Because the components are rewritten before the build sees every module, the build fails if a module outside `content` imports a wrapper whose props were read from its call sites. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), 14% in [Astro](examples/astro), 26–28% in the Rollup, Rolldown and webpack examples with Svelte 4, and 9–12% in the webpack and Rspack examples with Svelte 5, whose runtime is a larger share of a small app. Rewritten components come with source maps, so devtools and stack traces show Carbon's original source.
 
 #### `OptimizeComponentsPlugin` (experimental)
 
