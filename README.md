@@ -528,10 +528,12 @@ optimizeComponents({
   /**
    * Globs (relative to the Vite root) of every file that renders Carbon
    * components. They're analyzed before the build; a module outside them
-   * that imports a Carbon component fails the build.
-   * @default ["src/**\/*.svelte"]
+   * that imports a Carbon component fails the build. Components a script,
+   * Markdown, MDX or Astro file imports keep every prop value.
+   * `node_modules` is skipped unless a pattern names it.
+   * @default ["src/**\/*.{svelte,svx,md,mdx,astro,js,jsx,ts,tsx,mjs,mts,cjs,cts}"]
    */
-  content: ["src/**/*.svelte"],
+  content: ["src/**/*.{svelte,ts}"],
 
   /**
    * Replace an `{#if}` whose live branch is known with that branch instead

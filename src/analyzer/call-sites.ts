@@ -34,6 +34,14 @@ export type ModuleUsage = {
 
 const DIRECT_COMPONENT_PATH = /^carbon-components-svelte\/src\/(.+\.svelte)$/;
 const PROVIDED_CONTEXT = /setContext\(\s*["'](carbon:[^"']+)["']/g;
+/** JS and TS modules, which `lexImportsExports` reads. */
+const SCRIPT_FILE = /\.[cm]?[jt]sx?$/;
+const BARREL_IMPORT =
+  /\bimport\s+(type\s+)?\{([^}]*)\}\s*from\s*(["'])carbon-components-svelte\3/g;
+const BARREL_SPECIFIER = /["']carbon-components-svelte["']/g;
+const DIRECT_COMPONENT_SPECIFIER =
+  /["']carbon-components-svelte\/src\/([^"']+\.svelte)["']/g;
+const IMPORT_AS = /\s+as\s+/;
 /** Imports that are components, so passing one as a prop passes an object. */
 const COMPONENT_SOURCE = /\.svelte$|^carbon-(icons|pictograms)-svelte(\/|$)/;
 
@@ -141,6 +149,72 @@ export function collectScriptUsage(
   };
 }
 
+/**
+ * Call sites in a file the analysis can't parse (Markdown, Astro, a
+ * `.svelte` file another preprocessor rewrites), read from its text alone:
+ * every Carbon component it imports with `import { … }` or by path is
+ * open, and any other mention of the package (a namespace import, a
+ * re-export, a dynamic import) opens every component.
+ */
+export function collectImportedUsage(
+  code: string,
+  file: string,
+  carbon: CarbonComponents,
+  reason: string,
+): ModuleUsage {
+  const usage: ModuleUsage = {
+    sites: [],
+    openAll: false,
+    providedContexts: providedContexts(code),
+  };
+  if (!code.includes(CarbonSvelte.Components)) return usage;
+
+  const understood = new Set<number>();
+  for (const match of code.matchAll(BARREL_IMPORT)) {
+    understood.add(
+      match.index + match[0].length - CarbonSvelte.Components.length - 2,
+    );
+    if (match[1]) continue; // `import type { … }`
+    for (const specifier of match[2].split(",")) {
+      const name = specifier.trim();
+      if (name === "" || name.startsWith("type ")) continue;
+      const key = carbon.get(name.split(IMPORT_AS)[0]);
+      if (key)
+        usage.sites.push(
+          openSite(key, file, lineAt(code, match.index), reason),
+        );
+    }
+  }
+  for (const match of code.matchAll(BARREL_SPECIFIER)) {
+    if (!understood.has(match.index)) usage.openAll = true;
+  }
+  for (const match of code.matchAll(DIRECT_COMPONENT_SPECIFIER)) {
+    usage.sites.push(
+      openSite(match[1], file, lineAt(code, match.index), reason),
+    );
+  }
+  return usage;
+}
+
+/**
+ * Call sites in an app file read from its source as written: `.svelte`
+ * files are parsed, scripts lexed, and anything else read for imports.
+ */
+export function collectSourceUsage(
+  code: string,
+  file: string,
+  carbon: CarbonComponents,
+): ModuleUsage {
+  if (file.endsWith(".svelte")) return collectSvelteUsage(code, file, carbon);
+  if (SCRIPT_FILE.test(file)) return collectScriptUsage(code, file, carbon);
+  return collectImportedUsage(
+    code,
+    file,
+    carbon,
+    "not a Svelte or script file",
+  );
+}
+
 /** A prop value the app writes literally; anything else is unknown. */
 function staticValue(expression: Expression, objects: Set<string>): Value {
   switch (expression.type) {
@@ -188,7 +262,7 @@ export function collectSvelteUsage(
   try {
     ast = parse(code, { comments: false });
   } catch {
-    return collectScriptUsage(code, file, carbon, "could not be parsed");
+    return collectImportedUsage(code, file, carbon, "could not be parsed");
   }
 
   const bindings: ImportBindings = {

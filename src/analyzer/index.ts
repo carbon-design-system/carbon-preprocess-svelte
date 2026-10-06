@@ -17,6 +17,7 @@ import {
 import {
   type CarbonComponents,
   collectScriptUsage,
+  collectSourceUsage,
   collectSvelteUsage,
   type ModuleUsage,
   readCarbonComponents,
@@ -155,10 +156,7 @@ export async function analyzeFiles(input: {
     const modules: ModuleUsage[] = [];
     for (const { file, code } of input.files) {
       // `code` is the file's source here, not a bundler's output.
-      const usage = isSvelteFile(file)
-        ? collectSvelteUsage(code, file, carbon)
-        : readModuleUsage(file, code, carbon);
-      if (usage) modules.push(usage);
+      modules.push(collectSourceUsage(code, file, carbon));
     }
 
     const rendered = new Set(
@@ -268,9 +266,7 @@ export async function specializeFiles(input: {
   }
   const components = new Set<string>();
   for (const { file, code } of input.files) {
-    const usage = isSvelteFile(file)
-      ? collectSvelteUsage(code, file, carbon)
-      : collectScriptUsage(code, file, carbon);
+    const usage = collectSourceUsage(code, file, carbon);
     for (const site of usage.sites) components.add(site.component);
   }
   const result = await analyzeFiles({
