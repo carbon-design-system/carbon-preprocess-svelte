@@ -92,7 +92,10 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         ids.add(id);
         return;
       }
-      if (collector && isScannableModule(id)) collector.add(id, code);
+      // Virtual modules too: one may render the app's own components.
+      if (collector && (isScannableModule(id) || id.startsWith("\0"))) {
+        collector.add(id, code);
+      }
       if (options?.scanModules !== false && isScannableModule(id)) {
         const tokens = new Set<string>();
         collectCarbonTokens(code, tokens);

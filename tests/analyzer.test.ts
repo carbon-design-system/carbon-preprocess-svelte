@@ -58,8 +58,8 @@ describe("collectSvelteUsage", () => {
   test("an expression, a bind, or a spread leaves props unknown", () => {
     const { sites } = collectSvelteUsage(
       app(
-        `${IMPORT_BUTTON}\nlet kind = "ghost"; let ref;`,
-        `<Button {kind} bind:ref /><Button {...$$restProps} />`,
+        `${IMPORT_BUTTON}\nlet kind = "ghost"; let ref; const toggle = () => (kind = "danger");`,
+        `<Button {kind} bind:ref on:click={toggle} /><Button {...$$restProps} />`,
       ),
       "/app/App.svelte",
       carbon,
@@ -67,6 +67,26 @@ describe("collectSvelteUsage", () => {
     expect(sites[0].props.get("kind")).toBe(UNKNOWN);
     expect(sites[0].props.get("ref")).toBe(UNKNOWN);
     expect(sites[1].open).toBe(true);
+  });
+
+  test("reads the app's constants and state no code reassigns", () => {
+    const { sites } = collectSvelteUsage(
+      app(
+        `${IMPORT_BUTTON}
+const kind = "ghost";
+let size = $state("small");
+const label = $derived(size === "small" ? "S" : "L");
+let { tone = "danger" } = $props();`,
+        `<Button {kind} {size} iconDescription={label} /><Button kind={tone} />`,
+      ),
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(sites[0].props.get("kind")).toEqual(possible("ghost"));
+    expect(sites[0].props.get("size")).toEqual(possible("small"));
+    expect(sites[0].props.get("iconDescription")).toEqual(possible("S"));
+    // The app component's own props come from whoever renders it.
+    expect(sites[1].props.get("kind")).toBe(UNKNOWN);
   });
 
   test("a component used as a value, or never rendered as a tag, is open", () => {

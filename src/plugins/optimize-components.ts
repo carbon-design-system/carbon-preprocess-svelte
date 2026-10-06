@@ -42,6 +42,22 @@ export const optimizeComponents = (
       optimizer.check(id, code, root);
     },
     buildEnd() {
+      // The app components whose props came from their call sites: check
+      // nothing outside `content` imports them.
+      for (const id of this.getModuleIds()) {
+        if (!optimizer.isClosed(id)) continue;
+        const info = this.getModuleInfo(id);
+        if (!info) continue;
+        // An entry is mounted by something outside the module graph.
+        const importers: Array<string | undefined> = [...info.importers];
+        if (info.isEntry) importers.push(undefined);
+        optimizer.checkImporters(
+          id,
+          importers,
+          info.dynamicImporters.length > 0,
+          root,
+        );
+      }
       const error = optimizer.error();
       if (error) this.error(error);
     },

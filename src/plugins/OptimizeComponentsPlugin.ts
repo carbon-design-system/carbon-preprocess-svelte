@@ -22,7 +22,15 @@ type AsyncHook = {
   tapPromise(name: string, callback: () => Promise<void>): void;
 };
 
+type WebpackConnection = {
+  originModule?: WebpackModule | null;
+  dependency?: { type?: string } | null;
+};
+
 type WebpackCompilation = {
+  moduleGraph: {
+    getIncomingConnections(module: WebpackModule): Iterable<WebpackConnection>;
+  };
   hooks: {
     finishModules: {
       tap(
@@ -121,6 +129,28 @@ export class OptimizeComponentsPlugin {
           }
           if (typeof source === "string" || Buffer.isBuffer(source)) {
             optimizer.check(resource, source.toString(), compiler.context);
+          }
+          if (optimizer.isClosed(resource)) {
+            const importers: Array<string | undefined> = [];
+            let dynamic = false;
+            for (const connection of compilation.moduleGraph.getIncomingConnections(
+              module,
+            )) {
+              const origin = connection.originModule;
+              if (origin === module) continue;
+              importers.push(
+                typeof origin?.resource === "string"
+                  ? origin.resource
+                  : undefined,
+              );
+              dynamic ||= connection.dependency?.type === "import()";
+            }
+            optimizer.checkImporters(
+              resource,
+              importers,
+              dynamic,
+              compiler.context,
+            );
           }
         }
         const error = optimizer.error();

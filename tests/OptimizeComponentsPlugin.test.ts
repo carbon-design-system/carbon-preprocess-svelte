@@ -10,6 +10,8 @@ const SVELTE_LOADER = path.join(
   import.meta.dir,
   "helpers/svelte-source-loader.cjs",
 );
+const CARD_ESCAPED =
+  /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]extra\.js also render/;
 const MISSED_TOOLBAR =
   /OptimizeComponentsPlugin rewrote Carbon components before seeing lib[\\/]toolbar\.js/;
 
@@ -76,6 +78,35 @@ describe("OptimizeComponentsPlugin", () => {
       expect(code).toContain("<ButtonSkeleton");
     } finally {
       dispose();
+    }
+  });
+
+  test("follows a wrapper's props, unless something outside `content` renders it", async () => {
+    const files = {
+      "src/App.svelte": `<script>import Card from "./Card.svelte";</script>\n<Card tone="danger" />`,
+      "src/Card.svelte": `<script>${IMPORT_BUTTON}\nexport let tone = "primary";</script>\n<Button kind={tone} />`,
+      "src/index.js": `import App from "./App.svelte";\nconsole.log(App);`,
+    };
+    const wrapped = await build(files);
+    try {
+      expect(wrapped.stats.hasErrors()).toBe(false);
+      expect(wrapped.code).toContain(String.raw`\"bx--btn--danger\"`);
+    } finally {
+      wrapped.dispose();
+    }
+
+    const escaped = await build({
+      ...files,
+      "src/index.js": `${files["src/index.js"]}\nimport "../lib/extra.js";`,
+      "lib/extra.js": `import Card from "../src/Card.svelte";\nconsole.log(Card);`,
+    });
+    try {
+      const errors = escaped.stats.toJson({ errors: true }).errors ?? [];
+      expect(errors.map((error) => error.message).join("\n")).toMatch(
+        CARD_ESCAPED,
+      );
+    } finally {
+      escaped.dispose();
     }
   });
 
