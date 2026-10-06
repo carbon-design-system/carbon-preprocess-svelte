@@ -548,7 +548,7 @@ optimizeComponents({
 
 Under Rollup and Rolldown, list it before the Svelte plugin (Vite orders it first on its own) and add it only to production builds; `content` resolves from the working directory. Under SvelteKit it rewrites the server and client builds alike, so prerendered pages hydrate as before.
 
-It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), and 28% in the Rollup and Rolldown examples. Rewritten components have no source maps yet: devtools show the rewritten source.
+It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), and 28% in the Rollup and Rolldown examples. Rewritten components come with source maps, so devtools and stack traces show Carbon's original source.
 
 ### `OptimizeCssPlugin`
 
