@@ -34,6 +34,7 @@ const MISSED_TOOLBAR =
   /before seeing lib\/Toolbar\.ts.*Add those files to `content`/;
 const ANALYSIS_FAILED =
   /optimizeComponents could not analyze this build .*Carbon components were bundled unchanged/;
+const VIRTUAL_MODULE = /can't analyze \0virtual:toolbar.*no file on disk/;
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 
 /** A project with `src/App.svelte` and Carbon linked into its `node_modules`. */
@@ -135,6 +136,70 @@ describe("optimizeComponents", () => {
         path.join(project.root, "lib", "Toolbar.ts"),
       );
       expect(() => plugin.buildEnd.call(ctx)).toThrow(MISSED_TOOLBAR);
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("by default, scripts and Markdown in `src` are analyzed too", async () => {
+    const { project, carbon, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button kind="tertiary">Save</Button>`,
+    );
+    try {
+      const store = path.join(project.root, "src", "dialogs.ts");
+      writeFileSync(store, `import { Modal } from "carbon-components-svelte";`);
+      const page = path.join(project.root, "src", "about.md");
+      writeFileSync(page, `<script>${IMPORT_BUTTON}</script>\n\n<Button />`);
+      const ctx = context();
+      await plugin.buildStart.call(ctx);
+      plugin.transform(
+        `import { Modal } from "carbon-components-svelte";`,
+        store,
+      );
+      plugin.transform(
+        `import { Button } from "carbon-components-svelte";`,
+        page,
+      );
+      expect(() => plugin.buildEnd.call(ctx)).not.toThrow();
+
+      // Imported from a script or Markdown: every prop value stays.
+      expect(
+        plugin.load(path.join(carbon, "src/Modal/Modal.svelte")),
+      ).toBeDefined();
+      const button = plugin.load(path.join(carbon, "src/Button/Button.svelte"));
+      expect(button?.code).not.toContain(`"bx--btn--tertiary"`);
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("fails the build when a virtual module renders Carbon", async () => {
+    const { plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
+    );
+    const ctx = context();
+    await plugin.buildStart.call(ctx);
+    plugin.transform(IMPORT_BUTTON, "\0virtual:toolbar");
+    expect(() => plugin.buildEnd.call(ctx)).toThrow(VIRTUAL_MODULE);
+  });
+
+  test("a `content` pattern that names `node_modules` reaches inside it", async () => {
+    const { project, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
+      {
+        content: ["src/**/*.svelte", "node_modules/ui-kit/**/*.svelte"],
+        silent: true,
+      },
+    );
+    try {
+      const kit = path.join(project.root, "node_modules", "ui-kit");
+      mkdirSync(kit);
+      const toolbar = path.join(kit, "Toolbar.svelte");
+      writeFileSync(toolbar, `<script>${IMPORT_BUTTON}</script>\n<Button />`);
+      const ctx = context();
+      await plugin.buildStart.call(ctx);
+      plugin.transform(IMPORT_BUTTON, toolbar);
+      expect(() => plugin.buildEnd.call(ctx)).not.toThrow();
     } finally {
       project.dispose();
     }

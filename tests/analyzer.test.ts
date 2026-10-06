@@ -1,7 +1,9 @@
 import type { PropAwareOptions } from "../src/analyzer/analyze-usage";
 import { analyzeUsage } from "../src/analyzer/analyze-usage";
 import {
+  type collectImportedUsage,
   collectScriptUsage,
+  collectSourceUsage,
   collectSvelteUsage,
   readCarbonComponents,
 } from "../src/analyzer/call-sites";
@@ -153,6 +155,49 @@ describe("collectScriptUsage", () => {
         carbon,
       ).openAll,
     ).toBe(true);
+  });
+});
+
+describe("collectImportedUsage", () => {
+  const open = (usage: ReturnType<typeof collectImportedUsage>) =>
+    usage.sites.map((site) => [site.component, site.open, site.location?.line]);
+
+  test("an Astro or Markdown file's imports are open", () => {
+    const astro = `---
+import { Button, type ButtonProps, Modal as M } from "carbon-components-svelte";
+import type { DataTableHeader } from "carbon-components-svelte";
+import Tile from "carbon-components-svelte/src/Tile/Tile.svelte";
+---
+<Button kind="ghost" client:load>Isn't parsed</Button>`;
+    const usage = collectSourceUsage(astro, "/app/index.astro", carbon);
+    expect(open(usage)).toEqual([
+      [BUTTON, true, 2],
+      ["Modal/Modal.svelte", true, 2],
+      ["Tile/Tile.svelte", true, 4],
+    ]);
+    expect(usage.openAll).toBe(false);
+  });
+
+  test("any other mention of the package opens every component", () => {
+    for (const code of [
+      `<script>import * as C from "carbon-components-svelte";</script>`,
+      `export * from "carbon-components-svelte";`,
+      `const C = await import('carbon-components-svelte');`,
+    ]) {
+      expect(collectSourceUsage(code, "/app/page.md", carbon).openAll).toBe(
+        true,
+      );
+    }
+  });
+
+  test("a `.svelte` file that doesn't parse falls back to its imports", () => {
+    const usage = collectSourceUsage(
+      `<script>${IMPORT_BUTTON}</script>\n<Button kind={"ghost"}>{#if}</Button>`,
+      "/app/App.svelte",
+      carbon,
+    );
+    expect(open(usage)).toEqual([[BUTTON, true, 1]]);
+    expect(usage.sites[0].reason).toBe("could not be parsed");
   });
 });
 

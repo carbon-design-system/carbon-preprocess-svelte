@@ -2,8 +2,9 @@ import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
 import type { SpecializedComponents } from "../analyzer";
+import { CarbonSvelte, RE_EXT_STYLESHEET } from "../constants";
 import { installedMajor } from "../indexer/resolve-carbon-root";
-import { isCarbonSvelteImport, isScannableModule, stripQuery } from "../utils";
+import { isCarbonSvelteImport, stripQuery } from "../utils";
 import { collectCarbonImports } from "./scan-imports";
 
 export type OptimizeComponentsOptions = {
@@ -12,7 +13,11 @@ export type OptimizeComponentsOptions = {
    * Carbon components. They're analyzed before the build; a module outside
    * them that imports a Carbon component fails the build, since the
    * components were already rewritten without it.
-   * @default ["src/**\/*.svelte"]
+   *
+   * `.svelte` files are read for the props they pass. Every Carbon
+   * component a script, Markdown, MDX or Astro file imports keeps every
+   * prop value. `node_modules` is skipped unless a pattern names it.
+   * @default ["src/**\/*.{svelte,svx,md,mdx,astro,js,jsx,ts,tsx,mjs,mts,cjs,cts}"]
    */
   content?: string[];
 
@@ -32,8 +37,37 @@ export type OptimizeComponentsOptions = {
   silent?: boolean;
 };
 
-const DEFAULT_CONTENT = ["src/**/*.svelte"];
+const DEFAULT_CONTENT = [
+  "src/**/*.{svelte,svx,md,mdx,astro,js,jsx,ts,tsx,mjs,mts,cjs,cts}",
+];
 const PATH_SEPARATOR = /[\\/]/;
+/** Files whose imports `collectCarbonImports` can lex. */
+const LEXABLE = /\.(svelte|[cm]?[jt]sx?)$/;
+
+const isInNodeModules = (file: string) =>
+  file.split(PATH_SEPARATOR).includes("node_modules");
+
+/** Files matching `patterns`, skipping `node_modules` unless a pattern names it. */
+function globContent(patterns: string[], cwd: string): string[] {
+  const named = patterns.filter((pattern) => pattern.includes("node_modules"));
+  const rest = patterns.filter((pattern) => !named.includes(pattern));
+  return [
+    ...new Set([
+      ...(rest.length > 0
+        ? globSync(rest, { cwd, exclude: isInNodeModules })
+        : []),
+      ...(named.length > 0 ? globSync(named, { cwd }) : []),
+    ]),
+  ];
+}
+
+/** Whether module `code` imports a Carbon component. */
+function importsCarbon(file: string, code: string): boolean {
+  if (!LEXABLE.test(file)) return code.includes(CarbonSvelte.Components);
+  const imported = new Set<string>();
+  collectCarbonImports(code, imported);
+  return imported.size > 0;
+}
 
 /**
  * **Experimental.** Vite, Rollup and Rolldown plugin that rewrites each Carbon component
@@ -53,8 +87,10 @@ export const optimizeComponents = (
   let sources: SpecializedComponents["sources"] = new Map();
   /** Real paths of the files analyzed before the build. */
   const analyzed = new Set<string>();
-  /** Modules that render Carbon but weren't analyzed. */
+  /** Files that render Carbon but weren't analyzed. */
   const missed = new Set<string>();
+  /** Modules with no file that render Carbon: never analyzable. */
+  const virtual = new Set<string>();
 
   const realpath = (file: string): string | undefined => {
     try {
@@ -75,12 +111,13 @@ export const optimizeComponents = (
       sources = new Map();
       analyzed.clear();
       missed.clear();
+      virtual.clear();
 
       const files: Array<{ file: string; code: string }> = [];
-      for (const file of globSync(options?.content ?? DEFAULT_CONTENT, {
-        cwd: root,
-        exclude: (file) => file.split(PATH_SEPARATOR).includes("node_modules"),
-      })) {
+      for (const file of globContent(
+        options?.content ?? DEFAULT_CONTENT,
+        root,
+      )) {
         const absolute = path.resolve(root, file);
         try {
           files.push({ file: absolute, code: readFileSync(absolute, "utf8") });
@@ -120,18 +157,28 @@ export const optimizeComponents = (
     },
     transform(code, id) {
       if (sources.size === 0) return;
-      if (isCarbonSvelteImport(id) || !isScannableModule(id)) return;
       const file = stripQuery(id);
+      if (isCarbonSvelteImport(file) || RE_EXT_STYLESHEET.test(file)) return;
       if (analyzed.has(realpath(file) ?? file)) return;
-      const imported = new Set<string>();
-      collectCarbonImports(code, imported);
-      if (imported.size > 0) missed.add(path.relative(root, file));
+      if (!importsCarbon(file, code)) return;
+      if (id.startsWith("\0") || !path.isAbsolute(file)) virtual.add(id);
+      else missed.add(path.relative(root, file));
     },
     buildEnd() {
-      if (missed.size === 0) return;
-      this.error(
-        `carbon-preprocess-svelte: optimizeComponents rewrote Carbon components before seeing ${[...missed].join(", ")}, which import(s) them. Add those files to \`content\` (now ${JSON.stringify(options?.content ?? DEFAULT_CONTENT)}).`,
-      );
+      const errors: string[] = [];
+      if (missed.size > 0) {
+        errors.push(
+          `optimizeComponents rewrote Carbon components before seeing ${[...missed].join(", ")}, which import(s) them. Add those files to \`content\` (now ${JSON.stringify(options?.content ?? DEFAULT_CONTENT)}); only a pattern that names \`node_modules\` reaches inside it.`,
+        );
+      }
+      if (virtual.size > 0) {
+        errors.push(
+          `optimizeComponents can't analyze ${[...virtual].join(", ")}, which import(s) Carbon components but has no file on disk. Import them from a file in \`content\` instead, or remove optimizeComponents.`,
+        );
+      }
+      if (errors.length > 0) {
+        this.error(`carbon-preprocess-svelte: ${errors.join(" ")}`);
+      }
     },
   };
 };
