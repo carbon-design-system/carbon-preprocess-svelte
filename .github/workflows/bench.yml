@@ -1,0 +1,75 @@
+name: Benchmark
+
+# Runs the ostia benchmarks on a pull request and on its base, on the same
+# runner, and reports the comparison in the job summary. Informational: a
+# shared runner is too noisy to gate merges on. On main, the run is kept as
+# an artifact, a baseline for later comparisons.
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "bench/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/bench.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "bench/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/bench.yml"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Benchmark this commit
+        run: bun run bench --export-json "$GITHUB_WORKSPACE/head.json"
+
+      # The base's own benchmark files: a task only one side has is listed
+      # as unmatched rather than compared.
+      - name: Benchmark the base
+        if: github.event_name == 'pull_request'
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "${{ github.event.pull_request.base.sha }}"
+          cd "$RUNNER_TEMP/base"
+          bun ci
+          bun run bench --export-json "$GITHUB_WORKSPACE/base.json"
+
+      - name: Compare
+        if: github.event_name == 'pull_request'
+        run: |
+          set +e
+          ./node_modules/.bin/ostia compare base.json head.json --format markdown > compare.md
+          status=$?
+          {
+            echo "### Benchmarks: this pull request vs its base"
+            echo
+            cat compare.md
+            if [ "$status" -eq 1 ]; then
+              echo
+              echo "Some tasks regressed past ostia's thresholds. Runner noise is common; rerun before acting on it."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: bench-${{ github.event_name == 'push' && 'main' || 'pr' }}
+          path: |
+            head.json
+            base.json
+            compare.md
+          if-no-files-found: ignore
