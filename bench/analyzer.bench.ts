@@ -35,9 +35,11 @@ const APPS = {
   <Button type="submit">Save</Button>
 </Form>
 <Modal bind:open modalHeading="Confirm" primaryButtonText="OK">Sure?</Modal>`,
-  // The vite-matrix example: UI shell, forms, list boxes, DataTable, Modal.
+  // The vite-matrix example as of its first benchmark (UI shell, forms,
+  // list boxes, DataTable, Modal), frozen so edits to the example don't
+  // move the numbers.
   "large (vite-matrix app)": readFileSync(
-    path.join(root, "examples/vite-matrix@svelte-5/src/App.svelte"),
+    path.join(import.meta.dirname, "fixtures/vite-matrix-app.svelte"),
     "utf8",
   ),
 };
@@ -115,7 +117,7 @@ group("optimizeCss on white.css (large app)", () => {
 // The same app as its real files: `App.svelte` renders the `ActionButton`
 // wrapper, so the app components' own fixpoint and the wrapper's props
 // run too.
-const matrixSrc = path.join(root, "examples/vite-matrix@svelte-5/src");
+const matrixSrc = path.join(import.meta.dirname, "fixtures/wrapper");
 const matrixFiles = ["App.svelte", "ActionButton.svelte"].map((name) => ({
   file: path.join(matrixSrc, name),
   code: readFileSync(path.join(matrixSrc, name), "utf8"),
