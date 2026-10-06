@@ -42,6 +42,7 @@
     ToolbarSearch,
     TooltipDefinition,
   } from "carbon-components-svelte";
+  import ActionButton from "./ActionButton.svelte";
 
   const regions = [
     { id: "us-east", text: "US East" },
@@ -268,18 +269,13 @@
 
     <Row>
       <Column>
-        <Button
-          kind="tertiary"
-          on:click={() => (saved = true)}
+        <ActionButton
+          primary
+          onclick={() => (saved = true)}
         >
           Save settings
-        </Button>
-        <Button
-          kind="ghost"
-          size="small"
-        >
-          Cancel
-        </Button>
+        </ActionButton>
+        <ActionButton>Cancel</ActionButton>
       </Column>
     </Row>
   </Grid>
