@@ -9,8 +9,9 @@ import { createComponentOptimizer } from "../src/plugins/component-optimizer";
  * and on a watch rebuild where nothing in it changed), and checking every
  * transformed module for Carbon imports from outside `content`.
  */
-const root = path.join(import.meta.dirname, "../examples/vite-matrix@svelte-5");
-const options = { silent: true, content: ["src/**/*.{svelte,js}"] };
+// The vite-matrix app and its wrapper, frozen like the analyzer's fixtures.
+const root = path.join(import.meta.dirname, "fixtures/wrapper");
+const options = { silent: true, content: ["*.svelte"] };
 
 group("optimizeComponents: prepare (vite-matrix app)", () => {
   task("cold: a new build", async () => {
@@ -25,9 +26,9 @@ group("optimizeComponents: prepare (vite-matrix app)", () => {
 // 500 transformed modules: the app's own, 450 scripts with no Carbon
 // import, 40 that import it from outside `content`, and Carbon's own
 // files, which are skipped.
-const app = readFileSync(path.join(root, "src/App.svelte"), "utf8");
+const app = readFileSync(path.join(root, "App.svelte"), "utf8");
 const modules = [
-  { id: path.join(root, "src/App.svelte"), code: app },
+  { id: path.join(root, "App.svelte"), code: app },
   ...Array.from({ length: 450 }, (_, i) => ({
     id: path.join(root, `src/lib/util${i}.ts`),
     code: `export const value${i} = ${i};\n`.repeat(20),
