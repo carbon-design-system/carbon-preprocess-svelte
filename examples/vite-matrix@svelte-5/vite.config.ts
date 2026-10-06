@@ -21,8 +21,7 @@ export default {
     emptyOutDir: true,
   },
   plugins: [
-    // Svelte 5 renders unwrapped branches identically, so `unwrap` is safe.
-    variant === "full" && optimizeComponents({ unwrap: true }),
+    variant === "full" && optimizeComponents(),
     svelte({ preprocess: [optimizeImports()] }),
     variant !== "baseline" &&
       optimizeCss({

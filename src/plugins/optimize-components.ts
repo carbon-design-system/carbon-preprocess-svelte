@@ -2,6 +2,7 @@ import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
 import type { SpecializedComponents } from "../analyzer";
+import { installedMajor } from "../indexer/resolve-carbon-root";
 import { isCarbonSvelteImport, isScannableModule, stripQuery } from "../utils";
 import { collectCarbonImports } from "./scan-imports";
 
@@ -20,7 +21,7 @@ export type OptimizeComponentsOptions = {
    * instead of keeping an `{#if true}` around it. Svelte 5 only: Svelte 3/4
    * render whitespace differently without the block. Saves under a point of
    * JS.
-   * @default false
+   * @default true when the installed Svelte is 5 or later
    */
   unwrap?: boolean;
 
@@ -94,7 +95,9 @@ export const optimizeComponents = (
       const result = await specializeFiles({
         projectRoot: root,
         files,
-        options: { unwrap: options?.unwrap === true },
+        options: {
+          unwrap: options?.unwrap ?? (installedMajor("svelte", root) ?? 0) >= 5,
+        },
       });
       if ("warning" in result) {
         this.warn(result.warning);
