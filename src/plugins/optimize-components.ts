@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
@@ -91,6 +92,17 @@ export const optimizeComponents = (
   const missed = new Set<string>();
   /** Modules with no file that render Carbon: never analyzable. */
   const virtual = new Set<string>();
+  /**
+   * The last analysis and a hash of the `content` it read: watch rebuilds
+   * and SvelteKit's second (server or client) build reuse it unless a
+   * file changed.
+   */
+  let last:
+    | {
+        hash: string;
+        result: SpecializedComponents | { warning: string };
+      }
+    | undefined;
 
   const realpath = (file: string): string | undefined => {
     try {
@@ -114,28 +126,40 @@ export const optimizeComponents = (
       virtual.clear();
 
       const files: Array<{ file: string; code: string }> = [];
+      const hash = createHash("sha1");
       for (const file of globContent(
         options?.content ?? DEFAULT_CONTENT,
         root,
       )) {
         const absolute = path.resolve(root, file);
+        let code: string;
         try {
-          files.push({ file: absolute, code: readFileSync(absolute, "utf8") });
+          code = readFileSync(absolute, "utf8");
         } catch {
           continue; // A directory, or gone since the glob ran.
         }
+        files.push({ file: absolute, code });
+        hash.update(`${absolute}\0${code}\0`);
         analyzed.add(realpath(absolute) ?? absolute);
       }
 
-      // Loaded lazily: builds without this plugin never evaluate the analyzer.
-      const { specializeFiles } = await import("../analyzer");
-      const result = await specializeFiles({
-        projectRoot: root,
-        files,
-        options: {
-          unwrap: options?.unwrap ?? (installedMajor("svelte", root) ?? 0) >= 5,
-        },
-      });
+      const digest = hash.digest("hex");
+      if (last?.hash !== digest) {
+        // Loaded lazily: builds without this plugin never evaluate the analyzer.
+        const { specializeFiles } = await import("../analyzer");
+        last = {
+          hash: digest,
+          result: await specializeFiles({
+            projectRoot: root,
+            files,
+            options: {
+              unwrap:
+                options?.unwrap ?? (installedMajor("svelte", root) ?? 0) >= 5,
+            },
+          }),
+        };
+      }
+      const { result } = last;
       if ("warning" in result) {
         this.warn(result.warning);
         return;
