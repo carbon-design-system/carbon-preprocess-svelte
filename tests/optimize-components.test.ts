@@ -35,6 +35,8 @@ const MISSED_TOOLBAR =
 const ANALYSIS_FAILED =
   /optimizeComponents could not analyze this build .*Carbon components were bundled unchanged/;
 const VIRTUAL_MODULE = /can't analyze \0virtual:toolbar.*no file on disk/;
+const BUTTON_REPORT =
+  /Button +\d+ edits +no longer renders .*ButtonSkeleton[\s\S]*No longer bundled \(\d+\): .*ButtonSkeleton/;
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 
 /** A project with `src/App.svelte` and Carbon linked into its `node_modules`. */
@@ -130,6 +132,24 @@ describe("optimizeComponents", () => {
       await plugin.buildStart.call(context());
       expect(plugin.load(button)?.code).toContain(`"bx--btn--danger"`);
     } finally {
+      project.dispose();
+    }
+  });
+
+  test("`report` prints what each component lost", async () => {
+    const { project, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button kind="tertiary">Save</Button>`,
+      { report: true, silent: true },
+    );
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await plugin.buildStart.call(context());
+      const report = log.mock.calls.map(([line]) => line).join("\n");
+      expect(report).toContain("optimizeComponents report");
+      expect(report).toMatch(BUTTON_REPORT);
+      expect(report).toContain('kind             "tertiary"');
+    } finally {
+      log.mockRestore();
       project.dispose();
     }
   });

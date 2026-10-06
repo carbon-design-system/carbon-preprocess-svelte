@@ -1,4 +1,4 @@
-import { type AST, isReference, walk } from "sveast/walk";
+import { type AST, isReference, SKIP, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
 import { childEntries, type Node } from "./ast";
 import { evaluate, type Scope } from "./evaluate";
@@ -40,6 +40,8 @@ export type Specialization = {
   edits: number;
   /** Declarations removed because nothing read them after the edits. */
   dropped: number;
+  /** `.svelte` imports nothing renders anymore, so the bundler drops them. */
+  unrendered: string[];
 };
 
 type Rewrite = (start: number, end: number) => MappedText;
@@ -627,7 +629,48 @@ export function specializeComponent(
       ? { mapped: folded, dropped: 0 }
       : dropUnused(folded);
   const mapped = applied > 0 ? silenceUnusedProps(cleaned) : cleaned;
-  return { code: mapped.text, mapped, edits: applied, dropped };
+  return {
+    code: mapped.text,
+    mapped,
+    edits: applied,
+    dropped,
+    unrendered: applied > 0 ? unrenderedImports(mapped.text) : [],
+  };
+}
+
+/** Sources of `.svelte` imports whose bindings `code` no longer uses. */
+function unrenderedImports(code: string): string[] {
+  const ast = parse(code, { comments: false });
+  const imports = new Map<string, string[]>();
+  for (const script of [ast.module, ast.instance]) {
+    for (const statement of (script?.content.body ?? []) as Node[]) {
+      if (
+        statement.type === "ImportDeclaration" &&
+        typeof statement.source.value === "string" &&
+        statement.source.value.endsWith(".svelte")
+      ) {
+        imports.set(
+          statement.source.value,
+          statement.specifiers.map((specifier) => specifier.local.name),
+        );
+      }
+    }
+  }
+  if (imports.size === 0) return [];
+
+  const used = new Set<string>();
+  walk(ast, {
+    enter(node, parent) {
+      if (node.type === "ImportDeclaration") return SKIP;
+      if (node.type === "Component") used.add(node.name.split(".")[0]);
+      if (node.type === "Identifier" && isReference(node, parent)) {
+        used.add(node.name);
+      }
+    },
+  });
+  return [...imports]
+    .filter(([, locals]) => !locals.some((local) => used.has(local)))
+    .map(([source]) => source);
 }
 
 /** Whether `node` can be removed without losing a side effect (no scope facts). */

@@ -36,6 +36,15 @@ export type OptimizeComponentsOptions = {
    * @default false
    */
   silent?: boolean;
+
+  /**
+   * Print what each build rewrote: edits per component, the child
+   * components they no longer render, the ones no longer bundled, and the
+   * prop values each call site passes (or why it keeps every value).
+   * Independent of `silent`.
+   * @default false
+   */
+  report?: boolean;
 };
 
 const DEFAULT_CONTENT = [
@@ -169,6 +178,9 @@ export const optimizeComponents = (
         this.info?.(
           `rewrote ${sources.size} Carbon components for this app (${result.edits} edits)`,
         );
+      }
+      if (options?.report) {
+        for (const line of result.report()) console.log(line);
       }
     },
     load(id) {

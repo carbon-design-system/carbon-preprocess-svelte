@@ -545,6 +545,13 @@ optimizeComponents({
 
   /** Skip the per-build summary. @default false */
   silent: false,
+
+  /**
+   * Print what each build rewrote: edits per component, the child
+   * components they no longer render and the ones no longer bundled, and
+   * the prop values each call site passes. @default false
+   */
+  report: false,
 });
 ```
 
