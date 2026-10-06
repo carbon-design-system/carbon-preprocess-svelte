@@ -172,7 +172,7 @@ export class OptimizeCssPlugin {
                 collector = analyzer.createUsageCollector(compiler.context);
               } catch (error) {
                 warn(
-                  `${LOG_PREFIX} experimental.propAware is off for this build (${(error as Error).message}).`,
+                  `${LOG_PREFIX} propAware is off for this build (${(error as Error).message}).`,
                 );
               }
               for (const [resource, code] of propAwareModules) {

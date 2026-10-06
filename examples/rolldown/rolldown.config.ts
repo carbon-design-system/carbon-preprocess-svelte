@@ -9,7 +9,7 @@ import { defineConfig } from "rolldown";
 import svelte from "rollup-plugin-svelte";
 
 const production = process.env.NODE_ENV === "production";
-// `OPTIMIZE=1` adds the experimental optimizations: `optimizeComponents`
+// `OPTIMIZE=1` adds the component optimizations: `optimizeComponents`
 // rewrites Carbon components for the props the app passes, and prop-aware
 // `optimizeCss` prunes their unused styles. Built to `public-optimized/`.
 const optimize = production && process.env.OPTIMIZE === "1";
@@ -103,7 +103,7 @@ export default defineConfig({
     }),
     emitCss,
     // Only apply the plugin when building for production.
-    production && optimizeCss({ experimental: { propAware: optimize } }),
+    production && optimizeCss({ propAware: optimize }),
     emitHtml,
   ],
 });

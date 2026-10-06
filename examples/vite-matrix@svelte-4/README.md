@@ -10,7 +10,7 @@ Each build sets `VARIANT` ([vite.config.ts](vite.config.ts)):
 | --- | --- |
 | `baseline` | `optimizeImports` only |
 | `css` | `optimizeCss()`: drops styles of components the app doesn't import |
-| `prop-aware` | `optimizeCss({ experimental: { propAware: true } })`: also drops styles for props the app never passes |
+| `prop-aware` | `optimizeCss({ propAware: true })`: also drops styles for props the app never passes |
 | `full` | prop-aware CSS, plus `optimizeComponents()`: rewrites Carbon components for the props the app passes |
 
 With carbon-components-svelte 0.113.0, `bun run build` printed:

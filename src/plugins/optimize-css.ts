@@ -53,7 +53,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
   let components: ComponentIndex | undefined;
   const propAware = propAwareOptions(options);
-  /** Call sites per module for `experimental.propAware`. */
+  /** Call sites per module for `propAware`. */
   let collector: UsageCollector | undefined;
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
   let analyzer: typeof import("../analyzer") | undefined;
@@ -81,7 +81,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         } catch (error) {
           if (!silent) {
             this.warn(
-              `${LOG_PREFIX} experimental.propAware is off for this build (${(error as Error).message}).`,
+              `${LOG_PREFIX} propAware is off for this build (${(error as Error).message}).`,
             );
           }
         }

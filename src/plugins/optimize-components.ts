@@ -7,10 +7,10 @@ import {
 export type { OptimizeComponentsOptions };
 
 /**
- * **Experimental.** Vite, Rollup and Rolldown plugin that rewrites each Carbon component
+ * Vite, Rollup and Rolldown plugin that rewrites each Carbon component
  * the app renders for the props it passes: values that never change become
  * literals, and branches that can't run go, along with the components only
- * they render. Pair it with `optimizeCss({ experimental: { propAware: true } })`,
+ * they render. Pair it with `optimizeCss({ propAware: true })`,
  * which prunes the styles of the same branches.
  *
  * Runs on production builds only, before Svelte compiles. Rewritten

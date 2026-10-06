@@ -25,7 +25,7 @@ export default {
     svelte({ preprocess: [optimizeImports()] }),
     variant !== "baseline" &&
       optimizeCss({
-        experimental: { propAware: variant !== "css" },
+        propAware: variant !== "css",
       }),
   ],
   optimizeDeps: {

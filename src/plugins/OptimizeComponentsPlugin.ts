@@ -76,9 +76,9 @@ const LOADER = (() => {
 let nextId = 0;
 
 /**
- * **Experimental.** `optimizeComponents` for webpack and Rspack: rewrites
+ * `optimizeComponents` for webpack and Rspack: rewrites
  * each Carbon component the app renders for the props it passes. Pair it
- * with `new OptimizeCssPlugin({ experimental: { propAware: true } })`.
+ * with `new OptimizeCssPlugin({ propAware: true })`.
  *
  * Runs on production builds only. It adds a loader that runs before
  * `svelte-loader` on Carbon's `.svelte` files, and fails the build if a

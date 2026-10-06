@@ -1,5 +1,5 @@
 /**
- * Entry point the CSS plugins load lazily for `experimental.propAware`, so
+ * Entry point the CSS plugins load lazily for `propAware`, so
  * builds without it never evaluate the analyzer.
  */
 import { readFileSync, realpathSync } from "node:fs";
@@ -32,7 +32,7 @@ export type PropAwareResult = PropAwareUsage & {
 const WARN_PREFIX = "carbon-preprocess-svelte:";
 
 const PROP_AWARE_FAILURE = {
-  feature: "experimental.propAware",
+  feature: "propAware",
   fallback: "Carbon CSS was pruned without it",
 };
 const SPECIALIZE_FAILURE = {
@@ -212,7 +212,7 @@ export function formatPropAwareReport(
   root: string,
 ): string[] {
   return [
-    "  Prop-aware (experimental):",
+    "  Prop-aware:",
     ...formatCallSites(result, root),
     `    Classes pruned by props: ${prunedClasses.size}`,
   ];

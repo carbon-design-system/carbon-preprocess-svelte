@@ -31,9 +31,9 @@ This package has six independent tools; pick the one matching your bundler or pi
 | :--- | :--- | :--- | :--- |
 | [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports straight to source, for faster dev and build times |
 | [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Prunes unused Carbon styles at build time, shrinking CSS bundles up to 90% |
-| [`optimizeComponents`](#optimizecomponents-experimental) | Build plugin (experimental) | Vite, Rollup, Rolldown, Astro | Rewrites Carbon components for the props your app passes, removing code it never runs |
+| [`optimizeComponents`](#optimizecomponents) | Build plugin | Vite, Rollup, Rolldown, Astro | Rewrites Carbon components for the props your app passes, removing code it never runs |
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss` for Webpack and Rspack |
-| [`OptimizeComponentsPlugin`](#optimizecomponentsplugin-experimental) | Build plugin (experimental) | Webpack, Rspack | `optimizeComponents` for Webpack and Rspack |
+| [`OptimizeComponentsPlugin`](#optimizecomponentsplugin) | Build plugin | Webpack, Rspack | `optimizeComponents` for Webpack and Rspack |
 | [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, Bun.build, any post-build script | Programmatic version of the same CSS optimization engine, for any pipeline |
 | [CLI](#cli) | Command-line tool | esbuild, Bun, any pipeline without a plugin hook | Prunes unused Carbon styles from built CSS files with a single command |
 
@@ -430,12 +430,11 @@ optimizeCss({
   scanModules: false,
 
   /**
-   * Opt-in features that may change or go away in a minor release.
+   * Also prune styles for the prop values the app never passes.
    * See "Prop-aware pruning" below.
+   * @default false
    */
-  experimental: {
-    propAware: true,
-  },
+  propAware: true,
 });
 ```
 
@@ -459,12 +458,12 @@ optimizeCss({
 > - **`content`**: scan additional files for literal `bx--` prefixes: `content: ["**/*.{md,html}"]`.
 > - **`report`**: set `report: true` to print which components and tokens were detected, then compare against the class you are missing.
 
-#### Prop-aware pruning (experimental)
+#### Prop-aware pruning
 
-By default, importing a component keeps every style it could ever need: all of `Button`'s kinds, sizes, its skeleton, and its icon-only tooltip. `experimental.propAware` also reads the props your app passes and prunes the variants it never uses:
+By default, importing a component keeps every style it could ever need: all of `Button`'s kinds, sizes, its skeleton, and its icon-only tooltip. `propAware` also reads the props your app passes and prunes the variants it never uses:
 
 ```js
-optimizeCss({ experimental: { propAware: true } });
+optimizeCss({ propAware: true });
 ```
 
 ```svelte
@@ -488,27 +487,25 @@ Pass an object to tune it:
 
 ```js
 optimizeCss({
-  experimental: {
-    propAware: {
-      /** Components that keep every variant's styles. */
-      exclude: ["DataTable"],
-      /**
-       * Values for props set from expressions, by component then prop.
-       * A value the app passes that isn't listed loses its styles.
-       */
-      assume: { Button: { kind: ["primary", "danger"] } },
-    },
+  propAware: {
+    /** Components that keep every variant's styles. */
+    exclude: ["DataTable"],
+    /**
+     * Values for props set from expressions, by component then prop.
+     * A value the app passes that isn't listed loses its styles.
+     */
+    assume: { Button: { kind: ["primary", "danger"] } },
   },
 });
 ```
 
-To also remove the code for those branches, add [`optimizeComponents`](#optimizecomponents-experimental).
+To also remove the code for those branches, add [`optimizeComponents`](#optimizecomponents).
 
-`report: true` prints, per component, the prop values the analysis saw and why any call site kept every variant. The same option works with `OptimizeCssPlugin` and `optimizeCarbonCss` (which reads call sites from `content` and requires it), and as `--experimental-prop-aware` in the CLI.
+`report: true` prints, per component, the prop values the analysis saw and why any call site kept every variant. The same option works with `OptimizeCssPlugin` and `optimizeCarbonCss` (which reads call sites from `content` and requires it), and as `--prop-aware` in the CLI.
 
 Across every Carbon component and prop value, plus the example apps in this repo, prop-aware pruning removed 37% more CSS than default pruning, and no class those apps render lost its rules (`bun run eval:prop-aware`). The [vite-matrix](examples/vite-matrix@svelte-4) examples also render the same DOM and pixels as an unoptimized build through scripted clicks, typing and menus (`bun run eval:interactions`).
 
-#### `optimizeComponents` (experimental)
+#### `optimizeComponents`
 
 `optimizeComponents` is a Vite, Rollup and Rolldown plugin that rewrites each Carbon component your app renders for the props it passes. Values that never change become literals, and branches that can't run are removed, along with child components only they render (a skeleton, a tooltip portal). It's the JavaScript counterpart of prop-aware CSS pruning and uses the same analysis.
 
@@ -521,7 +518,7 @@ export default {
   plugins: [
     optimizeComponents(),
     svelte(),
-    optimizeCss({ experimental: { propAware: true } }),
+    optimizeCss({ propAware: true }),
   ],
 };
 ```
@@ -562,7 +559,7 @@ Under Rollup and Rolldown, list it before the Svelte plugin (Vite orders it firs
 
 It runs on production builds only, before Svelte compiles. It reads the app's constants and wrapper components like prop-aware CSS does, and a prop it can't read, `bind:`, or a spread keeps every value. Because the components are rewritten before the build sees every module, the build fails if a module outside `content` imports a wrapper whose props were read from its call sites. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), 14% in [Astro](examples/astro), 26–28% in the Rollup, Rolldown and webpack examples with Svelte 4, and 9–12% in the webpack and Rspack examples with Svelte 5, whose runtime is a larger share of a small app. Rewritten components come with source maps, so devtools and stack traces show Carbon's original source.
 
-#### `OptimizeComponentsPlugin` (experimental)
+#### `OptimizeComponentsPlugin`
 
 `OptimizeComponentsPlugin` is `optimizeComponents` for webpack and Rspack, with the same options. It adds a loader that runs before `svelte-loader` on Carbon's `.svelte` files, and like `OptimizeCssPlugin` it does nothing outside production mode. In watch mode, an edit to a file in `content` rebuilds the Carbon modules.
 
@@ -576,7 +573,7 @@ import {
 export default {
   plugins: [
     new OptimizeComponentsPlugin(),
-    new OptimizeCssPlugin({ experimental: { propAware: true } }),
+    new OptimizeCssPlugin({ propAware: true }),
   ],
 };
 ```
@@ -703,7 +700,7 @@ optimizeCarbonCss(css, {
    * `content` files, so `content` must cover every file that renders Carbon
    * components; a listed component no file renders keeps every variant.
    */
-  experimental: { propAware: true },
+  propAware: true,
 });
 ```
 
@@ -773,7 +770,7 @@ Options:
                           slashes for a RegExp: --safelist "/^\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
-  --experimental-prop-aware
+  --prop-aware
                           Also prune styles for prop values, slots, and child
                           components the --content files never use.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
