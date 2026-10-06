@@ -5,6 +5,7 @@ import type { ComponentUsage } from "./usage";
 import {
   BOOLEAN,
   binary,
+  EMPTY_ARRAY,
   flatMap,
   isNullish,
   isTruthy,
@@ -48,8 +49,19 @@ function lookup(name: string, scope: Scope): Value {
   if (scope.pending.has(name)) return UNKNOWN;
 
   scope.pending.add(name);
-  const value = resolve(name, scope);
+  let value = resolve(name, scope);
   scope.pending.delete(name);
+  const escapes = model.escapingNames;
+  if (
+    value !== UNKNOWN &&
+    value.has(EMPTY_ARRAY) &&
+    (escapes.has(name) ||
+      escapes.has("*") ||
+      escapes.has(`$$props.${model.propNames.get(name) ?? name}`))
+  ) {
+    // Something may fill it in.
+    value = flatMap(value, (p) => possible(p === EMPTY_ARRAY ? OBJECT : p));
+  }
   scope.memo.set(name, value);
   return value;
 }
@@ -176,6 +188,9 @@ export function evaluate(node: Node | Expression, scope: Scope): Value {
       return evaluate(node.expression as Expression, scope);
 
     case "ArrayExpression":
+      // Fresh, so empty until something that holds it fills it in.
+      return possible(node.elements.length === 0 ? EMPTY_ARRAY : OBJECT);
+
     case "ObjectExpression":
     case "ArrowFunctionExpression":
     case "FunctionExpression":
@@ -239,7 +254,16 @@ function evaluateMember(
     }
   }
   if (object.type === "Super") return UNKNOWN;
-  // `undefined?.x` is `undefined`; anything else is beyond this model.
+  // `undefined?.x` is `undefined`, `[].length` is 0; anything else is
+  // beyond this model.
   const target = evaluate(object, scope);
-  return optional && isOnly(target, undefined) ? UNDEFINED : UNKNOWN;
+  if (optional && isOnly(target, undefined)) return UNDEFINED;
+  if (
+    !computed &&
+    property.type === "Identifier" &&
+    property.name === "length"
+  ) {
+    return flatMap(target, (p) => (p === EMPTY_ARRAY ? possible(0) : UNKNOWN));
+  }
+  return UNKNOWN;
 }

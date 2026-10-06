@@ -5,6 +5,7 @@ import { UnsupportedComponentError } from "./component-model";
 import { evaluate, type Scope } from "./evaluate";
 import type { CallSite } from "./usage";
 import {
+  isEmptyArray,
   isNeverNullish,
   join,
   possible,
@@ -41,7 +42,8 @@ function addStrings(value: Value, result: LiveResult): void {
 /**
  * Walks `scope.model`'s script and markup, skipping whatever its usage
  * proves can't run: the falsy side of `&&`, `||`, `??`, ternaries, `if`
- * statements, `{#if}` branches, and falsy `class:` directives. Everything
+ * statements, `{#if}` branches, `{#each}` over an array that stays empty,
+ * and falsy `class:` directives. Everything
  * else is assumed live, including every function body.
  */
 export function walkLive(scope: Scope): LiveResult {
@@ -147,6 +149,16 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
       const truth = truthOf(evaluate(node.test, scope));
       visitBranches(truth, node.consequent, node.alternate, scope, result);
       return;
+    }
+
+    case "EachBlock": {
+      visit(node.expression, scope, result);
+      // Over an array known to stay empty: only `{:else}` renders.
+      if (isEmptyArray(evaluate(node.expression, scope))) {
+        if (node.fallback) visit(node.fallback, scope, result);
+        return;
+      }
+      break;
     }
 
     case "ClassDirective": {

@@ -269,6 +269,22 @@ describe("analyzeUsage", () => {
     expect(danger.isPruned(".bx--btn--danger")).toBe(false);
   });
 
+  test("a Modal without secondary buttons prunes their styles", async () => {
+    const IMPORT_MODAL = `import { Modal } from "carbon-components-svelte";`;
+    const THREE_BUTTONS = ".bx--modal-footer--three-button";
+    const without = await analyze(
+      app(IMPORT_MODAL, `<Modal open modalHeading="Hi">Body</Modal>`),
+    );
+    expect(without.isPruned(THREE_BUTTONS)).toBe(true);
+    const withButtons = await analyze(
+      app(
+        IMPORT_MODAL,
+        `<Modal open secondaryButtons={[{ text: "A" }, { text: "B" }]}>Body</Modal>`,
+      ),
+    );
+    expect(withButtons.isPruned(THREE_BUTTONS)).toBe(false);
+  });
+
   test("follows components imported through a `.js` barrel", async () => {
     const { isPruned } = await analyze(
       app(
