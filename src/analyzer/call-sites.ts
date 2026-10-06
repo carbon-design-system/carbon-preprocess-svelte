@@ -369,13 +369,15 @@ export function collectSourceUsage(
  */
 function appEvaluator(
   code: string,
+  ast: AST.Root,
   file: string,
   objects: Set<string>,
   options: SvelteUsageOptions,
 ): (expression: Expression) => Value {
   let scope: ReturnType<typeof createScope> | undefined;
   try {
-    const model = options.model ?? buildComponentModel(code, file);
+    const model =
+      options.model ?? buildComponentModel(code, file, undefined, ast);
     let usage = options.usage;
     if (!usage) {
       usage = newComponentUsage();
@@ -478,7 +480,8 @@ export function collectSvelteUsage(
 
   let ast: AST.Root;
   try {
-    ast = parse(code, { comments: false });
+    // The model, if given, holds the same parse.
+    ast = options.model?.ast ?? parse(code, { comments: false });
   } catch {
     return collectImportedUsage(
       code,
@@ -516,7 +519,7 @@ export function collectSvelteUsage(
   };
   const rendered = new Set<string>();
   const line = (node: { start: number }) => lineAt(code, node.start);
-  const propValue = appEvaluator(code, file, bindings.objects, options);
+  const propValue = appEvaluator(code, ast, file, bindings.objects, options);
 
   const visit = (node: Node, parent: Node | null): void => {
     switch (node.type) {

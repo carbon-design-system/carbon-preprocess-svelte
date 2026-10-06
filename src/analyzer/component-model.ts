@@ -163,8 +163,10 @@ export function buildComponentModel(
   code: string,
   key: string,
   resolveImport: ImportResolver = () => undefined,
+  /** `code` already parsed, to skip parsing it again. */
+  parsed?: AST.Root,
 ): ComponentModel {
-  const ast = parse(code, { comments: false });
+  const ast = parsed ?? parse(code, { comments: false });
   const model: ComponentModel = {
     key,
     code,
