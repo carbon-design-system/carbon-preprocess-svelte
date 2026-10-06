@@ -42,6 +42,8 @@
     ToolbarSearch,
     TooltipDefinition,
   } from "carbon-components-svelte";
+  import Close from "carbon-components-svelte/src/icons/Close.svelte";
+  import Copy from "carbon-components-svelte/src/icons/Copy.svelte";
   import ActionButton from "./ActionButton.svelte";
 
   const regions = [
@@ -71,6 +73,7 @@
   let filteredRowIds = [];
   let region = "us-east";
   let saved = false;
+  let deleting = false;
 </script>
 
 <Header
@@ -276,6 +279,13 @@
           Save settings
         </ActionButton>
         <ActionButton>Cancel</ActionButton>
+        <!-- Icon-only: its tooltip shows on hover. -->
+        <Button
+          kind="danger-tertiary"
+          icon={Close}
+          iconDescription="Delete balancers"
+          on:click={() => (deleting = true)}
+        />
       </Column>
     </Row>
   </Grid>
@@ -290,4 +300,23 @@
   on:submit={() => (open = false)}
 >
   <TextInput labelText="Name" />
+</Modal>
+
+<!-- Two secondary buttons, and a tooltip a Modal renders in a portal. -->
+<Modal
+  danger
+  bind:open={deleting}
+  modalHeading="Delete load balancers"
+  primaryButtonText="Delete"
+  secondaryButtons={[{ text: "Back" }, { text: "Keep them" }]}
+  on:click:button--secondary={() => (deleting = false)}
+  on:submit={() => (deleting = false)}
+>
+  <p>Traffic to these balancers stops.</p>
+  <Button
+    kind="ghost"
+    size="small"
+    icon={Copy}
+    iconDescription="Copy names"
+  />
 </Modal>
