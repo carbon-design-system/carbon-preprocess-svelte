@@ -2,17 +2,23 @@ name: Evaluate
 
 # Accuracy checks for prop-aware CSS pruning and component specialization.
 # Slow (minutes per job), so they run only when the analyzer, the
-# optimizeComponents plugin, the vite-matrix examples or the evaluation
+# optimizeComponents plugins, the examples they build or the evaluation
 # scripts change: once per pull request, and again on main after merge.
 on:
   pull_request:
     paths:
       - "src/analyzer/**"
       - "src/plugins/optimize-components.ts"
+      - "src/plugins/component-optimizer.ts"
+      - "src/plugins/OptimizeComponentsPlugin.ts"
+      - "src/optimize-components-loader.ts"
       - "examples/vite-matrix@*/**"
       - "examples/sveltekit-matrix@*/**"
       - "examples/rollup/**"
       - "examples/rolldown/**"
+      - "examples/webpack/**"
+      - "examples/webpack@svelte-5/**"
+      - "examples/rspack/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
       - ".github/workflows/eval.yml"
@@ -21,10 +27,16 @@ on:
     paths:
       - "src/analyzer/**"
       - "src/plugins/optimize-components.ts"
+      - "src/plugins/component-optimizer.ts"
+      - "src/plugins/OptimizeComponentsPlugin.ts"
+      - "src/optimize-components-loader.ts"
       - "examples/vite-matrix@*/**"
       - "examples/sveltekit-matrix@*/**"
       - "examples/rollup/**"
       - "examples/rolldown/**"
+      - "examples/webpack/**"
+      - "examples/webpack@svelte-5/**"
+      - "examples/rspack/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
       - ".github/workflows/eval.yml"
@@ -139,7 +151,8 @@ jobs:
           bun run build
           bun link
           for example in examples/vite-matrix@svelte-4 examples/vite-matrix@svelte-5 \
-            examples/sveltekit-matrix@svelte-5 examples/rollup examples/rolldown; do
+            examples/sveltekit-matrix@svelte-5 examples/rollup examples/rolldown \
+            examples/webpack examples/webpack@svelte-5 examples/rspack; do
             (cd "$example" && bun link carbon-preprocess-svelte && bun install)
           done
 
