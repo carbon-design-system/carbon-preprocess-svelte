@@ -24,7 +24,18 @@ export const optimizeComponents = (
 
   return {
     name: "vite:carbon:optimize-components",
+    // Builds only (`vite build`, `--watch` included), never the dev server:
+    // the analysis runs up front for the whole app, dev serving and HMR
+    // would leave rewritten components stale when an app prop changes,
+    // and the check in `buildEnd` needs the complete module graph. Rollup
+    // and Rolldown ignore `apply`, so there it's up to the config.
     apply: "build",
+    // Before the Svelte plugin: `load` hands Svelte the rewritten Carbon
+    // source to compile (the first `load` that returns wins), and
+    // `transform` reads app modules before a preprocessor changes them.
+    // Neither Svelte plugin loads plain `.svelte` files today, so this is
+    // a safeguard; Vite sorts `pre` plugins first, Rollup and Rolldown go
+    // by array order.
     enforce: "pre",
     configResolved(config) {
       root = config.root;

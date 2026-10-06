@@ -25,27 +25,21 @@ bun add -D carbon-preprocess-svelte
 
 ## Usage
 
-This package has six independent tools; pick the one matching your bundler or pipeline.
+Pick the tool for your bundler or pipeline; each works on its own.
 
-| Tool | Type | Works with | Description |
+| Tool | Type | Works with | What it does |
 | :--- | :--- | :--- | :--- |
-| [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports straight to source, for faster dev and build times |
-| [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Prunes unused Carbon styles at build time, shrinking CSS bundles up to 90% |
+| [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports to source paths, for faster dev and build times |
+| [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Prunes unused Carbon styles, shrinking CSS bundles up to 90% |
 | [`optimizeComponents`](#optimizecomponents) | Build plugin | Vite, Rollup, Rolldown, Astro | Rewrites Carbon components for the props your app passes, removing code it never runs |
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss` for Webpack and Rspack |
 | [`OptimizeComponentsPlugin`](#optimizecomponentsplugin) | Build plugin | Webpack, Rspack | `optimizeComponents` for Webpack and Rspack |
-| [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, Bun.build, any post-build script | Programmatic version of the same CSS optimization engine, for any pipeline |
-| [CLI](#cli) | Command-line tool | esbuild, Bun, any pipeline without a plugin hook | Prunes unused Carbon styles from built CSS files with a single command |
+| [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, `Bun.build`, any post-build script | The CSS engine as a function, for any pipeline |
+| [CLI](#cli) | Command | esbuild, Bun, any pipeline without a plugin hook | Prunes built CSS files with one command |
 
 ### `optimizeImports`
 
-`optimizeImports` rewrites barrel imports from Carbon's components/icons/pictograms packages to their source Svelte paths, speeding up dev and build compile times while preserving IDE typeahead and autocomplete.
-
-The preprocessor optimizes imports from the following packages:
-
-- [carbon-components-svelte](https://github.com/carbon-design-system/carbon-components-svelte)
-- [carbon-icons-svelte](https://github.com/carbon-design-system/carbon-icons-svelte)
-- [carbon-pictograms-svelte](https://github.com/carbon-design-system/carbon-pictograms-svelte)
+Rewrites barrel imports from [carbon-components-svelte](https://github.com/carbon-design-system/carbon-components-svelte), [carbon-icons-svelte](https://github.com/carbon-design-system/carbon-icons-svelte) and [carbon-pictograms-svelte](https://github.com/carbon-design-system/carbon-pictograms-svelte) to their source paths. Svelte compiles less, and your editor keeps its autocomplete.
 
 ```diff
 - import { Button } from "carbon-components-svelte";
@@ -58,16 +52,17 @@ The preprocessor optimizes imports from the following packages:
 + import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
 ```
 
-> [!NOTE]
-> This preprocessor predates [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte)'s [`prebundleSvelteLibraries: true`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries), now the default, which covers the same Vite cold-start problem. It's still useful for non-Vite bundlers like Rollup and Webpack, and can further improve cold start even with `prebundleSvelteLibraries: true`.
+- Paths come from your installed Carbon's own `src/index.js`, so they match your version.
+- Utilities stay named imports (`import { toCsv } from "carbon-components-svelte/src/DataTable/data-table-utils.js"`), and names the barrel doesn't export stay on the barrel.
 
-Component paths are read from your installed `carbon-components-svelte`'s own `src/index.js`, so they always match the version you have. Utilities exported by name stay named imports (`import { toCsv } from "carbon-components-svelte/src/DataTable/data-table-utils.js"`), and names that barrel doesn't export are left on the barrel.
+> [!NOTE]
+> Vite's [`prebundleSvelteLibraries`](https://github.com/sveltejs/vite-plugin-svelte/blob/ba4ac32cf5c3e9c048d1ac430c1091ca08eaa130/docs/config.md#prebundlesveltelibraries), now on by default, covers the same cold-start problem. This preprocessor still helps non-Vite bundlers (Rollup, Webpack) and can shave Vite's cold start further.
 
 **Set-ups:** [SvelteKit](#sveltekit) · [Vite](#vite) · [Rollup](#rollup) · [Webpack](#webpack) · [Rspack](#rspack)
 
 #### SvelteKit
 
-See [examples/sveltekit](examples/sveltekit). SvelteKit 3 takes its options in the `sveltekit()` Vite plugin:
+Full set-up: [examples/sveltekit](examples/sveltekit). SvelteKit 3 takes its options in the `sveltekit()` plugin:
 
 ```js
 // vite.config.js
@@ -79,48 +74,36 @@ import { optimizeImports } from "carbon-preprocess-svelte";
 export default {
   plugins: [
     sveltekit({
-      preprocess: [
-        // Preprocessors are run in sequence.
-        // If using TypeScript, the code must be transpiled first.
-        vitePreprocess(),
-        optimizeImports(),
-      ],
+      // In sequence: transpile TypeScript first.
+      preprocess: [vitePreprocess(), optimizeImports()],
       adapter: adapter(),
     }),
   ],
 };
 ```
 
-With SvelteKit 2, pass the same `preprocess` in `svelte.config.js` (and the adapter under `kit`).
+SvelteKit 2: pass the same `preprocess` in `svelte.config.js`, and the adapter under `kit`.
 
 #### Vite
 
-See [examples/vite](examples/vite).
+Full set-up: [examples/vite](examples/vite).
 
 ```js
 // vite.config.js
-import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { optimizeImports } from "carbon-preprocess-svelte";
 
-/** @type {import('vite').UserConfig} */
 export default {
   plugins: [
-    svelte({
-      preprocess: [
-        // Preprocessors are run in sequence.
-        // If using TypeScript, the code must be transpiled first.
-        vitePreprocess(),
-        optimizeImports(),
-      ],
-    }),
+    // In sequence: transpile TypeScript first.
+    svelte({ preprocess: [vitePreprocess(), optimizeImports()] }),
   ],
 };
 ```
 
 #### Rollup
 
-This code is abridged; see [examples/rollup](examples/rollup) for a full set-up.
+Abridged; full set-up: [examples/rollup](examples/rollup).
 
 ```js
 // rollup.config.js
@@ -128,17 +111,13 @@ import svelte from "rollup-plugin-svelte";
 import { optimizeImports } from "carbon-preprocess-svelte";
 
 export default {
-  plugins: [
-    svelte({
-      preprocess: [optimizeImports()],
-    }),
-  ],
+  plugins: [svelte({ preprocess: [optimizeImports()] })],
 };
 ```
 
 #### Webpack
 
-This code is abridged; see [examples/webpack](examples/webpack) for a full set-up.
+Abridged; full set-up: [examples/webpack](examples/webpack).
 
 ```js
 // webpack.config.mjs
@@ -151,11 +130,7 @@ export default {
         test: /\.svelte$/,
         use: {
           loader: "svelte-loader",
-          options: {
-            hotReload: !PROD,
-            preprocess: [optimizeImports()],
-            compilerOptions: { dev: !PROD },
-          },
+          options: { preprocess: [optimizeImports()] },
         },
       },
     ],
@@ -165,50 +140,38 @@ export default {
 
 #### Rspack
 
-[Rspack](https://rspack.rs) implements webpack's plugin and loader APIs, so setup matches [Webpack](#webpack) above unchanged. This code is abridged; see [examples/rspack](examples/rspack) for a full set-up.
-
-```js
-// rspack.config.mjs
-import { optimizeImports } from "carbon-preprocess-svelte";
-
-export default {
-  module: {
-    rules: [
-      {
-        test: /\.svelte$/,
-        use: {
-          loader: "svelte-loader",
-          options: {
-            hotReload: !PROD,
-            preprocess: [optimizeImports()],
-            compilerOptions: { dev: !PROD },
-          },
-        },
-      },
-    ],
-  },
-};
-```
+[Rspack](https://rspack.rs) implements webpack's loader API, so the [Webpack](#webpack) set-up works unchanged in `rspack.config.mjs`. Full set-up: [examples/rspack](examples/rspack).
 
 ### `optimizeCss`
 
-`optimizeCss` is a Vite plugin that strips unused Carbon styles at build time. It also works with Rollup and [Rolldown](https://rolldown.rs), which share the same plugin API ([Vite](https://vitejs.dev/guide/api-plugin) extends Rollup's).
+A build plugin that strips unused Carbon styles. It runs on Vite, Rollup and [Rolldown](https://rolldown.rs), which share a plugin API.
+
+```diff
+$ vite build
+
+Optimized index-CU4gbKFa.css
+- Before: 606.26 kB
++ After:   53.22 kB (-91.22%)
+```
+
+> [!NOTE]
+> It's a build plugin, not a preprocessor: add it to `plugins`. Vite runs it on `vite build` only; under Rollup and Rolldown, add it to production builds only.
 
 <details>
 <summary>How it works</summary>
 
-The plugin uses `apply: "build"` and `enforce: "post"`, so it runs only on production builds and after other plugins.
+It runs on production builds, after other plugins (`apply: "build"`, `enforce: "post"`).
 
-1. During `transform`, it collects imported `carbon-components-svelte` source paths, plus (unless `scanModules: false`) every literal `bx--` token found in other modules.
-2. During `generateBundle`, for each emitted CSS file it builds an allowlist of every `bx--` class tied to those components, plus global selectors like `.bx--body`. The component-to-class index is built from your installed `carbon-components-svelte` (see [Component index](#component-index)), so it always matches the version you have.
-3. A CSS filter prunes Carbon (`bx--`) selectors outside that allowlist:
-   - Individual selectors are pruned from comma-separated lists, not the whole rule, when only one branch matches
-   - Every Carbon class in a compound selector (same-element and descendant) must match the allowlist, so importing NumberInput doesn't pull in `.bx--modal .bx--number` context rules, and Button doesn't pull in Tabs skeleton styles via a shared `.bx--skeleton` modifier
-   - Flatpickr and legacy single-hyphen `bx-` rules are dropped unless DatePicker (or another flatpickr-based component) is in the bundle
-   - Selectors are parsed with parenthesis-awareness, handling `:is(...)` and `:not(...)` groups instead of naively splitting on commas
-4. Empty rules are discarded, and the CSS bundles are optimized.
+1. **`transform`:** collects the Carbon components the app imports, and (unless `scanModules: false`) every literal `bx--` token in other modules.
+2. **`generateBundle`:** for each CSS file, builds an allowlist of the `bx--` classes those components use, plus globals like `.bx--body`. The class index comes from your installed Carbon (see [Component index](#component-index)).
+3. **Prune** Carbon selectors outside the allowlist:
+   - from a selector list, only the branches that don't match;
+   - a compound selector only survives if every Carbon class in it does, so NumberInput doesn't pull in `.bx--modal .bx--number`;
+   - flatpickr and legacy `bx-` rules go unless a flatpickr-based component (DatePicker) is bundled;
+   - `:is(…)` and `:not(…)` groups are parsed, not split on commas.
+4. Empty rules are dropped.
 
-**Risk profile:** validated against a fixture suite covering most Carbon components and common multi-component bundles ([`tests/fixtures/optimize-css`](tests/fixtures/optimize-css)) with zero unexplained survivors, but it shares the blind spot in the warning below: class names that never appear as a literal `bx--` token in bundled code.
+Validated against most Carbon components and common multi-component bundles with no unexplained survivors. Its one blind spot is in the warning under the [API](#optimizecss-api): class names that never appear as a literal `bx--` token.
 
 ```mermaid
 flowchart TB
@@ -229,41 +192,25 @@ flowchart TB
 
 </details>
 
-```diff
-$ vite build
-
-Optimized index-CU4gbKFa.css
-- Before: 606.26 kB
-+ After:   53.22 kB (-91.22%)
-
-dist/index.html                  0.34 kB │ gzip:  0.24 kB
-dist/assets/index-CU4gbKFa.css  53.22 kB │ gzip:  6.91 kB
-dist/assets/index-Ceijs3eO.js   53.65 kB │ gzip: 15.88 kB
-```
-
-> [!NOTE]
-> This is a plugin, not a Svelte preprocessor. Add it to `vite.plugins`. Under Vite it only runs on `vite build`, never during dev. Under Rollup and Webpack, apply it conditionally so it only runs for production builds.
-
 **Set-ups:** [SvelteKit](#sveltekit-1) · [Astro](#astro) · [Vite](#vite-1) · [Rollup](#rollup-1) · [Rolldown](#rolldown) · [API reference](#optimizecss-api)
 
 #### SvelteKit
 
-See [examples/sveltekit](examples/sveltekit).
+Full set-up: [examples/sveltekit](examples/sveltekit).
 
 ```js
 // vite.config.js
 import { sveltekit } from "@sveltejs/kit/vite";
 import { optimizeCss } from "carbon-preprocess-svelte";
-import { defineConfig } from "vite";
 
-export default defineConfig({
+export default {
   plugins: [sveltekit(), optimizeCss()],
-});
+};
 ```
 
 #### Astro
 
-See [examples/astro](examples/astro).
+Full set-up: [examples/astro](examples/astro).
 
 ```js
 // astro.config.mjs
@@ -273,28 +220,21 @@ import { defineConfig } from "astro/config";
 
 export default defineConfig({
   integrations: [svelte()],
-  build: {
-    // Keep CSS as a separate asset so the pruned output is visible.
-    inlineStylesheets: "never",
-  },
-  vite: {
-    plugins: [optimizeCss()],
-  },
+  // Optional: keep CSS in its own file, so the pruned output is easy to inspect.
+  build: { inlineStylesheets: "never" },
+  vite: { plugins: [optimizeCss()] },
 });
 ```
 
-`inlineStylesheets: "never"` just makes the pruned asset inspectable; it's not required.
-
 #### Vite
 
-See [examples/vite](examples/vite).
+Full set-up: [examples/vite](examples/vite).
 
 ```js
 // vite.config.js
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { optimizeCss } from "carbon-preprocess-svelte";
 
-/** @type {import('vite').UserConfig} */
 export default {
   plugins: [svelte(), optimizeCss()],
 };
@@ -302,45 +242,38 @@ export default {
 
 #### Rollup
 
-This code is abridged; see [examples/rollup](examples/rollup) for a full set-up.
+Abridged; full set-up: [examples/rollup](examples/rollup).
 
 ```js
 // rollup.config.js
 import svelte from "rollup-plugin-svelte";
-import { optimizeCss } from "carbon-preprocess-svelte";
+import { optimizeCss, optimizeImports } from "carbon-preprocess-svelte";
 
 const production = !process.env.ROLLUP_WATCH;
 
 export default {
   plugins: [
-    svelte({
-      preprocess: [optimizeImports()],
-    }),
-
-    // Only apply the plugin when building for production.
-    production && optimizeCss(),
+    svelte({ preprocess: [optimizeImports()] }),
+    production && optimizeCss(), // production builds only
   ],
 };
 ```
 
 #### Rolldown
 
-See [examples/rolldown](examples/rolldown).
+Abridged; full set-up: [examples/rolldown](examples/rolldown).
 
 ```js
 // rolldown.config.ts
 import { optimizeCss, optimizeImports } from "carbon-preprocess-svelte";
+import svelte from "rollup-plugin-svelte";
 
 const production = process.env.NODE_ENV === "production";
 
 export default {
   plugins: [
-    svelte({
-      preprocess: [optimizeImports()],
-    }),
-
-    // Only apply the plugin when building for production.
-    production && optimizeCss(),
+    svelte({ preprocess: [optimizeImports()] }),
+    production && optimizeCss(), // production builds only
   ],
 };
 ```
@@ -439,28 +372,26 @@ optimizeCss({
 ```
 
 > [!WARNING]
-> **Class names that never appear as a literal `bx--` token can't be detected.** The plugin keeps classes from imported Carbon components, plus every literal `bx--…` token found in bundled modules (`scanModules`). Two things stay invisible:
+> **A class name that never appears as a literal `bx--` token can't be detected**, and gets pruned:
 >
 > ```svelte
-> <!-- pruned: "bx-" and "-btn" never appear together as one literal token -->
 > <script>
->   const p = "bx-" + "-btn";
+>   const p = "bx-" + "-btn"; // "bx--btn" never appears as one token
 > </script>
 > <button class={`${p}--${kind}`}>...</button>
 > ```
 >
-> - Tokens assembled at runtime from pieces that do not themselves start with `bx--`.
-> - Files the bundler never processes (markdown, HTML templates, CMS content).
+> The same goes for files the bundler never processes (Markdown, HTML templates, CMS content). Fixes:
 >
-> Two ways to fix it:
->
-> - **`safelist`**: list selectors (or a `RegExp`) to keep: `safelist: [".bx--grid", /^\.bx--btn--/]`.
-> - **`content`**: scan additional files for literal `bx--` prefixes: `content: ["**/*.{md,html}"]`.
-> - **`report`**: set `report: true` to print which components and tokens were detected, then compare against the class you are missing.
+> | Fix | Example |
+> | :--- | :--- |
+> | Keep selectors explicitly | `safelist: [".bx--grid", /^\.bx--btn--/]` |
+> | Scan extra files for tokens | `content: ["**/*.{md,html}"]` |
+> | See what was detected | `report: true` |
 
 #### Prop-aware pruning
 
-By default, importing a component keeps every style it could ever need: all of `Button`'s kinds, sizes, its skeleton, and its icon-only tooltip. `propAware` also reads the props your app passes and prunes the variants it never uses:
+`propAware` also reads the props your app passes, and prunes the variants it never uses:
 
 ```js
 optimizeCss({ propAware: true });
@@ -468,46 +399,49 @@ optimizeCss({ propAware: true });
 
 ```svelte
 <Button kind="tertiary">Save</Button>
-<!-- keeps .bx--btn and .bx--btn--tertiary; prunes the other kinds,
-     sizes, .bx--skeleton, and the icon-only tooltip -->
+<!-- kept:   .bx--btn, .bx--btn--tertiary
+     pruned: the other kinds and sizes, .bx--skeleton, the icon-only tooltip -->
 ```
 
-Each `.svelte` file that imports Carbon is read from its source, and each Carbon component is walked with the values its call sites pass. Branches those values rule out (`{#if skeleton}`, `kind === "ghost" && …`, `class:bx--btn--sm={size === "small"}`) are skipped, along with the child components only they render. Values passed by Carbon components to the components they render are followed the same way.
+What it reads:
 
-The app's own code is read the same way. A constant, or state no code reassigns (`const kind = "ghost"`, `let size = $state("small")`), passes its value. So does a wrapper component: `<ActionButton primary>` passes `primary` into the `kind={primary ? "tertiary" : "ghost"}` its `Button` gets. A wrapper's props come from its call sites only if every file that imports it is analyzed; a component a route, an entry or a script mounts, or one imported through an alias or `import.meta.glob`, renders with any props.
+| In your app | Example |
+| :--- | :--- |
+| Literal props | `<Button kind="ghost">` |
+| Constants, and state no code reassigns | `const kind = "ghost"`, `let size = $state("small")` |
+| Your own wrapper components | `<ActionButton primary>` reaching `<Button kind={primary ? "tertiary" : "ghost"}>` |
+| Props Carbon passes to its own children | `Modal` rendering `Button` |
 
-It errs toward keeping styles:
+What keeps every variant (it errs toward keeping styles):
 
-- A prop set from something the analysis can't read (a reassigned variable, a store, a function call), `bind:`, or a spread (`{...props}`) keeps every value.
-- A component used as a value (`<svelte:component this={Button}>`, passed as a prop, imported in a `.js`/`.ts` file) keeps everything.
-- A component imported but not rendered as a tag (for example, markup another preprocessor generates) keeps everything.
-- If the analysis fails (an unexpected Carbon source), the build warns and prunes without it.
+| Case | Example |
+| :--- | :--- |
+| A value it can't read | a reassigned variable, a store, a function call |
+| `bind:` or a spread | `bind:open`, `{...props}` |
+| A component used as a value | `<svelte:component this={Button}>`, passed as a prop, imported in a `.js`/`.ts` file |
+| Markup it can't see | imported but never rendered as a tag (another preprocessor's output) |
+| A wrapper rendered from outside the analyzed files | a route or entry the framework mounts, a `$lib/` alias, `import.meta.glob` |
 
-Pass an object to tune it:
+If the analysis fails, the build warns and prunes without it. To tune it:
 
 ```js
 optimizeCss({
   propAware: {
-    /** Components that keep every variant's styles. */
+    // Keep every variant's styles for these components.
     exclude: ["DataTable"],
-    /**
-     * Values for props set from expressions, by component then prop.
-     * A value the app passes that isn't listed loses its styles.
-     */
+    // Values for props set from expressions; a value not listed loses its styles.
     assume: { Button: { kind: ["primary", "danger"] } },
   },
 });
 ```
 
-To also remove the code for those branches, add [`optimizeComponents`](#optimizecomponents).
+`report: true` prints each component's prop values and why a call site kept every variant. The same options work on `OptimizeCssPlugin`, `optimizeCarbonCss` (which needs `content`), and the CLI (`--prop-aware`).
 
-`report: true` prints, per component, the prop values the analysis saw and why any call site kept every variant. The same option works with `OptimizeCssPlugin` and `optimizeCarbonCss` (which reads call sites from `content` and requires it), and as `--prop-aware` in the CLI.
-
-Across 2,416 apps covering every Carbon component and prop value, prop-aware pruning left 36% less CSS than default pruning, and no class those apps render lost its rules. Every example's optimized build also renders the same DOM and pixels as its unoptimized build through scripted clicks, typing, menus, modals and tooltips.
+Across 2,416 apps covering every Carbon component and prop value, it left 36% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](#optimizecomponents).
 
 #### `optimizeComponents`
 
-`optimizeComponents` is a Vite, Rollup and Rolldown plugin that rewrites each Carbon component your app renders for the props it passes. Values that never change become literals, and branches that can't run are removed, along with child components only they render (a skeleton, a tooltip portal). It's the JavaScript counterpart of prop-aware CSS pruning and uses the same analysis.
+Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). It's the JavaScript counterpart of prop-aware pruning, using the same analysis.
 
 ```js
 // vite.config.js
@@ -516,7 +450,7 @@ import { optimizeComponents, optimizeCss } from "carbon-preprocess-svelte";
 
 export default {
   plugins: [
-    optimizeComponents(),
+    optimizeComponents(), // before svelte(): it hands Svelte the rewritten source
     svelte(),
     optimizeCss({ propAware: true }),
   ],
@@ -555,13 +489,35 @@ optimizeComponents({
 });
 ```
 
-Under Rollup and Rolldown, list it before the Svelte plugin (Vite orders it first on its own) and add it only to production builds; `content` resolves from the working directory. Under SvelteKit and Astro (in `vite.plugins`) it rewrites the server and client builds alike, so prerendered pages hydrate as before. In watch mode (`vite build --watch`, `rollup -w`), a rebuild reanalyzes `content` when a file in it changed.
+Where it runs:
 
-It runs on production builds only, before Svelte compiles. It reads the app's constants and wrapper components like prop-aware CSS does, and a prop it can't read, `bind:`, or a spread keeps every value. Because the components are rewritten before the build sees every module, the build fails if a module outside `content` imports a wrapper whose props were read from its call sites. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5. In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–27% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), 14% in [Astro](examples/astro), 26–28% in the Rollup, Rolldown and webpack examples with Svelte 4, and 9–12% in the webpack and Rspack examples with Svelte 5, whose runtime is a larger share of a small app. Rewritten components come with source maps, so devtools and stack traces show Carbon's original source.
+| Bundler | Plugin order | Runs on |
+| :--- | :--- | :--- |
+| Vite, SvelteKit, Astro (`vite.plugins`) | first, automatically | `vite build` and `vite build --watch`; never `vite dev` |
+| Rollup, Rolldown | list it before the Svelte plugin | wherever you add it, so add it to production builds only (`content` resolves from the working directory) |
+| webpack, Rspack | first, automatically; see [`OptimizeComponentsPlugin`](#optimizecomponentsplugin) | `mode: "production"` only |
+
+It skips dev servers because it analyzes the whole app up front, dev rebuilds of single modules would leave rewritten components stale, and its safety check needs the complete build.
+
+- **Fails the build instead of shipping wrong code** if a module outside `content` imports a Carbon component, or a wrapper whose props were read from its call sites.
+- **SvelteKit and Astro:** the server and client builds are rewritten alike, so prerendered pages hydrate as before.
+- **Watch mode:** a rebuild reanalyzes `content` only when a file in it changed.
+- **Source maps** point devtools and stack traces at Carbon's original source.
+- **Same output:** across every Carbon component and prop value, the rewritten components render identical HTML on Svelte 3, 4 and 5, and every example's optimized build renders the same DOM and pixels through scripted clicks, menus, modals and tooltips.
+
+JavaScript removed in the examples:
+
+| Example | JS removed |
+| :--- | :--- |
+| [vite-matrix](examples/vite-matrix@svelte-4), Svelte 4 / 5 | 27% / 20% |
+| [SvelteKit](examples/sveltekit-matrix@svelte-5) | 18% |
+| [Astro](examples/astro) | 14% |
+| Rollup, Rolldown, webpack (Svelte 4) | 26–28% |
+| webpack, Rspack (Svelte 5) | 9–12% (the Svelte 5 runtime is a larger share of a small app) |
 
 #### `OptimizeComponentsPlugin`
 
-`OptimizeComponentsPlugin` is `optimizeComponents` for webpack and Rspack, with the same options. It adds a loader that runs before `svelte-loader` on Carbon's `.svelte` files, and like `OptimizeCssPlugin` it does nothing outside production mode. In watch mode, an edit to a file in `content` rebuilds the Carbon modules.
+`optimizeComponents` for webpack and Rspack, with the same options. It runs in production mode only, and its pre-loader runs before `svelte-loader` wherever the plugin is listed.
 
 ```js
 // webpack.config.mjs (or rspack.config.mjs)
@@ -580,9 +536,7 @@ export default {
 
 ### `OptimizeCssPlugin`
 
-`OptimizeCssPlugin` is a drop-in replacement for `optimizeCss`, for Webpack and [Rspack](https://rspack.rs) users. Same API, same production-only behavior. One instance works unchanged on both bundlers since Rspack implements webpack's plugin API.
-
-This code is abridged; see [examples/webpack](examples/webpack), [examples/webpack@svelte-5](examples/webpack@svelte-5), or [examples/rspack](examples/rspack) for a full set-up.
+`optimizeCss` for Webpack and [Rspack](https://rspack.rs): same options, production mode only. One instance works on both, since Rspack implements webpack's plugin API.
 
 ```js
 // webpack.config.mjs (or rspack.config.mjs)
@@ -593,12 +547,14 @@ export default {
 };
 ```
 
+Full set-ups: [examples/webpack](examples/webpack), [examples/webpack@svelte-5](examples/webpack@svelte-5), [examples/rspack](examples/rspack).
+
 ### `optimizeCarbonCss`
 
-`optimizeCarbonCss` is the same optimization engine behind `optimizeCss` and `OptimizeCssPlugin`, exposed as a plain async function for bundlers without a plugin API: esbuild, `Bun.build`, or any post-build script. It's `async` because it may build the [component index](#component-index). It can't discover which Carbon components your app imports, so pass them explicitly via `components`. Shares the same detection blind spot as the plugins; see the [warning under `optimizeCss`](#optimizecss-api).
+The engine behind `optimizeCss`, as an async function, for pipelines without a plugin API (esbuild, `Bun.build`, a post-build script). It can't see your imports, so you pass the `components`. It shares the plugins' [blind spot](#optimizecss-api).
 
 > [!TIP]
-> If your pipeline can run a shell command after the build instead of calling a function, the [CLI](#cli) does the component/import detection for you and needs no code changes.
+> Can your pipeline run a command after the build? The [CLI](#cli) detects components for you, with no code.
 
 ```js
 // esbuild
@@ -610,7 +566,6 @@ const result = await build({
   entryPoints: ["src/main.js"],
   bundle: true,
   write: false,
-  metafile: true,
   outdir: "dist",
 });
 
@@ -626,29 +581,32 @@ for (const file of result.outputFiles) {
 }
 ```
 
+<details>
+<summary><code>Bun.build</code></summary>
+
 ```js
-// Bun.build
 import { optimizeCarbonCss } from "carbon-preprocess-svelte";
 
-const result = await Bun.build({
-  entrypoints: ["src/main.js"],
-  outdir: "dist",
-});
+const result = await Bun.build({ entrypoints: ["src/main.js"], outdir: "dist" });
 
 const components = ["Button", "Accordion"];
-const jsOutputs = result.outputs.filter((output) => output.kind === "entry-point");
-const sources = await Promise.all(jsOutputs.map((output) => output.text()));
+const sources = await Promise.all(
+  result.outputs
+    .filter((output) => output.kind === "entry-point")
+    .map((output) => output.text()),
+);
 
 for (const output of result.outputs) {
-  if (output.path.endsWith(".css")) {
-    const { css } = await optimizeCarbonCss(await output.text(), {
-      components,
-      sources,
-    });
-    await Bun.write(output.path, css);
-  }
+  if (!output.path.endsWith(".css")) continue;
+  const { css } = await optimizeCarbonCss(await output.text(), {
+    components,
+    sources,
+  });
+  await Bun.write(output.path, css);
 }
 ```
+
+</details>
 
 ```ts
 optimizeCarbonCss(css, {
@@ -706,7 +664,7 @@ optimizeCarbonCss(css, {
 
 ### CLI
 
-The CLI wraps `optimizeCarbonCss` for pipelines with no plugin hook, like esbuild or `Bun.build`. It detects components by scanning `--content` files (default `src/**/*.{svelte,js,ts,mjs}`) for `carbon-components-svelte` imports, both the barrel form (`import { Button } from "carbon-components-svelte"`) and the direct-path form `optimizeImports` rewrites them to, and keeps literal `bx--` tokens found in those files too, the same as `optimizeCss`'s `content` option. It rewrites every matched CSS file in place, and shares the same detection blind spot as the plugins; see the [warning under `optimizeCss`](#optimizecss-api).
+Prunes built CSS files in place, for pipelines with no plugin hook. It finds the components to keep by scanning `--content` files for Carbon imports (barrel or direct paths) and literal `bx--` tokens, and shares the plugins' [blind spot](#optimizecss-api).
 
 **Jump to:** [Command](#command) · [Sample output](#sample-output) · [Options](#options)
 
@@ -716,7 +674,7 @@ The CLI wraps `optimizeCarbonCss` for pipelines with no plugin hook, like esbuil
 npx carbon-preprocess-svelte optimize-css "dist/**/*.css"
 ```
 
-Add it after the build step in `package.json`:
+Run it after the build step:
 
 ```json
 {
@@ -726,13 +684,7 @@ Add it after the build step in `package.json`:
 }
 ```
 
-```json
-{
-  "scripts": {
-    "build": "bun build src/main.ts --outdir dist && carbon-preprocess-svelte optimize-css \"dist/**/*.css\""
-  }
-}
-```
+With Bun, the build step is `bun build src/main.ts --outdir dist`.
 
 #### Sample output
 
@@ -770,8 +722,7 @@ Options:
                           slashes for a RegExp: --safelist "/^\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
-  --prop-aware
-                          Also prune styles for prop values, slots, and child
+  --prop-aware            Also prune styles for prop values, slots, and child
                           components the --content files never use.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
@@ -783,32 +734,37 @@ Options:
 
 ## Component index
 
-The CSS tools (`optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, and the CLI) prune against an index of the `bx--` classes each Carbon component renders. It's built at build time from your installed `carbon-components-svelte`, so it matches the version you have, whether that's older or newer than this package.
+The CSS tools (`optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, the CLI) prune against an index of the `bx--` classes each Carbon component renders, built from your installed `carbon-components-svelte`, so it matches your version, older or newer than this package.
 
-- Carbon's source is parsed with [sveast](https://github.com/metonym/sveast), bundled into this package, so it doesn't depend on your project's `svelte` version.
-- The index is built once (well under a second) and cached at `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`. Bumping either package rebuilds it. A `carbon-components-svelte` linked from a local checkout (`bun link`, `npm link`, `workspace:`) isn't cached, so edits to its source are picked up on the next build.
-- If it can't be built (for example, `carbon-components-svelte` can't be resolved), the build logs a warning and leaves Carbon CSS unpruned instead of failing.
+| | |
+| :--- | :--- |
+| Parsing | With [sveast](https://github.com/metonym/sveast), bundled in, so your project's `svelte` version doesn't matter |
+| Cost | Built once, well under a second |
+| Cache | `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`; bumping either package rebuilds it. A linked Carbon checkout (`bun link`, `npm link`, `workspace:`) isn't cached, so source edits apply on the next build. |
+| On failure | The build warns and leaves Carbon CSS unpruned, instead of failing |
 
-`optimizeImports` doesn't use this index: it reads import paths from Carbon's `src/index.js` directly.
+`optimizeImports` doesn't use it: it reads import paths from Carbon's `src/index.js`.
 
 ## Examples
 
-Full, runnable set-ups for every supported bundler live under [examples](examples):
+Runnable set-ups for every supported bundler, under [examples](examples):
 
-- [examples/sveltekit](examples/sveltekit): SvelteKit
-- [examples/vite](examples/vite): Vite with Svelte 4
-- [examples/vite@svelte-5](examples/vite@svelte-5): Vite with Svelte 5
-- [examples/vite@carbon-0.85](examples/vite@carbon-0.85): Vite pinned to an older Carbon (0.85.0)
-- [examples/vite-matrix@svelte-4](examples/vite-matrix@svelte-4) and [examples/vite-matrix@svelte-5](examples/vite-matrix@svelte-5): one app built with no optimization, `optimizeCss`, prop-aware CSS, and `optimizeComponents`, with a size table
-- [examples/sveltekit-matrix@svelte-5](examples/sveltekit-matrix@svelte-5): the same app and comparison, prerendered by SvelteKit and hydrated
-- [examples/astro](examples/astro): Astro
-- [examples/rollup](examples/rollup): Rollup
-- [examples/rolldown](examples/rolldown): Rolldown
-- [examples/webpack](examples/webpack): Webpack with Svelte 4
-- [examples/webpack@svelte-5](examples/webpack@svelte-5): Webpack with Svelte 5
-- [examples/rspack](examples/rspack): Rspack
+| Example | Bundler | Svelte | Notes |
+| :--- | :--- | :--- | :--- |
+| [sveltekit](examples/sveltekit) | SvelteKit | 5 | |
+| [vite](examples/vite) | Vite | 4 | |
+| [vite@svelte-5](examples/vite@svelte-5) | Vite | 5 | |
+| [vite@carbon-0.85](examples/vite@carbon-0.85) | Vite | 4 | Pinned to Carbon 0.85.0 |
+| [vite-matrix@svelte-4](examples/vite-matrix@svelte-4), [@svelte-5](examples/vite-matrix@svelte-5) | Vite | 4, 5 | One app built four ways, from no optimization to `optimizeComponents`, with a size table |
+| [sveltekit-matrix@svelte-5](examples/sveltekit-matrix@svelte-5) | SvelteKit | 5 | The same app and comparison, prerendered and hydrated |
+| [astro](examples/astro) | Astro | 5 | `build:optimized` script |
+| [rollup](examples/rollup) | Rollup | 4 | `build:optimized` script |
+| [rolldown](examples/rolldown) | Rolldown | 4 | `build:optimized` script |
+| [webpack](examples/webpack) | Webpack | 4 | `build:optimized` script |
+| [webpack@svelte-5](examples/webpack@svelte-5) | Webpack | 5 | `build:optimized` script |
+| [rspack](examples/rspack) | Rspack | 5 | `build:optimized` script |
 
-The Astro, Rollup, Rolldown, webpack and Rspack examples also have a `build:optimized` script that adds the component and prop-aware CSS optimizations.
+A `build:optimized` script adds `optimizeComponents` and prop-aware CSS.
 
 ## License
 

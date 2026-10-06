@@ -92,6 +92,9 @@ export class OptimizeComponentsPlugin {
   }
 
   public apply(compiler: WebpackCompiler) {
+    // Production builds only, like `optimizeComponents`: the analysis
+    // runs for the whole app up front, and the dev server's rebuilds of
+    // single modules would leave rewritten components stale.
     if (compiler.options.mode !== "production") return;
 
     const { WebpackError } = compiler.webpack;
@@ -99,6 +102,8 @@ export class OptimizeComponentsPlugin {
     const id = String(nextId++);
     optimizerRegistry().set(id, optimizer);
 
+    // A pre-loader runs before normal loaders, so `svelte-loader` compiles
+    // the rewritten source wherever this plugin sits in `plugins`.
     compiler.options.module.rules.push({
       test: CARBON_SVELTE_FILE,
       enforce: "pre",
