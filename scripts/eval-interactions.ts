@@ -164,6 +164,34 @@ const MATRIX_STEPS: Step[] = [
       page.getByRole("button", { name: "Close notification" }).click(),
   },
   {
+    name: "hover icon-only button",
+    run: (page) =>
+      page.getByRole("button", { name: "Delete balancers" }).hover(),
+  },
+  {
+    name: "open danger modal",
+    run: async (page) => {
+      await page.getByRole("button", { name: "Delete balancers" }).click();
+      await page.getByRole("dialog").waitFor();
+    },
+  },
+  {
+    // Inside a Modal, the tooltip renders in a portal after a short delay.
+    name: "hover portal tooltip",
+    run: async (page) => {
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Copy names" })
+        .hover();
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    name: "back from danger modal",
+    run: (page) =>
+      page.getByRole("dialog").getByRole("button", { name: "Back" }).click(),
+  },
+  {
     name: "keyboard focus",
     run: async (page) => {
       await page.locator("body").click({ position: { x: 1, y: 1 } });
