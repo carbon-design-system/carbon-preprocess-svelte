@@ -112,6 +112,28 @@ describe("optimizeComponents", () => {
     }
   });
 
+  test("a rebuild reanalyzes only when `content` changed", async () => {
+    const { project, carbon, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button kind="tertiary">Save</Button>`,
+    );
+    try {
+      const button = path.join(carbon, "src/Button/Button.svelte");
+      await plugin.buildStart.call(context());
+      const first = plugin.load(button);
+      await plugin.buildStart.call(context());
+      expect(plugin.load(button)).toBe(first);
+
+      writeFileSync(
+        path.join(project.root, "src", "App.svelte"),
+        `<script>${IMPORT_BUTTON}</script>\n<Button kind="danger">Delete</Button>`,
+      );
+      await plugin.buildStart.call(context());
+      expect(plugin.load(button)?.code).toContain(`"bx--btn--danger"`);
+    } finally {
+      project.dispose();
+    }
+  });
+
   test("fails the build when a module outside `content` renders Carbon", async () => {
     const { project, plugin } = setUp(
       `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
