@@ -33,6 +33,7 @@ This package has six independent tools; pick the one matching your bundler or pi
 | [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Prunes unused Carbon styles at build time, shrinking CSS bundles up to 90% |
 | [`optimizeComponents`](#optimizecomponents-experimental) | Build plugin (experimental) | Vite, Rollup, Rolldown | Rewrites Carbon components for the props your app passes, removing code it never runs |
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss` for Webpack and Rspack |
+| [`OptimizeComponentsPlugin`](#optimizecomponentsplugin-experimental) | Build plugin (experimental) | Webpack, Rspack | `optimizeComponents` for Webpack and Rspack |
 | [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, Bun.build, any post-build script | Programmatic version of the same CSS optimization engine, for any pipeline |
 | [CLI](#cli) | Command-line tool | esbuild, Bun, any pipeline without a plugin hook | Prunes unused Carbon styles from built CSS files with a single command |
 
@@ -557,7 +558,26 @@ optimizeComponents({
 
 Under Rollup and Rolldown, list it before the Svelte plugin (Vite orders it first on its own) and add it only to production builds; `content` resolves from the working directory. Under SvelteKit it rewrites the server and client builds alike, so prerendered pages hydrate as before. In watch mode (`vite build --watch`, `rollup -w`), a rebuild reanalyzes `content` when a file in it changed.
 
-It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), and 28% in the Rollup and Rolldown examples. Rewritten components come with source maps, so devtools and stack traces show Carbon's original source.
+It runs on production builds only, before Svelte compiles. Like prop-aware CSS, a prop set from an expression, `bind:`, or a spread keeps every value, and a component used as a value is left as is. Across every Carbon component and prop value, the rewritten components render HTML identical to the originals with Svelte 3, 4 and 5 (`bun run eval:specialize`). In the [vite-matrix](examples/vite-matrix@svelte-4) examples it removes 20–28% of the app's JS, 18% in [SvelteKit](examples/sveltekit-matrix@svelte-5), 26–28% in the Rollup, Rolldown and webpack examples with Svelte 4, and 9–12% in the webpack and Rspack examples with Svelte 5, whose runtime is a larger share of a small app. Rewritten components come with source maps, so devtools and stack traces show Carbon's original source.
+
+#### `OptimizeComponentsPlugin` (experimental)
+
+`OptimizeComponentsPlugin` is `optimizeComponents` for webpack and Rspack, with the same options. It adds a loader that runs before `svelte-loader` on Carbon's `.svelte` files, and like `OptimizeCssPlugin` it does nothing outside production mode. In watch mode, an edit to a file in `content` rebuilds the Carbon modules.
+
+```js
+// webpack.config.mjs (or rspack.config.mjs)
+import {
+  OptimizeComponentsPlugin,
+  OptimizeCssPlugin,
+} from "carbon-preprocess-svelte";
+
+export default {
+  plugins: [
+    new OptimizeComponentsPlugin(),
+    new OptimizeCssPlugin({ experimental: { propAware: true } }),
+  ],
+};
+```
 
 ### `OptimizeCssPlugin`
 
@@ -788,6 +808,8 @@ Full, runnable set-ups for every supported bundler live under [examples](example
 - [examples/webpack](examples/webpack): Webpack with Svelte 4
 - [examples/webpack@svelte-5](examples/webpack@svelte-5): Webpack with Svelte 5
 - [examples/rspack](examples/rspack): Rspack
+
+The Rollup, Rolldown, webpack and Rspack examples also have a `build:optimized` script that adds the component and prop-aware CSS optimizations.
 
 ## License
 

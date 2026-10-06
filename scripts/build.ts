@@ -79,7 +79,13 @@ async function slimPackageManifest() {
 
 async function buildProject() {
   const result = await build({
-    entrypoints: ["./src/index.ts", "./src/cli.ts"],
+    entrypoints: [
+      "./src/index.ts",
+      "./src/cli.ts",
+      // An entry of its own: `OptimizeComponentsPlugin` hands webpack/Rspack
+      // its path.
+      "./src/optimize-components-loader.ts",
+    ],
     outdir: outDir,
     format: "esm",
     target: "node",

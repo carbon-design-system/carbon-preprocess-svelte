@@ -1,3 +1,4 @@
+export { OptimizeComponentsPlugin } from "./plugins/OptimizeComponentsPlugin";
 export { OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin";
 export { optimizeCarbonCss } from "./plugins/optimize-carbon-css";
 export {
