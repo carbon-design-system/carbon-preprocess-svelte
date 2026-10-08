@@ -64,13 +64,13 @@ export type ComponentModel = {
   /** Keys this component passes to `setContext` as string literals. */
   providedContexts: Set<string>;
   /**
-   * Names read anywhere but `{#each name}` or `name.length`: an array
-   * they hold may be mutated (`push`), aliased or handed to code that
-   * mutates it, so it's not known to stay empty. `$$props.x` adds
-   * `"$$props.x"` (the prop passed as `x`), and any other use of `$$props`
-   * adds `"*"`: it reaches every prop.
+   * How each name's value can reach code that might mutate it, which
+   * decides whether an object or array literal it holds stays known (see
+   * `Shape`). `$$props.x` adds `"$$props.x"` (the prop passed as `x`) and
+   * any other use of `$$props` adds `"*"`, both `full`: they reach the
+   * props themselves.
    */
-  escapingNames: Set<string>;
+  escapes: Map<string, Escape>;
   /**
    * `rest` in `let { a, ...rest } = $props()`, when nothing reassigns or
    * shadows it: it holds the props the component doesn't declare, like
@@ -78,6 +78,16 @@ export type ComponentModel = {
    */
   restPropsName?: string;
 };
+
+/**
+ * How a name's value leaves the component's sight. `full`: the value
+ * itself does (it's mutated, aliased, passed on, or a method is called on
+ * it). `paths`: the property paths read from it (`["kind"]` for
+ * `button.kind`, `["[]", "text"]` for `item.text` in `{#each name as
+ * item}`). What a path reads may go anywhere, which only matters when
+ * it's an object.
+ */
+export type Escape = { full: boolean; paths: string[][] };
 
 /** Thrown for a component the analysis can't model. */
 export class UnsupportedComponentError extends Error {}
@@ -208,7 +218,7 @@ export function buildComponentModel(
     componentImports: new Map(),
     otherImports: new Set(),
     providedContexts: new Set(),
-    escapingNames: escapingNames(ast),
+    escapes: findEscapes(ast),
   };
 
   /** Instance-script `let` names: a later `export { … }` can make them props. */
@@ -416,35 +426,137 @@ function readTopLevelStatement(
   }
 }
 
-/** See `ComponentModel.escapingNames`. */
-function escapingNames(ast: AST.Root): Set<string> {
-  const names = new Set<string>();
+/**
+ * Whether `parent` only tests or renders `child`, never hands it on: a
+ * condition, a comparison, `{text}`, or an element's attribute (a
+ * component's props are handed on).
+ */
+function onlyTests(
+  parent: Node | undefined,
+  child: Node,
+  ancestors: readonly Node[],
+): boolean {
+  switch (parent?.type) {
+    case "ExpressionTag": {
+      const owner = ancestors.at(-1);
+      const element = ancestors.at(-2);
+      return !(
+        owner?.type === "Attribute" &&
+        (element?.type === "Component" ||
+          element?.type === "SvelteComponent" ||
+          element?.type === "SvelteSelf")
+      );
+    }
+    case "IfStatement":
+    case "IfBlock":
+    case "ConditionalExpression":
+      return parent.test === child;
+    case "UnaryExpression":
+      return parent.operator === "!" || parent.operator === "typeof";
+    case "BinaryExpression":
+      return ["===", "!==", "==", "!="].includes(parent.operator);
+    case "ClassDirective":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Whether `parent` writes to `child`, deletes it, or calls it as a method. */
+function mutates(parent: Node | undefined, child: Node): boolean {
+  switch (parent?.type) {
+    case "AssignmentExpression":
+      return parent.left === child;
+    case "UpdateExpression":
+      return true;
+    case "UnaryExpression":
+      return parent.operator === "delete";
+    case "CallExpression":
+    case "NewExpression":
+      return parent.callee === child;
+    case "BindDirective":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** See `ComponentModel.escapes`. */
+function findEscapes(ast: AST.Root): Map<string, Escape> {
+  const escapes = new Map<string, Escape>();
+  const entry = (name: string): Escape => {
+    let found = escapes.get(name);
+    if (!found) {
+      found = { full: false, paths: [] };
+      escapes.set(name, found);
+    }
+    return found;
+  };
+  /** `[array, item]` for each `{#each array as item}`. */
+  const eachItems: Array<[string, string]> = [];
   const stack: Node[] = [];
   walk(ast, {
     enter(node, parent, key) {
       stack.push(node as Node);
+      if (
+        node.type === "EachBlock" &&
+        node.expression.type === "Identifier" &&
+        node.context?.type === "Identifier"
+      ) {
+        eachItems.push([node.expression.name, node.context.name]);
+      }
       if (node.type !== "Identifier" || !isReference(node, parent)) return;
       if (node.name === "$$props") {
-        const key = memberKey(parent as Node | null);
-        names.add(key === undefined ? "*" : `$$props.${key}`);
+        const member = memberKey(parent as Node | null);
+        entry(member === undefined ? "*" : `$$props.${member}`).full = true;
         return;
       }
       if (
-        // Declaring or exporting a name doesn't hand its value anywhere.
+        // Declaring or exporting a name doesn't hand its value anywhere,
+        // and `{#each name}` hands on its items (see `eachItems`).
         (parent?.type === "VariableDeclarator" && key === "id") ||
         parent?.type === "ExportSpecifier" ||
-        (parent?.type === "EachBlock" && key === "expression") ||
-        isLengthRead(parent as Node | null, key, stack.at(-3))
+        (parent?.type === "EachBlock" &&
+          (key === "expression" || key === "context"))
       ) {
         return;
       }
-      names.add(node.name);
+      // Follow the member chain the name starts: `name.a.b`.
+      const path: string[] = [];
+      let current = node as Node;
+      let index = stack.length - 1;
+      for (;;) {
+        const up = stack[index - 1];
+        if (up?.type !== "MemberExpression" || up.object !== current) break;
+        path.push(memberKey(up) ?? "*");
+        current = up;
+        index--;
+      }
+      const consumer = stack[index - 1];
+      if (mutates(consumer, current)) {
+        entry(node.name).full = true;
+      } else if (path.length > 0) {
+        entry(node.name).paths.push(path);
+      } else if (
+        !onlyTests(consumer, current, stack.slice(0, Math.max(0, index - 1)))
+      ) {
+        entry(node.name).full = true;
+      }
     },
     leave() {
       stack.pop();
     },
   });
-  return names;
+  // What happens to an item happens to its array's elements: an item
+  // handed on is a path that matters only if items are objects.
+  for (const [array, item] of eachItems.reverse()) {
+    const itemEscape = escapes.get(item);
+    if (!itemEscape) continue;
+    const target = entry(array);
+    if (itemEscape.full) target.paths.push(["[]"]);
+    for (const path of itemEscape.paths) target.paths.push(["[]", ...path]);
+  }
+  return escapes;
 }
 
 /** `x` in `<object>.x` or `<object>["x"]`, if `parent` is such a member. */
@@ -457,33 +569,6 @@ function memberKey(parent: Node | null): string | undefined {
     typeof property.value === "string"
     ? property.value
     : undefined;
-}
-
-/** Whether `parent` reads `<object>.length` without writing it. */
-function isLengthRead(
-  parent: Node | null,
-  key: string | null,
-  grandparent: Node | undefined,
-): boolean {
-  if (
-    parent?.type !== "MemberExpression" ||
-    key !== "object" ||
-    parent.computed ||
-    parent.property.type !== "Identifier" ||
-    parent.property.name !== "length"
-  ) {
-    return false;
-  }
-  switch (grandparent?.type) {
-    case "AssignmentExpression":
-      return grandparent.left !== parent;
-    case "UpdateExpression":
-      return false;
-    case "UnaryExpression":
-      return grandparent.operator !== "delete";
-    default:
-      return true;
-  }
 }
 
 /**

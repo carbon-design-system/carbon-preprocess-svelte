@@ -206,6 +206,36 @@ describe("specializeComponent", () => {
     expect(specialize(source, { total: 5 })).toContain('class="total"');
   });
 
+  test("reads the items of a known array inside `{#each}`", () => {
+    const code = specialize(
+      `<script>
+  const links = [{ href: "/a", kind: "nav" }, { href: "/b", kind: "nav" }];
+</script>
+{#each links as link}<a href={link.href} class={link.kind}>{link.href}</a>{/each}`,
+    );
+    // Every item has the same `kind`; `href` differs.
+    expect(code).toContain('class={"nav"}');
+    expect(code).toContain("href={link.href}");
+  });
+
+  test("an object something may change stays unknown", () => {
+    for (const change of [
+      "links[0].kind = 'x';",
+      "links.push({ kind: 'x' });",
+      "keep(links);",
+      "keep(links[0]);",
+    ]) {
+      const code = specialize(
+        `<script>
+  const links = [{ kind: "nav" }];
+  function update() { ${change} }
+</script>
+{#each links as link}<a class={link.kind} on:click={update}>x</a>{/each}`,
+      );
+      expect(code).toContain("class={link.kind}");
+    }
+  });
+
   test("an array that stays empty renders no `{#each}` body", () => {
     const code = specialize(
       `<script>export let items = [];</script>

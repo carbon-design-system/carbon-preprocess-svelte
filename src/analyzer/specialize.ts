@@ -1,7 +1,7 @@
 import { type AST, isReference, SKIP, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
 import { childEntries, type Node } from "./ast";
-import { evaluate, isPropsObject, type Scope } from "./evaluate";
+import { bindEach, evaluate, isPropsObject, type Scope } from "./evaluate";
 import {
   concat,
   type MappedText,
@@ -15,6 +15,7 @@ import {
   isNeverNullish,
   isNullish,
   isObject,
+  isStructured,
   type Truth,
   truthOf,
   UNKNOWN,
@@ -190,11 +191,20 @@ function isPure(node: Node, scope: Scope): boolean {
         return true;
       }
       const target = evaluate(node.object, scope);
+      // A known object's own properties and a string's `length` run no
+      // getter.
       if (
-        isEmptyArray(target) &&
-        !node.computed &&
-        node.property.type === "Identifier" &&
-        node.property.name === "length"
+        target !== UNKNOWN &&
+        target.size > 0 &&
+        (!node.computed || node.property.type === "Literal") &&
+        [...target].every(
+          (p) =>
+            isStructured(p) ||
+            (typeof p === "string" &&
+              !node.computed &&
+              node.property.type === "Identifier" &&
+              node.property.name === "length"),
+        )
       ) {
         return isPure(node.object, scope);
       }
@@ -426,7 +436,17 @@ export function specializeComponent(
           !isPure(node.expression, scope) ||
           !isEmptyArray(valueAt(node.expression))
         ) {
-          break;
+          // The body sees the item's value: an element of a known array.
+          visit(node.expression as Node, node, "expression");
+          const unbind = bindEach(node, scope);
+          try {
+            if (node.key) visit(node.key as Node, node, "key");
+            visit(node.body as Node, node, "body");
+          } finally {
+            unbind();
+          }
+          if (node.fallback) visit(node.fallback as Node, node, "fallback");
+          return;
         }
         const placeholder = placeholderFor(node, parent);
         const trim = preserveDepth === 0;

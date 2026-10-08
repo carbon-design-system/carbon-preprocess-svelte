@@ -412,6 +412,7 @@ What it reads:
 | Your own wrapper components | `<ActionButton primary>` reaching `<Button kind={primary ? "tertiary" : "ghost"}>` |
 | Props Carbon passes to its own children | `Modal` rendering `Button` |
 | Props a component forwards to a child | `{...$$restProps}`, or `...rest` from `$props()` |
+| Object and array literals nothing changes | `secondaryButtons={[{ text: "Back", kind: "ghost" }]}`, read as `button.kind` in `{#each}` |
 
 What keeps every variant (it errs toward keeping styles):
 
