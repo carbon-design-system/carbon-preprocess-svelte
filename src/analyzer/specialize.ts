@@ -701,11 +701,11 @@ export function specializeComponent(
   };
 
   const folded = rewrite(0, code.length);
-  const { mapped: cleaned, dropped } =
-    options?.dropUnused === false
-      ? { mapped: folded, dropped: 0 }
-      : dropUnused(folded);
-  const mapped = applied > 0 ? silenceUnusedProps(cleaned) : cleaned;
+  const { mapped, dropped } = cleanUp(
+    folded,
+    options?.dropUnused !== false,
+    applied > 0,
+  );
   let unrendered: string[] | undefined;
   return {
     code: mapped.text,
@@ -811,14 +811,14 @@ const MAX_CLEANUP_PASSES = 8;
  * `owned` identifier nodes (the names being declared).
  */
 function countReads(
-  ast: AST.Root,
+  ast: AST.Root | Node,
   owned: ReadonlySet<Node>,
   /** Count `export { a }` as a read of `a` (it keeps `a` declared). */
   exportsRead = true,
 ): Map<string, number> {
   const reads = new Map<string, number>();
   const count = (name: string) => reads.set(name, (reads.get(name) ?? 0) + 1);
-  walk(ast, {
+  walk(ast as Node, {
     enter(node, parent, key) {
       if (
         node.type === "Identifier" &&
@@ -866,13 +866,15 @@ const IGNORE_UNUSED_PROP =
   "// svelte-ignore unused-export-let export_let_unused\n  ";
 
 /**
- * Marks props nothing reads anymore with `svelte-ignore`, so Svelte (3–5)
- * doesn't warn that they're unused. They stay declared: a prop the
- * component stops declaring would land in `$$restProps`.
+ * Props nothing reads anymore, marked with `svelte-ignore` so Svelte (3–5)
+ * doesn't warn that they're unused: where each mark goes. They stay
+ * declared: a prop the component stops declaring would land in
+ * `$$restProps`. `reads` doesn't count `export { a }` as reading `a`.
  */
-function silenceUnusedProps(input: MappedText): MappedText {
-  const ast = parse(input.text, { comments: false });
-  const statements = (ast.instance?.content.body ?? []) as Node[];
+function unusedPropMarks(
+  statements: readonly Node[],
+  reads: ReadonlyMap<string, number>,
+): number[] {
   // `export let a`, and `let a; export { a as b }`.
   const exported = statements.flatMap((statement) => {
     if (statement.type !== "ExportNamedDeclaration" || statement.source) {
@@ -896,7 +898,6 @@ function silenceUnusedProps(input: MappedText): MappedText {
           },
         ];
   });
-  const reads = countReads(ast, new Set(), false);
   // Svelte 5 reports `let a; export { a as b }` at the `let`, Svelte 3/4
   // at the export: mark both.
   const declaredAt = new Map<string, number>();
@@ -917,113 +918,148 @@ function silenceUnusedProps(input: MappedText): MappedText {
       if (declaration !== undefined) marks.add(declaration);
     }
   }
-  return splice(
-    input,
-    [...marks]
-      .sort((a, b) => a - b)
-      .map((start) => ({ start, end: start, text: IGNORE_UNUSED_PROP })),
-  );
+  return [...marks];
 }
 
 export function dropUnusedDeclarations(source: string): {
   code: string;
   dropped: number;
 } {
-  const { mapped, dropped } = dropUnused(sliceOf(source, 0, source.length));
+  const { mapped, dropped } = cleanUp(
+    sliceOf(source, 0, source.length),
+    true,
+    false,
+  );
   return { code: mapped.text, dropped };
 }
 
-function dropUnused(input: MappedText): {
-  mapped: MappedText;
-  dropped: number;
-} {
-  let mapped = input;
-  let dropped = 0;
-  for (let pass = 0; pass < MAX_CLEANUP_PASSES; pass++) {
-    const ast = parse(mapped.text, { comments: false });
-    const script = ast.instance?.content;
-    if (!script) break;
+type Candidate = {
+  name: string;
+  statement: Node;
+  /** The declared name and `$:` label: not reads. */
+  own: Set<Node>;
+};
 
-    type Candidate = {
-      name: string;
-      start: number;
-      end: number;
-      own: Set<Node>;
-    };
-    // Assigning a prop can update a parent's `bind:`, and assigning
-    // `$store` sets the store: never "unused".
-    const props = new Set<string>();
-    for (const statement of script.body as Node[]) {
-      if (statement.type !== "ExportNamedDeclaration") continue;
-      if (statement.declaration?.type === "VariableDeclaration") {
-        for (const declarator of statement.declaration.declarations) {
-          if (declarator.id.type === "Identifier")
-            props.add(declarator.id.name);
-        }
-      }
-      for (const specifier of statement.specifiers) {
-        if (specifier.local.type === "Identifier") {
-          props.add(specifier.local.name);
-        }
+/** Top-level declarations that can go once nothing reads them. */
+function removableDeclarations(statements: readonly Node[]): Candidate[] {
+  // Assigning a prop can update a parent's `bind:`, and assigning
+  // `$store` sets the store: never "unused".
+  const props = new Set<string>();
+  for (const statement of statements) {
+    if (statement.type !== "ExportNamedDeclaration") continue;
+    if (statement.declaration?.type === "VariableDeclaration") {
+      for (const declarator of statement.declaration.declarations) {
+        if (declarator.id.type === "Identifier") props.add(declarator.id.name);
       }
     }
-    const removable = (name: string) =>
-      !props.has(name) && !(name.startsWith("$") && !name.startsWith("$$"));
+    for (const specifier of statement.specifiers) {
+      if (specifier.local.type === "Identifier") {
+        props.add(specifier.local.name);
+      }
+    }
+  }
+  const removable = (name: string) =>
+    !props.has(name) && !(name.startsWith("$") && !name.startsWith("$$"));
 
-    const candidates: Candidate[] = [];
-    for (const statement of script.body as Node[]) {
-      if (
-        statement.type === "LabeledStatement" &&
-        statement.label.name === "$" &&
-        statement.body.type === "ExpressionStatement" &&
-        statement.body.expression.type === "AssignmentExpression" &&
-        statement.body.expression.operator === "=" &&
-        statement.body.expression.left.type === "Identifier" &&
-        removable(statement.body.expression.left.name) &&
-        hasNoSideEffects(statement.body.expression.right)
-      ) {
-        const { left } = statement.body.expression;
+  const candidates: Candidate[] = [];
+  for (const statement of statements) {
+    if (
+      statement.type === "LabeledStatement" &&
+      statement.label.name === "$" &&
+      statement.body.type === "ExpressionStatement" &&
+      statement.body.expression.type === "AssignmentExpression" &&
+      statement.body.expression.operator === "=" &&
+      statement.body.expression.left.type === "Identifier" &&
+      removable(statement.body.expression.left.name) &&
+      hasNoSideEffects(statement.body.expression.right)
+    ) {
+      const { left } = statement.body.expression;
+      candidates.push({
+        name: left.name,
+        statement,
+        own: new Set([left as Node, statement.label as Node]),
+      });
+    }
+    if (
+      statement.type === "VariableDeclaration" &&
+      statement.declarations.length === 1 &&
+      statement.declarations[0].id.type === "Identifier" &&
+      removable(statement.declarations[0].id.name) &&
+      hasNoSideEffects(statement.declarations[0].init as Node | null)
+    ) {
+      const { id } = statement.declarations[0];
+      if (id.type === "Identifier") {
         candidates.push({
-          name: left.name,
-          start: statement.start,
-          end: statement.end,
-          own: new Set([left as Node, statement.label as Node]),
+          name: id.name,
+          statement,
+          own: new Set([id as Node]),
         });
       }
-      if (
-        statement.type === "VariableDeclaration" &&
-        statement.declarations.length === 1 &&
-        statement.declarations[0].id.type === "Identifier" &&
-        removable(statement.declarations[0].id.name) &&
-        hasNoSideEffects(statement.declarations[0].init as Node | null)
-      ) {
-        const { id } = statement.declarations[0];
-        if (id.type === "Identifier") {
-          candidates.push({
-            name: id.name,
-            start: statement.start,
-            end: statement.end,
-            own: new Set([id as Node]),
-          });
-        }
+    }
+  }
+  return candidates;
+}
+
+/** Subtracts `removed`'s counts from `reads`. */
+function subtractReads(
+  reads: Map<string, number>,
+  removed: ReadonlyMap<string, number>,
+): void {
+  for (const [name, count] of removed) {
+    const left = (reads.get(name) ?? 0) - count;
+    if (left > 0) reads.set(name, left);
+    else reads.delete(name);
+  }
+}
+
+/**
+ * The clean-up after the edits, from one parse: with `drop`, removes
+ * top-level `$: x = …`, `const x = …` and `let x = …` (not props) that
+ * nothing reads, when their right-hand side has no side effects (Svelte
+ * compiles `$:` into effects a minifier must keep, so this is the only way
+ * they go), repeating while removing one leaves another unread; with
+ * `silence`, marks props nothing reads anymore (see `unusedPropMarks`).
+ */
+function cleanUp(
+  input: MappedText,
+  drop: boolean,
+  silence: boolean,
+): { mapped: MappedText; dropped: number } {
+  if (!drop && !silence) return { mapped: input, dropped: 0 };
+  const ast = parse(input.text, { comments: false });
+  const statements = (ast.instance?.content.body ?? []) as Node[];
+  const candidates = drop ? removableDeclarations(statements) : [];
+  const owned = new Set(candidates.flatMap((candidate) => [...candidate.own]));
+  // A declaration's own reads (`$: x = x + 1`) count: only `owned` nodes
+  // (the declared names) are left out.
+  const reads = countReads(ast, owned);
+  const propReads = silence ? countReads(ast, new Set(), false) : undefined;
+
+  const removed: Candidate[] = [];
+  let remaining = candidates;
+  for (let pass = 0; pass < MAX_CLEANUP_PASSES; pass++) {
+    const unused = remaining.filter((candidate) => !reads.has(candidate.name));
+    if (unused.length === 0) break;
+    for (const candidate of unused) {
+      removed.push(candidate);
+      subtractReads(reads, countReads(candidate.statement, owned));
+      if (propReads) {
+        subtractReads(
+          propReads,
+          countReads(candidate.statement, new Set(), false),
+        );
       }
     }
-    if (candidates.length === 0) break;
-
-    const reads = countReads(
-      ast,
-      new Set(candidates.flatMap((c) => [...c.own])),
-    );
-
-    // Count a declaration's own reads (`$: x = x + 1`) as reads too: only
-    // `owned` nodes (the declared names) are excluded above.
-    const unused = candidates.filter((c) => !reads.has(c.name));
-    if (unused.length === 0) break;
-    const removals: Splice[] = unused
-      .map(({ start, end }) => ({ start, end }))
-      .sort((a, b) => a.start - b.start);
-    mapped = splice(mapped, removals);
-    dropped += removals.length;
+    remaining = remaining.filter((candidate) => !unused.includes(candidate));
   }
-  return { mapped, dropped };
+
+  const edits: Splice[] = removed.map(({ statement }) => ({
+    start: (statement as unknown as Span).start,
+    end: (statement as unknown as Span).end,
+  }));
+  for (const start of propReads ? unusedPropMarks(statements, propReads) : []) {
+    edits.push({ start, end: start, text: IGNORE_UNUSED_PROP });
+  }
+  edits.sort((a, b) => a.start - b.start);
+  return { mapped: splice(input, edits), dropped: removed.length };
 }
