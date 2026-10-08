@@ -3,7 +3,27 @@ import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
 import { type AST, type Expression, isReference, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
-import { forEachNode, type Node, patternNames, rootName } from "./ast";
+import { forEachNode, lineAt, type Node, patternNames, rootName } from "./ast";
+
+/** Marks the names `pattern` binds as unknown, with why. */
+function markUnknown(
+  model: ComponentModel,
+  pattern: Node | null | undefined,
+  reason: string,
+): void {
+  const names = new Set<string>();
+  patternNames(pattern, names);
+  for (const name of names) markNameUnknown(model, name, reason);
+}
+
+function markNameUnknown(
+  model: ComponentModel,
+  name: string,
+  reason: string,
+): void {
+  model.unknownNames.add(name);
+  if (!model.unknownReasons.has(name)) model.unknownReasons.set(name, reason);
+}
 
 /** A top-level `function` declaration: some object, never re-bound. */
 export const FUNCTION_DECLARATION = "function";
@@ -35,6 +55,8 @@ export type ComponentModel = {
    * scope (a parameter, `{#each}` context, `let:`) the walk can't tell apart.
    */
   unknownNames: Set<string>;
+  /** Why each of `unknownNames` is unknown, for the report. */
+  unknownReasons: Map<string, string>;
   /** Local binding -> Carbon module key, for relative `.svelte` imports. */
   componentImports: Map<string, string>;
   /** Every other imported binding. */
@@ -182,6 +204,7 @@ export function buildComponentModel(
     declarations: new Map(),
     reactiveDeclarations: new WeakSet(),
     unknownNames: new Set(),
+    unknownReasons: new Map(),
     componentImports: new Map(),
     otherImports: new Set(),
     providedContexts: new Set(),
@@ -238,7 +261,9 @@ export function buildComponentModel(
   ]);
   const nested = nestedBindings(ast);
   for (const name of nested) {
-    if (topLevel.has(name)) model.unknownNames.add(name);
+    if (topLevel.has(name)) {
+      markNameUnknown(model, name, "is shadowed by a nested binding");
+    }
   }
 
   /** Names written after their declaration: a rest name among them is unusable. */
@@ -247,16 +272,28 @@ export function buildComponentModel(
     switch (node.type) {
       case "AssignmentExpression":
         if (!model.reactiveDeclarations.has(node)) {
-          patternNames(node.left, model.unknownNames);
+          markUnknown(
+            model,
+            node.left as Node,
+            `is assigned at line ${lineAt(code, node.start)}`,
+          );
           patternNames(node.left, written);
         }
         break;
       case "UpdateExpression":
-        patternNames(node.argument, model.unknownNames);
+        markUnknown(
+          model,
+          node.argument as Node,
+          `is updated at line ${lineAt(code, node.start)}`,
+        );
         patternNames(node.argument, written);
         break;
       case "BindDirective":
-        model.unknownNames.add(rootName(node.expression));
+        markNameUnknown(
+          model,
+          rootName(node.expression),
+          `is bound with \`bind:\` at line ${lineAt(code, node.start)}`,
+        );
         written.add(rootName(node.expression));
         break;
       case "CallExpression":
@@ -324,7 +361,11 @@ function readTopLevelStatement(
         continue;
       }
       if (declarator.id.type !== "Identifier") {
-        patternNames(declarator.id, model.unknownNames);
+        markUnknown(
+          model,
+          declarator.id as Node,
+          "is declared by destructuring",
+        );
         continue;
       }
       // `$state(x)`, `$state.raw(x)` and `$derived(x)` hold `x`; any
@@ -453,19 +494,27 @@ function isLengthRead(
  */
 function readPropsRune(model: ComponentModel, pattern: Node): void {
   if (pattern.type !== "ObjectPattern") {
-    patternNames(pattern, model.unknownNames);
+    markUnknown(model, pattern, "holds every prop (`$props()`)");
     return;
   }
   for (const property of pattern.properties) {
     if (property.type === "RestElement") {
-      patternNames(property.argument as Node, model.unknownNames);
+      markUnknown(
+        model,
+        property.argument as Node,
+        "is the rest of `$props()`",
+      );
       if (property.argument.type === "Identifier") {
         model.restPropsName = property.argument.name;
       }
       continue;
     }
     if (property.computed) {
-      patternNames(property.value as Node, model.unknownNames);
+      markUnknown(
+        model,
+        property.value as Node,
+        "has a computed `$props()` key",
+      );
       continue;
     }
     const passedAs =
@@ -480,7 +529,7 @@ function readPropsRune(model: ComponentModel, pattern: Node): void {
         ? [value.left as Node, value.right as Expression]
         : [value, null];
     if (passedAs === undefined || local.type !== "Identifier") {
-      patternNames(value, model.unknownNames);
+      markUnknown(model, value, "is a nested `$props()` pattern");
       continue;
     }
     const bindable = runeCall(fallback);

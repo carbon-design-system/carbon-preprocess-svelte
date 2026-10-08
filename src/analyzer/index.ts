@@ -22,7 +22,7 @@ import {
 } from "./call-sites";
 import { type SourceMap, toSourceMap } from "./mapped-text";
 import { type SpecializeOptions, specializeComponent } from "./specialize";
-import { formatValue } from "./values";
+import { formatValue, UNKNOWN } from "./values";
 
 export type PropAwareResult = PropAwareUsage & {
   analysis: UsageAnalysis;
@@ -247,14 +247,33 @@ function formatCallSites(result: PropAwareResult, root: string): string[] {
       lines.push(`      every variant kept: ${open.reason ?? "open"}${where}`);
       continue;
     }
+    if (usage.open) {
+      lines.push(`      every variant kept: ${usage.openReason ?? "open"}`);
+      continue;
+    }
     const propNames = new Set(
       usage.appSites.flatMap((site) => [...site.props.keys()]),
     );
+    const why = (prop: string) => {
+      const reason = usage.unknownBecause.get(prop);
+      return reason ? `: ${reason}` : "";
+    };
     for (const prop of [...propNames].sort()) {
       const value = usage.props.get(prop);
       if (value === undefined) continue;
       const omitted = usage.omitted.has(prop) ? " (+ default)" : "";
-      lines.push(`      ${prop.padEnd(16)} ${formatValue(value)}${omitted}`);
+      const reason = value === UNKNOWN ? why(prop) : "";
+      lines.push(
+        `      ${prop.padEnd(16)} ${formatValue(value)}${omitted}${reason}`,
+      );
+    }
+    // Props the app doesn't pass that something else leaves unknown.
+    for (const [prop, value] of [...usage.props].sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
+      if (propNames.has(prop) || value !== UNKNOWN) continue;
+      if (!usage.unknownBecause.has(prop)) continue;
+      lines.push(`      ${prop.padEnd(16)} dynamic${why(prop)}`);
     }
   }
   return lines;

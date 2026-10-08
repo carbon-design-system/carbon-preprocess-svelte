@@ -116,8 +116,11 @@ export function isPropsObject(name: string, scope: Scope): boolean {
   );
 }
 
-/** A key of `$$props`: the values sites pass, and whether some site leaves it out. */
-export type PassedProp = { value: Value; maybeAbsent: boolean };
+/**
+ * A key of `$$props`: the values sites pass, whether some site leaves it
+ * out, and why it's unknown when it is.
+ */
+export type PassedProp = { value: Value; maybeAbsent: boolean; why?: string };
 
 /**
  * What `$$props` holds (or `$$restProps`, with `rest`: only the keys the
@@ -134,7 +137,11 @@ export function passedProps(
   const props = new Map<string, PassedProp>();
   for (const [key, value] of usage.props) {
     if (declared.has(key)) continue;
-    props.set(key, { value, maybeAbsent: usage.omitted.has(key) });
+    props.set(key, {
+      value,
+      maybeAbsent: usage.omitted.has(key),
+      why: usage.unknownBecause.get(key),
+    });
   }
   return props;
 }
@@ -148,6 +155,88 @@ export function spreadProps(
     return undefined;
   }
   return passedProps(scope, argument.name !== "$$props");
+}
+
+const MAX_WHY_DEPTH = 8;
+const PATH_SEPARATOR = /[\\/]/;
+const MAX_SNIPPET = 40;
+
+/** `node`'s source, shortened for a report line. */
+function snippet(node: Node | Expression, scope: Scope): string {
+  const { start, end } = node as unknown as { start: number; end: number };
+  const text = scope.model.code.slice(start, end).replace(/\s+/g, " ");
+  return text.length > MAX_SNIPPET
+    ? `${text.slice(0, MAX_SNIPPET - 1)}…`
+    : text;
+}
+
+/**
+ * Why `node` evaluates to unknown under `scope`, for the report: the
+ * first part of it the analysis can't read. `undefined` when it's known.
+ */
+export function whyUnknown(
+  node: Node | Expression,
+  scope: Scope,
+  depth = 0,
+): string | undefined {
+  if (depth > MAX_WHY_DEPTH || evaluate(node, scope) !== UNKNOWN) {
+    return undefined;
+  }
+  const inner = (child: Node | Expression | null | undefined) =>
+    child ? whyUnknown(child, scope, depth + 1) : undefined;
+  switch (node.type) {
+    case "Identifier":
+      return whyNameUnknown(node.name, scope, depth);
+    case "CallExpression":
+      return `calls \`${snippet(node.callee as Expression, scope)}()\``;
+    case "MemberExpression":
+      return `reads \`${snippet(node, scope)}\``;
+    case "TemplateLiteral":
+      for (const expression of node.expressions) {
+        const why = inner(expression as Expression);
+        if (why) return why;
+      }
+      break;
+    case "BinaryExpression":
+    case "LogicalExpression":
+      return inner(node.left as Expression) ?? inner(node.right);
+    case "ConditionalExpression":
+      return (
+        inner(node.test) ?? inner(node.consequent) ?? inner(node.alternate)
+      );
+    case "UnaryExpression":
+      return inner(node.argument);
+    case "ChainExpression":
+      return inner(node.expression);
+  }
+  return `\`${snippet(node, scope)}\` isn't read by the analysis`;
+}
+
+function whyNameUnknown(name: string, scope: Scope, depth: number): string {
+  const { model, usage } = scope;
+  const component = model.key.split(PATH_SEPARATOR).pop() ?? model.key;
+  const reason = model.unknownReasons.get(name);
+  if (reason) return `\`${name}\` ${reason}`;
+  if (model.props.has(name)) {
+    if (usage.open) {
+      return `\`${name}\` is a prop of ${component}, which is rendered with any props${usage.openReason ? ` (${usage.openReason})` : ""}`;
+    }
+    const passedAs = model.propNames.get(name) ?? name;
+    const because = usage.unknownBecause.get(passedAs);
+    return because
+      ? `\`${name}\` comes from ${because}`
+      : `\`${name}\` is passed a value the analysis can't read`;
+  }
+  const declaration = model.declarations.get(name);
+  if (declaration && declaration !== FUNCTION_DECLARATION) {
+    const why = whyUnknown(declaration, scope, depth + 1);
+    if (why) return `\`${name}\`: ${why}`;
+  }
+  if (model.otherImports.has(name)) return `\`${name}\` is imported`;
+  if (name.startsWith("$") && !name.startsWith("$$")) {
+    return `\`${name}\` reads a store`;
+  }
+  return `\`${name}\` isn't declared in ${component}`;
 }
 
 /** Every value `node` can evaluate to under `scope`. */
