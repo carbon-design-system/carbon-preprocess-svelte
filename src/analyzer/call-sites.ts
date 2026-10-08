@@ -6,7 +6,12 @@ import { readCarbonExports } from "../indexer/carbon-exports";
 import { parse } from "../indexer/parser";
 import { childNodes, lineAt, type Node } from "./ast";
 import { buildComponentModel, type ComponentModel } from "./component-model";
-import { createScope, evaluate } from "./evaluate";
+import {
+  createScope,
+  evaluate,
+  type PassedProp,
+  spreadProps,
+} from "./evaluate";
 import { callSiteFromElement } from "./live-walk";
 import { type CallSite, type ComponentUsage, newComponentUsage } from "./usage";
 import {
@@ -373,7 +378,10 @@ function appEvaluator(
   file: string,
   objects: Set<string>,
   options: SvelteUsageOptions,
-): (expression: Expression) => Value {
+): {
+  value: (expression: Expression) => Value;
+  spread: (argument: Expression) => Map<string, PassedProp> | undefined;
+} {
   let scope: ReturnType<typeof createScope> | undefined;
   try {
     const model =
@@ -387,14 +395,18 @@ function appEvaluator(
   } catch {
     scope = undefined;
   }
-  return (expression) => {
-    // A component passed as a prop (`icon={Add}`) is an object.
-    if (expression.type === "Identifier" && objects.has(expression.name)) {
-      return possible(OBJECT);
-    }
-    return scope
-      ? evaluate(expression, scope)
-      : staticValue(expression, objects);
+  return {
+    value: (expression) => {
+      // A component passed as a prop (`icon={Add}`) is an object.
+      if (expression.type === "Identifier" && objects.has(expression.name)) {
+        return possible(OBJECT);
+      }
+      return scope
+        ? evaluate(expression, scope)
+        : staticValue(expression, objects);
+    },
+    // A wrapper's `{...$$restProps}`: what its own call sites pass.
+    spread: (argument) => (scope ? spreadProps(argument, scope) : undefined),
   };
 }
 
@@ -519,7 +531,7 @@ export function collectSvelteUsage(
   };
   const rendered = new Set<string>();
   const line = (node: { start: number }) => lineAt(code, node.start);
-  const propValue = appEvaluator(code, ast, file, bindings.objects, options);
+  const props = appEvaluator(code, ast, file, bindings.objects, options);
 
   const visit = (node: Node, parent: Node | null): void => {
     switch (node.type) {
@@ -535,7 +547,12 @@ export function collectSvelteUsage(
           : bindings.components.get(node.name);
         if (key) {
           rendered.add(member ? namespace : node.name);
-          const site = callSiteFromElement(node, key, propValue);
+          const site = callSiteFromElement(
+            node,
+            key,
+            props.value,
+            props.spread,
+          );
           if (isAppComponent(key)) passSnippets(node, site);
           site.location = { file, line: line(node) };
           usage.sites.push(site);
@@ -545,7 +562,12 @@ export function collectSvelteUsage(
 
       case "SvelteSelf":
         if (apps) {
-          const site = callSiteFromElement(node, file, propValue);
+          const site = callSiteFromElement(
+            node,
+            file,
+            props.value,
+            props.spread,
+          );
           passSnippets(node, site);
           site.location = { file, line: line(node) };
           usage.sites.push(site);

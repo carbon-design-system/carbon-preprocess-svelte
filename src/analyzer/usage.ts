@@ -24,7 +24,10 @@ export type ComponentUsage = {
   open: boolean;
   /** Values seen per prop, across the sites that pass it. */
   props: Map<string, Value>;
-  /** Props some site leaves out, so their default applies too. */
+  /**
+   * Props some site leaves out: a declared prop's default applies there,
+   * and an undeclared key (`$$restProps`) is absent.
+   */
   omitted: Set<string>;
   /**
    * Per slot name, `$$slots[name]` across sites: `true` where it's filled,
@@ -76,7 +79,13 @@ export function addCallSite(
     changed = true;
   }
 
+  /** Keys earlier sites passed: a key first seen here was absent there. */
+  const seen = new Set(usage.props.keys());
   for (const [name, value] of site.props) {
+    if (usage.siteCount > 0 && !seen.has(name) && !usage.omitted.has(name)) {
+      usage.omitted.add(name);
+      changed = true;
+    }
     const before = usage.props.get(name);
     const after = before === undefined ? value : join(before, value);
     if (!sameValue(before, after)) {
@@ -84,7 +93,8 @@ export function addCallSite(
       changed = true;
     }
   }
-  for (const name of propNames) {
+  // Declared props and every key some site passes: absent here.
+  for (const name of [...propNames, ...seen]) {
     if (!(site.props.has(name) || usage.omitted.has(name))) {
       usage.omitted.add(name);
       changed = true;

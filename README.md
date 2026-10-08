@@ -411,13 +411,14 @@ What it reads:
 | Constants, and state no code reassigns | `const kind = "ghost"`, `let size = $state("small")` |
 | Your own wrapper components | `<ActionButton primary>` reaching `<Button kind={primary ? "tertiary" : "ghost"}>` |
 | Props Carbon passes to its own children | `Modal` rendering `Button` |
+| Props a component forwards to a child | `{...$$restProps}`, or `...rest` from `$props()` |
 
 What keeps every variant (it errs toward keeping styles):
 
 | Case | Example |
 | :--- | :--- |
 | A value it can't read | a reassigned variable, a store, a function call |
-| `bind:` or a spread | `bind:open`, `{...props}` |
+| `bind:`, or spreading anything but a component's own props | `bind:open`, `{...props}` |
 | A component used as a value | `<svelte:component this={Button}>`, passed as a prop, imported in a `.js`/`.ts` file |
 | Markup it can't see | imported but never rendered as a tag (another preprocessor's output) |
 | A wrapper rendered from outside the analyzed files | a route or entry the framework mounts, a `$lib/` alias, `import.meta.glob` |
