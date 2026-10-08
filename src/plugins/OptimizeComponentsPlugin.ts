@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   createComponentOptimizer,
+  type ImportResolver,
   type OptimizeComponentsOptions,
 } from "./component-optimizer";
 import { optimizerRegistry } from "./optimizer-registry";
@@ -58,6 +59,17 @@ type WebpackCompiler = {
     };
   };
   getInfrastructureLogger(name: string): { info(message: string): void };
+  resolverFactory?: {
+    get(type: "normal"): {
+      resolve(
+        context: object,
+        path: string,
+        request: string,
+        resolveContext: object,
+        callback: (error: Error | null, result?: string | false) => void,
+      ): void;
+    };
+  };
 };
 
 const NAME = "OptimizeComponentsPlugin";
@@ -74,6 +86,34 @@ const LOADER = (() => {
 })();
 
 let nextId = 0;
+
+/** The compiler's resolver, for aliased imports; `undefined` if it has none. */
+function resolveWith(compiler: WebpackCompiler): ImportResolver | undefined {
+  let resolver: ReturnType<
+    NonNullable<WebpackCompiler["resolverFactory"]>["get"]
+  >;
+  try {
+    const factory = compiler.resolverFactory;
+    if (!factory) return undefined;
+    resolver = factory.get("normal");
+  } catch {
+    return undefined;
+  }
+  return (source, importer) =>
+    new Promise((resolve) => {
+      try {
+        resolver.resolve(
+          {},
+          path.dirname(importer),
+          source,
+          {},
+          (error, result) => resolve(error || !result ? undefined : result),
+        );
+      } catch {
+        resolve(undefined);
+      }
+    });
+}
 
 /**
  * `optimizeComponents` for webpack and Rspack: rewrites
@@ -112,7 +152,10 @@ export class OptimizeComponentsPlugin {
 
     let warning: string | undefined;
     const prepare = async () => {
-      const result = await optimizer.prepare(compiler.context);
+      const result = await optimizer.prepare(
+        compiler.context,
+        resolveWith(compiler),
+      );
       warning = result.warning;
       if (result.info) compiler.getInfrastructureLogger(NAME).info(result.info);
       for (const line of result.report ?? []) console.log(line);

@@ -300,6 +300,8 @@ export async function specializeFiles(input: {
   projectRoot: string;
   files: Array<{ file: string; code: string }>;
   options?: SpecializeOptions;
+  /** Aliased `.svelte` imports the bundler resolved, by `importKey`. */
+  resolvedImports?: ReadonlyMap<string, string>;
 }): Promise<SpecializedComponents | { warning: string }> {
   let carbon: CarbonComponents;
   try {
@@ -309,7 +311,7 @@ export async function specializeFiles(input: {
   }
   let appUsage: AppUsage;
   try {
-    appUsage = collectAppUsage(input.files, carbon);
+    appUsage = collectAppUsage(input.files, carbon, input.resolvedImports);
   } catch (error) {
     return { warning: failure(error, SPECIALIZE_FAILURE) };
   }

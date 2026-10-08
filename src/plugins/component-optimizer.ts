@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { SpecializedComponents } from "../analyzer";
+import { importKey } from "../analyzer/import-key";
 import { CarbonSvelte, LOG_PREFIX, RE_EXT_STYLESHEET } from "../constants";
 import { installedMajor } from "../indexer/resolve-carbon-root";
 import { isCarbonSvelteImport, stripQuery } from "../utils";
@@ -94,6 +95,52 @@ function realpath(file: string): string | undefined {
   }
 }
 
+/** Resolves `source` imported from `importer` to a file, as the bundler would. */
+export type ImportResolver = (
+  source: string,
+  importer: string,
+) => Promise<string | undefined>;
+
+/** `from "$lib/Card.svelte"`: a non-relative `.svelte` import. */
+const ALIAS_SVELTE_IMPORT =
+  /\b(?:from|import)\s*["']([^"'./][^"']*\.svelte)["']/g;
+
+/**
+ * Resolves the non-relative `.svelte` imports in `files` (aliases like
+ * `$lib/Card.svelte`) with the bundler, keeping those that land on one of
+ * `files`, by `importKey`.
+ */
+async function resolveAliases(
+  files: Array<{ file: string; code: string }>,
+  resolve: ImportResolver,
+): Promise<Map<string, string>> {
+  const byRealPath = new Map(
+    files.map(({ file }) => [realpath(file) ?? file, file] as const),
+  );
+  const resolved = new Map<string, string>();
+  const pending: Array<Promise<void>> = [];
+  for (const { file, code } of files) {
+    if (!code.includes(".svelte")) continue;
+    for (const match of code.matchAll(ALIAS_SVELTE_IMPORT)) {
+      const source = match[1];
+      if (isCarbonSvelteImport(source)) continue;
+      pending.push(
+        resolve(source, file).then(
+          (id) => {
+            if (!id) return;
+            const target = stripQuery(id);
+            const match = byRealPath.get(realpath(target) ?? target);
+            if (match) resolved.set(importKey(file, source), match);
+          },
+          () => {},
+        ),
+      );
+    }
+  }
+  await Promise.all(pending);
+  return resolved;
+}
+
 /** A rewritten Carbon component, as a bundler's `load` returns it. */
 export type RewrittenSource =
   SpecializedComponents["sources"] extends Map<string, infer Source>
@@ -139,6 +186,8 @@ export function createComponentOptimizer(
     /** Analyzes `content` under `root`; call before each build. */
     async prepare(
       root: string,
+      /** The bundler's resolver, for aliased imports (`$lib/X.svelte`). */
+      resolve?: ImportResolver,
     ): Promise<{ warning?: string; info?: string; report?: string[] }> {
       sources = new Map();
       analyzed.clear();
@@ -162,6 +211,13 @@ export function createComponentOptimizer(
         analyzed.add(realpath(absolute) ?? absolute);
       }
 
+      const resolvedImports = resolve
+        ? await resolveAliases(files, resolve)
+        : undefined;
+      for (const [key, file] of resolvedImports ?? []) {
+        hash.update(`${key}\0${file}\0`);
+      }
+
       const digest = hash.digest("hex");
       if (last?.hash !== digest) {
         // Loaded lazily: builds without this plugin never evaluate the analyzer.
@@ -171,6 +227,7 @@ export function createComponentOptimizer(
           result: await specializeFiles({
             projectRoot: root,
             files,
+            resolvedImports,
             options: {
               unwrap:
                 options?.unwrap ?? (installedMajor("svelte", root) ?? 0) >= 5,

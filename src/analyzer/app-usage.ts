@@ -39,6 +39,8 @@ export type AppUsage = {
 export function collectAppUsage(
   files: Iterable<{ file: string; code: string }>,
   carbon: CarbonComponents,
+  /** Aliased `.svelte` imports the bundler resolved; see `AppComponents`. */
+  resolved?: ReadonlyMap<string, string>,
 ): AppUsage {
   const sources = new Map<string, string>();
   const others: Array<{ file: string; code: string }> = [];
@@ -46,7 +48,7 @@ export function collectAppUsage(
     if (entry.file.endsWith(".svelte")) sources.set(entry.file, entry.code);
     else others.push(entry);
   }
-  const apps = indexAppComponents(sources.keys());
+  const apps = indexAppComponents(sources.keys(), resolved);
 
   const models = new Map<string, ComponentModel | null>();
   const modelOf = (key: string): ComponentModel | null => {

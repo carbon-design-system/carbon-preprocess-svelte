@@ -13,6 +13,7 @@ import {
   spreadProps,
   whyUnknown,
 } from "./evaluate";
+import { importKey } from "./import-key";
 import { callSiteFromElement } from "./live-walk";
 import { type CallSite, type ComponentUsage, newComponentUsage } from "./usage";
 import {
@@ -64,9 +65,17 @@ export type AppComponents = {
   files: ReadonlySet<string>;
   /** File name -> files, for imports through an alias (`$lib/X.svelte`). */
   byName: ReadonlyMap<string, string[]>;
+  /**
+   * Non-relative imports the bundler resolved to one of `files`, by
+   * `importKey(from, source)`: `$lib/X.svelte` resolves exactly then.
+   */
+  resolved?: ReadonlyMap<string, string>;
 };
 
-export function indexAppComponents(files: Iterable<string>): AppComponents {
+export function indexAppComponents(
+  files: Iterable<string>,
+  resolved?: ReadonlyMap<string, string>,
+): AppComponents {
   const byName = new Map<string, string[]>();
   const set = new Set<string>();
   for (const file of files) {
@@ -74,7 +83,7 @@ export function indexAppComponents(files: Iterable<string>): AppComponents {
     const name = path.basename(file);
     byName.set(name, [...(byName.get(name) ?? []), file]);
   }
-  return { files: set, byName };
+  return { files: set, byName, resolved };
 }
 
 /** Whether `key` names an app component (an absolute path), not a Carbon one. */
@@ -98,6 +107,10 @@ function resolveAppImport(
   }
   if (!source.endsWith(".svelte") || source.startsWith(SRC_PREFIX)) {
     return undefined;
+  }
+  const resolved = apps.resolved?.get(importKey(from, source));
+  if (resolved && apps.files.has(resolved)) {
+    return { keys: [resolved], exact: true };
   }
   const keys = apps.byName.get(path.posix.basename(source));
   return keys ? { keys, exact: false } : undefined;

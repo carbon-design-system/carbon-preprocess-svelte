@@ -4,6 +4,7 @@ import { optimizeComponents } from "../src/plugins/optimize-components";
 import { createFakeProject } from "./helpers/fake-project";
 
 type Context = {
+  resolve: (source: string, importer: string) => Promise<{ id: string } | null>;
   warn: jest.Mock;
   info: jest.Mock;
   error: (message: string) => never;
@@ -28,8 +29,10 @@ type GraphContext = {
   } | null;
 };
 
-function context(): Context & GraphContext {
+function context(aliases: Record<string, string> = {}): Context & GraphContext {
   return {
+    resolve: async (source) =>
+      aliases[source] ? { id: aliases[source] } : null,
     getModuleIds: () => [][Symbol.iterator](),
     getModuleInfo: () => null,
     warn: jest.fn(),
@@ -261,6 +264,36 @@ describe("optimizeComponents", () => {
       expect(() => plugin.buildEnd.call(graph([app, other]))).toThrow(
         WRAPPER_ESCAPED,
       );
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("follows a wrapper imported through an alias the bundler resolves", async () => {
+    const { project, carbon, plugin } = setUp(
+      `<script>import Card from "$lib/Card.svelte";</script>\n<Card tone="danger" />`,
+      { silent: true },
+    );
+    try {
+      const lib = path.join(project.root, "src", "lib");
+      mkdirSync(lib);
+      const card = path.join(lib, "Card.svelte");
+      writeFileSync(
+        card,
+        `<script>${IMPORT_BUTTON}\nexport let tone = "primary";</script>\n<Button kind={tone} />`,
+      );
+      writeFileSync(
+        path.join(project.root, "src", "main.ts"),
+        `import App from "./App.svelte";`,
+      );
+      const button = path.join(carbon, "src/Button/Button.svelte");
+
+      await plugin.buildStart.call(context({ "$lib/Card.svelte": card }));
+      expect(plugin.load(button)?.code).toContain(`"bx--btn--danger"`);
+
+      // Unresolved, the alias can't be told apart: every kind stays.
+      await plugin.buildStart.call(context());
+      expect(plugin.load(button)?.code).not.toContain(`"bx--btn--danger"`);
     } finally {
       project.dispose();
     }

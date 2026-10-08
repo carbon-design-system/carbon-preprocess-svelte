@@ -421,9 +421,9 @@ What keeps every variant (it errs toward keeping styles):
 | `bind:`, or spreading anything but a component's own props | `bind:open`, `{...props}` |
 | A component used as a value | `<svelte:component this={Button}>`, passed as a prop, imported in a `.js`/`.ts` file |
 | Markup it can't see | imported but never rendered as a tag (another preprocessor's output) |
-| A wrapper rendered from outside the analyzed files | a route or entry the framework mounts, a `$lib/` alias, `import.meta.glob` |
+| A wrapper rendered from outside the analyzed files | a route or entry the framework mounts, `import.meta.glob` |
 
-If the analysis fails, the build warns and prunes without it. To tune it:
+Imports through an alias (`#lib/Card.svelte` in SvelteKit 3, `$lib/Card.svelte` before it) are resolved with the bundler's own resolver. Without a bundler (`optimizeCarbonCss`, the CLI), a component imported through an alias renders with any props. If the analysis fails, the build warns and prunes without it. To tune it:
 
 ```js
 optimizeCss({
