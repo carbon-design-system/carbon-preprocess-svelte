@@ -44,7 +44,7 @@
   } from "carbon-components-svelte";
   import Close from "carbon-components-svelte/src/icons/Close.svelte";
   import Copy from "carbon-components-svelte/src/icons/Copy.svelte";
-  import ActionButton from "../lib/ActionButton.svelte";
+  import ActionButton from "#lib/ActionButton.svelte";
 
   const regions = [
     { id: "us-east", text: "US East" },

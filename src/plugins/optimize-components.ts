@@ -41,7 +41,11 @@ export const optimizeComponents = (
       root = config.root;
     },
     async buildStart() {
-      const { warning, info, report } = await optimizer.prepare(root);
+      const { warning, info, report } = await optimizer.prepare(
+        root,
+        async (source, importer) =>
+          (await this.resolve(source, importer, { skipSelf: true }))?.id,
+      );
       if (warning) this.warn(warning);
       if (info) this.info?.(info);
       for (const line of report ?? []) console.log(line);
