@@ -1,3 +1,10 @@
+export type {
+  MarkdownHeading,
+  MarkdownOptions,
+  MarkdownRenderers,
+  MarkdownTree,
+  RenderContext,
+} from "./markdown/compile";
 export {
   type CarbonBunOptions,
   type CarbonBunPlugin,
@@ -18,4 +25,5 @@ export {
 export { optimizeCss } from "./plugins/optimize-css";
 export type { OptimizeCssOptions } from "./plugins/options";
 export type { SafelistEntry } from "./plugins/safelist";
+export { markdown } from "./preprocessors/markdown";
 export { optimizeImports } from "./preprocessors/optimize-imports";
