@@ -1,8 +1,14 @@
 import type { AST, Expression } from "sveast/walk";
 import { extractCarbonClassTokens } from "../indexer/extract-runtime-classes";
-import { childNodes, type Node } from "./ast";
+import { childNodes, lineAt, type Node } from "./ast";
 import { UnsupportedComponentError } from "./component-model";
-import { evaluate, type PassedProp, type Scope, spreadProps } from "./evaluate";
+import {
+  evaluate,
+  type PassedProp,
+  type Scope,
+  spreadProps,
+  whyUnknown,
+} from "./evaluate";
 import type { CallSite } from "./usage";
 import {
   isEmptyArray,
@@ -180,11 +186,16 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
       }
       if (key) {
         result.childSites.push(
-          callSiteFromElement(
+          locateReason(
+            callSiteFromElement(
+              node,
+              key,
+              (expression) => evaluate(expression, scope),
+              (argument) => spreadProps(argument, scope),
+              explainAt(node, scope),
+            ),
             node,
-            key,
-            (expression) => evaluate(expression, scope),
-            (argument) => spreadProps(argument, scope),
+            scope,
           ),
         );
       }
@@ -198,12 +209,42 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
           scope.model.key,
           (expression) => evaluate(expression, scope),
           (argument) => spreadProps(argument, scope),
+          explainAt(node, scope),
         ),
       );
       break;
   }
 
   visitAll(childNodes(node), scope, result);
+}
+
+/** `Button.svelte:12`: where `node` is in the component `scope` walks. */
+function whereIn(node: { start: number }, scope: Scope): string {
+  return `${scope.model.key.split("/").pop()}:${lineAt(scope.model.code, node.start)}`;
+}
+
+/** Prefixes an open site's reason with where it is, for the report. */
+function locateReason(
+  site: CallSite,
+  node: { start: number },
+  scope: Scope,
+): CallSite {
+  if (site.open && site.reason) {
+    site.reason = `${whereIn(node, scope)} ${site.reason}`;
+  }
+  return site;
+}
+
+/** Explains unknown values at `node`, prefixed with where it is. */
+function explainAt(
+  node: { start: number },
+  scope: Scope,
+): (expression: Expression) => string | undefined {
+  const where = whereIn(node, scope);
+  return (expression) => {
+    const why = whyUnknown(expression, scope);
+    return why && `${where} ${why}`;
+  };
 }
 
 const MAX_ATTRIBUTE_VALUES = 32;
@@ -267,6 +308,27 @@ function filledSlots(fragment: AST.Fragment): Set<string> | null {
   return slots;
 }
 
+function whyOf(site: CallSite): Map<string, string> {
+  site.why ??= new Map();
+  return site.why;
+}
+
+/** Why an attribute's value is unknown: its first unknown expression. */
+function attributeWhy(
+  attribute: AST.Attribute,
+  explain: (expression: Expression) => string | undefined,
+): string | undefined {
+  const { value } = attribute;
+  if (value === true) return undefined;
+  const parts = Array.isArray(value) ? value : [value];
+  for (const part of parts) {
+    if (part.type === "Text") continue;
+    const why = explain(part.expression);
+    if (why) return why;
+  }
+  return undefined;
+}
+
 /**
  * A call site for `<Component …>`, its props evaluated by
  * `evaluateExpression`. `spread` gives the props a spread passes when it
@@ -278,6 +340,8 @@ export function callSiteFromElement(
   component: string,
   evaluateExpression: (expression: Expression) => Value,
   spread?: (argument: Expression) => Map<string, PassedProp> | undefined,
+  /** Why an expression is unknown, for the report. */
+  explain?: (expression: Expression) => string | undefined,
 ): CallSite {
   const site: CallSite = {
     component,
@@ -296,26 +360,37 @@ export function callSiteFromElement(
         }
         // Where the spread lacks a key, the value set before it stays,
         // or the prop isn't passed at all.
-        for (const [name, { value, maybeAbsent }] of props) {
+        for (const [name, { value, maybeAbsent, why }] of props) {
           if (name === "slot" || name.startsWith("--")) continue;
           const before = site.props.get(name);
           site.props.set(
             name,
             maybeAbsent ? join(before ?? UNDEFINED, value) : value,
           );
+          if (value === UNKNOWN && why) whyOf(site).set(name, why);
         }
         break;
       }
       case "Attribute":
         // `slot` places this element in its parent; `--x` sets a CSS variable.
         if (attribute.name === "slot" || attribute.name.startsWith("--")) break;
-        site.props.set(
-          attribute.name,
-          attributeValue(attribute, evaluateExpression),
-        );
+        {
+          const value = attributeValue(attribute, evaluateExpression);
+          site.props.set(attribute.name, value);
+          const why =
+            value === UNKNOWN && explain
+              ? attributeWhy(attribute, explain)
+              : undefined;
+          if (why) whyOf(site).set(attribute.name, why);
+        }
         break;
       case "BindDirective":
         site.props.set(attribute.name, UNKNOWN);
+        whyOf(site).set(
+          attribute.name,
+          explain?.(attribute.expression as Expression) ??
+            "is bound with `bind:`",
+        );
         break;
     }
   }

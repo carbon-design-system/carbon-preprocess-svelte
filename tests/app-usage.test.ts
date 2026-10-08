@@ -1,9 +1,11 @@
-import { analyzeFiles } from "../src/analyzer";
+import { analyzeFiles, specializeFiles } from "../src/analyzer";
 import { collectAppUsage } from "../src/analyzer/app-usage";
 import { readCarbonComponents } from "../src/analyzer/call-sites";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 
 const carbon = readCarbonComponents(resolveCarbonRoot());
+const KIND_REASSIGNED =
+  /kind +dynamic: Card\.svelte:5 `kind` is assigned at line 3/;
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 const MAIN = {
   file: "/app/src/main.ts",
@@ -209,5 +211,24 @@ describe("props a component spreads into its children", () => {
     expect(
       await buttonKinds([MAIN, appRendering(`<Card kind="danger" />`), card]),
     ).toEqual(["danger"]);
+  });
+});
+
+describe("why a value is unknown", () => {
+  test("the report says where and why a prop lost its value", async () => {
+    const card = {
+      file: "/app/src/Card.svelte",
+      code: `<script>${IMPORT_BUTTON}
+let kind = "ghost";
+const pick = (next) => (kind = next);
+</script>
+<Button {kind} on:click={() => pick("danger")} />`,
+    };
+    const result = await specializeFiles({
+      projectRoot: process.cwd(),
+      files: [MAIN, appRendering(`<Card />`), card],
+    });
+    if ("warning" in result) throw new Error(result.warning);
+    expect(result.report().join("\n")).toMatch(KIND_REASSIGNED);
   });
 });

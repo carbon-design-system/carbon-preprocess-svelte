@@ -17,6 +17,8 @@ export type CallSite = {
   location?: { file: string; line: number };
   /** Why the site is `open`, for the report. */
   reason?: string;
+  /** Why each prop the site passes as unknown is unknown, for the report. */
+  why?: Map<string, string>;
 };
 
 /** Every call site of one component, merged. */
@@ -38,6 +40,10 @@ export type ComponentUsage = {
   siteCount: number;
   /** App call sites, for the report. */
   appSites: CallSite[];
+  /** Why the usage is open: the first open site's reason. */
+  openReason?: string;
+  /** Why each unknown prop is unknown: the first site that made it so. */
+  unknownBecause: Map<string, string>;
 };
 
 export function newComponentUsage(): ComponentUsage {
@@ -49,6 +55,7 @@ export function newComponentUsage(): ComponentUsage {
     slotsUnknown: false,
     siteCount: 0,
     appSites: [],
+    unknownBecause: new Map(),
   };
 }
 
@@ -76,7 +83,11 @@ export function addCallSite(
 
   if (site.open && !usage.open) {
     usage.open = true;
+    usage.openReason = site.reason;
     changed = true;
+  }
+  for (const [name, why] of site.why ?? []) {
+    if (!usage.unknownBecause.has(name)) usage.unknownBecause.set(name, why);
   }
 
   /** Keys earlier sites passed: a key first seen here was absent there. */

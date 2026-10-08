@@ -436,7 +436,15 @@ optimizeCss({
 });
 ```
 
-`report: true` prints each component's prop values and why a call site kept every variant. The same options work on `OptimizeCssPlugin`, `optimizeCarbonCss` (which needs `content`), and the CLI (`--prop-aware`).
+`report: true` prints each component's prop values, and for each value it can't read, where and why it was lost:
+
+```
+Button (4 call sites)
+  kind             dynamic (+ default): Modal.svelte:279 reads `button.kind`
+DataTable (1 call site)
+  page             dynamic: App.svelte:231 `page` is bound with `bind:` at line 253
+```
+ The same options work on `OptimizeCssPlugin`, `optimizeCarbonCss` (which needs `content`), and the CLI (`--prop-aware`).
 
 Across 2,416 apps covering every Carbon component and prop value, it left 36% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](#optimizecomponents).
 

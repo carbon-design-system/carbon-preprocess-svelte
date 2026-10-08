@@ -11,6 +11,7 @@ import {
   evaluate,
   type PassedProp,
   spreadProps,
+  whyUnknown,
 } from "./evaluate";
 import { callSiteFromElement } from "./live-walk";
 import { type CallSite, type ComponentUsage, newComponentUsage } from "./usage";
@@ -381,6 +382,7 @@ function appEvaluator(
 ): {
   value: (expression: Expression) => Value;
   spread: (argument: Expression) => Map<string, PassedProp> | undefined;
+  explain: (expression: Expression) => string | undefined;
 } {
   let scope: ReturnType<typeof createScope> | undefined;
   try {
@@ -407,6 +409,8 @@ function appEvaluator(
     },
     // A wrapper's `{...$$restProps}`: what its own call sites pass.
     spread: (argument) => (scope ? spreadProps(argument, scope) : undefined),
+    explain: (expression) =>
+      scope ? whyUnknown(expression, scope) : "isn't a literal",
   };
 }
 
@@ -532,6 +536,12 @@ export function collectSvelteUsage(
   const rendered = new Set<string>();
   const line = (node: { start: number }) => lineAt(code, node.start);
   const props = appEvaluator(code, ast, file, bindings.objects, options);
+  const explainAt =
+    (node: { start: number }) =>
+    (expression: Expression): string | undefined => {
+      const why = props.explain(expression);
+      return why && `${path.basename(file)}:${line(node)} ${why}`;
+    };
 
   const visit = (node: Node, parent: Node | null): void => {
     switch (node.type) {
@@ -552,6 +562,7 @@ export function collectSvelteUsage(
             key,
             props.value,
             props.spread,
+            explainAt(node),
           );
           if (isAppComponent(key)) passSnippets(node, site);
           site.location = { file, line: line(node) };
@@ -567,6 +578,7 @@ export function collectSvelteUsage(
             file,
             props.value,
             props.spread,
+            explainAt(node),
           );
           passSnippets(node, site);
           site.location = { file, line: line(node) };
