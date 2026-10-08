@@ -1,3 +1,5 @@
+import type { Expression } from "sveast/walk";
+import type { Node } from "./ast";
 import {
   type CarbonComponents,
   collectSourceUsage,
@@ -7,12 +9,84 @@ import {
   type ModuleUsage,
 } from "./call-sites";
 import { buildComponentModel, type ComponentModel } from "./component-model";
+import { createScope, evaluate } from "./evaluate";
 import {
   addCallSite,
   type CallSite,
   type ComponentUsage,
   newComponentUsage,
 } from "./usage";
+import { isObject, UNKNOWN, type Value } from "./values";
+
+const MODULE_FILE = /\.[cm]?[jt]s$/;
+const TS_FILE = /\.[cm]?ts$/;
+const SCRIPT_END = /<\/script/i;
+
+/**
+ * The exported constants of the app's own JS/TS modules, read with the
+ * component model (as a module script). Only strings, numbers, booleans,
+ * `null` and `undefined`: an importer could change an exported object.
+ */
+function moduleConstants(
+  modules: ReadonlyArray<{ file: string; code: string }>,
+): Map<string, Map<string, Value>> {
+  const constants = new Map<string, Map<string, Value>>();
+  for (const { file, code } of modules) {
+    if (!MODULE_FILE.test(file) || !code.includes("export")) continue;
+    if (SCRIPT_END.test(code)) continue;
+    let model: ComponentModel;
+    try {
+      const lang = TS_FILE.test(file) ? ' lang="ts"' : "";
+      model = buildComponentModel(
+        `<script context="module"${lang}>\n${code}\n</script>`,
+        file,
+      );
+    } catch {
+      continue;
+    }
+    const usage = newComponentUsage();
+    usage.open = true;
+    const scope = createScope(model, usage, () => UNKNOWN);
+    const values = new Map<string, Value>();
+    for (const [exported, local] of exportedNames(model)) {
+      const value = evaluate(
+        { type: "Identifier", name: local } as Expression,
+        scope,
+      );
+      if (value === UNKNOWN || [...value].some(isObject)) continue;
+      values.set(exported, value);
+    }
+    if (values.size > 0) constants.set(file, values);
+  }
+  return constants;
+}
+
+/** `[exported name, local name]` for each `export const`/`export { … }`. */
+function exportedNames(model: ComponentModel): Array<[string, string]> {
+  const names: Array<[string, string]> = [];
+  for (const statement of (model.ast.module?.content.body ?? []) as Node[]) {
+    if (statement.type !== "ExportNamedDeclaration" || statement.source) {
+      continue;
+    }
+    const { declaration } = statement;
+    if (declaration?.type === "VariableDeclaration") {
+      for (const declarator of declaration.declarations) {
+        if (declarator.id.type === "Identifier") {
+          names.push([declarator.id.name, declarator.id.name]);
+        }
+      }
+    }
+    for (const specifier of statement.specifiers) {
+      if (
+        specifier.local.type === "Identifier" &&
+        specifier.exported.type === "Identifier"
+      ) {
+        names.push([specifier.exported.name, specifier.local.name]);
+      }
+    }
+  }
+  return names;
+}
 
 export type AppUsage = {
   /** Every module's Carbon call sites, ready for `analyzeUsage`. */
@@ -63,11 +137,13 @@ export function collectAppUsage(
     }
     return models.get(key) ?? null;
   };
+  const constants = moduleConstants(others);
   const collect = (key: string, usage?: ComponentUsage) =>
     collectSvelteUsage(sources.get(key) ?? "", key, carbon, {
       apps,
       usage,
       model: modelOf(key) ?? undefined,
+      constants,
     });
 
   // Which app components some analyzed file refers to at all; the rest are
