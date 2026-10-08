@@ -408,11 +408,12 @@ What it reads:
 | In your app | Example |
 | :--- | :--- |
 | Literal props | `<Button kind="ghost">` |
-| Constants, and state no code reassigns | `const kind = "ghost"`, `let size = $state("small")` |
+| Constants, and state no code reassigns | `const kind = "ghost"`, `let size = $state("small")`, or a string or number your own modules export: `import { KIND } from "./constants"` |
 | Your own wrapper components | `<ActionButton primary>` reaching `<Button kind={primary ? "tertiary" : "ghost"}>` |
 | Props Carbon passes to its own children | `Modal` rendering `Button` |
 | Props a component forwards to a child | `{...$$restProps}`, or `...rest` from `$props()` |
 | Object and array literals nothing changes | `secondaryButtons={[{ text: "Back", kind: "ghost" }]}`, read as `button.kind` in `{#each}` |
+| Your own `{#if}` and `{#each}` | a call site in a branch that can't render doesn't count |
 
 What keeps every variant (it errs toward keeping styles):
 

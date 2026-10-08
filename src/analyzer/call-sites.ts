@@ -4,9 +4,10 @@ import type { AST, Expression } from "sveast/walk";
 import { CarbonSvelte } from "../constants";
 import { readCarbonExports } from "../indexer/carbon-exports";
 import { parse } from "../indexer/parser";
-import { childNodes, lineAt, type Node } from "./ast";
+import { childNodes, forEachNode, lineAt, type Node } from "./ast";
 import { buildComponentModel, type ComponentModel } from "./component-model";
 import {
+  bindEach,
   createScope,
   evaluate,
   type PassedProp,
@@ -18,8 +19,10 @@ import { callSiteFromElement } from "./live-walk";
 import { type CallSite, type ComponentUsage, newComponentUsage } from "./usage";
 import {
   EMPTY_ARRAY,
+  isEmptyArray,
   OBJECT,
   possible,
+  truthOf,
   UNDEFINED,
   UNKNOWN,
   type Value,
@@ -396,6 +399,8 @@ function appEvaluator(
   value: (expression: Expression) => Value;
   spread: (argument: Expression) => Map<string, PassedProp> | undefined;
   explain: (expression: Expression) => string | undefined;
+  /** Binds an `{#each}`'s item while its body is read; returns the unbinding. */
+  bindEach: (node: Extract<Node, { type: "EachBlock" }>) => () => void;
 } {
   let scope: ReturnType<typeof createScope> | undefined;
   try {
@@ -406,7 +411,12 @@ function appEvaluator(
       usage = newComponentUsage();
       usage.open = true;
     }
-    scope = createScope(model, usage, () => UNKNOWN);
+    scope = createScope(
+      model,
+      usage,
+      () => UNKNOWN,
+      importedConstants(model, file, options.constants),
+    );
   } catch {
     scope = undefined;
   }
@@ -424,7 +434,51 @@ function appEvaluator(
     spread: (argument) => (scope ? spreadProps(argument, scope) : undefined),
     explain: (expression) =>
       scope ? whyUnknown(expression, scope) : "isn't a literal",
+    bindEach: (node) => (scope ? bindEach(node, scope) : () => {}),
   };
+}
+
+const MODULE_EXTENSIONS = [
+  "",
+  ".ts",
+  ".js",
+  ".mts",
+  ".mjs",
+  "/index.ts",
+  "/index.js",
+];
+
+/** The values `model` imports by name from the app's own modules. */
+function importedConstants(
+  model: ComponentModel,
+  file: string,
+  constants: ReadonlyMap<string, ReadonlyMap<string, Value>> | undefined,
+): Map<string, Value> {
+  const values = new Map<string, Value>();
+  if (!constants || constants.size === 0) return values;
+  for (const script of [model.ast.module, model.ast.instance]) {
+    for (const statement of (script?.content.body ?? []) as Node[]) {
+      if (statement.type !== "ImportDeclaration") continue;
+      const source = String(statement.source.value);
+      if (!source.startsWith(".")) continue;
+      const base = path.resolve(path.dirname(file), source);
+      const exports = MODULE_EXTENSIONS.map((ext) =>
+        constants.get(base + ext),
+      ).find(Boolean);
+      if (!exports) continue;
+      for (const specifier of statement.specifiers) {
+        if (
+          specifier.type !== "ImportSpecifier" ||
+          specifier.imported.type !== "Identifier"
+        ) {
+          continue;
+        }
+        const value = exports.get(specifier.imported.name);
+        if (value) values.set(specifier.local.name, value);
+      }
+    }
+  }
+  return values;
 }
 
 /** What `collectSvelteUsage` needs to follow props through app components. */
@@ -435,6 +489,8 @@ export type SvelteUsageOptions = {
   usage?: ComponentUsage;
   /** This component's model, if already built. */
   model?: ComponentModel;
+  /** Exported constants of the app's own modules, by file then name. */
+  constants?: ReadonlyMap<string, ReadonlyMap<string, Value>>;
 };
 
 const BLANK = /^\s*$/;
@@ -556,10 +612,55 @@ export function collectSvelteUsage(
       return why && `${path.basename(file)}:${line(node)} ${why}`;
     };
 
+  /** Marks the components a branch that can't render names, without sites. */
+  const markRendered = (node: Node | null | undefined): void => {
+    if (!node) return;
+    forEachNode(node, (inner) => {
+      if (inner.type === "Component") rendered.add(inner.name.split(".")[0]);
+      if (
+        inner.type === "Identifier" &&
+        (bindings.components.has(inner.name) ||
+          bindings.namespaces.has(inner.name))
+      ) {
+        rendered.add(inner.name);
+      }
+    });
+  };
+
   const visit = (node: Node, parent: Node | null): void => {
     switch (node.type) {
       case "ImportDeclaration":
         return;
+
+      // A branch that can't render passes nothing to what it holds.
+      case "IfBlock": {
+        visit(node.test, node);
+        const truth = truthOf(props.value(node.test));
+        if (truth === "falsy") markRendered(node.consequent as Node);
+        else visit(node.consequent as Node, node);
+        if (node.alternate) {
+          if (truth === "truthy") markRendered(node.alternate as Node);
+          else visit(node.alternate as Node, node);
+        }
+        return;
+      }
+
+      case "EachBlock": {
+        visit(node.expression, node);
+        if (isEmptyArray(props.value(node.expression))) {
+          markRendered(node.body as Node);
+        } else {
+          const unbind = props.bindEach(node);
+          try {
+            if (node.key) visit(node.key as Node, node);
+            visit(node.body as Node, node);
+          } finally {
+            unbind();
+          }
+        }
+        if (node.fallback) visit(node.fallback as Node, node);
+        return;
+      }
 
       case "Component": {
         const [namespace, member] = node.name.split(".");

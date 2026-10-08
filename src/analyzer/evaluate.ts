@@ -42,6 +42,8 @@ export type Scope = {
    * the component's own. Replaced, never mutated, while walking a body.
    */
   locals: ReadonlyMap<string, Value>;
+  /** Values of imported names, when known (the app's own constants). */
+  imported: ReadonlyMap<string, Value>;
 };
 
 const NO_LOCALS: ReadonlyMap<string, Value> = new Map();
@@ -50,6 +52,7 @@ export function createScope(
   model: ComponentModel,
   usage: ComponentUsage,
   context: ContextResolver,
+  imported: ReadonlyMap<string, Value> = NO_LOCALS,
 ): Scope {
   return {
     model,
@@ -58,6 +61,7 @@ export function createScope(
     memo: new Map(),
     pending: new Set(),
     locals: NO_LOCALS,
+    imported,
   };
 }
 
@@ -214,6 +218,8 @@ function resolve(name: string, scope: Scope): Value {
   if (model.declarations.has(name)) return UNDEFINED;
 
   if (model.componentImports.has(name)) return possible(OBJECT);
+  const imported = scope.imported.get(name);
+  if (imported && model.otherImports.has(name)) return imported;
 
   // `$store` reads a store's value: `undefined` only if the store itself is.
   if (name.startsWith("$") && !name.startsWith("$$") && name.length > 1) {

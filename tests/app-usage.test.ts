@@ -66,14 +66,13 @@ describe("props through the app's own components", () => {
     expect(
       await buttonKinds([MAIN, appRendering(`<Card>Save</Card>`), RUNES_CARD]),
     ).toEqual(["primary"]);
-    // App markup counts as rendering every call site it holds, live or not.
-    expect(
-      await buttonKinds([
-        MAIN,
-        appRendering(`<Card tone="ghost" />`),
-        RUNES_CARD,
-      ]),
-    ).toEqual(["ghost"]);
+    // No content: `children` is undefined, so `{#if children}` renders
+    // nothing and the Button has no call site at all.
+    const { modules } = collectAppUsage(
+      [MAIN, appRendering(`<Card tone="ghost" />`), RUNES_CARD],
+      carbon,
+    );
+    expect(modules.flatMap((module) => module.sites)).toEqual([]);
   });
 
   test("an app component the analyzed files never import renders with any props", async () => {
@@ -231,4 +230,94 @@ const pick = (next) => (kind = next);
     if ("warning" in result) throw new Error(result.warning);
     expect(result.report().join("\n")).toMatch(KIND_REASSIGNED);
   });
+});
+
+describe("branches in app markup", () => {
+  const app = (script: string, markup: string) => ({
+    file: "/app/src/App.svelte",
+    code: `<script>${IMPORT_BUTTON}\n${script}</script>\n${markup}`,
+  });
+
+  test("a call site in a branch that can't render doesn't count", async () => {
+    expect(
+      await buttonKinds([
+        MAIN,
+        app(
+          `const advanced = false;`,
+          `{#if advanced}<Button kind="danger" />{:else}<Button kind="ghost" />{/if}`,
+        ),
+      ]),
+    ).toEqual(["ghost"]);
+  });
+
+  test("a component only a dead branch renders isn't open", () => {
+    const { modules } = collectAppUsage(
+      [
+        MAIN,
+        app(
+          `import { Modal } from "carbon-components-svelte";`,
+          `{#if false}<Modal open />{/if}<Button kind="ghost" />`,
+        ),
+      ],
+      carbon,
+    );
+    const sites = modules.flatMap((module) => module.sites);
+    expect(sites.map((site) => [site.component, site.open])).toEqual([
+      ["Button/Button.svelte", false],
+    ]);
+  });
+
+  test("`{#each}` over an app literal reads its items", async () => {
+    expect(
+      await buttonKinds([
+        MAIN,
+        app(
+          `const actions = [{ label: "Save", kind: "ghost" }, { label: "Delete", kind: "danger" }];`,
+          `{#each actions as action}<Button kind={action.kind}>{action.label}</Button>{/each}`,
+        ),
+      ]),
+    ).toEqual(["danger", "ghost"]);
+  });
+});
+
+describe("constants imported from the app's own modules", () => {
+  const constants = {
+    file: "/app/src/lib/constants.ts",
+    code: `export const ACTION_KIND: "ghost" | "danger" = "ghost";
+export let mode = "danger";
+export function setMode(next: string) { mode = next; }
+export const DEFAULTS = { kind: "danger" };`,
+  };
+  const app = (imports: string, markup: string) => ({
+    file: "/app/src/App.svelte",
+    code: `<script>${IMPORT_BUTTON}\n${imports}</script>\n${markup}`,
+  });
+
+  test("a constant passes its value", async () => {
+    expect(
+      await buttonKinds([
+        MAIN,
+        constants,
+        app(
+          `import { ACTION_KIND } from "./lib/constants";`,
+          `<Button kind={ACTION_KIND} />`,
+        ),
+      ]),
+    ).toEqual(["ghost"]);
+  });
+
+  test.each([
+    [`import { mode } from "./lib/constants";`, `<Button kind={mode} />`],
+    [
+      `import { DEFAULTS } from "./lib/constants";`,
+      `<Button kind={DEFAULTS.kind} />`,
+    ],
+  ])(
+    "a reassigned export or an exported object stays unknown (%s)",
+    async (imports, markup) => {
+      expect(
+        await buttonKinds([MAIN, constants, app(imports, markup)]),
+      ).toEqual(["primary", "danger", "ghost"]);
+    },
+  );
 });
