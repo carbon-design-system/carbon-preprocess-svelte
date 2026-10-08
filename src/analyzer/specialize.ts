@@ -1,7 +1,7 @@
 import { type AST, isReference, SKIP, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
 import { childEntries, type Node } from "./ast";
-import { evaluate, type Scope } from "./evaluate";
+import { evaluate, isPropsObject, type Scope } from "./evaluate";
 import {
   concat,
   type MappedText,
@@ -180,6 +180,14 @@ function isPure(node: Node, scope: Scope): boolean {
     case "MemberExpression": {
       if (node.object.type === "Identifier" && node.object.name === "$$slots") {
         return !node.computed;
+      }
+      // Svelte's prop objects are plain: reading one runs no getter.
+      if (
+        node.object.type === "Identifier" &&
+        isPropsObject(node.object.name, scope) &&
+        (!node.computed || node.property.type === "Literal")
+      ) {
+        return true;
       }
       const target = evaluate(node.object, scope);
       if (

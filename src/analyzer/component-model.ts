@@ -49,6 +49,12 @@ export type ComponentModel = {
    * adds `"*"`: it reaches every prop.
    */
   escapingNames: Set<string>;
+  /**
+   * `rest` in `let { a, ...rest } = $props()`, when nothing reassigns or
+   * shadows it: it holds the props the component doesn't declare, like
+   * `$$restProps`.
+   */
+  restPropsName?: string;
 };
 
 /** Thrown for a component the analysis can't model. */
@@ -235,18 +241,23 @@ export function buildComponentModel(
     if (topLevel.has(name)) model.unknownNames.add(name);
   }
 
+  /** Names written after their declaration: a rest name among them is unusable. */
+  const written = new Set<string>();
   forEachNode(ast, (node) => {
     switch (node.type) {
       case "AssignmentExpression":
         if (!model.reactiveDeclarations.has(node)) {
           patternNames(node.left, model.unknownNames);
+          patternNames(node.left, written);
         }
         break;
       case "UpdateExpression":
         patternNames(node.argument, model.unknownNames);
+        patternNames(node.argument, written);
         break;
       case "BindDirective":
         model.unknownNames.add(rootName(node.expression));
+        written.add(rootName(node.expression));
         break;
       case "CallExpression":
         if (node.callee.type === "Identifier") {
@@ -262,6 +273,13 @@ export function buildComponentModel(
         break;
     }
   });
+
+  if (
+    model.restPropsName &&
+    (written.has(model.restPropsName) || nested.has(model.restPropsName))
+  ) {
+    model.restPropsName = undefined;
+  }
 
   return model;
 }
@@ -441,6 +459,9 @@ function readPropsRune(model: ComponentModel, pattern: Node): void {
   for (const property of pattern.properties) {
     if (property.type === "RestElement") {
       patternNames(property.argument as Node, model.unknownNames);
+      if (property.argument.type === "Identifier") {
+        model.restPropsName = property.argument.name;
+      }
       continue;
     }
     if (property.computed) {

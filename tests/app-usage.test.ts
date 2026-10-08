@@ -26,11 +26,15 @@ const appRendering = (
 });
 
 /** The kinds Button can render with, per the analysis of `files`. */
-async function buttonKinds(files: Array<{ file: string; code: string }>) {
+async function buttonKinds(
+  files: Array<{ file: string; code: string }>,
+  // The bundle; a listed component no file renders keeps every variant.
+  components = ["Button"],
+) {
   const result = await analyzeFiles({
     projectRoot: process.cwd(),
     files,
-    components: ["Button"],
+    components,
     options: {},
   });
   if ("warning" in result) throw new Error(result.warning);
@@ -122,5 +126,88 @@ describe("props through the app's own components", () => {
         LEGACY_CARD,
       ]),
     ).toEqual(["ghost"]);
+  });
+});
+
+describe("props a component spreads into its children", () => {
+  const IMPORT_ACTION = `import { HeaderGlobalAction } from "carbon-components-svelte";`;
+
+  test("`{...$$restProps}` passes what call sites pass and the parent doesn't declare", async () => {
+    // HeaderGlobalAction spreads $$restProps into a Button.
+    expect(
+      await buttonKinds(
+        [
+          MAIN,
+          appRendering(`<HeaderGlobalAction kind="ghost" />`, IMPORT_ACTION),
+        ],
+        ["HeaderGlobalAction"],
+      ),
+    ).toEqual(["ghost"]);
+    // Without `kind`, the Button keeps its default.
+    expect(
+      await buttonKinds(
+        [MAIN, appRendering(`<HeaderGlobalAction />`, IMPORT_ACTION)],
+        ["HeaderGlobalAction"],
+      ),
+    ).toEqual(["primary"]);
+  });
+
+  test("a site that spreads its own props keeps the child open", async () => {
+    expect(
+      await buttonKinds(
+        [
+          MAIN,
+          appRendering(`<HeaderGlobalAction {...props} />`, IMPORT_ACTION),
+        ],
+        ["HeaderGlobalAction"],
+      ),
+    ).toEqual(["primary", "danger", "ghost"]);
+  });
+
+  test("attributes after a spread win; before it, the spread may override them", async () => {
+    const card = (markup: string) => ({
+      file: "/app/src/Card.svelte",
+      code: `<script>${IMPORT_BUTTON}</script>\n${markup}`,
+    });
+    const files = (markup: string, site: string) => [
+      MAIN,
+      appRendering(site),
+      card(markup),
+    ];
+    expect(
+      await buttonKinds(
+        files(
+          `<Button {...$$restProps} kind="danger" />`,
+          `<Card kind="ghost" />`,
+        ),
+      ),
+    ).toEqual(["danger"]);
+    expect(
+      await buttonKinds(
+        files(
+          `<Button kind="danger" {...$$restProps} />`,
+          `<Card kind="ghost" />`,
+        ),
+      ),
+    ).toEqual(["ghost"]);
+    // A site that leaves `kind` out keeps the value set before the spread.
+    expect(
+      await buttonKinds(
+        files(
+          `<Button kind="danger" {...$$restProps} />`,
+          `<Card kind="ghost" /><Card />`,
+        ),
+      ),
+    ).toEqual(["danger", "ghost"]);
+  });
+
+  test("runes: `...rest` from `$props()` works like `$$restProps`", async () => {
+    const card = {
+      file: "/app/src/Card.svelte",
+      code: `<script>${IMPORT_BUTTON}\nlet { tone = "ghost", ...rest } = $props();</script>\n<Button {...rest} size={rest.size}>{tone}</Button>`,
+    };
+    expect(
+      await buttonKinds([MAIN, appRendering(`<Card kind="danger" />`), card]),
+    ).toEqual(["danger"]);
   });
 });

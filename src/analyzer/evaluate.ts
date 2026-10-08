@@ -14,6 +14,7 @@ import {
   possible,
   stringify,
   truthOf,
+  typeOf,
   UNDEFINED,
   UNKNOWN,
   type Value,
@@ -106,6 +107,49 @@ function isOnly(value: Value, p: undefined): boolean {
   return value !== UNKNOWN && value.size === 1 && value.has(p);
 }
 
+/** `$$props`, `$$restProps`, or the rest of `$props()`. */
+export function isPropsObject(name: string, scope: Scope): boolean {
+  return (
+    name === "$$props" ||
+    name === "$$restProps" ||
+    name === scope.model.restPropsName
+  );
+}
+
+/** A key of `$$props`: the values sites pass, and whether some site leaves it out. */
+export type PassedProp = { value: Value; maybeAbsent: boolean };
+
+/**
+ * What `$$props` holds (or `$$restProps`, with `rest`: only the keys the
+ * component doesn't declare): every key a call site passes. `undefined`
+ * when some site spreads props or the component is used as a value.
+ */
+export function passedProps(
+  scope: Scope,
+  rest: boolean,
+): Map<string, PassedProp> | undefined {
+  const { model, usage } = scope;
+  if (usage.open) return undefined;
+  const declared = new Set(rest ? model.propNames.values() : []);
+  const props = new Map<string, PassedProp>();
+  for (const [key, value] of usage.props) {
+    if (declared.has(key)) continue;
+    props.set(key, { value, maybeAbsent: usage.omitted.has(key) });
+  }
+  return props;
+}
+
+/** The props a spread on a child passes, if it spreads the component's own props. */
+export function spreadProps(
+  argument: Expression,
+  scope: Scope,
+): Map<string, PassedProp> | undefined {
+  if (argument.type !== "Identifier" || !isPropsObject(argument.name, scope)) {
+    return undefined;
+  }
+  return passedProps(scope, argument.name !== "$$props");
+}
+
 /** Every value `node` can evaluate to under `scope`. */
 export function evaluate(node: Node | Expression, scope: Scope): Value {
   switch (node.type) {
@@ -157,6 +201,9 @@ export function evaluate(node: Node | Expression, scope: Scope): Value {
 
     case "UnaryExpression": {
       if (node.operator === "void") return UNDEFINED;
+      if (node.operator === "typeof") {
+        return typeOf(evaluate(node.argument, scope));
+      }
       if (node.operator !== "!") return UNKNOWN;
       const truth = truthOf(evaluate(node.argument, scope));
       return truth === "either" ? BOOLEAN : possible(truth === "falsy");
@@ -249,8 +296,23 @@ function evaluateMember(
       if (usage.open || usage.slotsUnknown) return UNKNOWN;
       return usage.slots.get(property.name) ?? UNDEFINED;
     }
-    if (object.name === "$$props" || object.name === "$$restProps") {
-      return UNKNOWN;
+    if (isPropsObject(object.name, scope)) {
+      const key =
+        !computed && property.type === "Identifier"
+          ? property.name
+          : computed &&
+              property.type === "Literal" &&
+              typeof property.value === "string"
+            ? property.value
+            : undefined;
+      const props =
+        key === undefined
+          ? undefined
+          : passedProps(scope, object.name !== "$$props");
+      const prop = props?.get(key as string);
+      if (!props) return UNKNOWN;
+      if (!prop) return UNDEFINED;
+      return prop.maybeAbsent ? join(prop.value, UNDEFINED) : prop.value;
     }
   }
   if (object.type === "Super") return UNKNOWN;

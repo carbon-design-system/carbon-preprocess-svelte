@@ -8,6 +8,7 @@ import {
   possible,
   stringify,
   truthOf,
+  typeOf,
   UNKNOWN,
 } from "../src/analyzer/values";
 
@@ -66,5 +67,15 @@ describe("analyzer values", () => {
     expect(formatValue(possible("b", "a", undefined, OBJECT))).toBe(
       '"a", "b", object, undefined',
     );
+  });
+
+  test("typeOf reads every possible value's type", () => {
+    expect(typeOf(possible(1, "a", undefined))).toEqual(
+      possible("number", "string", "undefined"),
+    );
+    expect(typeOf(possible(null))).toEqual(possible("object"));
+    // Some object may be a function: a component, a handler.
+    expect(typeOf(possible(OBJECT))).toEqual(possible("object", "function"));
+    expect(typeOf(UNKNOWN)).toBe(UNKNOWN);
   });
 });

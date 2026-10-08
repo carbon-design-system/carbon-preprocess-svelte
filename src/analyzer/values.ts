@@ -157,6 +157,18 @@ export function binary(operator: string, a: Value, b: Value): Value {
   );
 }
 
+/**
+ * `typeof value` for every possible value. Some object may be a function
+ * (a component, a handler), so it reads as `"object"` or `"function"`.
+ */
+export function typeOf(value: Value): Value {
+  return flatMap(value, (p) => {
+    if (p === OBJECT) return possible("object", "function");
+    if (p === EMPTY_ARRAY || p === null) return possible("object");
+    return possible(typeof p);
+  });
+}
+
 /** `String(value)` for every possible value, as a template literal would. */
 export function stringify(value: Value): Value {
   return flatMap(value, (p) => (isObject(p) ? UNKNOWN : possible(String(p))));

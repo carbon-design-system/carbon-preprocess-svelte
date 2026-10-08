@@ -196,6 +196,16 @@ describe("specializeComponent", () => {
     expect(code).toContain('<p>{"yes"}</p>');
   });
 
+  test("`typeof` picks a branch when the value's type is known", () => {
+    const source = `<script>
+  export let total = undefined;
+  $: hasTotal = typeof total === "number";
+</script>
+{#if hasTotal}<span class="total">{total}</span>{/if}`;
+    expect(specialize(source)).not.toContain('class="total"');
+    expect(specialize(source, { total: 5 })).toContain('class="total"');
+  });
+
   test("an array that stays empty renders no `{#each}` body", () => {
     const code = specialize(
       `<script>export let items = [];</script>
@@ -313,6 +323,30 @@ describe("dropUnusedDeclarations", () => {
     );
     expect(dropped).toBe(0);
   });
+});
+
+test("Carbon BigNumber without `total` drops the denominator", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "specialize-"));
+  try {
+    const file = join(dir, "App.svelte");
+    const code = `<script>import { BigNumber } from "carbon-components-svelte";</script>\n<BigNumber value={42} />`;
+    writeFileSync(file, code);
+    const result = await analyzeFiles({
+      projectRoot: process.cwd(),
+      files: [{ file, code }],
+      components: ["BigNumber"],
+      options: {},
+    });
+    if ("warning" in result) throw new Error(result.warning);
+    const scope = result.analysis.scopeFor("BigNumber/BigNumber.svelte");
+    if (!scope) throw new Error("BigNumber isn't live");
+    expect(result.isPruned(".bx--big-number__denominator")).toBe(true);
+    const { code: rewritten } = specializeComponent(scope);
+    parse(rewritten);
+    expect(rewritten).not.toContain("bx--big-number__denominator");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 describe("Carbon Button for kind=tertiary", () => {

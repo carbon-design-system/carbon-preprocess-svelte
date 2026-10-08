@@ -2,7 +2,7 @@ import type { AST, Expression } from "sveast/walk";
 import { extractCarbonClassTokens } from "../indexer/extract-runtime-classes";
 import { childNodes, type Node } from "./ast";
 import { UnsupportedComponentError } from "./component-model";
-import { evaluate, type Scope } from "./evaluate";
+import { evaluate, type PassedProp, type Scope, spreadProps } from "./evaluate";
 import type { CallSite } from "./usage";
 import {
   isEmptyArray,
@@ -12,6 +12,7 @@ import {
   stringify,
   type Truth,
   truthOf,
+  UNDEFINED,
   UNKNOWN,
   type Value,
 } from "./values";
@@ -179,8 +180,11 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
       }
       if (key) {
         result.childSites.push(
-          callSiteFromElement(node, key, (expression) =>
-            evaluate(expression, scope),
+          callSiteFromElement(
+            node,
+            key,
+            (expression) => evaluate(expression, scope),
+            (argument) => spreadProps(argument, scope),
           ),
         );
       }
@@ -189,8 +193,11 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
 
     case "SvelteSelf":
       result.childSites.push(
-        callSiteFromElement(node, scope.model.key, (expression) =>
-          evaluate(expression, scope),
+        callSiteFromElement(
+          node,
+          scope.model.key,
+          (expression) => evaluate(expression, scope),
+          (argument) => spreadProps(argument, scope),
         ),
       );
       break;
@@ -260,11 +267,17 @@ function filledSlots(fragment: AST.Fragment): Set<string> | null {
   return slots;
 }
 
-/** A call site for `<Component …>`, its props evaluated by `evaluateExpression`. */
+/**
+ * A call site for `<Component …>`, its props evaluated by
+ * `evaluateExpression`. `spread` gives the props a spread passes when it
+ * can tell (the component's own `$$restProps`); any other spread makes
+ * the site open.
+ */
 export function callSiteFromElement(
   node: AST.Component | AST.SvelteSelf,
   component: string,
   evaluateExpression: (expression: Expression) => Value,
+  spread?: (argument: Expression) => Map<string, PassedProp> | undefined,
 ): CallSite {
   const site: CallSite = {
     component,
@@ -274,10 +287,25 @@ export function callSiteFromElement(
   };
   for (const attribute of node.attributes) {
     switch (attribute.type) {
-      case "SpreadAttribute":
-        site.open = true;
-        site.reason = "spreads props";
+      case "SpreadAttribute": {
+        const props = spread?.(attribute.expression);
+        if (!props) {
+          site.open = true;
+          site.reason = "spreads props";
+          break;
+        }
+        // Where the spread lacks a key, the value set before it stays,
+        // or the prop isn't passed at all.
+        for (const [name, { value, maybeAbsent }] of props) {
+          if (name === "slot" || name.startsWith("--")) continue;
+          const before = site.props.get(name);
+          site.props.set(
+            name,
+            maybeAbsent ? join(before ?? UNDEFINED, value) : value,
+          );
+        }
         break;
+      }
       case "Attribute":
         // `slot` places this element in its parent; `--x` sets a CSS variable.
         if (attribute.name === "slot" || attribute.name.startsWith("--")) break;
