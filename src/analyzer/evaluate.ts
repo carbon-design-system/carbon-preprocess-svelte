@@ -1,5 +1,5 @@
 import type { Expression } from "sveast/walk";
-import type { Node } from "./ast";
+import { type Node, patternNames } from "./ast";
 import { type ComponentModel, FUNCTION_DECLARATION } from "./component-model";
 import type { ComponentUsage } from "./usage";
 import {
@@ -8,10 +8,16 @@ import {
   EMPTY_ARRAY,
   flatMap,
   isNullish,
+  isObject,
+  isStructured,
   isTruthy,
+  itemsOf,
   join,
+  MAX_SHAPE_SIZE,
   OBJECT,
   possible,
+  readProperty,
+  shape,
   stringify,
   truthOf,
   typeOf,
@@ -31,18 +37,34 @@ export type Scope = {
   memo: Map<string, Value>;
   /** Names being evaluated, so a cycle reads as unknown instead of looping. */
   pending: Set<string>;
+  /**
+   * Names an enclosing `{#each}` binds (its item, its index), shadowing
+   * the component's own. Replaced, never mutated, while walking a body.
+   */
+  locals: ReadonlyMap<string, Value>;
 };
+
+const NO_LOCALS: ReadonlyMap<string, Value> = new Map();
 
 export function createScope(
   model: ComponentModel,
   usage: ComponentUsage,
   context: ContextResolver,
 ): Scope {
-  return { model, usage, context, memo: new Map(), pending: new Set() };
+  return {
+    model,
+    usage,
+    context,
+    memo: new Map(),
+    pending: new Set(),
+    locals: NO_LOCALS,
+  };
 }
 
 function lookup(name: string, scope: Scope): Value {
   if (name === "undefined") return UNDEFINED;
+  const local = scope.locals.get(name);
+  if (local !== undefined) return local;
   const { model } = scope;
   if (model.unknownNames.has(name)) return UNKNOWN;
   const cached = scope.memo.get(name);
@@ -50,21 +72,120 @@ function lookup(name: string, scope: Scope): Value {
   if (scope.pending.has(name)) return UNKNOWN;
 
   scope.pending.add(name);
-  let value = resolve(name, scope);
-  scope.pending.delete(name);
-  const escapes = model.escapingNames;
-  if (
-    value !== UNKNOWN &&
-    value.has(EMPTY_ARRAY) &&
-    (escapes.has(name) ||
-      escapes.has("*") ||
-      escapes.has(`$$props.${model.propNames.get(name) ?? name}`))
-  ) {
-    // Something may fill it in.
-    value = flatMap(value, (p) => possible(p === EMPTY_ARRAY ? OBJECT : p));
+  // A top-level name is evaluated where it's declared, outside any
+  // `{#each}` the lookup came from.
+  const locals = scope.locals;
+  scope.locals = NO_LOCALS;
+  let value: Value;
+  try {
+    value = keepIfContained(resolve(name, scope), name, model);
+  } finally {
+    scope.locals = locals;
+    scope.pending.delete(name);
   }
   scope.memo.set(name, value);
   return value;
+}
+
+/**
+ * `value` with its known objects and arrays (`[]`, shapes) widened to
+ * some object, unless nothing can mutate them: the name isn't passed on
+ * or written through, and every property path read from it that reaches
+ * an object stays in sight. See `ComponentModel.escapes`.
+ */
+function keepIfContained(
+  value: Value,
+  name: string,
+  model: ComponentModel,
+): Value {
+  if (value === UNKNOWN || ![...value].some(isStructured)) return value;
+  const own = model.escapes.get(name);
+  const passedAs = model.propNames.get(name) ?? name;
+  const contained =
+    !model.escapes.get("*")?.full &&
+    !model.escapes.get(`$$props.${passedAs}`)?.full &&
+    !own?.full &&
+    !(own?.paths ?? []).some((path) => mayReachObject(value, path));
+  return contained
+    ? value
+    : flatMap(value, (p) => possible(isStructured(p) ? OBJECT : p));
+}
+
+/** Whether reading `path` from `value` can give an object (or something unknown). */
+function mayReachObject(value: Value, path: readonly string[]): boolean {
+  let current = value;
+  for (const segment of path) {
+    current =
+      segment === "[]"
+        ? itemsOf(current)
+        : segment === "*"
+          ? UNKNOWN
+          : flatMap(current, (p) => readProperty(p, segment));
+    if (current === UNKNOWN) return true;
+  }
+  return current === UNKNOWN || [...current].some(isObject);
+}
+
+/**
+ * Binds the item (and index) of `{#each}` `node` while its body is walked;
+ * returns a function that unbinds them.
+ */
+export function bindEach(
+  node: Extract<Node, { type: "EachBlock" }>,
+  scope: Scope,
+): () => void {
+  const items = itemsOf(evaluate(node.expression, scope));
+  const outer = scope.locals;
+  const locals = new Map(outer);
+  bindPattern(node.context as Node | null, items, locals);
+  if (node.index) locals.set(node.index, UNKNOWN);
+  scope.locals = locals;
+  return () => {
+    scope.locals = outer;
+  };
+}
+
+/** Binds the names `pattern` declares to what it reads from `value`. */
+function bindPattern(
+  pattern: Node | null,
+  value: Value,
+  locals: Map<string, Value>,
+): void {
+  if (!pattern) return;
+  if (pattern.type === "Identifier") {
+    locals.set(pattern.name, value);
+    return;
+  }
+  if (pattern.type === "ObjectPattern") {
+    for (const property of pattern.properties) {
+      const key =
+        property.type === "Property" && !property.computed
+          ? property.key.type === "Identifier"
+            ? property.key.name
+            : property.key.type === "Literal"
+              ? String(property.key.value)
+              : undefined
+          : undefined;
+      if (
+        key !== undefined &&
+        property.type === "Property" &&
+        property.value.type === "Identifier"
+      ) {
+        locals.set(
+          property.value.name,
+          flatMap(value, (p) => readProperty(p, key)),
+        );
+        continue;
+      }
+      const names = new Set<string>();
+      patternNames(property as Node, names);
+      for (const name of names) locals.set(name, UNKNOWN);
+    }
+    return;
+  }
+  const names = new Set<string>();
+  patternNames(pattern, names);
+  for (const name of names) locals.set(name, UNKNOWN);
 }
 
 function resolve(name: string, scope: Scope): Value {
@@ -324,10 +445,26 @@ export function evaluate(node: Node | Expression, scope: Scope): Value {
       return evaluate(node.expression as Expression, scope);
 
     case "ArrayExpression":
-      // Fresh, so empty until something that holds it fills it in.
-      return possible(node.elements.length === 0 ? EMPTY_ARRAY : OBJECT);
+      // Fresh: known until something that holds it changes it.
+      if (node.elements.length === 0) return possible(EMPTY_ARRAY);
+      if (
+        node.elements.length > MAX_SHAPE_SIZE ||
+        node.elements.some((element) => element?.type === "SpreadElement")
+      ) {
+        return possible(OBJECT);
+      }
+      return possible(
+        shape({
+          kind: "array",
+          elements: node.elements.map((element) =>
+            element ? evaluate(element as Expression, scope) : UNDEFINED,
+          ),
+        }),
+      );
 
     case "ObjectExpression":
+      return objectShape(node, scope);
+
     case "ArrowFunctionExpression":
     case "FunctionExpression":
     case "ClassExpression":
@@ -405,16 +542,51 @@ function evaluateMember(
     }
   }
   if (object.type === "Super") return UNKNOWN;
-  // `undefined?.x` is `undefined`, `[].length` is 0; anything else is
-  // beyond this model.
   const target = evaluate(object, scope);
+  // `undefined?.x` is `undefined`.
   if (optional && isOnly(target, undefined)) return UNDEFINED;
-  if (
-    !computed &&
-    property.type === "Identifier" &&
-    property.name === "length"
-  ) {
-    return flatMap(target, (p) => (p === EMPTY_ARRAY ? possible(0) : UNKNOWN));
+  const key = computed
+    ? singleKey(evaluate(property as Expression, scope))
+    : property.type === "Identifier"
+      ? property.name
+      : undefined;
+  if (key === undefined) return UNKNOWN;
+  // A known object's own properties and elements, a string's `length`;
+  // anything else (`null.x` throws, a getter may run) is beyond this model.
+  return flatMap(target, (p) =>
+    optional && isNullish(p) ? UNDEFINED : readProperty(p, key),
+  );
+}
+
+/** The one string or number key `value` holds, as a property name. */
+function singleKey(value: Value): string | undefined {
+  if (value === UNKNOWN || value.size !== 1) return undefined;
+  const [p] = value;
+  return typeof p === "string" || typeof p === "number" ? String(p) : undefined;
+}
+
+/** An object literal's shape, or some object if it has spreads, getters or computed keys. */
+function objectShape(
+  node: Extract<Node, { type: "ObjectExpression" }>,
+  scope: Scope,
+): Value {
+  if (node.properties.length > MAX_SHAPE_SIZE) return possible(OBJECT);
+  const props = new Map<string, Value>();
+  for (const property of node.properties) {
+    if (property.type !== "Property" || property.kind !== "init") {
+      return possible(OBJECT);
+    }
+    const key = property.computed
+      ? property.key.type === "Literal"
+        ? String(property.key.value)
+        : undefined
+      : property.key.type === "Identifier"
+        ? property.key.name
+        : property.key.type === "Literal"
+          ? String(property.key.value)
+          : undefined;
+    if (key === undefined || key === "__proto__") return possible(OBJECT);
+    props.set(key, evaluate(property.value as Expression, scope));
   }
-  return UNKNOWN;
+  return possible(shape({ kind: "object", props }));
 }

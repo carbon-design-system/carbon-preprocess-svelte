@@ -3,6 +3,7 @@ import { extractCarbonClassTokens } from "../indexer/extract-runtime-classes";
 import { childNodes, lineAt, type Node } from "./ast";
 import { UnsupportedComponentError } from "./component-model";
 import {
+  bindEach,
   evaluate,
   type PassedProp,
   type Scope,
@@ -165,7 +166,16 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
         if (node.fallback) visit(node.fallback, scope, result);
         return;
       }
-      break;
+      // The body sees the item's value: an element of a known array.
+      const unbind = bindEach(node, scope);
+      try {
+        if (node.key) visit(node.key, scope, result);
+        visit(node.body, scope, result);
+      } finally {
+        unbind();
+      }
+      if (node.fallback) visit(node.fallback, scope, result);
+      return;
     }
 
     case "ClassDirective": {

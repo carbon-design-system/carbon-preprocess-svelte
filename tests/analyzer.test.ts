@@ -304,6 +304,27 @@ describe("analyzeUsage", () => {
     expect(withButtons.isPruned(THREE_BUTTONS)).toBe(false);
   });
 
+  test("reads the kinds of a Modal's secondary buttons", async () => {
+    const IMPORT_MODAL = `import { Modal } from "carbon-components-svelte";`;
+    const SECONDARY = ".bx--btn--secondary";
+    const ghosts = await analyze(
+      app(
+        IMPORT_MODAL,
+        `<Modal open secondaryButtons={[{ text: "A", kind: "ghost" }, { text: "B", kind: "ghost" }]}>Body</Modal>`,
+      ),
+    );
+    expect(ghosts.isPruned(SECONDARY)).toBe(true);
+    expect(ghosts.isPruned(".bx--btn--ghost")).toBe(false);
+    // A button without `kind` is "secondary".
+    const defaulted = await analyze(
+      app(
+        IMPORT_MODAL,
+        `<Modal open secondaryButtons={[{ text: "A", kind: "ghost" }, { text: "B" }]}>Body</Modal>`,
+      ),
+    );
+    expect(defaulted.isPruned(SECONDARY)).toBe(false);
+  });
+
   test("follows components imported through a `.js` barrel", async () => {
     const { isPruned } = await analyze(
       app(

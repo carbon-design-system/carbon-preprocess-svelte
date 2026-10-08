@@ -10,13 +10,23 @@ export const OBJECT = Symbol("object");
 
 /**
  * A `[]` the component never mutates or lets escape (see
- * `ComponentModel.escapingNames`): an object with no items. Everything
+ * `ComponentModel.escapes`): an object with no items. Everything
  * but `.length` and `{#each}` treats it as `OBJECT`.
  */
 export const EMPTY_ARRAY = Symbol("empty array");
 
 /** A value the analysis can't bound. */
 export const UNKNOWN = Symbol("unknown");
+
+/**
+ * An object or array literal nothing mutates or lets escape (like
+ * `EMPTY_ARRAY`; see `ComponentModel.escapes`): its own properties and
+ * elements are known. Only made by `shape`, which interns them, so two
+ * equal literals are the same value.
+ */
+export type Shape =
+  | { readonly kind: "object"; readonly props: ReadonlyMap<string, Value> }
+  | { readonly kind: "array"; readonly elements: readonly Value[] };
 
 export type Primitive =
   | string
@@ -25,7 +35,8 @@ export type Primitive =
   | null
   | undefined
   | typeof OBJECT
-  | typeof EMPTY_ARRAY;
+  | typeof EMPTY_ARRAY
+  | Shape;
 
 export type Value = ReadonlySet<Primitive> | typeof UNKNOWN;
 
@@ -59,11 +70,103 @@ export function flatMap(value: Value, map: (p: Primitive) => Value): Value {
   return result;
 }
 
-/** `OBJECT` or `EMPTY_ARRAY`. */
+export function isShape(p: Primitive): p is Shape {
+  return typeof p === "object" && p !== null;
+}
+
+/** `OBJECT`, `EMPTY_ARRAY`, or a shape: some object. */
 export function isObject(
   p: Primitive,
-): p is typeof OBJECT | typeof EMPTY_ARRAY {
-  return p === OBJECT || p === EMPTY_ARRAY;
+): p is typeof OBJECT | typeof EMPTY_ARRAY | Shape {
+  return p === OBJECT || p === EMPTY_ARRAY || isShape(p);
+}
+
+/** An object whose contents are known: `EMPTY_ARRAY` or a shape. */
+export function isStructured(p: Primitive): p is typeof EMPTY_ARRAY | Shape {
+  return p === EMPTY_ARRAY || isShape(p);
+}
+
+/** Past this many properties or elements, a literal is just some object. */
+export const MAX_SHAPE_SIZE = 32;
+/** Interned shapes; cleared past this many, so watch rebuilds don't grow it forever. */
+const MAX_INTERNED = 10_000;
+const interned = new Map<string, Shape>();
+const ids = new WeakMap<Shape, number>();
+let nextId = 0;
+
+/** A stable key for a value, for interning the shapes that hold it. */
+function valueKey(value: Value): string {
+  if (value === UNKNOWN) return "?";
+  return [...value]
+    .map((p) => {
+      if (isShape(p)) return `#${ids.get(p)}`;
+      if (p === OBJECT) return "o";
+      if (p === EMPTY_ARRAY) return "[]";
+      return `${typeof p}:${String(p)}`;
+    })
+    .sort()
+    .join("|");
+}
+
+/** The interned shape of an object (`props`) or array (`elements`) literal. */
+export function shape(
+  contents:
+    | { kind: "object"; props: ReadonlyMap<string, Value> }
+    | { kind: "array"; elements: readonly Value[] },
+): Shape {
+  const key =
+    contents.kind === "object"
+      ? `{${[...contents.props]
+          .map(([name, value]) => `${JSON.stringify(name)}:${valueKey(value)}`)
+          .sort()
+          .join(",")}}`
+      : `[${contents.elements.map(valueKey).join(",")}]`;
+  let existing = interned.get(key);
+  if (!existing) {
+    if (interned.size >= MAX_INTERNED) interned.clear();
+    existing = contents;
+    interned.set(key, existing);
+    ids.set(existing, nextId++);
+  }
+  return existing;
+}
+
+const INDEX = /^(?:0|[1-9]\d*)$/;
+const OBJECT_PROTOTYPE_KEYS = new Set(
+  Object.getOwnPropertyNames(Object.prototype),
+);
+
+/** `p[key]` when it's known: an own property, an element, `length`. */
+export function readProperty(p: Primitive, key: string): Value {
+  if (typeof p === "string" && key === "length") return possible(p.length);
+  if (p === EMPTY_ARRAY) {
+    if (key === "length") return possible(0);
+    return INDEX.test(key) ? UNDEFINED : UNKNOWN;
+  }
+  if (!isShape(p)) return UNKNOWN;
+  if (p.kind === "array") {
+    if (key === "length") return possible(p.elements.length);
+    if (!INDEX.test(key)) return UNKNOWN;
+    return p.elements[Number(key)] ?? UNDEFINED;
+  }
+  const own = p.props.get(key);
+  if (own) return own;
+  // Inherited (`toString`, `constructor`) is some function, not `undefined`.
+  return OBJECT_PROTOTYPE_KEYS.has(key) ? UNKNOWN : UNDEFINED;
+}
+
+/** The items `{#each value}` iterates: every element, or none for `[]`. */
+export function itemsOf(value: Value): Value {
+  return flatMap(value, (p) => {
+    if (p === EMPTY_ARRAY) return EMPTY;
+    if (isShape(p) && p.kind === "array") {
+      return p.elements.reduce<Value>(
+        (all, element) => join(all, element),
+        EMPTY,
+      );
+    }
+    return UNKNOWN;
+  });
 }
 
 /** Whether every possible value is an `EMPTY_ARRAY`. */
@@ -164,7 +267,7 @@ export function binary(operator: string, a: Value, b: Value): Value {
 export function typeOf(value: Value): Value {
   return flatMap(value, (p) => {
     if (p === OBJECT) return possible("object", "function");
-    if (p === EMPTY_ARRAY || p === null) return possible("object");
+    if (isStructured(p) || p === null) return possible("object");
     return possible(typeof p);
   });
 }
@@ -183,9 +286,11 @@ export function formatValue(value: Value): string {
         ? "object"
         : p === EMPTY_ARRAY
           ? "[]"
-          : p === undefined
-            ? "undefined"
-            : JSON.stringify(p),
+          : isShape(p)
+            ? p.kind
+            : p === undefined
+              ? "undefined"
+              : JSON.stringify(p),
     )
     .sort()
     .join(", ");

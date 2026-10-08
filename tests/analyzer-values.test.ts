@@ -3,9 +3,12 @@ import {
   binary,
   formatValue,
   isNeverNullish,
+  itemsOf,
   join,
   OBJECT,
   possible,
+  readProperty,
+  shape,
   stringify,
   truthOf,
   typeOf,
@@ -77,5 +80,24 @@ describe("analyzer values", () => {
     // Some object may be a function: a component, a handler.
     expect(typeOf(possible(OBJECT))).toEqual(possible("object", "function"));
     expect(typeOf(UNKNOWN)).toBe(UNKNOWN);
+  });
+
+  test("shapes: equal literals are one value, and their contents read back", () => {
+    const button = (kind: string) =>
+      shape({ kind: "object", props: new Map([["kind", possible(kind)]]) });
+    expect(button("ghost")).toBe(button("ghost"));
+    expect(button("ghost")).not.toBe(button("danger"));
+    expect(readProperty(button("ghost"), "kind")).toEqual(possible("ghost"));
+    expect(readProperty(button("ghost"), "text")).toEqual(possible(undefined));
+    // Inherited properties are functions, not `undefined`.
+    expect(readProperty(button("ghost"), "toString")).toBe(UNKNOWN);
+    const list = shape({
+      kind: "array",
+      elements: [possible(button("ghost")), possible(button("danger"))],
+    });
+    expect(readProperty(list, "length")).toEqual(possible(2));
+    expect(itemsOf(possible(list))).toEqual(
+      possible(button("ghost"), button("danger")),
+    );
   });
 });
