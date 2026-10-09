@@ -10,6 +10,13 @@ export interface InlineOptions {
   refs: ReadonlyMap<string, LinkReference>;
   /** Pass `{expression}` in text through to Svelte instead of escaping it. */
   expressions: boolean;
+  /** Link bare `https://` and `www.` URLs (GFM autolink literals). */
+  autolinks?: boolean;
+  /**
+   * Markup for a footnote reference (`[^label]`), or `undefined` when the
+   * label has no definition and the text stays literal.
+   */
+  footnote?: (label: string) => string | undefined;
 }
 
 type Inline =
@@ -60,6 +67,16 @@ const NUMERIC_ENTITY = /&#([xX]?)([0-9a-fA-F]+);/g;
 const UNSAFE_URL_CHAR =
   /[^A-Za-z0-9\-._~:/?#@!$&'()*+,;=%]|%(?![0-9a-fA-F]{2})/g;
 const ESCAPE_TEXT = /[&<>"{}]/g;
+const URL_LITERAL = /(?:https?:\/\/|ftp:\/\/|www\.)[^\s<]+/g;
+const EMAIL_LITERAL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+const TRAILING_ENTITY = /&[A-Za-z0-9]+;$/;
+const NUMERIC_LABEL = /\.\d+$/;
+const TRAILING_DOTS = /\.+$/;
+const INVALID_EMAIL_END = /[-_]$/;
+const URL_PRECEDER = /[\s*_~(]/;
+const URL_TRAILING = /[?!.,:*_~'"]+$/;
+const URL_SCHEME = /^(?:(?:https?|ftp):\/\/)?(?:www\.)?/;
+const FOOTNOTE_REF = /\[\^([^\]\s]+)\]/y;
 const ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -306,12 +323,58 @@ function processEmphasis(items: Inline[]): void {
   }
 }
 
+/**
+ * GFM autolink literals: where each bare URL starts and ends. A URL must
+ * follow the start, whitespace, or `*_~(`, and drops trailing punctuation
+ * and unbalanced closing parentheses.
+ */
+function urlLiterals(
+  src: string,
+): { start: number; end: number; href: string }[] {
+  const found: { start: number; end: number; href: string }[] = [];
+  for (const match of src.matchAll(URL_LITERAL)) {
+    const start = match.index ?? 0;
+    if (start > 0 && !URL_PRECEDER.test(src[start - 1])) continue;
+    let url = match[0];
+    for (let previous = ""; previous !== url; ) {
+      previous = url;
+      url = url.replace(URL_TRAILING, "").replace(TRAILING_ENTITY, "");
+      if (url.endsWith(")") && url.split("(").length < url.split(")").length) {
+        url = url.slice(0, -1);
+      }
+    }
+    const host = url.replace(URL_SCHEME, "");
+    if (!host.includes(".")) continue;
+    found.push({
+      start,
+      end: start + url.length,
+      href: url.startsWith("www.") ? `http://${url}` : url,
+    });
+  }
+  // Emails, except a domain ending in a number (`pkg@1.2.3` is a version).
+  for (const match of src.matchAll(EMAIL_LITERAL)) {
+    const start = match.index ?? 0;
+    if (start > 0 && !URL_PRECEDER.test(src[start - 1])) continue;
+    const email = match[0].replace(TRAILING_DOTS, "");
+    if (INVALID_EMAIL_END.test(email) || NUMERIC_LABEL.test(email)) continue;
+    if (
+      found.some((url) => start < url.end && url.start < start + email.length)
+    ) {
+      continue;
+    }
+    found.push({ start, end: start + email.length, href: `mailto:${email}` });
+  }
+  return found.sort((a, b) => a.start - b.start);
+}
+
 /** Parse a paragraph's (or heading's, or table cell's) inline content. */
 export function parseInline(src: string, options: InlineOptions): Inline[] {
   const items: Inline[] = [];
   const brackets: Bracket[] = [];
   let text = "";
   let pos = 0;
+  const urls = options.autolinks ? urlLiterals(src) : [];
+  let nextUrl = 0;
 
   const flush = () => {
     if (text) {
@@ -327,6 +390,23 @@ export function parseInline(src: string, options: InlineOptions): Inline[] {
   while (pos < src.length) {
     SPECIAL.lastIndex = pos;
     const next = SPECIAL.exec(src);
+    // A bare URL before the next special character becomes a link. URLs
+    // inside code spans, tags, and link destinations were skipped past.
+    while (nextUrl < urls.length && urls[nextUrl].start < pos) nextUrl++;
+    const url = urls[nextUrl];
+    if (url && (!next || url.start < next.index)) {
+      text += src.slice(pos, url.start);
+      const value = src.slice(url.start, url.end);
+      push({
+        type: "link",
+        href: normalizeUrl(url.href),
+        title: "",
+        children: [{ type: "text", value }],
+      });
+      pos = url.end;
+      nextUrl++;
+      continue;
+    }
     if (!next) {
       text += src.slice(pos);
       break;
@@ -418,7 +498,15 @@ export function parseInline(src: string, options: InlineOptions): Inline[] {
           pos++;
         }
         break;
-      case "[":
+      case "[": {
+        FOOTNOTE_REF.lastIndex = pos;
+        const ref = src[pos + 1] === "^" ? FOOTNOTE_REF.exec(src) : null;
+        const markup = ref ? options.footnote?.(ref[1]) : undefined;
+        if (ref && markup !== undefined) {
+          push({ type: "raw", value: markup });
+          pos = FOOTNOTE_REF.lastIndex;
+          break;
+        }
         push({ type: "text", value: "[" });
         brackets.push({
           index: items.length - 1,
@@ -428,6 +516,7 @@ export function parseInline(src: string, options: InlineOptions): Inline[] {
         });
         pos++;
         break;
+      }
       case "]": {
         const opener = brackets.pop();
         if (!opener?.active) {
@@ -560,7 +649,7 @@ export function parseInline(src: string, options: InlineOptions): Inline[] {
         const hard = text.endsWith("  ");
         text = text.replace(TRAILING_SPACES, "");
         if (hard) push({ type: "break" });
-        text += "\n";
+        else text += "\n";
         pos++;
         while (src[pos] === " ") pos++;
         break;

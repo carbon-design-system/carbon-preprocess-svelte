@@ -116,6 +116,16 @@ export interface MarkdownOptions {
    * @default false
    */
   expressions?: boolean;
+  /**
+   * Link bare `https://…` and `www.…` URLs in text, as GitHub does.
+   * @default true
+   */
+  autolinks?: boolean;
+  /**
+   * Text for the footnotes section's (visually hidden) heading and each
+   * back link's accessible name, for translation.
+   */
+  footnoteLabels?: { heading?: string; backref?: (n: number) => string };
   /** Turn heading text into an id. Defaults to GitHub's slugger. */
   slug?: (text: string) => string;
   /**
@@ -227,10 +237,28 @@ export async function renderMarkdown(
       ? { yaml: undefined, body: source }
       : splitFrontmatter(source);
   const metadata = yaml ? (options.frontmatter || parseFrontmatter)(yaml) : {};
-  const { blocks, refs } = parseDocument(body);
-  const inlineOptions: InlineOptions = {
+  const { blocks, refs, footnotes } = parseDocument(body);
+  // Footnotes are numbered in the order they're first referenced.
+  const cited = new Map<string, { n: number; refs: number }>();
+  const footnoteId = (label: string) => githubSlug(label) || "note";
+  const textOptions: InlineOptions = {
     refs,
     expressions: options.expressions ?? false,
+    autolinks: options.autolinks ?? true,
+  };
+  const inlineOptions: InlineOptions = {
+    ...textOptions,
+    footnote(label) {
+      const key = label.toLowerCase();
+      if (!footnotes.has(key)) return undefined;
+      const entry = cited.get(key) ?? { n: cited.size + 1, refs: 0 };
+      entry.refs++;
+      cited.set(key, entry);
+      const id = footnoteId(key);
+      const refId =
+        entry.refs === 1 ? `fnref-${id}` : `fnref-${id}-${entry.refs}`;
+      return `<sup class="footnote-ref"><a href="#fn-${id}" id="${refId}" aria-describedby="footnote-label">${entry.n}</a></sup>`;
+    },
   };
 
   const tree: MarkdownTree = { filename: options.filename, metadata, blocks };
@@ -255,7 +283,7 @@ export async function renderMarkdown(
     const seen = new Map<string, number>();
     for (const block of walk(content)) {
       if (block.type !== "heading") continue;
-      const text = inlineText(block.text, inlineOptions);
+      const text = inlineText(block.text, textOptions);
       if (!block.id) {
         const base = slug(text);
         let id = base;
@@ -426,12 +454,32 @@ export async function renderMarkdown(
   const rendered = await Promise.all(
     content.map((block) => renderBlock(block, false)),
   );
+  const parts = rendered.map((html, index) => ({
+    svelte: content[index].type === "svelte" && OUTSIDE_PROSE.test(html),
+    html,
+  }));
+
+  // Referenced footnotes, after the content, as GitHub renders them.
+  if (cited.size > 0) {
+    const labels = options.footnoteLabels ?? {};
+    const items = await Promise.all(
+      [...cited]
+        .sort((a, b) => a[1].n - b[1].n)
+        .map(async ([key, { n }]) => {
+          const id = footnoteId(key);
+          const inner = await renderBlocks(footnotes.get(key) ?? [], false);
+          const back = labels.backref?.(n) ?? `Back to reference ${n}`;
+          return `<li id="fn-${id}">\n${inner}\n<a href="#fnref-${id}" class="footnote-backref" aria-label="${escapeText(back)}">↩</a>\n</li>`;
+        }),
+    );
+    const html = `<section class="footnotes" data-footnotes>\n<h2 id="footnote-label" class="bx--assistive-text">${escapeText(labels.heading ?? "Footnotes")}</h2>\n<ol>\n${items.join("\n")}\n</ol>\n</section>`;
+    rendered.push(html);
+    parts.push({ svelte: false, html });
+  }
+
   return {
     html: rendered.join("\n"),
-    parts: rendered.map((html, index) => ({
-      svelte: content[index].type === "svelte" && OUTSIDE_PROSE.test(html),
-      html,
-    })),
+    parts,
     hoisted,
     headings,
     metadata,
