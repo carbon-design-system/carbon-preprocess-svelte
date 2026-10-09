@@ -118,7 +118,7 @@ Label
     expect(html).toContain('id="fnref-b-2"');
     expect(html).toContain("missing[^x].");
     expect(html).toContain(
-      '<li id="fn-b">\n<p>Note B.</p>\n<p>More of B.</p>\n<a href="#fnref-b" class="footnote-backref" aria-label="Back to reference 1">↩</a>\n</li>',
+      '<li id="fn-b">\n<p>Note B.</p>\n<p>More of B. <a href="#fnref-b" class="footnote-backref" aria-label="Back to reference 1">↩</a></p>\n</li>',
     );
     expect(html.indexOf('id="fn-b"')).toBeLessThan(html.indexOf('id="fn-a"'));
   });
