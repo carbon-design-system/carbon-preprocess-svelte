@@ -95,6 +95,38 @@ Label
     );
   });
 
+  test("links bare URLs and emails, but not version strings", async () => {
+    expect(
+      await body(
+        "See https://a.example/x_(y)., www.b.example, a@c.example, pkg@1.2.3.",
+      ),
+    ).toBe(
+      '<p>See <a href="https://a.example/x_(y)">https://a.example/x_(y)</a>., <a href="http://www.b.example">www.b.example</a>, <a href="mailto:a@c.example">a@c.example</a>, pkg@1.2.3.</p>',
+    );
+    expect(
+      await body("`https://a.example` and https://b", { autolinks: false }),
+    ).toBe("<p><code>https://a.example</code> and https://b</p>");
+  });
+
+  test("renders footnotes at the end, numbered by first reference", async () => {
+    const html = await body(
+      "A[^b] B[^a] again[^b] missing[^x].\n\n[^a]: Note A.\n[^b]: Note B.\n\n    More of B.",
+    );
+    expect(html).toContain(
+      '<a href="#fn-b" id="fnref-b" aria-describedby="footnote-label">1</a>',
+    );
+    expect(html).toContain('id="fnref-b-2"');
+    expect(html).toContain("missing[^x].");
+    expect(html).toContain(
+      '<li id="fn-b">\n<p>Note B.</p>\n<p>More of B.</p>\n<a href="#fnref-b" class="footnote-backref" aria-label="Back to reference 1">↩</a>\n</li>',
+    );
+    expect(html.indexOf('id="fn-b"')).toBeLessThan(html.indexOf('id="fn-a"'));
+  });
+
+  test("renders a hard break without an extra blank line", async () => {
+    expect(await body("a  \nb")).toBe("<p>a<br />\nb</p>");
+  });
+
   test("resolves reference links defined later in the page", async () => {
     expect(
       await body("[Carbon][c]\n\n[c]: https://carbondesignsystem.com"),
