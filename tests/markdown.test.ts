@@ -283,7 +283,7 @@ export let proseProps = {};
       { proseScope: "markdown" },
     );
     expect(code).toContain(
-      "<Prose {...proseProps}>\n<p>Intro.</p>\n</Prose>\n<Demo />\n<Prose {...proseProps}>\n<details><summary>S</summary></details>\n</Prose>\n{#if a}\n<Prose {...proseProps}>\n<p>More.</p>\n</Prose>\n{/if}",
+      '<div class="bx--prose-flow">\n<Prose {...proseProps}>\n<p>Intro.</p>\n</Prose>\n<Demo />\n<Prose {...proseProps}>\n<details><summary>S</summary></details>\n</Prose>\n{#if a}\n<Prose {...proseProps}>\n<p>More.</p>\n</Prose>\n{/if}\n</div>',
     );
   });
 

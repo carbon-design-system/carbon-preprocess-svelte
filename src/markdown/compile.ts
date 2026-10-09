@@ -75,7 +75,7 @@ export interface MarkdownOptions {
   prose?: boolean | Record<string, string | number | boolean>;
   /**
    * What `Prose` wraps: the whole page, or each run of Markdown between
-   * components. With `"markdown"`, a top-level block that renders as a
+   * components, inside a `bx--prose-flow` container that spaces them. With `"markdown"`, a top-level block that renders as a
    * component (`<Name`) or a Svelte tag (`{#if}`) sits outside Prose; plain
    * HTML (`<details>`, `<figure>`) stays in the run. Use it when the page
    * renders live examples, so Prose doesn't style their plain elements and a
@@ -569,7 +569,9 @@ export async function compileMarkdown(
         }
       }
       flush();
-      body = out.join("\n");
+      // Prose's flow container spaces the runs and the components between
+      // them (more room before a run that opens with a heading).
+      body = `<div class="bx--prose-flow">\n${out.join("\n")}\n</div>`;
       if (body.includes("<Prose")) components.add("Prose");
     } else {
       body = `${open}\n${body}\n</Prose>`;
