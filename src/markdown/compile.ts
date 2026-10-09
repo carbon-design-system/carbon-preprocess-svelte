@@ -68,9 +68,11 @@ export interface MarkdownOptions {
   prose?: boolean | Record<string, string | number | boolean>;
   /**
    * What `Prose` wraps: the whole page, or each run of Markdown between
-   * Svelte blocks. Use `"markdown"` when the page renders live examples, so
-   * Prose doesn't style their plain elements and a `Prose` inside one isn't
-   * nested in the page's.
+   * components. With `"markdown"`, a top-level block that renders as a
+   * component (`<Name`) or a Svelte tag (`{#if}`) sits outside Prose; plain
+   * HTML (`<details>`, `<figure>`) stays in the run. Use it when the page
+   * renders live examples, so Prose doesn't style their plain elements and a
+   * `Prose` inside one isn't nested in the page's.
    * @default "page"
    */
   proseScope?: "page" | "markdown";
@@ -164,6 +166,8 @@ const ALERT_KINDS: Record<AlertType, [kind: string, title: string]> = {
 };
 
 const ANCHOR_CLASS = "bx--prose__heading-anchor";
+/** Rendered markup that `proseScope: "markdown"` keeps out of Prose. */
+const OUTSIDE_PROSE = /^\s*(?:<[A-Z]|\{)/;
 
 /** GitHub's heading slug (`github-slugger`), for ids that match on GitHub. */
 export function githubSlug(text: string): string {
@@ -204,7 +208,7 @@ export async function renderMarkdown(
   options: MarkdownOptions & { filename?: string; ids?: boolean } = {},
 ): Promise<{
   html: string;
-  /** The rendered top-level blocks, marking which are Svelte markup. */
+  /** The rendered top-level blocks, marking components and Svelte tags. */
   parts: { svelte: boolean; html: string }[];
   hoisted: string[];
   headings: MarkdownHeading[];
@@ -411,7 +415,7 @@ export async function renderMarkdown(
   return {
     html: rendered.join("\n"),
     parts: rendered.map((html, index) => ({
-      svelte: content[index].type === "svelte",
+      svelte: content[index].type === "svelte" && OUTSIDE_PROSE.test(html),
       html,
     })),
     hoisted,
