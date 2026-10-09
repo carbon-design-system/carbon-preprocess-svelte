@@ -69,6 +69,7 @@ for (const example of examples) {
     ids: false,
     expressions: false,
     frontmatter: false,
+    autolinks: false,
   });
   const ok = normalize(html) === normalize(example.html);
   const section = sections.get(example.section) ?? { pass: 0, total: 0 };
