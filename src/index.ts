@@ -6,6 +6,12 @@ export type {
   RenderContext,
 } from "./markdown/compile";
 export {
+  highlight,
+  type Token,
+  type TokenType,
+  tokenize,
+} from "./markdown/highlight";
+export {
   type CarbonBunOptions,
   type CarbonBunPlugin,
   optimizeCarbonBun,

@@ -4,9 +4,13 @@
  * pipeline maps to an option or hook:
  *
  * - mdsvex layout          → `layout`
- * - `mdsvexPrismHighlighter` → `renderers.code` (same Prism output)
+ * - `mdsvexPrismHighlighter` → the built-in `highlight` (Carbon syntax
+ *                            tokens; no Prism)
  * - `plugin` (Preview)     → `renderers.svelte`: a component block is one
- *                            block even with blank lines inside
+ *                            block even with blank lines inside, and its
+ *                            code view comes from `ctx.example`, with the
+ *                            page-script imports and declarations it uses
+ *                            (the old icon-name guess is gone)
  * - `heroIntro`            → `transform`
  * - `carbonify`            → dropped: the page renders inside `Prose`; the
  *                            h2 section intro keeps its class via `transform`
@@ -15,30 +19,19 @@
  * - TOC regex scrape       → the `headings` prop on the layout
  * - auto-import `Preview`, `DocKbd` → `autoImport`
  *
- * Prettier, Prism and the docs helpers load from the CCS checkout, so this
+ * Prettier and the docs helpers load from the CCS checkout, so this
  * package doesn't depend on them.
  */
 import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { Block } from "../src/markdown/blocks";
+import { highlight } from "../src/markdown/highlight";
 import { markdown } from "../src/preprocessors/markdown";
 
-type Legacy = { type?: string; name?: string; expression?: Legacy } & Record<
-  string,
-  unknown
->;
-
-const ICON_NAME = /[A-Z][a-z]*/;
 const FILE_SOURCE_SRC = /src="([^"]+)"/;
 const DOC_KBD = /^\s*<DocKbd\b/;
 const FILE_SOURCE = /^<FileSource/;
-const LANG_ALIASES: Record<string, string> = {
-  js: "javascript",
-  ts: "typescript",
-  html: "markup",
-  svg: "markup",
-};
 
 export async function createCcsMarkdown(
   ccsDir: string,
@@ -46,24 +39,12 @@ export async function createCcsMarkdown(
 ) {
   const docs = path.join(ccsDir, "docs");
   const require = createRequire(path.join(docs, "package.json"));
-  const Prism = require("prismjs");
-  for (const lang of ["markup", "css", "clike", "javascript", "typescript"]) {
-    require(`prismjs/components/prism-${lang}.js`);
-  }
-  require("prism-svelte");
   const { format } = await import(require.resolve("prettier"));
   const prettierPluginSvelte = (
     await import(require.resolve("prettier-plugin-svelte"))
   ).default;
-  const { parse } = await import(require.resolve("svelte/compiler"));
   const { stripDocsOnly } = await import(
     path.join(docs, "scripts/strip-docs-only.ts")
-  );
-  const componentApi = JSON.parse(
-    readFileSync(path.join(docs, "src/COMPONENT_API.json"), "utf8"),
-  );
-  const componentNames = new Set<string>(
-    componentApi.components.map((c: { moduleName: string }) => c.moduleName),
   );
   const cache = new Map<string, { codeRaw: string; code: string }>();
 
@@ -79,56 +60,10 @@ export async function createCcsMarkdown(
       : source;
     const result = {
       codeRaw,
-      code: Prism.highlight(codeRaw, Prism.languages.svelte, "svelte"),
+      code: highlight(codeRaw, "svelte") ?? codeRaw,
     };
     cache.set(source, result);
     return result;
-  }
-
-  /** The `<script>` a snippet needs to run on its own: Carbon components, icons, actions. */
-  function createImports(source: string): string {
-    const components = new Set<string>();
-    const icons = new Set<string>();
-    const isIcon = (name: string) =>
-      ICON_NAME.test(name) && !componentNames.has(name);
-    const visit = (node: unknown) => {
-      if (!node || typeof node !== "object") return;
-      if (Array.isArray(node)) {
-        for (const child of node) visit(child);
-        return;
-      }
-      const n = node as Legacy;
-      if (
-        n.type === "InlineComponent" &&
-        n.name &&
-        !n.name.startsWith("svelte:") &&
-        n.name !== "DocKbd"
-      ) {
-        (isIcon(n.name) ? icons : components).add(n.name);
-      } else if (
-        n.type === "MustacheTag" &&
-        n.expression?.type === "Identifier" &&
-        n.expression.name &&
-        isIcon(n.expression.name)
-      ) {
-        icons.add(n.expression.name);
-      } else if (n.type === "Action" && n.name) {
-        components.add(n.name);
-      }
-      for (const [key, value] of Object.entries(n)) {
-        if (key !== "start" && key !== "end") visit(value);
-      }
-    };
-    visit(parse(source).html);
-    if (components.size === 0) return "";
-    const lines = [
-      `  import { ${[...components].join(", ")} } from "carbon-components-svelte";`,
-    ];
-    for (const icon of icons)
-      lines.push(
-        `  import ${icon} from "carbon-icons-svelte/lib/${icon}.svelte";`,
-      );
-    return `<script>\n${lines.join("\n")}\n</script>\n\n`;
   }
 
   return markdown({
@@ -174,18 +109,9 @@ export async function createCcsMarkdown(
         }
       });
     },
+    highlight,
     renderers: {
-      code(block, ctx) {
-        const raw = block.lang.toLowerCase();
-        const key = LANG_ALIASES[raw] ?? raw;
-        const grammar = key ? Prism.languages[key] : undefined;
-        const inner = grammar
-          ? Prism.highlight(block.value, grammar, key)
-          : ctx.escape(block.value);
-        const lang = raw || "text";
-        return `<pre class="language-${lang}">{@html ${JSON.stringify(`<code class="language-${lang}">${inner}</code>`)}}</pre>`;
-      },
-      async svelte(block) {
+      async svelte(block, ctx) {
         const value = block.value;
         if (DOC_KBD.test(value)) return `<p>${value}</p>`;
         if (value.startsWith("<!--") || value.startsWith("{")) return value;
@@ -198,9 +124,7 @@ export async function createCcsMarkdown(
           );
           return `<Preview framed src="${src}" codeRaw={${JSON.stringify(codeRaw)}} code={${JSON.stringify(code)}} />`;
         }
-        const { codeRaw, code } = await formatAndHighlight(
-          createImports(value) + value,
-        );
+        const { codeRaw, code } = await formatAndHighlight(ctx.example(value));
         return `<Preview codeRaw={${JSON.stringify(codeRaw)}} code={${JSON.stringify(code)}}>${value}</Preview>`;
       },
     },
