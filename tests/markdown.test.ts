@@ -7,7 +7,7 @@ import { parseFrontmatter } from "carbon-preprocess-svelte/markdown/frontmatter"
 import { compile } from "svelte/compiler";
 
 const body = async (source: string, options = {}) =>
-  (await renderMarkdown(source, { alerts: false, ...options })).html;
+  (await renderMarkdown(source, options)).html;
 
 describe("renderMarkdown", () => {
   test("renders CommonMark blocks and inlines", async () => {
@@ -85,7 +85,10 @@ Label
 
   test("renders tight, loose, nested, and task lists", async () => {
     expect(await body("- a\n  - b\n- [x] c")).toBe(
-      '<ul>\n<li>a\n<ul>\n<li>b</li>\n</ul></li>\n<li><input type="checkbox" disabled checked /> c</li>\n</ul>',
+      '<ul class="contains-task-list">\n<li>a\n<ul>\n<li>b</li>\n</ul></li>\n<li class="task-list-item"><label><input type="checkbox" disabled checked /> c</label></li>\n</ul>',
+    );
+    expect(await body("- [ ] a\n\n  more")).toBe(
+      '<ul class="contains-task-list">\n<li class="task-list-item">\n<p><label><input type="checkbox" disabled /> a</label></p>\n<p>more</p>\n</li>\n</ul>',
     );
     expect(await body("1. a\n\n2. b")).toBe(
       "<ol>\n<li>\n<p>a</p>\n</li>\n<li>\n<p>b</p>\n</li>\n</ol>",
@@ -117,14 +120,32 @@ Label
     );
   });
 
-  test("maps GitHub alerts to InlineNotification", async () => {
+  test("renders GitHub alerts as Prose alerts, or as InlineNotification", async () => {
+    expect(await body("> [!NOTE]\n> Plain.")).toBe(
+      '<blockquote data-alert="note" data-alert-title="Note">\n<p>Plain.</p>\n</blockquote>',
+    );
     expect(
-      await body("> [!WARNING]\n> Mind the **gap**.", { alerts: true }),
+      await body("> [!TIP]\n> Plain.", { alertTitles: { tip: "Astuce" } }),
+    ).toContain('data-alert-title="Astuce"');
+    expect(
+      await body("> [!WARNING]\n> Mind the **gap**.", {
+        alerts: "InlineNotification",
+      }),
     ).toBe(
       '<InlineNotification lowContrast hideCloseButton kind="warning" title="Warning"><svelte:fragment slot="subtitleChildren">Mind the <strong>gap</strong>.</svelte:fragment></InlineNotification>',
     );
-    expect(await body("> [!NOTE]\n> Plain.")).toBe(
-      '<blockquote data-alert="note">\n<p>Plain.</p>\n</blockquote>',
+  });
+
+  test("adds heading anchors when `anchors` is set", async () => {
+    expect(await body("## Set `up`", { anchors: true })).toBe(
+      '<h2 id="set-up">Set <code>up</code> <a class="bx--prose__heading-anchor" href="#set-up" aria-label="Link to Set up">#</a></h2>',
+    );
+    expect(
+      await body("# A\n\n## B", {
+        anchors: { depths: [2], label: (h: { text: string }) => `§ ${h.text}` },
+      }),
+    ).toBe(
+      '<h1 id="a">A</h1>\n<h2 id="b">B <a class="bx--prose__heading-anchor" href="#b" aria-label="§ B">#</a></h2>',
     );
   });
 
@@ -209,6 +230,15 @@ import { Prose } from "carbon-components-svelte";
 `);
   });
 
+  test('wraps only Markdown runs in Prose with `proseScope: "markdown"`', async () => {
+    const { code } = await compileMarkdown("Intro.\n\n<Demo />\n\nMore.", {
+      proseScope: "markdown",
+    });
+    expect(code).toContain(
+      "<Prose>\n<p>Intro.</p>\n</Prose>\n<Demo />\n<Prose>\n<p>More.</p>\n</Prose>",
+    );
+  });
+
   test("auto-imports components the page renders but doesn't import", async () => {
     const { code } = await compileMarkdown('Press <Kbd label="Tab" />.', {
       prose: false,
@@ -221,7 +251,7 @@ import { Prose } from "carbon-components-svelte";
   test("compiles with Svelte 5", async () => {
     const { code } = await compileMarkdown(
       "# Hi { there }\n\n<button on:click={() => count++}>\n\n  {count}\n\n</button>\n\n> [!TIP]\n> Done.\n\n```js\nlet a = {};\n```",
-      { codeSnippet: true },
+      { codeSnippet: true, alerts: "InlineNotification", anchors: true },
     );
     expect(() => compile(code, { filename: "page.md" })).not.toThrow();
   });
