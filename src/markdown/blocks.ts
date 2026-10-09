@@ -54,6 +54,7 @@ const ORDERED = /^(\d{1,9})([.)])(?=[ \t]|$)/;
 const TABLE_DELIMITER_CELL = /^:?-+:?$/;
 const ALERT = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(?:\n|$)/i;
 const TASK = /^\[([ xX])\](?=[ \t])[ \t]*/;
+const FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
 const SVELTE_START = /^(?:<(?:[A-Za-z]|!--)|\{[#:/@])/;
 const SVELTE_INTERRUPT = /^(?:<\/?([A-Za-z][\w-]*)|\{[#:/])/;
 const UNESCAPED_PIPE = /(?<!\\)\|/;
@@ -80,6 +81,8 @@ const ALERTS: Record<string, AlertType> = {
 
 export interface BlockContext {
   refs: Map<string, LinkReference>;
+  /** Footnote definitions (`[^label]: …`), by lowercased label. */
+  footnotes: Map<string, Block[]>;
 }
 
 interface ParsedBlocks {
@@ -431,6 +434,40 @@ export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
     }
     flush();
 
+    // A footnote definition: its first line, lazy continuation lines, and
+    // any following blocks indented four columns. It renders at the end.
+    const footnote = FOOTNOTE_DEF.exec(rest);
+    if (footnote) {
+      const body = [footnote[2]];
+      i++;
+      while (i < lines.length) {
+        const current = lines[i];
+        if (isBlank(current)) {
+          let j = i;
+          while (j < lines.length && isBlank(lines[j])) j++;
+          if (j >= lines.length || indentOf(lines[j]) < 4) break;
+          for (; i < j; i++) body.push("");
+        } else if (indentOf(current) >= 4) {
+          body.push(stripColumns(current, 4));
+          i++;
+        } else if (
+          !isBlank(body.at(-1)) &&
+          !interruptsParagraph(current) &&
+          !FOOTNOTE_DEF.test(current.trimStart())
+        ) {
+          body.push(current.trimStart());
+          i++;
+        } else {
+          break;
+        }
+      }
+      const label = footnote[1].toLowerCase();
+      if (!ctx.footnotes.has(label)) {
+        ctx.footnotes.set(label, parseBlocks(body, ctx).blocks);
+      }
+      continue;
+    }
+
     const fence = FENCE.exec(rest);
     if (fence && !(fence[1][0] === "`" && fence[2].includes("`"))) {
       const marker = fence[1];
@@ -658,8 +695,9 @@ function lastIsParagraphText(content: string[]): boolean {
 export function parseDocument(source: string): {
   blocks: Block[];
   refs: Map<string, LinkReference>;
+  footnotes: Map<string, Block[]>;
 } {
-  const refs = new Map<string, LinkReference>();
+  const ctx: BlockContext = { refs: new Map(), footnotes: new Map() };
   const lines = source.replace(/\r\n?/g, "\n").split("\n");
-  return { blocks: parseBlocks(lines, { refs }).blocks, refs };
+  return { blocks: parseBlocks(lines, ctx).blocks, ...ctx };
 }
