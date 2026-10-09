@@ -11,6 +11,7 @@
  * - `carbonify`            → dropped: the page renders inside `Prose`; the
  *                            h2 section intro keeps its class via `transform`
  * - `rehypeSlug`           → built in (GitHub slugs)
+ * - `rehypeHeadingAnchors` → `anchors` (Prose's heading-anchor style)
  * - TOC regex scrape       → the `headings` prop on the layout
  * - auto-import `Preview`, `DocKbd` → `autoImport`
  *
@@ -136,7 +137,12 @@ export async function createCcsMarkdown(
       filename?.includes(`${path.sep}pages${path.sep}components${path.sep}`)
         ? path.join(docs, "src/layouts/ComponentLayout.svelte")
         : undefined,
+    // Prose wraps the Markdown between live examples, not the examples:
+    // their plain elements keep their own look, and examples that render
+    // Prose aren't nested in the page's.
     prose: { maxWidth: "none" },
+    proseScope: "markdown",
+    anchors: { depths: [2, 3] },
     autoImport: {
       Preview: "../../components/Preview.svelte",
       DocKbd: "../../components/DocKbd.svelte",

@@ -110,7 +110,8 @@ function bench() {
 const HEADINGS_EXPORT = /export const headings = (.*);/;
 const TAGS = /<(p|li|th|td|h[1-6])\b[^>]*>([\s\S]*?)<\/\1>/g;
 const HEADING = /<h([23])\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g;
-const ANCHOR = /<a\b[^>]*class="heading-anchor"[^>]*>[\s\S]*?<\/a\s*>/g;
+const ANCHOR =
+  /\s*<a\b[^>]*class="(?:bx--prose__)?heading-anchor"[^>]*>[\s\S]*?<\/a\s*>/g;
 const ATTRIBUTES = /\s(?:class|style|align)="[^"]*"/g;
 const TAG_WHITESPACE = /<(\w+)\s+>/g;
 const WHITESPACE = /\s+/g;
