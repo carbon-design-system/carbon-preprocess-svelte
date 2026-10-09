@@ -277,6 +277,21 @@ describe("parseFrontmatter", () => {
 });
 
 describe("markdown preprocessor", () => {
+  // The dev-dependency carbon-components-svelte predates Prose.
+  test("uses Prose only when the installed Carbon has it", async () => {
+    const auto = await markdown().markup({ content: "Hi", filename: "a.md" });
+    expect(auto?.code).not.toContain("Prose");
+
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const forced = markdown({ prose: true });
+    await forced.markup({ content: "Hi", filename: "a.md" });
+    const second = await forced.markup({ content: "Hi", filename: "b.md" });
+    expect(second?.code).toContain("<Prose>");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("has no Prose");
+    warn.mockRestore();
+  });
+
   test("converts only files with a matching extension", async () => {
     const preprocessor = markdown({ extensions: [".svx"], svelte: 5 });
     expect(
