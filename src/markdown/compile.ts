@@ -469,7 +469,12 @@ export async function renderMarkdown(
           const id = footnoteId(key);
           const inner = await renderBlocks(footnotes.get(key) ?? [], false);
           const back = labels.backref?.(n) ?? `Back to reference ${n}`;
-          return `<li id="fn-${id}">\n${inner}\n<a href="#fnref-${id}" class="footnote-backref" aria-label="${escapeText(back)}">↩</a>\n</li>`;
+          const link = `<a href="#fnref-${id}" class="footnote-backref" aria-label="${escapeText(back)}">↩</a>`;
+          // Like GitHub, the back link ends the note's last paragraph.
+          const body = inner.endsWith("</p>")
+            ? `${inner.slice(0, -4)} ${link}</p>`
+            : `${inner}\n${link}`;
+          return `<li id="fn-${id}">\n${body}\n</li>`;
         }),
     );
     const html = `<section class="footnotes" data-footnotes>\n<h2 id="footnote-label" class="bx--assistive-text">${escapeText(labels.heading ?? "Footnotes")}</h2>\n<ol>\n${items.join("\n")}\n</ol>\n</section>`;
