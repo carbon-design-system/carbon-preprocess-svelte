@@ -67,7 +67,6 @@ for (const example of examples) {
   // biome-ignore lint/performance/noAwaitInLoops: examples print in order
   const { html } = await renderMarkdown(example.markdown, {
     ids: false,
-    alerts: false,
     expressions: false,
     frontmatter: false,
   });
