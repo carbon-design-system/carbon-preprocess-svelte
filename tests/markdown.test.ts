@@ -114,6 +114,19 @@ Label
     );
   });
 
+  test("passes a highlighter's whole `<pre>` through", async () => {
+    const shiki = (code: string) =>
+      `<pre class="shiki" style="color:var(--shiki-foreground)"><code><span>${code.trim()}</span></code></pre>`;
+    expect(await body("```js\nlet a;\n```", { highlight: shiki })).toBe(
+      '{@html "<pre class=\\"shiki\\" style=\\"color:var(--shiki-foreground)\\"><code><span>let a;</span></code></pre>"}',
+    );
+    expect(
+      await body("```js\nlet a;\n```", { highlight: shiki, codeSnippet: true }),
+    ).toBe(
+      '<CodeSnippet type="multi" code={"let a;"}>{@html "<span>let a;</span>"}</CodeSnippet>',
+    );
+  });
+
   test("maps fenced code to CodeSnippet when `codeSnippet` is set", async () => {
     expect(await body("```\nnpm i\n```", { codeSnippet: true })).toBe(
       '<CodeSnippet type="multi" code={"npm i"} />',
@@ -195,9 +208,10 @@ export const headings = [{"id":"guide","text":"Guide","depth":1}];
 <script>
 import { Prose } from "carbon-components-svelte";
 import MarkdownLayout from "./Layout.svelte";
+export let proseProps = {};
 </script>
 <MarkdownLayout {...metadata} {headings}>
-<Prose>
+<Prose {...proseProps}>
 <h1 id="guide">Guide</h1>
 <p>Hello.</p>
 </Prose>
@@ -218,10 +232,11 @@ export const headings = [];
 </script>
 <script>
 import { Prose } from "carbon-components-svelte";
+export let proseProps = {};
   import { Button } from "carbon-components-svelte";
 </script>
 <svelte:head><title>T</title></svelte:head>
-<Prose variant="compact">
+<Prose variant="compact" {...proseProps}>
 <Button />
 </Prose>
 <style>
@@ -236,8 +251,20 @@ import { Prose } from "carbon-components-svelte";
       { proseScope: "markdown" },
     );
     expect(code).toContain(
-      "<Prose>\n<p>Intro.</p>\n</Prose>\n<Demo />\n<Prose>\n<details><summary>S</summary></details>\n</Prose>\n{#if a}\n<Prose>\n<p>More.</p>\n</Prose>\n{/if}",
+      "<Prose {...proseProps}>\n<p>Intro.</p>\n</Prose>\n<Demo />\n<Prose {...proseProps}>\n<details><summary>S</summary></details>\n</Prose>\n{#if a}\n<Prose {...proseProps}>\n<p>More.</p>\n</Prose>\n{/if}",
     );
+  });
+
+  test("declares `proseProps` for runtime Prose props, with runes when the page uses them", async () => {
+    const runes = await compileMarkdown(
+      "<script>\n  let open = $state(false);\n</script>\n\nHi",
+    );
+    expect(runes.code).toContain("let { proseProps = {} } = $props();");
+    const own = await compileMarkdown(
+      "<script>\n  let { title } = $props();\n</script>\n\nHi",
+    );
+    expect(own.code).not.toContain("proseProps");
+    expect(own.code).toContain("<Prose>");
   });
 
   test("auto-imports components the page renders but doesn't import", async () => {
@@ -287,7 +314,7 @@ describe("markdown preprocessor", () => {
     const forced = markdown({ prose: true });
     await forced.markup({ content: "Hi", filename: "a.md" });
     const second = await forced.markup({ content: "Hi", filename: "b.md" });
-    expect(second?.code).toContain("<Prose>");
+    expect(second?.code).toContain("<Prose {...proseProps}>");
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0][0])).toContain("has no Prose");
     warn.mockRestore();

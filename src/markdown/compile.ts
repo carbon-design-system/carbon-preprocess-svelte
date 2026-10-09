@@ -100,8 +100,10 @@ export interface MarkdownOptions {
     | boolean
     | { depths?: number[]; label?: (heading: MarkdownHeading) => string };
   /**
-   * Highlight fenced code. Return HTML for the inside of `<code>`, or
-   * `undefined` to leave the block plain.
+   * Highlight fenced code, with any highlighter. Return the HTML for the
+   * inside of `<code>` (Prism's `highlight`), a whole `<pre>` element
+   * (Shiki's `codeToHtml`), or `undefined` to leave the block plain. Called
+   * once per block at build time; it may be async.
    */
   highlight?: (
     code: string,
@@ -166,6 +168,11 @@ const ALERT_KINDS: Record<AlertType, [kind: string, title: string]> = {
 };
 
 const ANCHOR_CLASS = "bx--prose__heading-anchor";
+const PRE_ELEMENT = /^\s*<pre\b/;
+const CODE_CONTENT = /<code\b[^>]*>([\s\S]*)<\/code>\s*<\/pre>\s*$/;
+const RUNES = /\$(?:state|derived|effect|props)\s*[.(]/;
+const PROPS_RUNE = /\$props\s*\(/;
+
 /** Rendered markup that `proseScope: "markdown"` keeps out of Prose. */
 const OUTSIDE_PROSE = /^\s*(?:<[A-Z]|\{)/;
 
@@ -324,12 +331,19 @@ export async function renderMarkdown(
           block.meta,
         );
         const raw = JSON.stringify(block.value.replace(FINAL_NEWLINE, ""));
+        const wholePre =
+          highlighted !== undefined && PRE_ELEMENT.test(highlighted);
         if (options.codeSnippet) {
           const snippet = ctx.use("CodeSnippet");
-          return highlighted === undefined
+          // CodeSnippet renders its own `pre` and `code`: keep the tokens.
+          const inner = wholePre
+            ? (CODE_CONTENT.exec(highlighted)?.[1] ?? highlighted)
+            : highlighted;
+          return inner === undefined
             ? `<${snippet} type="multi" code={${raw}} />`
-            : `<${snippet} type="multi" code={${raw}}>{@html ${JSON.stringify(highlighted)}}</${snippet}>`;
+            : `<${snippet} type="multi" code={${raw}}>{@html ${JSON.stringify(inner)}}</${snippet}>`;
         }
+        if (wholePre) return `{@html ${JSON.stringify(highlighted)}}`;
         const lang = block.lang
           ? ` class="language-${escapeText(block.lang)}"`
           : "";
@@ -464,8 +478,13 @@ export async function compileMarkdown(
 
   const prose = options.prose ?? true;
   let body = rendered.html;
+  // `proseProps` lets the page's parent set Prose props at runtime, over the
+  // build-time ones: `<Guide proseProps={{ variant: "compact" }} />`. Pages
+  // whose script already calls `$props()` keep the build-time props only.
+  const runtimeProps =
+    prose !== false && !PROPS_RUNE.test(instanceScript ?? "");
   if (prose !== false) {
-    const open = `<Prose${typeof prose === "object" ? propsOf(prose) : ""}>`;
+    const open = `<Prose${typeof prose === "object" ? propsOf(prose) : ""}${runtimeProps ? " {...proseProps}" : ""}>`;
     if (options.proseScope === "markdown") {
       // One Prose per run of Markdown blocks; Svelte blocks stay outside.
       const out: string[] = [];
@@ -522,6 +541,13 @@ export async function compileMarkdown(
     ) {
       imports.push(`import ${name} from ${JSON.stringify(from)};`);
     }
+  }
+  if (runtimeProps) {
+    imports.push(
+      RUNES.test(instanceScript ?? "")
+        ? "let { proseProps = {} } = $props();"
+        : "export let proseProps = {};",
+    );
   }
   if (imports.length > 0) {
     instanceScript = instanceScript
