@@ -67,17 +67,36 @@ export interface MarkdownOptions {
    */
   prose?: boolean | Record<string, string | number | boolean>;
   /**
+   * What `Prose` wraps: the whole page, or each run of Markdown between
+   * Svelte blocks. Use `"markdown"` when the page renders live examples, so
+   * Prose doesn't style their plain elements and a `Prose` inside one isn't
+   * nested in the page's.
+   * @default "page"
+   */
+  proseScope?: "page" | "markdown";
+  /**
    * Render fenced code blocks with `CodeSnippet type="multi"` (copy button,
    * show more) instead of a plain `<pre>`.
    * @default false
    */
   codeSnippet?: boolean;
   /**
-   * Render GitHub alerts (`> [!NOTE]`) with `InlineNotification`. When
-   * `false`, they render as `<blockquote data-alert="note">`.
-   * @default true
+   * How GitHub alerts (`> [!NOTE]`) render: a `<blockquote data-alert>`
+   * that `Prose` styles without JavaScript, or an `InlineNotification`.
+   * @default "blockquote"
    */
-  alerts?: boolean;
+  alerts?: "blockquote" | "InlineNotification";
+  /** Alert titles, for translation. Defaults to "Note", "Tip", and so on. */
+  alertTitles?: Partial<Record<AlertType, string>>;
+  /**
+   * Add a `#` link to each heading (Prose's `bx--prose__heading-anchor`).
+   * Pass `depths` to limit which headings get one, and `label` for the
+   * link's accessible name.
+   * @default false
+   */
+  anchors?:
+    | boolean
+    | { depths?: number[]; label?: (heading: MarkdownHeading) => string };
   /**
    * Highlight fenced code. Return HTML for the inside of `<code>`, or
    * `undefined` to leave the block plain.
@@ -135,13 +154,16 @@ const OPEN_TAG_END = />/;
 const FINAL_NEWLINE = /\n$/;
 const CLOSE_SCRIPT = /<\/script>\s*$/;
 
+/** InlineNotification kinds and default titles, matching Prose's alert colors. */
 const ALERT_KINDS: Record<AlertType, [kind: string, title: string]> = {
   note: ["info", "Note"],
   tip: ["success", "Tip"],
-  important: ["info-square", "Important"],
+  important: ["info", "Important"],
   warning: ["warning", "Warning"],
   caution: ["error", "Caution"],
 };
+
+const ANCHOR_CLASS = "bx--prose__heading-anchor";
 
 /** GitHub's heading slug (`github-slugger`), for ids that match on GitHub. */
 export function githubSlug(text: string): string {
@@ -182,6 +204,8 @@ export async function renderMarkdown(
   options: MarkdownOptions & { filename?: string; ids?: boolean } = {},
 ): Promise<{
   html: string;
+  /** The rendered top-level blocks, marking which are Svelte markup. */
+  parts: { svelte: boolean; html: string }[];
   hoisted: string[];
   headings: MarkdownHeading[];
   metadata: Record<string, unknown>;
@@ -214,6 +238,7 @@ export async function renderMarkdown(
   }
 
   const headings: MarkdownHeading[] = [];
+  const headingOf = new Map<Block, MarkdownHeading>();
   if (options.ids !== false) {
     const slug = options.slug ?? githubSlug;
     const seen = new Map<string, number>();
@@ -231,13 +256,16 @@ export async function renderMarkdown(
         block.id = id;
       }
       seen.set(block.id, seen.get(block.id) ?? 0);
-      headings.push({ id: block.id, text, depth: block.depth });
+      const heading = { id: block.id, text, depth: block.depth };
+      headings.push(heading);
+      headingOf.set(block, heading);
     }
   }
 
   const components = new Set<string>();
   const renderers = options.renderers ?? {};
-  const alerts = options.alerts ?? true;
+  const alerts = options.alerts ?? "blockquote";
+  const anchors = options.anchors === true ? {} : options.anchors || undefined;
   const ctx: RenderContext = {
     filename: options.filename,
     metadata,
@@ -273,7 +301,17 @@ export async function renderMarkdown(
       }
       case "heading": {
         const id = block.id ? ` id="${escapeText(block.id)}"` : "";
-        return `<h${block.depth}${id}${attributes(block.attrs)}>${ctx.inline(block.text)}</h${block.depth}>`;
+        const heading = headingOf.get(block);
+        let anchor = "";
+        if (
+          anchors &&
+          heading &&
+          (!anchors.depths || anchors.depths.includes(block.depth))
+        ) {
+          const label = anchors.label?.(heading) ?? `Link to ${heading.text}`;
+          anchor = ` <a class="${ANCHOR_CLASS}" href="#${escapeText(heading.id)}" aria-label="${escapeText(label)}">#</a>`;
+        }
+        return `<h${block.depth}${id}${attributes(block.attrs)}>${ctx.inline(block.text)}${anchor}</h${block.depth}>`;
       }
       case "code": {
         const highlighted = await options.highlight?.(
@@ -298,8 +336,11 @@ export async function renderMarkdown(
       case "thematicBreak":
         return "<hr />";
       case "blockquote": {
-        if (block.alert && alerts) {
-          const [kind, title] = ALERT_KINDS[block.alert];
+        const title = block.alert
+          ? (options.alertTitles?.[block.alert] ?? ALERT_KINDS[block.alert][1])
+          : "";
+        if (block.alert && alerts === "InlineNotification") {
+          const [kind] = ALERT_KINDS[block.alert];
           const [only] = block.children;
           const body =
             block.children.length === 1 && only.type === "paragraph"
@@ -308,25 +349,41 @@ export async function renderMarkdown(
           const notification = ctx.use("InlineNotification");
           return `<${notification} lowContrast hideCloseButton kind="${kind}" title="${title}"><svelte:fragment slot="subtitleChildren">${body}</svelte:fragment></${notification}>`;
         }
-        const alert = block.alert ? ` data-alert="${block.alert}"` : "";
+        const alert = block.alert
+          ? ` data-alert="${block.alert}" data-alert-title="${escapeText(title)}"`
+          : "";
         return `<blockquote${alert}>\n${await renderBlocks(block.children, false)}\n</blockquote>`;
       }
       case "list": {
         const tag = block.ordered ? "ol" : "ul";
         const start =
           block.ordered && block.start !== 1 ? ` start="${block.start}"` : "";
+        const tasks = block.items.some((item) => item.checked !== undefined);
         const items = await Promise.all(
           block.items.map(async (item) => {
-            const checkbox =
-              item.checked === undefined
-                ? ""
-                : `<input type="checkbox" disabled${item.checked ? " checked" : ""} /> `;
-            const inner = await renderBlocks(item.children, block.tight);
-            const wrap = block.tight || inner === "" ? inner : `\n${inner}\n`;
-            return `<li>${checkbox}${wrap}</li>`;
+            if (item.checked === undefined) {
+              const inner = await renderBlocks(item.children, block.tight);
+              const wrap = block.tight || inner === "" ? inner : `\n${inner}\n`;
+              return `<li>${wrap}</li>`;
+            }
+            // A task item: the checkbox and the first paragraph share a
+            // `label`, so the checkbox has an accessible name.
+            const [first, ...rest] = item.children;
+            const text =
+              first?.type === "paragraph" ? ctx.inline(first.text) : "";
+            const checkbox = `<input type="checkbox" disabled${item.checked ? " checked" : ""} />`;
+            const label = `<label>${checkbox} ${text}</label>`;
+            const others = first?.type === "paragraph" ? rest : item.children;
+            const tail = await renderBlocks(others, block.tight);
+            const inner = [block.tight ? label : `<p>${label}</p>`, tail]
+              .filter(Boolean)
+              .join("\n");
+            const wrap = block.tight ? inner : `\n${inner}\n`;
+            return `<li class="task-list-item">${wrap}</li>`;
           }),
         );
-        return `<${tag}${start}>\n${items.join("\n")}\n</${tag}>`;
+        const listClass = tasks ? ' class="contains-task-list"' : "";
+        return `<${tag}${listClass}${start}>\n${items.join("\n")}\n</${tag}>`;
       }
       case "table": {
         const cell = (tag: string, text: string, column: number) => {
@@ -348,8 +405,15 @@ export async function renderMarkdown(
     }
   }
 
+  const rendered = await Promise.all(
+    content.map((block) => renderBlock(block, false)),
+  );
   return {
-    html: await renderBlocks(content, false),
+    html: rendered.join("\n"),
+    parts: rendered.map((html, index) => ({
+      svelte: content[index].type === "svelte",
+      html,
+    })),
     hoisted,
     headings,
     metadata,
@@ -397,9 +461,30 @@ export async function compileMarkdown(
   const prose = options.prose ?? true;
   let body = rendered.html;
   if (prose !== false) {
-    const props = typeof prose === "object" ? propsOf(prose) : "";
-    body = `<Prose${props}>\n${body}\n</Prose>`;
-    components.add("Prose");
+    const open = `<Prose${typeof prose === "object" ? propsOf(prose) : ""}>`;
+    if (options.proseScope === "markdown") {
+      // One Prose per run of Markdown blocks; Svelte blocks stay outside.
+      const out: string[] = [];
+      let run: string[] = [];
+      const flush = () => {
+        if (run.length > 0) out.push(`${open}\n${run.join("\n")}\n</Prose>`);
+        run = [];
+      };
+      for (const part of rendered.parts) {
+        if (part.svelte) {
+          flush();
+          out.push(part.html);
+        } else {
+          run.push(part.html);
+        }
+      }
+      flush();
+      body = out.join("\n");
+      if (body.includes("<Prose")) components.add("Prose");
+    } else {
+      body = `${open}\n${body}\n</Prose>`;
+      components.add("Prose");
+    }
   }
   const layout =
     typeof options.layout === "function"
