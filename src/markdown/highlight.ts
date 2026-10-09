@@ -81,6 +81,12 @@ const JS_OPERATOR =
 const WHITESPACE = /\s+/y;
 const PUNCTUATION = /[{}()[\];,.:]/y;
 const UPPERCASE = /^[A-Z]/;
+const TS_PRIMITIVES = new Set(
+  "string number boolean any unknown never void object bigint symbol".split(
+    " ",
+  ),
+);
+const TYPE_POSITION = new Set([":", "|", "&", "<", ",", "=>"]);
 const NEXT_IS_CALL = /\s*\(/y;
 const NEXT_IS_COLON = /\s*:/y;
 
@@ -209,6 +215,10 @@ function classifyIdentifier(
   NEXT_IS_CALL.lastIndex = pos + name.length;
   if (NEXT_IS_CALL.test(code)) return "function";
   if (UPPERCASE.test(name)) return "typeName";
+  // TypeScript's built-in types, in a type position: `role: string`.
+  if (TS_PRIMITIVES.has(name) && previous && TYPE_POSITION.has(previous.text)) {
+    return "typeName";
+  }
   return null;
 }
 
@@ -300,6 +310,35 @@ function lexMustache(code: string, pos: number, out: Token[]): number {
   return stop;
 }
 
+/**
+ * A quoted attribute value. Svelte reads `{…}` inside the quotes as an
+ * expression (`on:click="{() => log("x")}"`), so those parts are script.
+ */
+function lexQuotedValue(code: string, start: number, out: Token[]): number {
+  const quote = code[start];
+  let text = quote;
+  let pos = start + 1;
+  const flushText = () => {
+    if (text) out.push({ type: "attributeValue", text });
+    text = "";
+  };
+  while (pos < code.length && code[pos] !== quote) {
+    if (code[pos] === "{") {
+      flushText();
+      pos = lexMustache(code, pos, out);
+      continue;
+    }
+    text += code[pos];
+    pos++;
+  }
+  if (pos < code.length) {
+    text += quote;
+    pos++;
+  }
+  flushText();
+  return pos;
+}
+
 /** A tag's attributes, up to its `>` or `/>`. Returns where they end. */
 function lexAttributes(code: string, start: number, out: Token[]): number {
   let pos = start;
@@ -310,6 +349,10 @@ function lexAttributes(code: string, start: number, out: Token[]): number {
   ) {
     if (code[pos] === "{") {
       pos = lexMustache(code, pos, out);
+      continue;
+    }
+    if ((code[pos] === '"' || code[pos] === "'") && out.at(-1)?.text === "=") {
+      pos = lexQuotedValue(code, pos, out);
       continue;
     }
     const afterEquals = out.at(-1)?.text === "=";
