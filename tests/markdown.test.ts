@@ -231,11 +231,12 @@ import { Prose } from "carbon-components-svelte";
   });
 
   test('wraps only Markdown runs in Prose with `proseScope: "markdown"`', async () => {
-    const { code } = await compileMarkdown("Intro.\n\n<Demo />\n\nMore.", {
-      proseScope: "markdown",
-    });
+    const { code } = await compileMarkdown(
+      "Intro.\n\n<Demo />\n\n<details><summary>S</summary></details>\n\n{#if a}\n\nMore.\n\n{/if}",
+      { proseScope: "markdown" },
+    );
     expect(code).toContain(
-      "<Prose>\n<p>Intro.</p>\n</Prose>\n<Demo />\n<Prose>\n<p>More.</p>\n</Prose>",
+      "<Prose>\n<p>Intro.</p>\n</Prose>\n<Demo />\n<Prose>\n<details><summary>S</summary></details>\n</Prose>\n{#if a}\n<Prose>\n<p>More.</p>\n</Prose>\n{/if}",
     );
   });
 
