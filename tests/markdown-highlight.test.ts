@@ -116,6 +116,39 @@ describe("tokenize", () => {
     ]);
   });
 
+  test("reads expressions inside quoted attribute values as script", () => {
+    expect(types('<B on:click="{() => log("x")}" />', "svelte")).toEqual([
+      "angleBracket:<",
+      "tagName:B",
+      "attributeName:on:click",
+      "operator:=",
+      'attributeValue:"',
+      "brace:{",
+      "paren:(",
+      "paren:)",
+      "operator:=>",
+      "function:log",
+      "paren:(",
+      'string:"x"',
+      "paren:)",
+      "brace:}",
+      'attributeValue:"',
+      "angleBracket:/>",
+    ]);
+  });
+
+  test("colors TypeScript's built-in types in type positions", () => {
+    expect(types("function f(role: string): Promise<void> {}", "ts")).toContain(
+      "typeName:string",
+    );
+    expect(types("let n: number | undefined;", "ts")).toContain(
+      "typeName:number",
+    );
+    expect(types("const o = { number };", "js")).not.toContain(
+      "typeName:number",
+    );
+  });
+
   test("keeps every character, so offsets map back to the source", () => {
     const code = '<A b="c" {d}>{#each e as f}{f}{/each}</A>\n<!-- g -->';
     expect(
