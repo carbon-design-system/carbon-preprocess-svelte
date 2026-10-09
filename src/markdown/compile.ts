@@ -1,5 +1,6 @@
 import type { AlertType, Attributes, Block } from "./blocks";
 import { parseDocument } from "./blocks";
+import { exampleSource } from "./example";
 import { parseFrontmatter, splitFrontmatter } from "./frontmatter";
 import {
   escapeText,
@@ -37,6 +38,12 @@ export interface RenderContext {
   escape(text: string): string;
   /** Import a `carbon-components-svelte` component the output uses. */
   use(component: string): string;
+  /**
+   * A live example's standalone source, for a code view: the markup, after
+   * a `<script>` with exactly the page-script imports and declarations it
+   * uses (and what those use).
+   */
+  example(markup: string): string;
 }
 
 type BlockOf<T extends Block["type"]> = Extract<Block, { type: T }>;
@@ -315,6 +322,13 @@ export async function renderMarkdown(
       components.add(component);
       return component;
     },
+    example: (markup) =>
+      exampleSource(
+        markup,
+        hoisted.find(
+          (block) => SCRIPT.test(block) && !MODULE_SCRIPT.test(block),
+        ),
+      ),
   };
 
   async function renderBlocks(list: Block[], tight: boolean): Promise<string> {
