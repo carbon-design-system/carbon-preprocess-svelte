@@ -9,7 +9,7 @@ import {
   inlineText,
   renderInline,
 } from "./inline";
-import { renderCodeLines } from "./lines";
+import { type CodeKind, renderCodeLines } from "./lines";
 
 export interface MarkdownHeading {
   /** The heading's `id`, unique within the page. */
@@ -26,6 +26,26 @@ export interface MarkdownTree {
   /** Parsed frontmatter, exported as `metadata` and passed to the layout. */
   metadata: Record<string, unknown>;
   blocks: Block[];
+}
+
+/** What a code block header needs an icon for. */
+export type CodeIconTarget =
+  | {
+      type: "file";
+      /** The block's file name or title. */
+      title?: string;
+      lang: string;
+      /** A shell session with `$ ` prompts. */
+      terminal: boolean;
+      /** The fence's `icon="…"`, if any. */
+      name?: string;
+    }
+  | { type: "status"; status: CodeKind };
+
+/** A component to import as an icon: `import <name> from "<from>"`. */
+export interface CodeIcon {
+  name: string;
+  from: string;
 }
 
 export interface ImageOptions {
@@ -56,6 +76,10 @@ export interface RenderContext {
   escape(text: string): string;
   /** Import a `carbon-components-svelte` component the output uses. */
   use(component: string): string;
+  /** Default-import a component the output uses; returns its local name. */
+  importDefault(name: string, from: string): string;
+  /** The icon component for a code block header, imported, or `undefined`. */
+  codeIcon(target: CodeIconTarget): string | undefined;
   /**
    * A live example's standalone source, for a code view: the markup, after
    * a `<script>` with exactly the page-script imports and declarations it
@@ -111,6 +135,15 @@ export interface MarkdownOptions {
    * @default {}
    */
   images?: false | ImageOptions;
+  /**
+   * Icons in code block headers: one for the file (by its name, else its
+   * language) and one for a status (`kind`, `do`, `dont`). Return the
+   * component to import, or `undefined` for none. The preprocessor uses
+   * `carbonCodeIcon` (Carbon's icons) when `carbon-icons-svelte` is
+   * installed; wrap it to add your own: `(target) => mine(target) ??
+   * carbonCodeIcon(target)`. `false` turns icons off.
+   */
+  codeIcons?: false | ((target: CodeIconTarget) => CodeIcon | undefined);
   /**
    * Render fenced code blocks with `CodeSnippet type="multi"` (copy button,
    * show more) instead of a plain `<pre>`.
@@ -306,6 +339,8 @@ export async function renderMarkdown(
   headings: MarkdownHeading[];
   metadata: Record<string, unknown>;
   components: Set<string>;
+  /** Default imports the output uses, by local name. */
+  defaultImports: Map<string, string>;
 }> {
   const { yaml, body } =
     options.frontmatter === false
@@ -378,6 +413,7 @@ export async function renderMarkdown(
   }
 
   const components = new Set<string>();
+  const defaultImports = new Map<string, string>();
   const renderers = options.renderers ?? {};
   const alerts = options.alerts ?? "blockquote";
   const anchors = options.anchors === true ? {} : options.anchors || undefined;
@@ -390,6 +426,16 @@ export async function renderMarkdown(
     use(component) {
       components.add(component);
       return component;
+    },
+    importDefault(name, from) {
+      // A prefix keeps icons and the page's own names apart.
+      const local = `Md${name.replace(/\W/g, "_")}`;
+      defaultImports.set(local, from);
+      return local;
+    },
+    codeIcon(target) {
+      const icon = options.codeIcons ? options.codeIcons(target) : undefined;
+      return icon ? ctx.importDefault(icon.name, icon.from) : undefined;
     },
     example: (markup) =>
       exampleSource(
@@ -474,10 +520,12 @@ export async function renderMarkdown(
           ? `<pre><code${lang}>${escapeText(block.value)}</code></pre>`
           : `<pre${lang}><code${lang}>{@html ${JSON.stringify(highlighted)}}</code></pre>`;
       }
-      case "codeGroup":
+      case "codeGroup": {
         // Without a renderer: the blocks in a row, each under its label.
         // A docs site renders tabs through `renderers.codeGroup`.
-        return `<div class="code-group">\n${await renderBlocks(block.children, false)}\n</div>`;
+        const kind = block.layout === "compare" ? "code-compare" : "code-group";
+        return `<div class="${kind}">\n${await renderBlocks(block.children, false)}\n</div>`;
+      }
       case "thematicBreak":
         return "<hr />";
       case "blockquote": {
@@ -588,22 +636,30 @@ export async function renderMarkdown(
     headings,
     metadata,
     components,
+    defaultImports,
   };
 }
 
 /**
  * A fenced block with line features: one `<span class="line">` per line
  * (with `data-highlight`, `data-ins`, `data-del`, `data-focus`, or
- * terminal `data-output`), line numbers through a CSS counter, and a title
- * above it when the fence names one.
+ * terminal `data-output`), line numbers through a CSS counter, and a header
+ * when the fence names a file or a status: the file's icon and name, and
+ * the status icon and label.
  */
 function codeWithLines(
   lang: string,
   lines: NonNullable<Awaited<ReturnType<typeof renderCodeLines>>>,
   ctx: RenderContext & { codeSnippet?: boolean },
 ): string {
+  const { title, kind, label, theme, icon, copy } = lines.meta;
+  const hasHeader = title !== undefined || kind !== undefined;
   const langClass = lang ? ` class="language-${escapeText(lang)}"` : "";
-  const preAttributes = Object.entries(lines.attributes)
+  const preAttributes = Object.entries({
+    ...lines.attributes,
+    // A theme for the block alone; on the wrapper when there is one.
+    ...(theme && !hasHeader ? { theme } : {}),
+  })
     .map(([name, value]) =>
       value ? ` ${name}="${escapeText(value)}"` : ` ${name}`,
     )
@@ -613,11 +669,36 @@ function codeWithLines(
       ? ` style="counter-reset: line ${lines.meta.lineNumbers - 1}"`
       : "";
   const body = `{@html ${JSON.stringify(lines.html)}}`;
-  const block = ctx.codeSnippet
-    ? `<${ctx.use("CodeSnippet")} type="multi" code={${JSON.stringify(lines.copy)}}${preAttributes}>${body}</${ctx.use("CodeSnippet")}>`
+  const snippet = ctx.codeSnippet ? ctx.use("CodeSnippet") : undefined;
+  const block = snippet
+    ? `<${snippet} type="multi" code={${JSON.stringify(lines.copy)}}${copy ? "" : " hideCopyButton"}${preAttributes}>${body}</${snippet}>`
     : `<pre${langClass}${preAttributes}><code${langClass}${counter}>${body}</code></pre>`;
-  if (!lines.meta.title) return block;
-  return `<div class="code-block">\n<div class="code-block__title">${escapeText(lines.meta.title)}</div>\n${block}\n</div>`;
+  if (!hasHeader) return block;
+
+  const iconOf = (name: string | undefined) =>
+    name ? `<${name} class="code-block__icon" />` : "";
+  const fileIcon =
+    title !== undefined
+      ? ctx.codeIcon({
+          type: "file",
+          title,
+          lang,
+          terminal: "data-terminal" in lines.attributes,
+          name: icon,
+        })
+      : undefined;
+  const statusIcon = kind
+    ? ctx.codeIcon({ type: "status", status: kind })
+    : undefined;
+  const name =
+    title !== undefined
+      ? `${iconOf(fileIcon)}<span class="code-block__title">${escapeText(title)}</span>`
+      : "";
+  const status = kind
+    ? `<span class="code-block__status">${iconOf(statusIcon)}${escapeText(label ?? kind)}</span>`
+    : "";
+  const attributes = `${kind ? ` data-kind="${kind}"` : ""}${theme ? ` theme="${escapeText(theme)}"` : ""}`;
+  return `<div class="code-block"${attributes}>\n<div class="code-block__header">${name}${status}</div>\n${block}\n</div>`;
 }
 
 /** Whether the page's own script already names `name` (imports or declares it). */
@@ -644,7 +725,7 @@ export async function compileMarkdown(
   options: MarkdownOptions & { filename?: string } = {},
 ): Promise<CompiledMarkdown> {
   const rendered = await renderMarkdown(source, options);
-  const { headings, metadata, components } = rendered;
+  const { headings, metadata, components, defaultImports } = rendered;
 
   let moduleScript: string | undefined;
   let instanceScript: string | undefined;
@@ -717,6 +798,11 @@ export async function compileMarkdown(
   }
   if (layout)
     imports.push(`import MarkdownLayout from ${JSON.stringify(layout)};`);
+  for (const [local, from] of defaultImports) {
+    if (!declares(instanceScript, local)) {
+      imports.push(`import ${local} from ${JSON.stringify(from)};`);
+    }
+  }
   for (const [name, from] of Object.entries(options.autoImport ?? {})) {
     if (
       new RegExp(`<${name}\\b`).test(body) &&
