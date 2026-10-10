@@ -13,6 +13,8 @@ import { skipExpression } from "./scan";
 
 interface Statement {
   text: string;
+  /** A blank line separated it from the previous statement in the page. */
+  blankBefore: boolean;
   declares: string[];
   references: Set<string>;
   /** For an import: its specifiers, so unused ones can be dropped. */
@@ -62,18 +64,35 @@ const CONTINUES_BEFORE = new Set([
   "as",
 ]);
 const IDENTIFIER_TEXT = /^[A-Za-z_$][\w$]*$/;
+const BLANK_LINE = /\n[ \t]*\n/;
+
+/** Statement tokens, and whether a blank line came before them. */
+type StatementTokens = Token[] & { blankBefore?: boolean };
 
 const significant = (token: Token) =>
   token.type !== null || token.text.trim() !== "";
 
 /** Split a script into top-level statements, by `;` or a line break that ends one. */
-function splitStatements(code: string): Token[][] {
+function splitStatements(code: string): StatementTokens[] {
   const tokens = tokenize(code, "js") ?? [];
-  const statements: Token[][] = [];
+  const statements: StatementTokens[] = [];
   let current: Token[] = [];
   let depth = 0;
+  let blankBefore = false;
   const end = () => {
-    if (current.some(significant)) statements.push(current);
+    if (current.some(significant)) {
+      // Blank lines before a statement's first token count too.
+      const leading = current
+        .slice(0, current.findIndex(significant))
+        .map((t) => t.text)
+        .join("");
+      statements.push(
+        Object.assign(current, {
+          blankBefore: blankBefore || BLANK_LINE.test(leading),
+        }),
+      );
+      blankBefore = false;
+    }
     current = [];
   };
   for (let i = 0; i < tokens.length; i++) {
@@ -107,6 +126,7 @@ function splitStatements(code: string): Token[][] {
           next.text !== "--");
       if (!continues) {
         end();
+        blankBefore = BLANK_LINE.test(token.text);
         continue;
       }
     }
@@ -149,6 +169,21 @@ function referencesOf(tokens: Token[]): Set<string> {
   const meaningful = tokens.filter(significant);
   for (let i = 0; i < meaningful.length; i++) {
     const token = meaningful[i];
+    // A template literal's `${…}` parts are expressions too.
+    if (token.type === "string" && token.text.startsWith("`")) {
+      for (
+        let at = token.text.indexOf("${");
+        at >= 0;
+        at = token.text.indexOf("${", at + 1)
+      ) {
+        const end = skipExpression(token.text, at + 1);
+        if (end < 0) break;
+        const inner = tokenize(token.text.slice(at + 2, end - 1), "js") ?? [];
+        for (const name of referencesOf(inner)) references.add(name);
+        at = end - 1;
+      }
+      continue;
+    }
     if (!IDENTIFIER_TYPES.has(token.type) || !IDENTIFIER_TEXT.test(token.text))
       continue;
     const previous = meaningful[i - 1];
@@ -164,7 +199,7 @@ function referencesOf(tokens: Token[]): Set<string> {
   return references;
 }
 
-function parseStatement(tokens: Token[]): Statement {
+function parseStatement(tokens: StatementTokens): Statement {
   const text = tokens
     .map((token) => token.text)
     .join("")
@@ -172,6 +207,7 @@ function parseStatement(tokens: Token[]): Statement {
   const meaningful = tokens.filter(significant);
   const statement: Statement = {
     text,
+    blankBefore: tokens.blankBefore ?? false,
     declares: [],
     references: referencesOf(tokens),
   };
@@ -320,8 +356,13 @@ export function exampleSource(
     if (!statement.declares.some((name) => needed.has(name))) continue;
     const imports = statement.imports;
     if (!imports) {
-      // A blank line between the imports and the declarations.
-      if (!afterImports && lines.length > 0) lines.push("");
+      // A blank line between the imports and the declarations, and wherever
+      // the page separated two included statements with one.
+      const separate =
+        (!afterImports || statement.blankBefore) &&
+        lines.length > 0 &&
+        lines.at(-1) !== "";
+      if (separate) lines.push("");
       afterImports = true;
       lines.push(dedent(statement.text));
       continue;
