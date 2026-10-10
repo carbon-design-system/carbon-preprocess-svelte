@@ -220,6 +220,40 @@ describe("exampleSource", () => {
     expect(source).not.toContain("const regions");
   });
 
+  test("keeps the page's blank lines between the statements it includes", () => {
+    const spaced = `<script>
+  import { Button } from "carbon-components-svelte";
+
+  let count = 0;
+  let step = 1;
+
+  function add() {
+    count += step;
+  }
+</script>`;
+    expect(
+      exampleSource("<Button on:click={add}>{count}</Button>", spaced),
+    ).toBe(`<script>
+  import { Button } from "carbon-components-svelte";
+
+  let count = 0;
+  let step = 1;
+
+  function add() {
+    count += step;
+  }
+</script>
+
+<Button on:click={add}>{count}</Button>`);
+  });
+
+  test("follows names used inside template literals", () => {
+    const markup = ["<p>{`Total: $", "{items.length}`}</p>"].join("");
+    const source = exampleSource(markup, page);
+    expect(source).toContain("const items = regions.map");
+    expect(source).toContain('const regions = ["a", "b"];');
+  });
+
   test("returns the markup alone when the example needs nothing from the page", () => {
     expect(exampleSource("<p>Hi</p>", page)).toBe("<p>Hi</p>");
     expect(exampleSource("<Button />", undefined)).toBe("<Button />");
