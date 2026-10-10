@@ -167,6 +167,25 @@ describe("code block headers", () => {
     );
   });
 
+  test("a status alone, without a file name", async () => {
+    const { html } = await renderMarkdown(
+      '```js kind="warning" label="Deprecated"\nx\n```',
+    );
+    expect(html).toContain(
+      '<div class="code-block" data-kind="warning">\n<div class="code-block__header"><span class="code-block__status">Deprecated</span></div>',
+    );
+  });
+
+  test("`iconOnly`: the icon, with the name for screen readers and as a tooltip", async () => {
+    const { code } = await compileMarkdown("```svelte iconOnly\n<p />\n```", {
+      prose: false,
+      codeIcons: carbonCodeIcon,
+    });
+    expect(code).toContain(
+      '<div class="code-block__header"><span class="code-block__icon-only" title="svelte"><MdLogoSvelte class="code-block__icon" /><span class="bx--assistive-text">svelte</span></span></div>',
+    );
+  });
+
   test("without a header, a theme and variant go on the block", async () => {
     const { html } = await renderMarkdown(
       '```js theme="g90" variant="compact"\nx\n```',

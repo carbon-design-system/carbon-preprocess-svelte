@@ -39,6 +39,11 @@ export interface CodeMeta {
   theme?: string;
   /** An icon to use instead of the file's default: `icon="LogoPython"`. */
   icon?: string;
+  /**
+   * `iconOnly`: a header with the file's or language's icon and no visible
+   * name (the name stays for screen readers).
+   */
+  iconOnly: boolean;
 }
 
 const META_TOKEN =
@@ -55,6 +60,7 @@ const VALUE = /^(kind|label|variant|theme|icon)=(?:"([^"]*)"|'([^']*)'|(\S+))$/;
 const DO = /^do$/;
 const DONT = /^(?:dont|don't|do-not)$/;
 const COPY = /^(copy|nocopy|no-copy)$/;
+const ICON_ONLY = /^(?:iconOnly|icon-only)$/;
 const KINDS = new Set<string>(["error", "warning", "success", "info"]);
 const KIND_LABELS: Record<CodeKind, string> = {
   error: "Error",
@@ -109,7 +115,12 @@ function* lineRange(text: string): Generator<number> {
 
 /** Parse a fence's metadata (the text after its language). */
 export function parseCodeMeta(meta: string): CodeMeta {
-  const result: CodeMeta = { marks: new Map(), wrap: false, copy: true };
+  const result: CodeMeta = {
+    marks: new Map(),
+    wrap: false,
+    copy: true,
+    iconOnly: false,
+  };
   let copy: boolean | undefined;
   for (const [token] of meta.matchAll(META_TOKEN)) {
     const ranges = RANGES.exec(token);
@@ -135,6 +146,8 @@ export function parseCodeMeta(meta: string): CodeMeta {
       result.kind = "error";
       result.label ??= "Don't";
       copy ??= false;
+    } else if (ICON_ONLY.test(token)) {
+      result.iconOnly = true;
     } else if (COPY.test(token)) {
       copy = token === "copy";
     } else {
@@ -270,6 +283,7 @@ export async function renderCodeLines(
     meta.wrap ||
     meta.title !== undefined ||
     meta.kind !== undefined ||
+    meta.iconOnly ||
     meta.variant !== undefined ||
     meta.theme !== undefined ||
     ansi ||
