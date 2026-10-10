@@ -220,7 +220,8 @@ function propsOf(props: Record<string, string | number | boolean>): string {
 function* walk(blocks: Block[]): Generator<Block> {
   for (const block of blocks) {
     yield block;
-    if (block.type === "blockquote") yield* walk(block.children);
+    if (block.type === "blockquote" || block.type === "codeGroup")
+      yield* walk(block.children);
     if (block.type === "list") {
       for (const item of block.items) yield* walk(item.children);
     }
@@ -406,6 +407,10 @@ export async function renderMarkdown(
           ? `<pre><code${lang}>${escapeText(block.value)}</code></pre>`
           : `<pre${lang}><code${lang}>{@html ${JSON.stringify(highlighted)}}</code></pre>`;
       }
+      case "codeGroup":
+        // Without a renderer: the blocks in a row, each under its label.
+        // A docs site renders tabs through `renderers.codeGroup`.
+        return `<div class="code-group">\n${await renderBlocks(block.children, false)}\n</div>`;
       case "thematicBreak":
         return "<hr />";
       case "blockquote": {

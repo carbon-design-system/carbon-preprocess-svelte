@@ -15,7 +15,7 @@ import { escapeText } from "./inline";
 export type LineMark = "highlight" | "ins" | "del" | "focus";
 
 export interface CodeMeta {
-  /** A file name or caption, from `title="…"`. */
+  /** A file name or caption, from `title="…"` or `[label]` (VitePress). */
   title?: string;
   /** Marks by 1-based line number. */
   marks: Map<number, Set<LineMark>>;
@@ -25,10 +25,12 @@ export interface CodeMeta {
   wrap: boolean;
 }
 
-const META_TOKEN = /[\w-]+=(?:"[^"]*"|'[^']*'|\{[^}]*\}|\S+)|\{[^}]*\}|\S+/g;
+const META_TOKEN =
+  /[\w-]+=(?:"[^"]*"|'[^']*'|\{[^}]*\}|\S+)|\{[^}]*\}|\[[^\]]*\]|\S+/g;
 const RANGES = /^\{([\d,\s-]*)\}$/;
 const KEYED_RANGES =
   /^(mark|highlight|hl|ins|add|del|remove|focus)=\{([\d,\s-]*)\}$/;
+const LABEL = /^\[([^\]]*)\]$/;
 const TITLE = /^(?:title|filename|file)=(?:"([^"]*)"|'([^']*)'|(\S+))$/;
 const LINE_NUMBERS =
   /^(?:showLineNumbers|lineNumbers|line-numbers)(?:=\{?(\d+)\}?)?$/;
@@ -84,7 +86,7 @@ export function parseCodeMeta(meta: string): CodeMeta {
   for (const [token] of meta.matchAll(META_TOKEN)) {
     const ranges = RANGES.exec(token);
     const keyed = KEYED_RANGES.exec(token);
-    const title = TITLE.exec(token);
+    const title = TITLE.exec(token) ?? LABEL.exec(token);
     const numbers = LINE_NUMBERS.exec(token);
     if (ranges) {
       for (const line of lineRange(ranges[1]))
@@ -217,6 +219,7 @@ export async function renderCodeLines(
     meta.marks.size > 0 ||
     meta.lineNumbers !== undefined ||
     meta.wrap ||
+    meta.title !== undefined ||
     terminal ||
     marked !== original;
   if (!hasFeatures) return undefined;

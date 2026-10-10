@@ -135,6 +135,11 @@ describe("markdown() fenced code with line features", () => {
     );
   });
 
+  test("renders a title on its own", async () => {
+    const { html } = await renderMarkdown('```js title="a.js"\nx\n```');
+    expect(html).toContain('<div class="code-block__title">a.js</div>');
+  });
+
   test("passes the copy text to CodeSnippet", async () => {
     const { html } = await renderMarkdown("```sh\n$ bun add x\nok\n```", {
       codeSnippet: true,
@@ -142,5 +147,52 @@ describe("markdown() fenced code with line features", () => {
     expect(html).toContain(
       '<CodeSnippet type="multi" code={"bun add x"} data-terminal>',
     );
+  });
+});
+
+describe("::: code-group", () => {
+  const source = [
+    "::: code-group",
+    "",
+    "```svelte [App.svelte]",
+    "<Counter />",
+    "```",
+    "",
+    '```js title="counter.js"',
+    "export let count = 0;",
+    "```",
+    "",
+    ":::",
+    "",
+    "After.",
+  ].join("\n");
+
+  test("groups its blocks, each under its label, when no renderer handles it", async () => {
+    const { html } = await renderMarkdown(source);
+    expect(html).toContain(
+      '<div class="code-group">\n<div class="code-block">\n<div class="code-block__title">App.svelte</div>',
+    );
+    expect(html).toContain('<div class="code-block__title">counter.js</div>');
+    expect(html).toMatch(/<\/div>\n<\/div>\n<p>After\.<\/p>$/);
+  });
+
+  test("passes the group to `renderers.codeGroup`", async () => {
+    const { html } = await renderMarkdown(source, {
+      renderers: {
+        codeGroup: (block) =>
+          `<Tabs files={${JSON.stringify(block.children.map((child) => (child.type === "code" ? child.meta : child.type)))}} />`,
+      },
+    });
+    expect(html).toBe(
+      '<Tabs files={["[App.svelte]","title=\\"counter.js\\""]} />\n<p>After.</p>',
+    );
+  });
+
+  test("ignores a `:::` inside a fence", async () => {
+    const { html } = await renderMarkdown(
+      "::: code-group\n```md [a.md]\n:::\n```\n:::",
+    );
+    expect(html).toContain("a.md");
+    expect(html).toContain(":::");
   });
 });

@@ -25,6 +25,11 @@ export type Block =
     }
   | { type: "paragraph"; text: string; attrs?: Attributes }
   | { type: "code"; lang: string; meta: string; value: string }
+  /**
+   * `::: code-group` (VitePress): code blocks shown as tabs, labeled by
+   * their `[label]` or `title="…"`. Other blocks inside are kept.
+   */
+  | { type: "codeGroup"; children: Block[] }
   | { type: "thematicBreak" }
   | { type: "blockquote"; children: Block[]; alert?: AlertType }
   | {
@@ -45,6 +50,8 @@ export interface ListItem {
 }
 
 const FENCE = /^(`{3,}|~{3,})(.*)$/;
+const CODE_GROUP = /^:{3,}[ \t]*code-group[ \t]*$/;
+const CONTAINER_END = /^:{3,}[ \t]*$/;
 const ATX = /^(#{1,6})(?=[ \t]|$)(.*)$/;
 const ATX_CLOSING = /(?:^|[ \t]+)#+[ \t]*$/;
 const THEMATIC_BREAK = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
@@ -187,6 +194,7 @@ function interruptsParagraph(line: string): boolean {
   const rest = line.trimStart();
   if (
     FENCE.test(rest) ||
+    CODE_GROUP.test(rest) ||
     ATX.test(rest) ||
     THEMATIC_BREAK.test(rest) ||
     rest.startsWith(">")
@@ -465,6 +473,21 @@ export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
       if (!ctx.footnotes.has(label)) {
         ctx.footnotes.set(label, parseBlocks(body, ctx).blocks);
       }
+      continue;
+    }
+
+    if (CODE_GROUP.test(rest)) {
+      const inner: string[] = [];
+      let fenced = false;
+      i++;
+      while (i < lines.length) {
+        const current = stripColumns(lines[i], indent);
+        i++;
+        if (!fenced && CONTAINER_END.test(current.trim())) break;
+        if (FENCE.test(current.trimStart())) fenced = !fenced;
+        inner.push(current);
+      }
+      add({ type: "codeGroup", children: parseBlocks(inner, ctx).blocks });
       continue;
     }
 
