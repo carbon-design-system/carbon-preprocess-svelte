@@ -3,6 +3,7 @@ import {
   renderCodeLines,
   splitHtmlLines,
   stripCodeMarkers,
+  terminalLines,
 } from "carbon-preprocess-svelte";
 import { renderMarkdown } from "carbon-preprocess-svelte/markdown/compile";
 import { highlight } from "carbon-preprocess-svelte/markdown/highlight";
@@ -107,6 +108,20 @@ describe("renderCodeLines", () => {
     );
     expect(lines?.copy).toBe("npm i x");
     expect(lines?.attributes).toEqual({ "data-terminal": "" });
+  });
+});
+
+describe("terminalLines", () => {
+  test("keeps a command's `\\` continuation lines with the command", () => {
+    const lines = terminalLines("$ docker run \\\n  -p 80:80 nginx\nok", "sh");
+    expect([...(lines?.commands ?? [])]).toEqual([1, 2]);
+    expect([...(lines?.prompts ?? [])]).toEqual([1]);
+    expect(lines?.code).toBe("docker run \\\n  -p 80:80 nginx\nok");
+  });
+
+  test("leaves shell code without prompts, and other languages, alone", () => {
+    expect(terminalLines("npm i x", "sh")).toBeUndefined();
+    expect(terminalLines("$ x", "js")).toBeUndefined();
   });
 });
 
