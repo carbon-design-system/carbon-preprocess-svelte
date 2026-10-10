@@ -11,6 +11,15 @@ export {
   type TokenType,
   tokenize,
 } from "./markdown/highlight";
+export {
+  type CodeMeta,
+  type LineMark,
+  parseCodeMeta,
+  renderCodeLines,
+  splitHtmlLines,
+  stripCodeMarkers,
+  terminalLines,
+} from "./markdown/lines";
 export { OptimizeComponentsPlugin } from "./plugins/OptimizeComponentsPlugin";
 export { OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin";
 export { optimizeCarbonCss } from "./plugins/optimize-carbon-css";
