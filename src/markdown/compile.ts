@@ -652,8 +652,8 @@ function codeWithLines(
   lines: NonNullable<Awaited<ReturnType<typeof renderCodeLines>>>,
   ctx: RenderContext & { codeSnippet?: boolean },
 ): string {
-  const { title, kind, label, theme, icon, copy } = lines.meta;
-  const hasHeader = title !== undefined || kind !== undefined;
+  const { title, kind, label, theme, icon, copy, iconOnly } = lines.meta;
+  const hasHeader = title !== undefined || kind !== undefined || iconOnly;
   const langClass = lang ? ` class="language-${escapeText(lang)}"` : "";
   const preAttributes = Object.entries({
     ...lines.attributes,
@@ -678,7 +678,7 @@ function codeWithLines(
   const iconOf = (name: string | undefined) =>
     name ? `<${name} class="code-block__icon" />` : "";
   const fileIcon =
-    title !== undefined
+    title !== undefined || iconOnly
       ? ctx.codeIcon({
           type: "file",
           title,
@@ -690,8 +690,13 @@ function codeWithLines(
   const statusIcon = kind
     ? ctx.codeIcon({ type: "status", status: kind })
     : undefined;
-  const name =
-    title !== undefined
+  // Icon only: the name stays for screen readers, and as a tooltip.
+  const shownName = title ?? lang;
+  const name = iconOnly
+    ? fileIcon
+      ? `<span class="code-block__icon-only" title="${escapeText(shownName)}">${iconOf(fileIcon)}<span class="bx--assistive-text">${escapeText(shownName)}</span></span>`
+      : `<span class="code-block__title">${escapeText(shownName)}</span>`
+    : title !== undefined
       ? `${iconOf(fileIcon)}<span class="code-block__title">${escapeText(title)}</span>`
       : "";
   const status = kind
