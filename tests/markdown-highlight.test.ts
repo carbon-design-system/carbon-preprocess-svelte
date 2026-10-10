@@ -158,6 +158,15 @@ describe("tokenize", () => {
     ).toBe(code);
   });
 
+  test("keeps every character of shell code, including a bare `$` prompt", () => {
+    const code = "$ npm i x # note\n$ echo $ a | b > c";
+    expect(
+      tokenize(code, "sh")
+        ?.map((token) => token.text)
+        .join(""),
+    ).toBe(code);
+  });
+
   test("returns undefined for an unknown language", () => {
     expect(tokenize("x", "cobol")).toBeUndefined();
     expect(highlight("x", "cobol")).toBeUndefined();
