@@ -26,10 +26,12 @@ export type Block =
   | { type: "paragraph"; text: string; attrs?: Attributes }
   | { type: "code"; lang: string; meta: string; value: string }
   /**
-   * `::: code-group` (VitePress): code blocks shown as tabs, labeled by
-   * their `[label]` or `title="…"`. Other blocks inside are kept.
+   * Code blocks that belong together. `::: code-group` (VitePress) shows
+   * them as tabs, labeled by their `[label]` or `title="…"`; `::: compare`
+   * shows them side by side, such as a `dont` block and a `do` block. Other
+   * blocks inside are kept.
    */
-  | { type: "codeGroup"; children: Block[] }
+  | { type: "codeGroup"; layout: "tabs" | "compare"; children: Block[] }
   | { type: "thematicBreak" }
   | { type: "blockquote"; children: Block[]; alert?: AlertType }
   | {
@@ -50,7 +52,7 @@ export interface ListItem {
 }
 
 const FENCE = /^(`{3,}|~{3,})(.*)$/;
-const CODE_GROUP = /^:{3,}[ \t]*code-group[ \t]*$/;
+const CODE_GROUP = /^:{3,}[ \t]*(code-group|compare)[ \t]*$/;
 const CONTAINER_END = /^:{3,}[ \t]*$/;
 const ATX = /^(#{1,6})(?=[ \t]|$)(.*)$/;
 const ATX_CLOSING = /(?:^|[ \t]+)#+[ \t]*$/;
@@ -476,7 +478,8 @@ export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
       continue;
     }
 
-    if (CODE_GROUP.test(rest)) {
+    const group = CODE_GROUP.exec(rest);
+    if (group) {
       const inner: string[] = [];
       let fenced = false;
       i++;
@@ -487,7 +490,11 @@ export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
         if (FENCE.test(current.trimStart())) fenced = !fenced;
         inner.push(current);
       }
-      add({ type: "codeGroup", children: parseBlocks(inner, ctx).blocks });
+      add({
+        type: "codeGroup",
+        layout: group[1] === "compare" ? "compare" : "tabs",
+        children: parseBlocks(inner, ctx).blocks,
+      });
       continue;
     }
 

@@ -131,13 +131,13 @@ describe("markdown() fenced code with line features", () => {
       '```js title="a.js" {2} showLineNumbers=3\nlet a;\nlet b;\n```',
     );
     expect(html).toBe(
-      '<div class="code-block">\n<div class="code-block__title">a.js</div>\n<pre class="language-js" data-line-numbers="3"><code class="language-js" style="counter-reset: line 2">{@html "<span class=\\"line\\">let a;</span>\\n<span class=\\"line\\" data-highlight>let b;</span>"}</code></pre>\n</div>',
+      '<div class="code-block">\n<div class="code-block__header"><span class="code-block__title">a.js</span></div>\n<pre class="language-js" data-line-numbers="3"><code class="language-js" style="counter-reset: line 2">{@html "<span class=\\"line\\">let a;</span>\\n<span class=\\"line\\" data-highlight>let b;</span>"}</code></pre>\n</div>',
     );
   });
 
   test("renders a title on its own", async () => {
     const { html } = await renderMarkdown('```js title="a.js"\nx\n```');
-    expect(html).toContain('<div class="code-block__title">a.js</div>');
+    expect(html).toContain('<span class="code-block__title">a.js</span>');
   });
 
   test("passes the copy text to CodeSnippet", async () => {
@@ -170,9 +170,9 @@ describe("::: code-group", () => {
   test("groups its blocks, each under its label, when no renderer handles it", async () => {
     const { html } = await renderMarkdown(source);
     expect(html).toContain(
-      '<div class="code-group">\n<div class="code-block">\n<div class="code-block__title">App.svelte</div>',
+      '<div class="code-group">\n<div class="code-block">\n<div class="code-block__header"><span class="code-block__title">App.svelte</span></div>',
     );
-    expect(html).toContain('<div class="code-block__title">counter.js</div>');
+    expect(html).toContain('<span class="code-block__title">counter.js</span>');
     expect(html.endsWith("</div>\n</div>\n<p>After.</p>")).toBe(true);
   });
 

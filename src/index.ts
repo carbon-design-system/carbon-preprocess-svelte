@@ -1,4 +1,15 @@
+export {
+  type AnsiRun,
+  type AnsiStyle,
+  ansiToHtml,
+  hasAnsi,
+  parseAnsi,
+  stripAnsi,
+} from "./markdown/ansi";
+export { carbonCodeIcon, carbonCodeIconName } from "./markdown/code-icons";
 export type {
+  CodeIcon,
+  CodeIconTarget,
   ImageOptions,
   MarkdownHeading,
   MarkdownOptions,
@@ -18,6 +29,7 @@ export {
 } from "./markdown/highlight";
 export { type ImageSize, imageSize } from "./markdown/image-size";
 export {
+  type CodeKind,
   type CodeMeta,
   type LineMark,
   parseCodeMeta,
