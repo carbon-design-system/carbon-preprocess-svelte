@@ -12,6 +12,15 @@ export {
   tokenize,
 } from "./markdown/highlight";
 export {
+  type CodeMeta,
+  type LineMark,
+  parseCodeMeta,
+  renderCodeLines,
+  splitHtmlLines,
+  stripCodeMarkers,
+  terminalLines,
+} from "./markdown/lines";
+export {
   type CarbonBunOptions,
   type CarbonBunPlugin,
   optimizeCarbonBun,

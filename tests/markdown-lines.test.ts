@@ -1,0 +1,131 @@
+import {
+  parseCodeMeta,
+  renderCodeLines,
+  splitHtmlLines,
+  stripCodeMarkers,
+} from "carbon-preprocess-svelte";
+import { renderMarkdown } from "carbon-preprocess-svelte/markdown/compile";
+import { highlight } from "carbon-preprocess-svelte/markdown/highlight";
+
+const marks = (meta: ReturnType<typeof parseCodeMeta>) =>
+  Object.fromEntries(
+    [...meta.marks].map(([line, set]) => [line, [...set].sort().join(" ")]),
+  );
+
+describe("parseCodeMeta", () => {
+  test("reads Docusaurus, VitePress, and Expressive Code fence metadata", () => {
+    const meta = parseCodeMeta(
+      'title="+page.svelte" {1,3-4} ins={6} del={5} focus={3} showLineNumbers=10 wrap',
+    );
+    expect(meta.title).toBe("+page.svelte");
+    expect(meta.lineNumbers).toBe(10);
+    expect(meta.wrap).toBe(true);
+    expect(marks(meta)).toEqual({
+      1: "highlight",
+      3: "focus highlight",
+      4: "highlight",
+      5: "del",
+      6: "ins",
+    });
+  });
+
+  test("accepts the other spellings", () => {
+    expect(
+      parseCodeMeta("filename='a.js' mark={2} add={3} remove={4} lineNumbers")
+        .title,
+    ).toBe("a.js");
+    expect(marks(parseCodeMeta("mark={2} add={3} remove={4}"))).toEqual({
+      2: "highlight",
+      3: "ins",
+      4: "del",
+    });
+    expect(parseCodeMeta("").marks.size).toBe(0);
+  });
+});
+
+describe("stripCodeMarkers", () => {
+  test("removes `[!code …]` comments in any comment syntax and records their marks", () => {
+    const found = new Map();
+    const code = stripCodeMarkers(
+      [
+        "a(); // [!code ++]",
+        "b(); /* [!code --] */",
+        "<p /> <!-- [!code highlight] -->",
+        "x # [!code focus:2]",
+        "y",
+      ].join("\n"),
+      found,
+    );
+    expect(code).toBe("a();\nb();\n<p />\nx\ny");
+    expect(
+      Object.fromEntries([...found].map(([l, s]) => [l, [...s].join(" ")])),
+    ).toEqual({
+      1: "ins",
+      2: "del",
+      3: "highlight",
+      4: "focus",
+      5: "focus",
+    });
+  });
+});
+
+describe("splitHtmlLines", () => {
+  test("closes and reopens elements that span a line break", () => {
+    expect(splitHtmlLines('<span class="c">/* a\nb */</span> x')).toEqual([
+      '<span class="c">/* a</span>',
+      '<span class="c">b */</span> x',
+    ]);
+  });
+});
+
+describe("renderCodeLines", () => {
+  test("leaves code without line features alone", async () => {
+    expect(await renderCodeLines("let a;\n", "js", "")).toBeUndefined();
+  });
+
+  test("marks lines, and copies without deleted lines", async () => {
+    const lines = await renderCodeLines(
+      "a\nb\nc\n",
+      "js",
+      "{1} del={2} ins={3}",
+    );
+    expect(lines?.html).toBe(
+      '<span class="line" data-highlight>a</span>\n<span class="line" data-del>b</span>\n<span class="line" data-ins>c</span>',
+    );
+    expect(lines?.copy).toBe("a\nc");
+  });
+
+  test("renders a terminal session: prompts outside the copy text, output plain", async () => {
+    const lines = await renderCodeLines(
+      "$ npm i x\nadded 1 package\n",
+      "sh",
+      "",
+      (code) => highlight(code, "sh"),
+    );
+    expect(lines?.html).toBe(
+      '<span class="line"><span class="prompt" aria-hidden="true">$ </span><span class="tok-function">npm</span> i x</span>\n<span class="line" data-output>added 1 package</span>',
+    );
+    expect(lines?.copy).toBe("npm i x");
+    expect(lines?.attributes).toEqual({ "data-terminal": "" });
+  });
+});
+
+describe("markdown() fenced code with line features", () => {
+  test("renders a title, line numbers, and marked lines", async () => {
+    const { html } = await renderMarkdown(
+      '```js title="a.js" {2} showLineNumbers=3\nlet a;\nlet b;\n```',
+    );
+    expect(html).toBe(
+      '<div class="code-block">\n<div class="code-block__title">a.js</div>\n<pre class="language-js" data-line-numbers="3"><code class="language-js" style="counter-reset: line 2">{@html "<span class=\\"line\\">let a;</span>\\n<span class=\\"line\\" data-highlight>let b;</span>"}</code></pre>\n</div>',
+    );
+  });
+
+  test("passes the copy text to CodeSnippet", async () => {
+    const { html } = await renderMarkdown("```sh\n$ bun add x\nok\n```", {
+      codeSnippet: true,
+    });
+    expect(html).toContain(
+      '<CodeSnippet type="multi" code={"bun add x"} data-terminal>',
+    );
+  });
+});
