@@ -70,6 +70,8 @@ for (const example of examples) {
     expressions: false,
     frontmatter: false,
     autolinks: false,
+    // The spec's HTML has plain images, without loading hints.
+    images: false,
   });
   const ok = normalize(html) === normalize(example.html);
   const section = sections.get(example.section) ?? { pass: 0, total: 0 };

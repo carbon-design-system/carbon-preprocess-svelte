@@ -1,10 +1,44 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { resolvePackageDir } from "../indexer/resolve-carbon-root";
-import { compileMarkdown, type MarkdownOptions } from "../markdown/compile";
+import {
+  compileMarkdown,
+  type ImageOptions,
+  type MarkdownOptions,
+} from "../markdown/compile";
+import { type ImageSize, imageSize } from "../markdown/image-size";
 
 const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;
+// `https:`, `data:`, `//cdn…`, or a Svelte expression: not a local file.
+const NOT_LOCAL = /^(?:[a-z][a-z\d+.-]*:|\/\/|\{)/i;
+const QUERY_OR_HASH = /[?#].*$/;
+
+const sizes = new Map<string, { mtime: number; size: ImageSize | undefined }>();
+
+/** The size of a local image a Markdown file refers to, cached by modification time. */
+function localImageSize(
+  src: string,
+  filename: string,
+  root: string | undefined,
+): ImageSize | undefined {
+  if (NOT_LOCAL.test(src)) return undefined;
+  const clean = decodeURI(src.replace(QUERY_OR_HASH, ""));
+  const file = clean.startsWith("/")
+    ? root && path.resolve(root, `.${clean}`)
+    : path.resolve(path.dirname(filename), clean);
+  if (!file) return undefined;
+  try {
+    const mtime = statSync(file).mtimeMs;
+    const cached = sizes.get(file);
+    if (cached?.mtime === mtime) return cached.size;
+    const size = imageSize(readFileSync(file));
+    sizes.set(file, { mtime, size });
+    return size;
+  } catch {
+    return undefined;
+  }
+}
 
 /** The installed Svelte's major version, read from its `package.json`. */
 function detectSvelteMajor(): 3 | 4 | 5 {
@@ -68,8 +102,19 @@ export function markdown(options: MarkdownOptions = {}) {
           );
         }
       }
+      const configured = options.images;
+      const images: false | ImageOptions =
+        configured === false
+          ? false
+          : {
+              ...configured,
+              size:
+                configured?.size ??
+                ((src) => localImageSize(src, filename, configured?.root)),
+            };
       const { code } = await compileMarkdown(content, {
         ...options,
+        images,
         svelte,
         prose,
         filename,
