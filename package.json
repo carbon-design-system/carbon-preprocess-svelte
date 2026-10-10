@@ -17,7 +17,7 @@
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
     "test:fixtures:update": "UPDATE_FIXTURES=true bun test tests/optimize-css-fixtures.test.ts",
     "bench": "bun bench/run.ts",
-    "typecheck": "tsc6 --noEmit",
+    "typecheck": "bun check",
     "lint": "biome ci --error-on-warnings",
     "lint:fix": "biome check --write --unsafe .",
     "upgrade-examples": "bun scripts/upgrade-examples.ts",
