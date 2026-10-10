@@ -8,6 +8,7 @@ import {
   inlineText,
   renderInline,
 } from "./inline";
+import { renderCodeLines } from "./lines";
 
 export interface MarkdownHeading {
   /** The heading's `id`, unique within the page. */
@@ -367,6 +368,18 @@ export async function renderMarkdown(
         return `<h${block.depth}${id}${attributes(block.attrs)}>${ctx.inline(block.text)}${anchor}</h${block.depth}>`;
       }
       case "code": {
+        const lines = await renderCodeLines(
+          block.value,
+          block.lang,
+          block.meta,
+          (code) => options.highlight?.(code, block.lang, block.meta),
+        );
+        if (lines) {
+          return codeWithLines(block.lang, lines, {
+            ...ctx,
+            codeSnippet: options.codeSnippet,
+          });
+        }
         const highlighted = await options.highlight?.(
           block.value,
           block.lang,
@@ -504,6 +517,35 @@ export async function renderMarkdown(
     metadata,
     components,
   };
+}
+
+/**
+ * A fenced block with line features: one `<span class="line">` per line
+ * (with `data-highlight`, `data-ins`, `data-del`, `data-focus`, or
+ * terminal `data-output`), line numbers through a CSS counter, and a title
+ * above it when the fence names one.
+ */
+function codeWithLines(
+  lang: string,
+  lines: NonNullable<Awaited<ReturnType<typeof renderCodeLines>>>,
+  ctx: RenderContext & { codeSnippet?: boolean },
+): string {
+  const langClass = lang ? ` class="language-${escapeText(lang)}"` : "";
+  const preAttributes = Object.entries(lines.attributes)
+    .map(([name, value]) =>
+      value ? ` ${name}="${escapeText(value)}"` : ` ${name}`,
+    )
+    .join("");
+  const counter =
+    lines.meta.lineNumbers !== undefined
+      ? ` style="counter-reset: line ${lines.meta.lineNumbers - 1}"`
+      : "";
+  const body = `{@html ${JSON.stringify(lines.html)}}`;
+  const block = ctx.codeSnippet
+    ? `<${ctx.use("CodeSnippet")} type="multi" code={${JSON.stringify(lines.copy)}}${preAttributes}>${body}</${ctx.use("CodeSnippet")}>`
+    : `<pre${langClass}${preAttributes}><code${langClass}${counter}>${body}</code></pre>`;
+  if (!lines.meta.title) return block;
+  return `<div class="code-block">\n<div class="code-block__title">${escapeText(lines.meta.title)}</div>\n${block}\n</div>`;
 }
 
 /** Whether the page's own script already names `name` (imports or declares it). */
