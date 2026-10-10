@@ -125,8 +125,10 @@ export function stripCodeMarkers(
 }
 
 export interface TerminalLines {
-  /** 1-based lines that are commands (their `$ ` prompt removed). */
+  /** 1-based lines that are commands: `$ ` lines (prompt removed) and their `\` continuations. */
   commands: Set<number>;
+  /** 1-based lines that had a `$ ` prompt: where each command starts. */
+  prompts: Set<number>;
   /** The code without prompts. */
   code: string;
 }
@@ -140,12 +142,18 @@ export function terminalLines(
   const lines = code.split("\n");
   if (!lines.some((line) => PROMPT.test(line))) return undefined;
   const commands = new Set<number>();
+  const prompts = new Set<number>();
+  let continued = false;
   const stripped = lines.map((line, index) => {
-    if (!PROMPT.test(line)) return line;
+    const prompt = PROMPT.test(line);
+    // A command continues past a line ending in `\`.
+    if (!prompt && !continued) return line;
     commands.add(index + 1);
-    return line.slice(2);
+    if (prompt) prompts.add(index + 1);
+    continued = line.endsWith("\\");
+    return prompt ? line.slice(2) : line;
   });
-  return { commands, code: stripped.join("\n") };
+  return { commands, prompts, code: stripped.join("\n") };
 }
 
 /**
@@ -231,7 +239,7 @@ export async function renderCodeLines(
         .join("");
       const command = terminal?.commands.has(number);
       const output = terminal && !command ? " data-output" : "";
-      const prompt = command
+      const prompt = terminal?.prompts.has(number)
         ? '<span class="prompt" aria-hidden="true">$ </span>'
         : "";
       // Output isn't shell syntax: show it as plain text.
