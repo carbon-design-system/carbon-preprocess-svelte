@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { resolvePackageDir } from "../indexer/resolve-carbon-root";
+import { carbonCodeIcon } from "../markdown/code-icons";
 import {
   compileMarkdown,
   type ImageOptions,
@@ -78,6 +79,10 @@ export function markdown(options: MarkdownOptions = {}) {
   let svelte = options.svelte;
   let prose = options.prose;
   let proseChecked: boolean | undefined;
+  // Carbon icons in code block headers, when the package is installed.
+  const codeIcons =
+    options.codeIcons ??
+    (resolvePackageDir("carbon-icons-svelte") ? carbonCodeIcon : false);
 
   return {
     name: "carbon:markdown",
@@ -115,6 +120,7 @@ export function markdown(options: MarkdownOptions = {}) {
       const { code } = await compileMarkdown(content, {
         ...options,
         images,
+        codeIcons,
         svelte,
         prose,
         filename,

@@ -10,9 +10,13 @@
  * - Terminal sessions: in `sh`/`bash`/`shell`/`console`, lines starting
  *   with `$ ` are commands; the others are output.
  */
+import { type AnsiStyle, ansiToHtml, stripAnsi } from "./ansi";
 import { escapeText } from "./inline";
 
 export type LineMark = "highlight" | "ins" | "del" | "focus";
+
+/** A block's status, shown in its header with an icon and a label. */
+export type CodeKind = "error" | "warning" | "success" | "info";
 
 export interface CodeMeta {
   /** A file name or caption, from `title="…"` or `[label]` (VitePress). */
@@ -23,6 +27,18 @@ export interface CodeMeta {
   lineNumbers?: number;
   /** Soft-wrap long lines instead of scrolling. */
   wrap: boolean;
+  /** A status: `kind="error"` (or `warning`, `success`, `info`). `do` and `dont` set it too. */
+  kind?: CodeKind;
+  /** The status label: `label="Deprecated"`. Defaults to the kind, or "Do" and "Don't". */
+  label?: string;
+  /** Whether to offer copying: off for `dont` blocks unless the fence says `copy`. */
+  copy: boolean;
+  /** A Prose variant for this block's type and spacing: `variant="compact"`. */
+  variant?: string;
+  /** A Carbon theme for this block alone: `theme="g100"`. */
+  theme?: string;
+  /** An icon to use instead of the file's default: `icon="LogoPython"`. */
+  icon?: string;
 }
 
 const META_TOKEN =
@@ -35,6 +51,17 @@ const TITLE = /^(?:title|filename|file)=(?:"([^"]*)"|'([^']*)'|(\S+))$/;
 const LINE_NUMBERS =
   /^(?:showLineNumbers|lineNumbers|line-numbers)(?:=\{?(\d+)\}?)?$/;
 const WRAP = /^(?:wrap|wordWrap)$/;
+const VALUE = /^(kind|label|variant|theme|icon)=(?:"([^"]*)"|'([^']*)'|(\S+))$/;
+const DO = /^do$/;
+const DONT = /^(?:dont|don't|do-not)$/;
+const COPY = /^(copy|nocopy|no-copy)$/;
+const KINDS = new Set<string>(["error", "warning", "success", "info"]);
+const KIND_LABELS: Record<CodeKind, string> = {
+  error: "Error",
+  warning: "Warning",
+  success: "Success",
+  info: "Note",
+};
 const MARKER =
   /[ \t]*(?:\/\/|\/\*|<!--|#|--)[ \t]*\[!code (highlight|hl|\+\+|--|focus)(?::(\d+))?\][ \t]*(?:\*\/|-->)?[ \t]*$/;
 const SHELL = new Set(["sh", "bash", "shell", "zsh", "console", "terminal"]);
@@ -82,7 +109,8 @@ function* lineRange(text: string): Generator<number> {
 
 /** Parse a fence's metadata (the text after its language). */
 export function parseCodeMeta(meta: string): CodeMeta {
-  const result: CodeMeta = { marks: new Map(), wrap: false };
+  const result: CodeMeta = { marks: new Map(), wrap: false, copy: true };
+  let copy: boolean | undefined;
   for (const [token] of meta.matchAll(META_TOKEN)) {
     const ranges = RANGES.exec(token);
     const keyed = KEYED_RANGES.exec(token);
@@ -100,8 +128,28 @@ export function parseCodeMeta(meta: string): CodeMeta {
       result.lineNumbers = numbers[1] ? Number(numbers[1]) : 1;
     } else if (WRAP.test(token)) {
       result.wrap = true;
+    } else if (DO.test(token)) {
+      result.kind = "success";
+      result.label ??= "Do";
+    } else if (DONT.test(token)) {
+      result.kind = "error";
+      result.label ??= "Don't";
+      copy ??= false;
+    } else if (COPY.test(token)) {
+      copy = token === "copy";
+    } else {
+      const value = VALUE.exec(token);
+      if (!value) continue;
+      const text = value[2] ?? value[3] ?? value[4];
+      if (value[1] === "kind") {
+        if (KINDS.has(text)) result.kind = text as CodeKind;
+      } else {
+        result[value[1] as "label" | "variant" | "theme" | "icon"] = text;
+      }
     }
   }
+  if (result.kind) result.label ??= KIND_LABELS[result.kind];
+  result.copy = copy ?? true;
   return result;
 }
 
@@ -215,11 +263,16 @@ export async function renderCodeLines(
   const original = value.replace(FINAL_NEWLINE, "");
   const marked = stripCodeMarkers(original, meta.marks);
   const terminal = terminalLines(marked, lang);
+  const ansi = lang.toLowerCase() === "ansi";
   const hasFeatures =
     meta.marks.size > 0 ||
     meta.lineNumbers !== undefined ||
     meta.wrap ||
     meta.title !== undefined ||
+    meta.kind !== undefined ||
+    meta.variant !== undefined ||
+    meta.theme !== undefined ||
+    ansi ||
     terminal ||
     marked !== original;
   if (!hasFeatures) return undefined;
@@ -233,6 +286,13 @@ export async function renderCodeLines(
   const lines = splitHtmlLines(inner ?? escapeText(code));
   const source = code.split("\n");
   const hasFocus = [...meta.marks.values()].some((set) => set.has("focus"));
+  // ANSI colors in terminal output (or a whole `ansi` block) carry from line to line.
+  let ansiStyle: AnsiStyle = {};
+  const ansiLine = (line: string) => {
+    const result = ansiToHtml(line, { literals: ansi, style: ansiStyle });
+    ansiStyle = result.style;
+    return result.html;
+  };
   const html = lines
     .map((content, index) => {
       const number = index + 1;
@@ -245,8 +305,8 @@ export async function renderCodeLines(
       const prompt = terminal?.prompts.has(number)
         ? '<span class="prompt" aria-hidden="true">$ </span>'
         : "";
-      // Output isn't shell syntax: show it as plain text.
-      const text = output ? escapeText(source[index] ?? "") : content;
+      // Output isn't shell syntax: show it as plain text, in its ANSI colors.
+      const text = ansi || output ? ansiLine(source[index] ?? "") : content;
       return `<span class="line"${attributes}${output}>${prompt}${text}</span>`;
     })
     .join("\n");
@@ -256,6 +316,7 @@ export async function renderCodeLines(
       if (meta.marks.get(number)?.has("del")) return false;
       return !terminal || terminal.commands.has(number);
     })
+    .map((line) => (ansi ? stripAnsi(line, true) : line))
     .join("\n");
   const attributes: Record<string, string> = {};
   if (meta.lineNumbers !== undefined)
@@ -263,5 +324,7 @@ export async function renderCodeLines(
   if (meta.wrap) attributes["data-wrap"] = "";
   if (hasFocus) attributes["data-has-focus"] = "";
   if (terminal) attributes["data-terminal"] = "";
+  if (ansi) attributes["data-ansi"] = "";
+  if (meta.variant) attributes["data-variant"] = meta.variant;
   return { html, copy, attributes, meta };
 }
