@@ -537,6 +537,87 @@ export function tokenize(code: string, lang: string): Token[] | undefined {
   return out;
 }
 
+/** Every token type, in a fixed order: `encodeTokens` refers to them by index. */
+export const TOKEN_TYPES: readonly TokenType[] = [
+  "angleBracket",
+  "attributeName",
+  "attributeValue",
+  "bool",
+  "brace",
+  "bracket",
+  "className",
+  "color",
+  "comment",
+  "controlKeyword",
+  "definition",
+  "definitionKeyword",
+  "deleted",
+  "function",
+  "inserted",
+  "keyword",
+  "meta",
+  "moduleKeyword",
+  "null",
+  "number",
+  "operator",
+  "paren",
+  "propertyName",
+  "punctuation",
+  "regexp",
+  "self",
+  "special",
+  "string",
+  "tagName",
+  "typeName",
+  "unit",
+  "variableName",
+];
+const TYPE_INDEX = new Map(TOKEN_TYPES.map((type, index) => [type, index]));
+
+/** A colored span of code, by character offsets. */
+export interface TokenRange {
+  start: number;
+  end: number;
+  type: TokenType;
+}
+
+/**
+ * Token positions as compact data, for a code view that colors code itself
+ * (with the CSS Custom Highlight API) instead of shipping one `<span>` per
+ * token: `[gap, length, type, gap, length, type, …]`, where `gap` is the
+ * plain text before the token and `type` indexes `TOKEN_TYPES`. Tokenizing
+ * at build time leaves the browser only the painting. Returns `undefined`
+ * for a language the tokenizer doesn't know.
+ */
+export function encodeTokens(code: string, lang: string): number[] | undefined {
+  const tokens = tokenize(code, lang);
+  if (!tokens) return undefined;
+  const data: number[] = [];
+  let offset = 0;
+  let last = 0;
+  for (const { type, text } of tokens) {
+    if (type && text.length > 0) {
+      data.push(offset - last, text.length, TYPE_INDEX.get(type) ?? 0);
+      last = offset + text.length;
+    }
+    offset += text.length;
+  }
+  return data;
+}
+
+/** Token ranges from `encodeTokens` data. */
+export function decodeTokens(data: readonly number[]): TokenRange[] {
+  const ranges: TokenRange[] = [];
+  let offset = 0;
+  for (let i = 0; i + 2 < data.length; i += 3) {
+    const start = offset + data[i];
+    const end = start + data[i + 1];
+    ranges.push({ start, end, type: TOKEN_TYPES[data[i + 2]] });
+    offset = end;
+  }
+  return ranges;
+}
+
 const KEBAB = /[A-Z]/g;
 
 /** `controlKeyword` -> `control-keyword`, matching Carbon's `syntax-*` token names. */

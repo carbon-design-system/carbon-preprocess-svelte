@@ -2,6 +2,7 @@ import type { AlertType, Attributes, Block } from "./blocks";
 import { parseDocument } from "./blocks";
 import { exampleSource } from "./example";
 import { parseFrontmatter, splitFrontmatter } from "./frontmatter";
+import type { ImageSize } from "./image-size";
 import {
   escapeText,
   type InlineOptions,
@@ -25,6 +26,22 @@ export interface MarkdownTree {
   /** Parsed frontmatter, exported as `metadata` and passed to the layout. */
   metadata: Record<string, unknown>;
   blocks: Block[];
+}
+
+export interface ImageOptions {
+  /**
+   * `loading="lazy"` on every image but the first.
+   * @default true
+   */
+  lazy?: boolean;
+  /** An image's intrinsic size, by its source, for `width` and `height`. */
+  size?: (src: string) => ImageSize | undefined;
+  /**
+   * The directory root-relative sources (`/logo.png`) resolve against, such
+   * as `static` or `public`. The preprocessor reads sizes from it; other
+   * sources resolve against the Markdown file.
+   */
+  root?: string;
 }
 
 /** Passed to each renderer, for rendering children the default way. */
@@ -84,6 +101,16 @@ export interface MarkdownOptions {
    * @default "page"
    */
   proseScope?: "page" | "markdown";
+  /**
+   * Loading hints for Markdown images (`![alt](src)`). By default, every
+   * image but the page's first gets `loading="lazy"` (the first is likely in
+   * view, and often the page's largest paint), and every image gets
+   * `decoding="async"`. With `size`, images also get `width` and `height`,
+   * so the page doesn't shift as they load: the preprocessor reads local
+   * files. `false` renders images as written.
+   * @default {}
+   */
+  images?: false | ImageOptions;
   /**
    * Render fenced code blocks with `CodeSnippet type="multi"` (copy button,
    * show more) instead of a plain `<pre>`.
@@ -216,6 +243,45 @@ function propsOf(props: Record<string, string | number | boolean>): string {
     .join("");
 }
 
+const IMAGE_SOURCE = /!\[[^\]]*\]\(\s*<?([^\s)>]+)/;
+
+/** The source of the page's first inline image, in document order. */
+function firstImageSource(blocks: Block[]): string | undefined {
+  for (const block of walk(blocks)) {
+    const texts =
+      block.type === "paragraph" || block.type === "heading"
+        ? [block.text]
+        : block.type === "table"
+          ? [...block.head, ...block.rows.flat()]
+          : [];
+    for (const text of texts) {
+      const match = IMAGE_SOURCE.exec(text);
+      if (match) return match[1];
+    }
+  }
+  return undefined;
+}
+
+/** `loading`, `decoding`, `width`, and `height` for each image. */
+function imageAttributes(
+  images: false | ImageOptions | undefined,
+  first: string | undefined,
+): ((src: string) => string) | undefined {
+  if (images === false) return undefined;
+  const lazy = images?.lazy ?? true;
+  let firstSeen = false;
+  return (src) => {
+    const isFirst = !firstSeen && src === first;
+    if (isFirst) firstSeen = true;
+    const size = images?.size?.(src);
+    return [
+      lazy && !isFirst ? ' loading="lazy"' : "",
+      ' decoding="async"',
+      size ? ` width="${size.width}" height="${size.height}"` : "",
+    ].join("");
+  };
+}
+
 /** Visit every block, including those nested in quotes and lists. */
 function* walk(blocks: Block[]): Generator<Block> {
   for (const block of blocks) {
@@ -257,6 +323,7 @@ export async function renderMarkdown(
   };
   const inlineOptions: InlineOptions = {
     ...textOptions,
+    image: imageAttributes(options.images, firstImageSource(blocks)),
     footnote(label) {
       const key = label.toLowerCase();
       if (!footnotes.has(key)) return undefined;

@@ -173,7 +173,7 @@ describe("::: code-group", () => {
       '<div class="code-group">\n<div class="code-block">\n<div class="code-block__title">App.svelte</div>',
     );
     expect(html).toContain('<div class="code-block__title">counter.js</div>');
-    expect(html).toMatch(/<\/div>\n<\/div>\n<p>After\.<\/p>$/);
+    expect(html.endsWith("</div>\n</div>\n<p>After.</p>")).toBe(true);
   });
 
   test("passes the group to `renderers.codeGroup`", async () => {

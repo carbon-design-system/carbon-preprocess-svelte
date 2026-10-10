@@ -17,6 +17,8 @@ export interface InlineOptions {
    * label has no definition and the text stays literal.
    */
   footnote?: (label: string) => string | undefined;
+  /** Extra attributes for an image (`loading`, `width`), by its source. */
+  image?: (src: string) => string;
 }
 
 type Inline =
@@ -670,7 +672,11 @@ export function parseInline(src: string, options: InlineOptions): Inline[] {
  */
 type RenderMode = "html" | "text" | "raw";
 
-function renderNodes(nodes: Inline[], mode: RenderMode): string {
+function renderNodes(
+  nodes: Inline[],
+  mode: RenderMode,
+  image?: InlineOptions["image"],
+): string {
   const html = mode === "html";
   const esc = mode === "raw" ? (s: string) => s : escapeText;
   let out = "";
@@ -696,12 +702,12 @@ function renderNodes(nodes: Inline[], mode: RenderMode): string {
       case "em":
       case "strong":
       case "del": {
-        const inner = renderNodes(node.children, mode);
+        const inner = renderNodes(node.children, mode, image);
         out += html ? `<${node.type}>${inner}</${node.type}>` : inner;
         break;
       }
       case "link": {
-        const inner = renderNodes(node.children, mode);
+        const inner = renderNodes(node.children, mode, image);
         const title = node.title ? ` title="${escapeText(node.title)}"` : "";
         out += html
           ? `<a href="${escapeText(node.href)}"${title}>${inner}</a>`
@@ -712,7 +718,7 @@ function renderNodes(nodes: Inline[], mode: RenderMode): string {
         const alt = renderNodes(node.children, html ? "text" : mode);
         const title = node.title ? ` title="${escapeText(node.title)}"` : "";
         out += html
-          ? `<img src="${escapeText(node.href)}" alt="${alt}"${title} />`
+          ? `<img src="${escapeText(node.href)}" alt="${alt}"${title}${image?.(node.href) ?? ""} />`
           : alt;
         break;
       }
@@ -723,7 +729,7 @@ function renderNodes(nodes: Inline[], mode: RenderMode): string {
 
 /** Render inline Markdown to Svelte markup. */
 export function renderInline(src: string, options: InlineOptions): string {
-  return renderNodes(parseInline(src, options), "html");
+  return renderNodes(parseInline(src, options), "html", options.image);
 }
 
 /**

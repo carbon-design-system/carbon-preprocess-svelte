@@ -1,4 +1,5 @@
 export type {
+  ImageOptions,
   MarkdownHeading,
   MarkdownOptions,
   MarkdownRenderers,
@@ -6,11 +7,16 @@ export type {
   RenderContext,
 } from "./markdown/compile";
 export {
+  decodeTokens,
+  encodeTokens,
   highlight,
+  TOKEN_TYPES,
   type Token,
+  type TokenRange,
   type TokenType,
   tokenize,
 } from "./markdown/highlight";
+export { type ImageSize, imageSize } from "./markdown/image-size";
 export {
   type CodeMeta,
   type LineMark,
