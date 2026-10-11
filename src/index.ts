@@ -26,6 +26,7 @@ export {
   type TokenRange,
   type TokenType,
   tokenize,
+  tokenName,
 } from "./markdown/highlight";
 export { type ImageSize, imageSize } from "./markdown/image-size";
 export {
