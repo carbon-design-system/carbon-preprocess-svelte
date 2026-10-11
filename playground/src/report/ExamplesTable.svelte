@@ -1,6 +1,6 @@
 <script>
   /** Every example's CSS before and after `optimizeCss`, from the e2e snapshot. */
-  import { DataTable, ProgressBar } from "carbon-components-svelte";
+  import { DataTable } from "carbon-components-svelte";
   import report from "virtual:build-report";
 
   const headers = [
@@ -31,7 +31,9 @@
     <svelte:fragment slot="cell" let:cell>
       {#if cell.key === "reduction_percent"}
         <div class="bar">
-          <ProgressBar size="sm" value={cell.value} max={100} hideLabel labelText="Smaller by" />
+          <!-- A data bar, drawn: ProgressBar would announce each row as a task
+               in progress. The percentage beside it is the value. -->
+          <span class="track" aria-hidden="true"><span class="fill" style:inline-size="{cell.value}%"></span></span>
           <span>{cell.value.toFixed(1)}%</span>
         </div>
       {:else}
@@ -53,5 +55,18 @@
     gap: var(--cds-spacing-03);
     font-variant-numeric: tabular-nums;
     text-align: end;
+  }
+
+  /* ProgressBar's small size and colors, as a plain bar. */
+  .track {
+    display: block;
+    block-size: 0.25rem;
+    background-color: var(--cds-ui-03);
+  }
+
+  .fill {
+    display: block;
+    block-size: 100%;
+    background-color: var(--cds-interactive-04);
   }
 </style>
