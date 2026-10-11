@@ -61,6 +61,8 @@ export type ComponentModel = {
   componentImports: Map<string, string>;
   /** Every other imported binding. */
   otherImports: Set<string>;
+  /** Bindings imported from `svelte/store`, by local name: `readable`. */
+  storeImports: Map<string, string>;
   /** Keys this component passes to `setContext` as string literals. */
   providedContexts: Set<string>;
   /**
@@ -217,6 +219,7 @@ export function buildComponentModel(
     unknownReasons: new Map(),
     componentImports: new Map(),
     otherImports: new Set(),
+    storeImports: new Map(),
     providedContexts: new Set(),
     escapes: findEscapes(ast),
   };
@@ -331,6 +334,108 @@ export function buildComponentModel(
   return model;
 }
 
+/**
+ * Declares each name `pattern` binds as the read of its path from `read`
+ * (`init.b`, `init[0]`), defaults applied where that's `undefined`. A
+ * rest element, or a computed key, is unknown.
+ */
+function declareDestructured(
+  model: ComponentModel,
+  pattern: Node,
+  read: Expression,
+  lets: Set<string> | undefined,
+): void {
+  // The read takes the pattern's place in the source, for reports.
+  const at = {
+    start: (pattern as { start: number }).start,
+    end: (pattern as { end: number }).end,
+  };
+  const member = (property: Expression, computed: boolean) =>
+    ({
+      type: "MemberExpression",
+      object: read,
+      property,
+      computed,
+      optional: false,
+      ...at,
+    }) as unknown as Expression;
+  switch (pattern.type) {
+    case "Identifier":
+      model.declarations.set(pattern.name, read);
+      lets?.add(pattern.name);
+      return;
+    case "ObjectPattern":
+      for (const property of pattern.properties) {
+        const key =
+          property.type !== "Property"
+            ? undefined
+            : !property.computed && property.key.type === "Identifier"
+              ? property.key.name
+              : property.key.type === "Literal" &&
+                  typeof property.key.value === "string"
+                ? property.key.value
+                : undefined;
+        if (property.type !== "Property" || key === undefined) {
+          markUnknown(
+            model,
+            (property.type === "RestElement"
+              ? property.argument
+              : property.value) as Node,
+            "is declared by destructuring",
+          );
+          continue;
+        }
+        declareDestructured(
+          model,
+          property.value as Node,
+          member({ type: "Identifier", name: key } as Expression, false),
+          lets,
+        );
+      }
+      return;
+    case "ArrayPattern":
+      for (const [index, element] of pattern.elements.entries()) {
+        if (!element) continue;
+        if (element.type === "RestElement") {
+          markUnknown(
+            model,
+            element.argument as Node,
+            "is declared by destructuring",
+          );
+          continue;
+        }
+        declareDestructured(
+          model,
+          element as Node,
+          member({ type: "Literal", value: index } as Expression, true),
+          lets,
+        );
+      }
+      return;
+    case "AssignmentPattern":
+      declareDestructured(
+        model,
+        pattern.left as Node,
+        {
+          type: "ConditionalExpression",
+          test: {
+            type: "BinaryExpression",
+            operator: "===",
+            left: read,
+            right: { type: "Identifier", name: "undefined" },
+          },
+          consequent: pattern.right,
+          alternate: read,
+          ...at,
+        } as unknown as Expression,
+        lets,
+      );
+      return;
+    default:
+      markUnknown(model, pattern, "is declared by destructuring");
+  }
+}
+
 function readTopLevelStatement(
   model: ComponentModel,
   statement: Node,
@@ -355,6 +460,9 @@ function readTopLevelStatement(
           : undefined;
       if (key) model.componentImports.set(specifier.local.name, key);
       else model.otherImports.add(specifier.local.name);
+      if (source === "svelte/store" && imported) {
+        model.storeImports.set(specifier.local.name, imported);
+      }
     }
     return;
   }
@@ -371,11 +479,21 @@ function readTopLevelStatement(
         continue;
       }
       if (declarator.id.type !== "Identifier") {
-        markUnknown(
-          model,
-          declarator.id as Node,
-          "is declared by destructuring",
-        );
+        if (isExport || rune || !declarator.init) {
+          markUnknown(
+            model,
+            declarator.id as Node,
+            "is declared by destructuring",
+          );
+        } else {
+          // `const { a, b: c = 1 } = init`: each name reads its path.
+          declareDestructured(
+            model,
+            declarator.id as Node,
+            declarator.init as Expression,
+            declaration.kind === "let" ? lets : undefined,
+          );
+        }
         continue;
       }
       // `$state(x)`, `$state.raw(x)` and `$derived(x)` hold `x`; any

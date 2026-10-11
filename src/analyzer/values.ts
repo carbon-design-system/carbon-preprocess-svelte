@@ -28,6 +28,12 @@ export type Shape =
   | { readonly kind: "object"; readonly props: ReadonlyMap<string, Value> }
   | { readonly kind: "array"; readonly elements: readonly Value[] };
 
+/**
+ * A Svelte store whose value never changes: `readable(v)` from
+ * `svelte/store` with no start function. Only made by `store`.
+ */
+export type Store = { readonly kind: "store"; readonly value: Value };
+
 export type Primitive =
   | string
   | number
@@ -36,7 +42,8 @@ export type Primitive =
   | undefined
   | typeof OBJECT
   | typeof EMPTY_ARRAY
-  | Shape;
+  | Shape
+  | Store;
 
 export type Value = ReadonlySet<Primitive> | typeof UNKNOWN;
 
@@ -71,14 +78,18 @@ export function flatMap(value: Value, map: (p: Primitive) => Value): Value {
 }
 
 export function isShape(p: Primitive): p is Shape {
-  return typeof p === "object" && p !== null;
+  return typeof p === "object" && p !== null && p.kind !== "store";
 }
 
-/** `OBJECT`, `EMPTY_ARRAY`, or a shape: some object. */
+export function isStore(p: Primitive): p is Store {
+  return typeof p === "object" && p !== null && p.kind === "store";
+}
+
+/** `OBJECT`, `EMPTY_ARRAY`, a shape or a store: some object. */
 export function isObject(
   p: Primitive,
-): p is typeof OBJECT | typeof EMPTY_ARRAY | Shape {
-  return p === OBJECT || p === EMPTY_ARRAY || isShape(p);
+): p is typeof OBJECT | typeof EMPTY_ARRAY | Shape | Store {
+  return p === OBJECT || p === EMPTY_ARRAY || isShape(p) || isStore(p);
 }
 
 /** An object whose contents are known: `EMPTY_ARRAY` or a shape. */
@@ -100,6 +111,7 @@ function valueKey(value: Value): string {
   return [...value]
     .map((p) => {
       if (isShape(p)) return `#${ids.get(p)}`;
+      if (isStore(p)) return `$(${valueKey(p.value)})`;
       if (p === OBJECT) return "o";
       if (p === EMPTY_ARRAY) return "[]";
       return `${typeof p}:${String(p)}`;
@@ -127,6 +139,20 @@ export function shape(
     existing = contents;
     interned.set(key, existing);
     ids.set(existing, nextId++);
+  }
+  return existing;
+}
+
+const stores = new Map<string, Store>();
+
+/** The interned store holding `value`; see `Store`. */
+export function store(value: Value): Store {
+  const key = valueKey(value);
+  let existing = stores.get(key);
+  if (!existing) {
+    if (stores.size >= MAX_INTERNED) stores.clear();
+    existing = { kind: "store", value };
+    stores.set(key, existing);
   }
   return existing;
 }
@@ -267,7 +293,9 @@ export function binary(operator: string, a: Value, b: Value): Value {
 export function typeOf(value: Value): Value {
   return flatMap(value, (p) => {
     if (p === OBJECT) return possible("object", "function");
-    if (isStructured(p) || p === null) return possible("object");
+    if (isStructured(p) || isStore(p) || p === null) {
+      return possible("object");
+    }
     return possible(typeof p);
   });
 }
@@ -286,7 +314,7 @@ export function formatValue(value: Value): string {
         ? "object"
         : p === EMPTY_ARRAY
           ? "[]"
-          : isShape(p)
+          : isShape(p) || isStore(p)
             ? p.kind
             : p === undefined
               ? "undefined"
