@@ -29,15 +29,12 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { plugin } from "bun";
 import { filterCss } from "caligula";
+import { requiredClasses } from "caligula/selector";
 import { compile } from "svelte/compiler";
 import { render } from "svelte/server";
 import { analyzeFiles } from "../src/analyzer";
 import { readCarbonComponents } from "../src/analyzer/call-sites";
 import { loadComponentModel } from "../src/analyzer/component-model";
-import {
-  splitSelectorList,
-  stripNotPseudoClasses,
-} from "../src/indexer/css-selector-utils";
 import { loadComponentIndex } from "../src/indexer/load-index";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { optimizeCssWithReport } from "../src/plugins/create-optimized-css";
@@ -109,21 +106,18 @@ function bundledClosure(keys: string[]): string[] {
   return [...seen];
 }
 
-const CLASS_TOKEN = /\.bx--[\w-]+/g;
 const CLASS_ATTR = /class="([^"]*)"/g;
-const PARENTHESIZED = /\([^()]*\)/g;
 
 /** Each selector in `source`, with the Carbon classes it requires. */
 function selectors(source: string): Map<string, string[]> {
   const result = new Map<string, string[]>();
   filterCss(source, {
-    rule({ selector: list }) {
-      for (const selector of splitSelectorList(list)) {
-        let positive = stripNotPseudoClasses(selector);
-        while (PARENTHESIZED.test(positive)) {
-          positive = positive.replace(PARENTHESIZED, "");
-        }
-        result.set(selector, positive.match(CLASS_TOKEN) ?? []);
+    rule({ parsed }) {
+      for (const selector of parsed) {
+        result.set(
+          selector.text,
+          requiredClasses(selector, { prefix: "bx--" }).map((cls) => `.${cls}`),
+        );
       }
     },
   });

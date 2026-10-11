@@ -1,12 +1,6 @@
+import type { ParsedSelector } from "caligula/selector";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
-import {
-  findSubjectStart,
-  HYPHEN,
-  isClassTokenChar,
-  splitSelectorList,
-  stripNotPseudoClasses,
-} from "../indexer/css-selector-utils";
 import { isSafelisted, type SafelistEntry } from "./safelist";
 
 const FLATPICKR_CLASS_NAMES = [
@@ -52,7 +46,10 @@ const OPTIMIZABLE_CSS = new RegExp(
   `bx-|flatpickr|IBM Plex|${[...FLATPICKR_KEYFRAMES, ...FLATPICKR_CLASS_NAMES].join("|")}`,
 );
 const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
-const CONTEXT_ANCESTOR_SET = new Set<string>(CONTEXT_ANCESTORS);
+/** `CONTEXT_ANCESTORS` without the leading `.`, as parsed selectors name them. */
+const CONTEXT_ANCESTOR_NAMES = new Set<string>(
+  CONTEXT_ANCESTORS.map((cls) => cls.slice(1)),
+);
 
 export function hasOptimizableCss(css: string): boolean {
   return OPTIMIZABLE_CSS.test(css);
@@ -104,8 +101,9 @@ type AllowlistIndex = Ownership & {
   exact: Set<string>;
   hyphenPrefixes: string[];
   /**
-   * Per-class verdicts: Carbon's stylesheet repeats ~1.3k class names across
-   * ~14k selector positions, so the walk runs once per distinct class.
+   * Per-class verdicts, by name without the `.`: Carbon's stylesheet repeats
+   * ~1.3k class names across ~14k selector positions, so the walk runs once
+   * per distinct class.
    */
   verdicts: Map<string, boolean>;
 };
@@ -131,16 +129,17 @@ function getAllowlistIndex(
   return index;
 }
 
-function matchesAllowlist(name: string, index: AllowlistIndex): boolean {
-  const cached = index.verdicts.get(name);
+/** `matchesAllowlist` for a class name without the `.`, cached. */
+function matchesClass(cls: string, index: AllowlistIndex): boolean {
+  const cached = index.verdicts.get(cls);
   if (cached !== undefined) return cached;
 
-  const verdict = computeAllowlistMatch(name, index);
-  index.verdicts.set(name, verdict);
+  const verdict = matchesAllowlist(`.${cls}`, index);
+  index.verdicts.set(cls, verdict);
   return verdict;
 }
 
-function computeAllowlistMatch(name: string, index: AllowlistIndex): boolean {
+function matchesAllowlist(name: string, index: AllowlistIndex): boolean {
   if (index.exact.has(name)) return true;
 
   for (const prefix of index.hyphenPrefixes) {
@@ -171,82 +170,50 @@ function computeAllowlistMatch(name: string, index: AllowlistIndex): boolean {
   return false;
 }
 
-function classMatchesAllowlist(name: string, index: AllowlistIndex): boolean {
-  return CONTEXT_ANCESTOR_SET.has(name) || matchesAllowlist(name, index);
+/**
+ * A selector's class as Carbon names it: `bx--x` as is, legacy `bx-x` as
+ * `bx--x`, `null` for any other class.
+ */
+function carbonClass(cls: string): string | null {
+  if (!cls.startsWith("bx-")) return null;
+  if (cls.startsWith("bx--")) return cls.length > 4 ? cls : null;
+  return cls.length > 3 ? `bx--${cls.slice(3)}` : null;
 }
 
-const CLASSES_NONE = 0;
-const CLASSES_MATCH = 1;
-const CLASSES_MISS = 2;
-
-/**
- * Runs the allowlist over every Carbon class token in `normalized[from, to)`
- * (legacy `.bx-x` read as `.bx--x`), stopping at the first miss. Yields the
- * same tokens as `getCarbonClassesFromNormalized` without materializing them.
- */
-function scanCarbonClasses(
-  normalized: string,
-  from: number,
-  to: number,
+/** Whether every Carbon class in `classes` matches the allowlist. */
+function classesMatch(
+  classes: readonly string[],
   index: AllowlistIndex,
   ancestor: boolean,
-): number {
-  let start = normalized.indexOf(".bx-", from);
-  if (start === -1 || start >= to) return CLASSES_NONE;
-
-  let result = CLASSES_NONE;
-
-  while (start !== -1 && start < to) {
-    const isCarbon = normalized.charCodeAt(start + 4) === HYPHEN;
-    const tokenStart = isCarbon ? start + 5 : start + 4;
-    let end = tokenStart;
-    while (end < to && isClassTokenChar(normalized.charCodeAt(end))) {
-      end++;
-    }
-
-    if (end > tokenStart) {
-      const name = isCarbon
-        ? normalized.slice(start, end)
-        : `.bx--${normalized.slice(tokenStart, end)}`;
-      const matched = ancestor
-        ? classMatchesAllowlist(name, index)
-        : matchesAllowlist(name, index);
-      if (!matched) return CLASSES_MISS;
-      result = CLASSES_MATCH;
-    }
-
-    start = normalized.indexOf(".bx-", end);
+): boolean {
+  for (let i = 0; i < classes.length; i++) {
+    const cls = carbonClass(classes[i]);
+    if (cls === null) continue;
+    if (ancestor && CONTEXT_ANCESTOR_NAMES.has(cls)) continue;
+    if (!matchesClass(cls, index)) return false;
   }
-
-  return result;
+  return true;
 }
 
 /**
  * Whether to keep a selector: every subject class must match the allowlist
  * (exactly, as a hyphen prefix, or as a BEM child of an allowed class), and
- * ancestor classes must too, or be one of `CONTEXT_ANCESTORS`.
+ * ancestor classes must too, or be one of `CONTEXT_ANCESTORS`. Classes in
+ * `:not()` don't count.
  */
-function shouldKeepSelector(selector: string, index: AllowlistIndex): boolean {
-  const normalized = stripNotPseudoClasses(selector);
-  const subjectStart = findSubjectStart(normalized);
+function shouldKeepSelector(
+  selector: ParsedSelector,
+  index: AllowlistIndex,
+): boolean {
+  const { compounds } = selector;
+  const last = compounds.length - 1;
 
   // Most pruned rules fail on their subject, so check ancestors second.
-  if (
-    scanCarbonClasses(
-      normalized,
-      subjectStart,
-      normalized.length,
-      index,
-      false,
-    ) === CLASSES_MISS
-  ) {
-    return false;
+  if (!classesMatch(compounds[last].classes, index, false)) return false;
+  for (let i = 0; i < last; i++) {
+    if (!classesMatch(compounds[i].classes, index, true)) return false;
   }
-
-  return (
-    subjectStart === 0 ||
-    scanCarbonClasses(normalized, 0, subjectStart, index, true) !== CLASSES_MISS
-  );
+  return true;
 }
 
 export type PrunedSelector = {
@@ -259,12 +226,13 @@ export type PrunedSelector = {
 /**
  * What pruning does to a rule's selector list: `undefined` when nothing
  * changes, else the pruned list (`null` drops the rule) and how many
- * selectors went.
+ * selectors went. Reads `rule.parsed` only for lists that may change.
  */
 export function pruneRuleSelector(
-  selector: string,
+  rule: { selector: string; readonly parsed: readonly ParsedSelector[] },
   options: StrictCssOptimizerOptions,
 ): PrunedSelector | undefined {
+  const { selector } = rule;
   const { allowlist, components, preserveFlatpickr, safelist, isPruned } =
     options;
   const index = getAllowlistIndex(allowlist, components);
@@ -279,20 +247,7 @@ export function pruneRuleSelector(
 
   const dropFlatpickr = hasFlatpickr && !preserveFlatpickr;
 
-  // Single selectee (the common case): no list to split or rebuild.
-  if (!selector.includes(",")) {
-    return keepSelectee(
-      selector.trim(),
-      safelist,
-      dropFlatpickr,
-      index,
-      isPruned,
-    )
-      ? undefined
-      : { removed: 1, selector: null };
-  }
-
-  const selectors = splitSelectorList(selector);
+  const selectors = rule.parsed;
   const kept = selectors.filter((selectee) =>
     keepSelectee(selectee, safelist, dropFlatpickr, index, isPruned),
   );
@@ -301,51 +256,39 @@ export function pruneRuleSelector(
 
   return {
     removed: selectors.length - kept.length,
-    selector: kept.length === 0 ? null : kept.join(", "),
+    selector:
+      kept.length === 0
+        ? null
+        : kept.map((selectee) => selectee.text).join(", "),
   };
 }
 
 function keepSelectee(
-  selectee: string,
+  selectee: ParsedSelector,
   safelist: readonly SafelistEntry[],
   dropFlatpickr: boolean,
   index: AllowlistIndex,
   isPruned: ((cls: string) => boolean) | undefined,
 ): boolean {
-  if (isSafelisted(selectee, safelist)) return true;
+  const { text } = selectee;
+  if (isSafelisted(text, safelist)) return true;
   if (isPruned && needsPrunedClass(selectee, isPruned)) return false;
-  if (dropFlatpickr && FLATPICKR_SELECTOR.test(selectee)) return false;
-  return !selectee.includes("bx-") || shouldKeepSelector(selectee, index);
+  if (dropFlatpickr && FLATPICKR_SELECTOR.test(text)) return false;
+  return !text.includes("bx-") || shouldKeepSelector(selectee, index);
 }
 
-const DOT = 46;
-const OPEN_PAREN = 40;
-const CLOSE_PAREN = 41;
-
 /**
- * Whether `selectee` only matches an element with a class `isPruned`
- * rejects. Classes inside `:not(…)`, `:is(…)`, `:where(…)`, `:has(…)` are
- * skipped: those don't require the class.
+ * Whether `selectee` only matches an element with a `.bx--` class `isPruned`
+ * rejects. Classes in `:not()` and `:has()` don't count: those don't
+ * require the class.
  */
 function needsPrunedClass(
-  selectee: string,
+  selectee: ParsedSelector,
   isPruned: (cls: string) => boolean,
 ): boolean {
-  let depth = 0;
-  for (let i = 0; i < selectee.length; i++) {
-    const code = selectee.charCodeAt(i);
-    if (code === OPEN_PAREN) depth++;
-    else if (code === CLOSE_PAREN) depth = Math.max(0, depth - 1);
-    else if (code === DOT && depth === 0 && selectee.startsWith(".bx--", i)) {
-      let end = i + 5;
-      while (
-        end < selectee.length &&
-        isClassTokenChar(selectee.charCodeAt(end))
-      ) {
-        end++;
-      }
-      if (isPruned(selectee.slice(i, end))) return true;
-      i = end - 1;
+  for (const { classes } of selectee.compounds) {
+    for (const cls of classes) {
+      if (cls.startsWith("bx--") && isPruned(`.${cls}`)) return true;
     }
   }
   return false;

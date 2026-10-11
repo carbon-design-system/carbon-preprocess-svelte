@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { filterCss } from "caligula";
+import { splitSelectorList } from "caligula/selector";
 import {
   buildAllowlist,
   carbonClassesIn,
@@ -102,26 +103,6 @@ type Report = {
   /** Carbon classes that survived but the allowlist does not justify. */
   leaked_classes: string[];
 };
-
-/** Split a selector list on top-level commas (parenthesis-aware), like the source. */
-function splitSelectorList(selector: string): string[] {
-  const selectors: string[] = [];
-  let depth = 0;
-  let start = 0;
-
-  for (let i = 0; i < selector.length; i++) {
-    const char = selector[i];
-    if (char === "(") depth++;
-    else if (char === ")") depth = Math.max(0, depth - 1);
-    else if (char === "," && depth === 0) {
-      selectors.push(selector.slice(start, i).trim());
-      start = i + 1;
-    }
-  }
-  selectors.push(selector.slice(start).trim());
-
-  return selectors.filter(Boolean);
-}
 
 /** Visit every rule's selector, including nested ones, without editing the CSS. */
 function walkRules(css: string, visit: (selector: string) => void): void {

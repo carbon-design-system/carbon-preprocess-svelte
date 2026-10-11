@@ -1,20 +1,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { parseSelector, requiredClasses } from "caligula/selector";
 import {
   ALWAYS_ON_CLASSES,
   CONTEXT_ANCESTORS,
 } from "carbon-preprocess-svelte/constants";
-import {
-  findSubjectStart,
-  stripNotPseudoClasses,
-} from "../../src/indexer/css-selector-utils";
 import { components } from "./component-index";
 
 const require = createRequire(import.meta.url);
 
-const CARBON_CLASS = /\.bx--[A-Za-z0-9_-]+/g;
-const LEGACY_CARBON_CLASS = /\.bx-(?!-)[A-Za-z0-9_-]+/g;
 const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
 const CONTEXT_ANCESTOR_SET = new Set<string>(CONTEXT_ANCESTORS);
 
@@ -37,19 +32,23 @@ export function resolveCarbonCss(theme = "white"): string {
   return readFileSync(cssPath, "utf-8");
 }
 
-/**
- * Pull `.bx--*` tokens from a selector. Normalizes legacy `.bx-` to `.bx--`.
- * Strips `:not(...)` with `stripNotPseudoClasses`, then matches with regex.
- * Fixture tests fail if `getCarbonClassesFromNormalized` changes token rules.
- */
-export function carbonClassesIn(selector: string): string[] {
-  const normalized = stripNotPseudoClasses(selector);
-  const classes = normalized.match(CARBON_CLASS) ?? [];
-  const legacy = (normalized.match(LEGACY_CARBON_CLASS) ?? []).map((cls) =>
-    cls.replace(".bx-", ".bx--"),
-  );
-
+/** Carbon classes in `names` as `.bx--x`, legacy `bx-x` read as `.bx--x` and listed last. */
+function carbonClasses(names: readonly string[]): string[] {
+  const classes = names
+    .filter((cls) => cls.startsWith("bx--") && cls.length > 4)
+    .map((cls) => `.${cls}`);
+  const legacy = names
+    .filter(
+      (cls) =>
+        !cls.startsWith("bx--") && cls.startsWith("bx-") && cls.length > 3,
+    )
+    .map((cls) => `.bx--${cls.slice(3)}`);
   return [...new Set([...classes, ...legacy])];
+}
+
+/** The `.bx--*` classes a selector requires (not those in `:not()`), legacy `.bx-` read as `.bx--`. */
+export function carbonClassesIn(selector: string): string[] {
+  return carbonClasses(requiredClasses(selector, { prefix: "bx-" }));
 }
 
 function classMatchesAllowlist(name: string, allowlist: Set<string>): boolean {
@@ -63,10 +62,11 @@ export function shouldKeepStrictSelector(
   selector: string,
   allowlist: Set<string>,
 ): boolean {
-  const normalized = stripNotPseudoClasses(selector);
-  const subjectStart = findSubjectStart(normalized);
-  const subjectClasses = carbonClassesIn(normalized.slice(subjectStart));
-  const ancestorClasses = carbonClassesIn(normalized.slice(0, subjectStart));
+  const { compounds } = parseSelector(selector);
+  const subjectClasses = carbonClasses(compounds[compounds.length - 1].classes);
+  const ancestorClasses = carbonClasses(
+    compounds.slice(0, -1).flatMap((compound) => compound.classes),
+  );
 
   if (subjectClasses.length === 0 && ancestorClasses.length === 0) {
     return true;
