@@ -20,6 +20,7 @@
  *
  * Apps that render Carbon through their own wrappers (`./wrapper-cases.ts`)
  * run too, with the wrappers rewritten; `--wrappers` runs only those.
+ * `--golden` runs the realistic apps in `golden/` instead (Svelte 5).
  *
  * `--project <dir>` runs against another install: its `svelte` (3, 4 or 5)
  * compiles and renders, and its `carbon-components-svelte` is analyzed. A
@@ -37,6 +38,7 @@ import { readCarbonComponents } from "../src/analyzer/call-sites";
 import { specializeComponent } from "../src/analyzer/specialize";
 import { parse } from "../src/indexer/parser";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import { goldenApps } from "./golden-apps";
 import { buildCases, caseSource } from "./prop-aware-cases";
 import { wrapperCases } from "./wrapper-cases";
 
@@ -57,6 +59,8 @@ const { values: args } = parseArgs({
     project: { type: "string" },
     // Only the apps with their own wrapper components.
     wrappers: { type: "boolean" },
+    // Only the golden apps in `golden/` (see `golden-apps.ts`).
+    golden: { type: "boolean" },
   },
 });
 
@@ -74,9 +78,9 @@ type Compile = (
   source: string,
   options: Record<string, unknown>,
 ) => { js: { code: string } };
-const { compile } = (await import(
+const { compile, compileModule } = (await import(
   Bun.resolveSync("svelte/compiler", PROJECT)
-)) as { compile: Compile };
+)) as { compile: Compile; compileModule?: Compile };
 const GENERATE =
   svelteMajor >= 5
     ? { server: "server", client: "client" }
@@ -90,33 +94,45 @@ mkdirSync(OUT, { recursive: true });
 type EvalCase = ReturnType<typeof buildCases>[number] & {
   /** An app of several files, the first rendered: see `wrapper-cases.ts`. */
   files?: Record<string, string>;
+  /** An app's existing files, `file` the one rendered (`golden/`). */
+  appFiles?: Array<{ file: string; code: string }>;
 };
 
-const cases: EvalCase[] = [
-  ...(args.wrappers
-    ? []
-    : buildCases({
-        root: ROOT,
-        carbon,
-        carbonSrc,
-        only: args.only,
-        apps: args.apps,
-        combos: Number(args.combos),
-        seed: Number(args.seed),
-      })),
-  // Apps with their own wrappers, which get rewritten too.
-  ...(args.only || args.apps
-    ? []
-    : wrapperCases({
-        count: Math.ceil(Number(args.combos) / 5),
-        seed: Number(args.seed),
-        runes: svelteMajor >= 5,
-      }).map((wrapper) => ({ ...wrapper, markup: "" }))),
-];
+const cases: EvalCase[] = args.golden
+  ? goldenApps(ROOT, args.only).map((app) => ({
+      id: app.id,
+      components: app.components,
+      markup: "",
+      file: app.entry,
+      appFiles: app.files,
+    }))
+  : [
+      ...(args.wrappers
+        ? []
+        : buildCases({
+            root: ROOT,
+            carbon,
+            carbonSrc,
+            only: args.only,
+            apps: args.apps,
+            combos: Number(args.combos),
+            seed: Number(args.seed),
+          })),
+      // Apps with their own wrappers, which get rewritten too.
+      ...(args.only || args.apps
+        ? []
+        : wrapperCases({
+            count: Math.ceil(Number(args.combos) / 5),
+            seed: Number(args.seed),
+            runes: svelteMajor >= 5,
+          }).map((wrapper) => ({ ...wrapper, markup: "" }))),
+    ];
 
 // ---------- bundling ----------
 
 const SVELTE_FILE = /\.svelte$/;
+const SVELTE_MODULE = /\.svelte\.[jt]s$/;
+const typescript = new Bun.Transpiler({ loader: "ts" });
 const CSS_FILE = /\.css$/;
 const WHITESPACE = /\s+/;
 const SCOPING_CLASS = /^svelte-[a-z0-9]+$/;
@@ -145,6 +161,18 @@ function sveltePlugin(
           }).js.code;
           compiled.set(cacheKey, js);
         }
+        return { contents: js, loader: "js" };
+      });
+      // Svelte 5's rune modules (`cart.svelte.ts`), TypeScript stripped
+      // first as Vite's Svelte plugin does.
+      build.onLoad({ filter: SVELTE_MODULE }, async ({ path: file }) => {
+        if (!compileModule) throw new Error(`${file} needs Svelte 5`);
+        let source = await Bun.file(file).text();
+        if (file.endsWith(".ts")) source = typescript.transformSync(source);
+        const js = compileModule(source, {
+          filename: file,
+          generate: GENERATE[generate],
+        }).js.code;
         return { contents: js, loader: "js" };
       });
     },
@@ -253,7 +281,10 @@ const emptyBlock = args["empty-block"];
 for (const [n, testCase] of cases.entries()) {
   let appFile: string;
   const files: Array<{ file: string; code: string }> = [];
-  if (testCase.files) {
+  if (testCase.appFiles && testCase.file) {
+    appFile = testCase.file;
+    files.push(...testCase.appFiles);
+  } else if (testCase.files) {
     const dir = path.join(OUT, `case-${n}`);
     mkdirSync(dir, { recursive: true });
     for (const [name, code] of Object.entries(testCase.files)) {
