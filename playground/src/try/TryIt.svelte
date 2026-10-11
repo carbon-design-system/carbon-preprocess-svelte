@@ -54,14 +54,20 @@
 
   let run = 0;
   let timer;
-  $: {
+  // Only `source` is a dependency: reading `result` here would recompile
+  // every time a compile sets it, forever.
+  $: schedule(source);
+
+  /** Compile at once the first time, then once typing pauses. */
+  function schedule(text) {
     clearTimeout(timer);
-    const text = source;
     timer = setTimeout(() => compile(text), result ? 120 : 0);
   }
 
   async function compile(text) {
     const id = ++run;
+    // A mark per compile, for the tests and DevTools' Performance panel.
+    performance.mark("try:compile");
     try {
       const start = performance.now();
       const compiled = await compileMarkdown(text, { ...OPTIONS, filename: "Page.md" });
