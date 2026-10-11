@@ -15,6 +15,7 @@
     "test": "rm -rf node_modules/.cache/carbon-preprocess-svelte && bun test --parallel",
     "test:e2e": "bun tests/test-e2e.ts",
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
+    "snapshots:from-ci": "bun scripts/snapshots-from-ci.ts",
     "test:fixtures:update": "UPDATE_FIXTURES=true bun test tests/optimize-css-fixtures.test.ts",
     "bench": "bun bench/run.ts",
     "typecheck": "bun check",

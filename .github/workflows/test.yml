@@ -24,3 +24,13 @@ jobs:
 
       - name: Run e2e tests
         run: bun run test:e2e
+        env:
+          E2E_OBSERVED: e2e-observed.json
+
+      # Sizes changed on purpose? `bun run snapshots:from-ci` applies these.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: e2e-snapshots
+          path: e2e-observed.json
+          if-no-files-found: ignore

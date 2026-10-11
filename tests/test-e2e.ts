@@ -5,6 +5,11 @@ import { name } from "../package.json";
 
 const SNAPSHOT_PATH = join(import.meta.dirname, "__snapshots__/e2e.json");
 const UPDATE_SNAPSHOTS = process.env.UPDATE_SNAPSHOTS === "true";
+/**
+ * Where to write the snapshots this run observed, matching or not (CI
+ * uploads it; `bun run snapshots:from-ci` applies it).
+ */
+const OBSERVED_PATH = process.env.E2E_OBSERVED;
 /** Comma-separated example names to build (`vite,vite@svelte-5`); all by default. */
 const ONLY_EXAMPLES = process.env.EXAMPLES?.split(",").filter(Boolean);
 
@@ -142,8 +147,8 @@ function sortSnapshotValue(value: ExampleSnapshot): ExampleSnapshot {
   return value;
 }
 
-function saveSnapshots(snapshots: Snapshots): void {
-  const dir = dirname(SNAPSHOT_PATH);
+function saveSnapshots(snapshots: Snapshots, path = SNAPSHOT_PATH): void {
+  const dir = dirname(path);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -153,7 +158,7 @@ function saveSnapshots(snapshots: Snapshots): void {
       acc[key] = sortSnapshotValue(snapshots[key]);
       return acc;
     }, {});
-  writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(sorted, null, 2)}\n`);
+  writeFileSync(path, `${JSON.stringify(sorted, null, 2)}\n`);
 }
 
 function loadEntryManifest(dir: string): string[] | null {
@@ -413,6 +418,13 @@ async function main() {
       ONLY_EXAMPLES ? { ...snapshots, ...newSnapshots } : newSnapshots,
     );
     console.log(`\n\x1b[33mSnapshots updated: ${SNAPSHOT_PATH}\x1b[0m`);
+  }
+
+  // What a snapshot update would write, for CI to hand back; a warned
+  // build has no result to record.
+  if (OBSERVED_PATH && !anyWarned) {
+    saveSnapshots({ ...snapshots, ...newSnapshots }, OBSERVED_PATH);
+    console.log(`\nObserved snapshots: ${OBSERVED_PATH}`);
   }
 
   console.log();
