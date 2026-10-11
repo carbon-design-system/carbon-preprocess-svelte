@@ -6,9 +6,9 @@
    * headings and frontmatter it exports. The draft stays in CCS's
    * `LocalStorage`.
    *
-   * The compiler isn't a public browser entry (yet): this imports it from
-   * the repo's source. The preview renders the user's own HTML, in their own
-   * browser; nothing is shared or sent.
+   * Both come from `carbon-preprocess-svelte/code`: `compileMarkdown` for
+   * the component, `markdownToHtml` for the preview. The preview renders the
+   * user's own HTML, in their own browser; nothing is shared or sent.
    */
   import {
     Button,
@@ -25,8 +25,7 @@
     TextArea,
   } from "carbon-components-svelte";
   import Reset from "carbon-icons-svelte/lib/Reset.svelte";
-  import { carbonCodeIcon, highlight } from "carbon-preprocess-svelte/code";
-  import { compileMarkdown, renderMarkdown } from "../../../src/markdown/compile";
+  import { carbonCodeIcon, compileMarkdown, highlight, markdownToHtml } from "carbon-preprocess-svelte/code";
   import CodeView from "../CodeView.svelte";
   import { SAMPLES } from "./samples.js";
   import ProsePreview from "./ProsePreview.sample";
@@ -43,22 +42,14 @@
   // The options this playground's pages use (Carbon icons, the built-in
   // highlighter, anchors on h2 and h3), so the output is what a page gets.
   const OPTIONS = { prose: true, codeIcons: carbonCodeIcon, highlight, anchors: { depths: [2, 3] } };
-  // A fence's lines come back as `{@html "…"}` (they can hold `{`); the
-  // preview is plain HTML.
-  const AT_HTML = /\{@html ("(?:[^"\\]|\\.)*")\}/g;
-  const toHtml = (markup) => markup.replace(AT_HTML, (_, string) => JSON.parse(string));
   const COMPONENT = /^<([A-Z][\w.]*)/;
+  const SCRIPT = /^<script\b/m;
   const escape = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  /** The rendered page as HTML: Svelte blocks (components, `{#if}`) become placeholders. */
-  function previewHtml(rendered) {
-    let html = rendered.html;
-    for (const part of rendered.parts) {
-      if (!part.svelte) continue;
-      const name = COMPONENT.exec(part.html)?.[1];
-      const label = name ? `<code>${escape(`<${name}>`)}</code> renders here` : "A Svelte block renders here";
-      html = html.replace(part.html, `<p class="try-placeholder">${label} in the compiled page.</p>`);
-    }
-    return toHtml(html);
+  /** A component or `{#if}` in the preview: a placeholder that names it. */
+  function placeholder(markup) {
+    const name = COMPONENT.exec(markup)?.[1];
+    const label = name ? `<code>${escape(`<${name}>`)}</code> renders here` : "A Svelte block renders here";
+    return `<p class="try-placeholder">${label} in the compiled page.</p>`;
   }
 
   let run = 0;
@@ -75,14 +66,22 @@
       const start = performance.now();
       const compiled = await compileMarkdown(text, { ...OPTIONS, filename: "Page.md" });
       const ms = performance.now() - start;
-      // The preview: the same blocks, without Svelte-only output (icons).
-      const rendered = await renderMarkdown(text, { ...OPTIONS, codeIcons: false });
+      let usesSvelte = false;
+      const preview = await markdownToHtml(text, {
+        highlight,
+        anchors: OPTIONS.anchors,
+        svelteBlock(markup) {
+          usesSvelte = true;
+          return placeholder(markup);
+        },
+      });
       if (id !== run) return;
       result = {
         ms,
         svelte: compiled.code,
-        html: previewHtml(rendered),
-        usesSvelte: rendered.hoisted.length > 0 || rendered.parts.some((part) => part.svelte),
+        html: preview.html,
+        // A component or block, or a script (which the preview drops).
+        usesSvelte: usesSvelte || SCRIPT.test(text),
         exports: JSON.stringify({ metadata: compiled.metadata, headings: compiled.headings }, null, 2),
       };
       error = undefined;
