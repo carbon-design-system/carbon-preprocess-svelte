@@ -43,16 +43,22 @@
 
   let results = [];
 
+  const pending = (format) => (value) => (value === undefined ? "–" : format(value));
   const resultHeaders = [
     { key: "name", value: "Component" },
-    { key: "msPerInstance", value: "ms per instance", display: (ms) => ms.toFixed(3) },
-    { key: "nodesPerInstance", value: "Elements per instance" },
+    { key: "msPerInstance", value: "ms per instance", display: pending((ms) => ms.toFixed(3)) },
+    { key: "nodesPerInstance", value: "Elements per instance", display: pending(String) },
   ];
-  $: resultRows = results.map((r) => ({ id: r.name, ...r }));
+  // Every row from the start, filled in as each is measured: the table's
+  // height never changes, so nothing below it moves.
+  $: resultRows = cases.map(([name]) => ({ id: name, name, ...results.find((r) => r.name === name) }));
   $: done = results.length === cases.length;
 
   function run(Component, props) {
+    // Out of the page's flow and out of sight: mounting here lays out the
+    // instances without moving anything on the page.
     const target = document.createElement("div");
+    target.style.cssText = "position: fixed; top: 0; left: 0; width: 40rem; visibility: hidden; pointer-events: none;";
     document.body.append(target);
     const start = performance.now();
     const instances = [];
@@ -80,5 +86,14 @@
   status={done ? "finished" : "active"}
   description={done ? `Measured ${cases.length} components` : `Measuring ${results.length + 1} of ${cases.length}…`}
 />
-<DataTable size="compact" sortable headers={resultHeaders} rows={resultRows} />
+<div class="results">
+  <DataTable size="compact" sortable headers={resultHeaders} rows={resultRows} />
+</div>
 <pre id="bench-results" hidden data-done={done || undefined}>{JSON.stringify(results)}</pre>
+
+<style>
+  /* Columns sized by the table, not by the numbers as they fill in. */
+  .results :global(table) {
+    table-layout: fixed;
+  }
+</style>
