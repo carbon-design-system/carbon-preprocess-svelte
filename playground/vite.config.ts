@@ -24,6 +24,7 @@ import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 // The built-in highlighter: Carbon syntax tokens, no Prism.
 import {
   carbonCodeIcon,
+  compileMarkdown,
   encodeTokens,
   highlight,
   type MarkdownOptions,
@@ -38,6 +39,7 @@ import {
 } from "carbon-preprocess-svelte";
 import { sveld } from "sveld";
 import { loadEnv } from "vite";
+import { GALLERY, GALLERY_BASE } from "./gallery";
 import { analyze } from "./src/intel/analyze.js";
 import { toJSDoc, toTypeScript } from "./src/intel/typescript.js";
 
@@ -368,6 +370,73 @@ function noLocalPaths() {
         const found = paths.find((p) => text.includes(p));
         if (found) throw new Error(`${name} contains a local path: ${found}`);
       }
+    },
+  };
+}
+
+/**
+ * The options gallery (`gallery.ts`): each variant's sample compiled with
+ * `compileMarkdown` to `src/gallery/<option>-<n>.svelte`, and the page that
+ * lays them out, `src/pages/Options.svx`, written at startup (git-ignored).
+ * Without Prose in the CCS in use, every variant is compiled without it.
+ */
+function optionsGallery() {
+  const write = (file: string, text: string) => {
+    if (!existsSync(file) || readFileSync(file, "utf8") !== text)
+      writeFileSync(file, text);
+  };
+  return {
+    name: "playground-options-gallery",
+    async buildStart() {
+      const dir = path.join(HERE, "src/gallery");
+      mkdirSync(dir, { recursive: true });
+      // Every variant compiled at once; then the page, option by option.
+      const compiled = await Promise.all(
+        GALLERY.flatMap((option) =>
+          option.variants.map(async (variant, n) => {
+            const name = `${option.name}-${n}`;
+            const { code } = await compileMarkdown(option.sample, {
+              ...GALLERY_BASE,
+              ...variant.options,
+              prose: HAS_PROSE ? (variant.options.prose ?? true) : false,
+              filename: `${name}.md`,
+            });
+            write(path.join(dir, `${name}.svelte`), code);
+            return { option, variant, name, local: `G_${option.name}_${n}` };
+          }),
+        ),
+      );
+      const imports = compiled.map(
+        ({ name, local }) =>
+          `  import ${local} from "../gallery/${name}.svelte";`,
+      );
+      const sections = GALLERY.map((option) => {
+        const items = compiled
+          .filter((c) => c.option === option)
+          .map(
+            ({ variant, local }) =>
+              `{ label: ${JSON.stringify(variant.label)}, component: ${local} }`,
+          );
+        const configs = option.variants
+          .map((v) => `// ${v.label}\n${v.config};`)
+          .join("\n\n");
+        return [
+          `## ${option.name}`,
+          option.description,
+          option.name === "prose" && !HAS_PROSE
+            ? "> [!NOTE]\n> The CCS in use has no Prose, so both are plain HTML here."
+            : "",
+          `\`\`\`\`md title="Sample"\n${option.sample}\n\`\`\`\``,
+          `\`\`\`js title="svelte.config.js"\n${configs}\n\`\`\``,
+          `<GalleryRow items={[${items.join(", ")}]} />`,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+      });
+      write(
+        path.join(HERE, "src/pages/Options.svx"),
+        `---\ntitle: Options gallery\ndescription: "One sample under each markdown() option: the default first, then the option's other values, each compiled by compileMarkdown."\nexamples: false\n---\n\n<script>\n  import GalleryRow from "../GalleryRow.svelte";\n${imports.join("\n")}\n</script>\n\n${sections.join("\n\n")}\n`,
+      );
     },
   };
 }
@@ -870,6 +939,7 @@ export default {
     // renders (the e2e snapshot records it; see OPTIMIZE).
     ...(OPTIMIZE ? [optimizeCss({ propAware: true })] : []),
     stressPage(),
+    optionsGallery(),
     ccsPages(),
     noLocalPaths(),
     restartOnLibraryBuild(),

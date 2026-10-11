@@ -8,3 +8,5 @@ src/pages/Stress.svx
 screenshots
 # Local settings, such as CCS_DIR (see README).
 .env.local
+src/gallery/
+src/pages/Options.svx
