@@ -12,6 +12,7 @@ import {
   createScope,
   evaluate,
   type PassedProp,
+  type Scope,
   spreadProps,
   whyUnknown,
 } from "./evaluate";
@@ -426,12 +427,7 @@ function appEvaluator(
       usage = newComponentUsage();
       usage.open = true;
     }
-    scope = createScope(
-      model,
-      usage,
-      () => UNKNOWN,
-      importedConstants(model, file, options.constants),
-    );
+    scope = appScope(model, file, usage, options.constants);
   } catch {
     scope = undefined;
   }
@@ -451,6 +447,25 @@ function appEvaluator(
       scope ? whyUnknown(expression, scope) : "isn't a literal",
     bindEach: (node) => (scope ? bindEach(node, scope) : () => {}),
   };
+}
+
+/**
+ * The scope app component `file` evaluates in under `usage`: the
+ * constants it imports from the app's modules are known, its context
+ * isn't.
+ */
+export function appScope(
+  model: ComponentModel,
+  file: string,
+  usage: ComponentUsage,
+  constants: ModuleConstants | undefined,
+): Scope {
+  return createScope(
+    model,
+    usage,
+    () => UNKNOWN,
+    importedConstants(model, file, constants),
+  );
 }
 
 const MODULE_EXTENSIONS = [

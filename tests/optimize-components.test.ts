@@ -248,6 +248,8 @@ describe("optimizeComponents", () => {
         `import App from "./App.svelte";`,
       );
       await plugin.buildStart.call(context());
+      // Every call site is known, so the wrapper is rewritten too.
+      expect(plugin.load(card)?.code).toContain(`kind={"danger"}`);
       const graph = (importers: string[], dynamic: string[] = []) => ({
         ...context(),
         getModuleIds: () => [card][Symbol.iterator](),

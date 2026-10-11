@@ -91,6 +91,8 @@ describe("OptimizeComponentsPlugin", () => {
     try {
       expect(wrapped.stats.hasErrors()).toBe(false);
       expect(wrapped.code).toContain(String.raw`\"bx--btn--danger\"`);
+      // The wrapper itself, rewritten for its one call site.
+      expect(wrapped.code).toContain(String.raw`kind={\"danger\"}`);
     } finally {
       wrapped.dispose();
     }

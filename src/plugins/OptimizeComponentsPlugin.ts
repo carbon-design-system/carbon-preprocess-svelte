@@ -73,7 +73,7 @@ type WebpackCompiler = {
 };
 
 const NAME = "OptimizeComponentsPlugin";
-const CARBON_SVELTE_FILE = /[\\/]carbon-components-svelte[\\/].+\.svelte$/;
+const SVELTE_FILE = /\.svelte$/;
 
 /** The loader's built file next to the bundle, or its source in a checkout. */
 const LOADER = (() => {
@@ -121,7 +121,7 @@ function resolveWith(compiler: WebpackCompiler): ImportResolver | undefined {
  * with `new OptimizeCssPlugin({ propAware: true })`.
  *
  * Runs on production builds only. It adds a loader that runs before
- * `svelte-loader` on Carbon's `.svelte` files, and fails the build if a
+ * `svelte-loader` on `.svelte` files, and fails the build if a
  * module outside `content` imports a Carbon component.
  */
 export class OptimizeComponentsPlugin {
@@ -143,9 +143,11 @@ export class OptimizeComponentsPlugin {
     optimizerRegistry().set(id, optimizer);
 
     // A pre-loader runs before normal loaders, so `svelte-loader` compiles
-    // the rewritten source wherever this plugin sits in `plugins`.
+    // the rewritten source wherever this plugin sits in `plugins`. Every
+    // `.svelte` file: which of the app's own get rewritten depends on the
+    // analysis, and the loader passes the rest through.
     compiler.options.module.rules.push({
-      test: CARBON_SVELTE_FILE,
+      test: SVELTE_FILE,
       enforce: "pre",
       use: [{ loader: LOADER, options: { id } }],
     });

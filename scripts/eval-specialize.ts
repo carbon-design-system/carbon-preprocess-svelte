@@ -18,6 +18,9 @@
  *
  *   bun scripts/eval-specialize.ts [--only Button] [--combos 200] [--json out.json]
  *
+ * Apps that render Carbon through their own wrappers (`./wrapper-cases.ts`)
+ * run too, with the wrappers rewritten; `--wrappers` runs only those.
+ *
  * `--project <dir>` runs against another install: its `svelte` (3, 4 or 5)
  * compiles and renders, and its `carbon-components-svelte` is analyzed. A
  * directory with just a package.json naming both, after `bun install`, is
@@ -29,11 +32,13 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import type { BunPlugin } from "bun";
 import { analyzeFiles } from "../src/analyzer";
+import { collectAppUsage } from "../src/analyzer/app-usage";
 import { readCarbonComponents } from "../src/analyzer/call-sites";
 import { specializeComponent } from "../src/analyzer/specialize";
 import { parse } from "../src/indexer/parser";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { buildCases, caseSource } from "./prop-aware-cases";
+import { wrapperCases } from "./wrapper-cases";
 
 process.on("unhandledRejection", () => {});
 
@@ -50,6 +55,8 @@ const { values: args } = parseArgs({
     // Unwrap branches known to run (Svelte 5 only).
     unwrap: { type: "boolean" },
     project: { type: "string" },
+    // Only the apps with their own wrapper components.
+    wrappers: { type: "boolean" },
   },
 });
 
@@ -80,21 +87,39 @@ const carbon = readCarbonComponents(carbonRoot);
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
-const cases = buildCases({
-  root: ROOT,
-  carbon,
-  carbonSrc,
-  only: args.only,
-  apps: args.apps,
-  combos: Number(args.combos),
-  seed: Number(args.seed),
-});
+type EvalCase = ReturnType<typeof buildCases>[number] & {
+  /** An app of several files, the first rendered: see `wrapper-cases.ts`. */
+  files?: Record<string, string>;
+};
+
+const cases: EvalCase[] = [
+  ...(args.wrappers
+    ? []
+    : buildCases({
+        root: ROOT,
+        carbon,
+        carbonSrc,
+        only: args.only,
+        apps: args.apps,
+        combos: Number(args.combos),
+        seed: Number(args.seed),
+      })),
+  // Apps with their own wrappers, which get rewritten too.
+  ...(args.only || args.apps
+    ? []
+    : wrapperCases({
+        count: Math.ceil(Number(args.combos) / 5),
+        seed: Number(args.seed),
+        runes: svelteMajor >= 5,
+      }).map((wrapper) => ({ ...wrapper, markup: "" }))),
+];
 
 // ---------- bundling ----------
 
 const SVELTE_FILE = /\.svelte$/;
 const CSS_FILE = /\.css$/;
 const WHITESPACE = /\s+/;
+const SCOPING_CLASS = /^svelte-[a-z0-9]+$/;
 const compiled = new Map<string, string>();
 
 function sveltePlugin(
@@ -166,11 +191,16 @@ async function ssr(appFile: string, overrides: Map<string, string>) {
       .replace(/<!--[^>]*-->/g, "")
       // Svelte 3/4 leave a space per falsy `class:` directive in the
       // attribute; the class list is the same with or without them.
-      .replace(
-        /class="([^"]*)"/g,
-        (_, value: string) =>
-          `class="${value.trim().split(WHITESPACE).join(" ")}"`,
-      )
+      // Scoping classes (`svelte-1x2y3z`) go on the elements a wrapper's
+      // own `<style>` could match: one whose `class:` directive no call
+      // site turns on loses it with the directive, though no rule applied.
+      .replace(/class="([^"]*)"/g, (_, value: string) => {
+        const classes = value
+          .trim()
+          .split(WHITESPACE)
+          .filter((name) => !SCOPING_CLASS.test(name));
+        return `class="${classes.join(" ")}"`;
+      })
   );
 }
 
@@ -201,6 +231,8 @@ type Outcome = {
     | "render-error"
     | "analysis-error";
   edits?: number;
+  /** Of `edits`, those in the app's own components. */
+  appEdits?: number;
   specializeMs?: number;
   before?: { bytes: number; gzip: number };
   after?: { bytes: number; gzip: number };
@@ -219,16 +251,32 @@ const started = performance.now();
 const emptyBlock = args["empty-block"];
 
 for (const [n, testCase] of cases.entries()) {
-  const appFile = testCase.file ?? path.join(OUT, `case-${n}.svelte`);
-  const code = caseSource(testCase, carbon);
-  if (!testCase.file) writeFileSync(appFile, code);
+  let appFile: string;
+  const files: Array<{ file: string; code: string }> = [];
+  if (testCase.files) {
+    const dir = path.join(OUT, `case-${n}`);
+    mkdirSync(dir, { recursive: true });
+    for (const [name, code] of Object.entries(testCase.files)) {
+      files.push({ file: path.join(dir, name), code });
+      writeFileSync(path.join(dir, name), code);
+    }
+    appFile = files[0].file;
+  } else {
+    appFile = testCase.file ?? path.join(OUT, `case-${n}.svelte`);
+    const code = caseSource(testCase, carbon);
+    if (!testCase.file) writeFileSync(appFile, code);
+    files.push({ file: appFile, code });
+  }
 
+  // The app's own components, closed when every call site is in `files`.
+  const appUsage = collectAppUsage(files, carbon);
   // biome-ignore lint/performance/noAwaitInLoops: one app at a time keeps output attributable
   const result = await analyzeFiles({
     projectRoot: PROJECT,
-    files: [{ file: appFile, code }],
+    files,
     components: testCase.components,
     options: {},
+    appUsage,
   });
   if ("warning" in result) {
     outcomes.push({
@@ -241,6 +289,7 @@ for (const [n, testCase] of cases.entries()) {
 
   const overrides = new Map<string, string>();
   let edits = 0;
+  let appEdits = 0;
   let invalid: string | undefined;
   const t = performance.now();
   for (const key of result.analysis.liveComponents) {
@@ -258,6 +307,24 @@ for (const [n, testCase] of cases.entries()) {
       invalid = `${key}: ${(error as Error).message}`;
     }
     overrides.set(path.join(carbonSrc, key), specialized.code);
+  }
+  for (const file of appUsage.closed) {
+    const scope = appUsage.scopeFor(file);
+    if (!scope) continue;
+    const specialized = specializeComponent(scope, {
+      emptyBlock,
+      dropUnused: !args["no-drop"],
+      unwrap: args.unwrap,
+    });
+    if (specialized.edits === 0) continue;
+    edits += specialized.edits;
+    appEdits += specialized.edits;
+    try {
+      parse(specialized.code);
+    } catch (error) {
+      invalid = `${path.basename(file)}: ${(error as Error).message}`;
+    }
+    overrides.set(file, specialized.code);
   }
   const specializeMs = performance.now() - t;
   if (invalid) {
@@ -300,6 +367,7 @@ for (const [n, testCase] of cases.entries()) {
     id: testCase.id,
     status: original === specialized ? "identical" : "DIFFERENT",
     edits,
+    appEdits,
     specializeMs,
     detail:
       original === specialized

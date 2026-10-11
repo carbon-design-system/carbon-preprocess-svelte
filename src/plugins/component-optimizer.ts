@@ -244,7 +244,7 @@ export function createComponentOptimizer(
       return {
         info: options?.silent
           ? undefined
-          : `rewrote ${sources.size} Carbon components for this app (${result.edits} edits)`,
+          : `rewrote ${sources.size - result.apps} Carbon components${result.apps > 0 ? ` and ${result.apps} of the app's own` : ""} for this app (${result.edits} edits)`,
         report: options?.report ? result.report() : undefined,
       };
     },
@@ -254,7 +254,17 @@ export function createComponentOptimizer(
       return analyzed;
     },
 
-    /** The rewritten source of module `id`, if it's a rewritten Carbon component. */
+    /**
+     * Whether file `id` may be served rewritten, now or after `content`
+     * changes: a Carbon component, or an app component in `content`.
+     */
+    rewritable(id: string): boolean {
+      const file = stripQuery(id);
+      if (!file.endsWith(".svelte")) return false;
+      return isCarbonSvelteImport(file) || analyzed.has(realpath(file) ?? file);
+    },
+
+    /** The rewritten source of module `id`: a Carbon component, or an app component whose every call site is known. */
     load(id: string): RewrittenSource | undefined {
       if (sources.size === 0) return undefined;
       // Svelte's style sub-modules (`?svelte&type=style`) aren't the source.

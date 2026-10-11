@@ -1,6 +1,7 @@
 import type { Expression } from "sveast/walk";
 import type { Node } from "./ast";
 import {
+  appScope,
   type CarbonComponents,
   collectSourceUsage,
   collectSvelteUsage,
@@ -10,7 +11,7 @@ import {
   type ModuleUsage,
 } from "./call-sites";
 import { buildComponentModel, type ComponentModel } from "./component-model";
-import { createScope, evaluate } from "./evaluate";
+import { createScope, evaluate, type Scope } from "./evaluate";
 import {
   addCallSite,
   type CallSite,
@@ -117,6 +118,12 @@ export type AppUsage = {
    * the build plugins check against the module graph.
    */
   closed: Set<string>;
+  /**
+   * The scope closed app component `file` was last read in, with its
+   * merged usage; `undefined` for one that isn't closed or couldn't be
+   * modeled.
+   */
+  scopeFor(file: string): Scope | undefined;
 };
 
 /**
@@ -220,10 +227,18 @@ export function collectAppUsage(
     ...module,
     sites: module.sites.filter((site) => !isAppComponent(site.component)),
   });
+  const closed = new Set(
+    [...usages].filter(([, usage]) => !usage.open).map(([key]) => key),
+  );
   return {
     modules: [...statics, ...latest.values()].map(carbonOnly),
-    closed: new Set(
-      [...usages].filter(([, usage]) => !usage.open).map(([key]) => key),
-    ),
+    closed,
+    scopeFor(file) {
+      const usage = usages.get(file);
+      const model = modelOf(file);
+      return closed.has(file) && usage && model
+        ? appScope(model, file, usage, constants)
+        : undefined;
+    },
   };
 }
