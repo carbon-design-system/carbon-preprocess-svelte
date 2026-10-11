@@ -5,6 +5,8 @@ declare global {
   interface Window {
     /** Long tasks seen since load. */
     __long: number[];
+    /** Layout shift values seen since load. */
+    __shifts: number[];
     /** Event Timing entries over 16 ms (interact-bench). */
     __events: { name: string; duration: number }[];
     /** Contrast helpers (accessibility tests). */
