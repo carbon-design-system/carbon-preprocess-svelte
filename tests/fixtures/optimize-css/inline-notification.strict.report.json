@@ -2,10 +2,10 @@
   "ids": [
     "InlineNotification"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 22960,
-  "reduction_percent": 96.77,
-  "kept_rules": 127,
+  "before_bytes": 561637,
+  "after_bytes": 22252,
+  "reduction_percent": 96.04,
+  "kept_rules": 126,
   "leaked_count": 0,
   "leaked_classes": []
 }

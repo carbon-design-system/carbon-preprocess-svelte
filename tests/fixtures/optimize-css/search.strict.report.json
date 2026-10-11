@@ -2,10 +2,10 @@
   "ids": [
     "Search"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 28443,
-  "reduction_percent": 95.99,
-  "kept_rules": 174,
+  "before_bytes": 561637,
+  "after_bytes": 29502,
+  "reduction_percent": 94.75,
+  "kept_rules": 201,
   "leaked_count": 0,
   "leaked_classes": []
 }

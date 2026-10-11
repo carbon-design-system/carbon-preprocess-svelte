@@ -4,10 +4,10 @@
     "SideNav",
     "SideNavItems"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 19895,
-  "reduction_percent": 97.2,
-  "kept_rules": 118,
+  "before_bytes": 561637,
+  "after_bytes": 20187,
+  "reduction_percent": 96.41,
+  "kept_rules": 127,
   "leaked_count": 1,
   "leaked_classes": [
     ".bx--header__global"

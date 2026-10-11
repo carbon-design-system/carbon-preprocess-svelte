@@ -57,8 +57,8 @@ import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`,
     ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import Accordion2 from "carbon-components-svelte/src/Accordion/Accordion.svelte";
-import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
-import { toHierarchy } from "carbon-components-svelte/src/utils/toHierarchy.js";
+import { breakpoints } from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
+import { toHierarchy } from "carbon-components-svelte/src/utils/to-hierarchy.js";
 
 import Add from "carbon-icons-svelte/lib/Add.svelte";
 import Add2 from "carbon-icons-svelte/lib/Add.svelte";
@@ -74,9 +74,9 @@ import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`);
       preprocess({
         content: `import { filterTreeById, filterTreeByText as byText, filterTreeNodes } from "carbon-components-svelte";`,
       }),
-    ).toEqual(`import { filterTreeById } from "carbon-components-svelte/src/utils/filterTreeNodes.js";
-import { filterTreeByText as byText } from "carbon-components-svelte/src/utils/filterTreeNodes.js";
-import { filterTreeNodes } from "carbon-components-svelte/src/utils/filterTreeNodes.js";`);
+    ).toEqual(`import { filterTreeById } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";
+import { filterTreeByText as byText } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";
+import { filterTreeNodes } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";`);
   });
 
   test("names the installed barrel doesn't export stay on the barrel", () => {
@@ -113,7 +113,7 @@ import { Airplane, Analytics } from "carbon-pictograms-svelte";`,
       }),
     ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
-import bp from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
+import { breakpoints as bp } from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
 import Add from "carbon-icons-svelte/lib/Add.svelte";
 import Download from "carbon-icons-svelte/lib/Download.svelte";
 import Airplane from "carbon-pictograms-svelte/lib/Airplane.svelte";
@@ -225,12 +225,12 @@ import { NewComponent } from "carbon-components-svelte";`,
     ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import AccordionSkeleton from "carbon-components-svelte/src/Accordion/AccordionSkeleton.svelte";
-import breakpointObserver from "carbon-components-svelte/src/Breakpoint/breakpointObserver.js";
-import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
+import { breakpointObserver } from "carbon-components-svelte/src/Breakpoint/breakpoint-observer.js";
+import { breakpoints } from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
 import ContainedList from "carbon-components-svelte/src/ContainedList/ContainedList.svelte";
 import ContainedListItem from "carbon-components-svelte/src/ContainedList/ContainedListItem.svelte";
-import { filterTreeNodes } from "carbon-components-svelte/src/utils/filterTreeNodes.js";
-import { toHierarchy } from "carbon-components-svelte/src/utils/toHierarchy.js";
+import { filterTreeNodes } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";
+import { toHierarchy } from "carbon-components-svelte/src/utils/to-hierarchy.js";
 import { NewComponent } from "carbon-components-svelte";`);
   });
 

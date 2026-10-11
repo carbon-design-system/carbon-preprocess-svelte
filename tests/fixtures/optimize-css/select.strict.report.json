@@ -2,10 +2,10 @@
   "ids": [
     "Select"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 28415,
-  "reduction_percent": 96,
-  "kept_rules": 162,
+  "before_bytes": 561637,
+  "after_bytes": 22897,
+  "reduction_percent": 95.92,
+  "kept_rules": 142,
   "leaked_count": 0,
   "leaked_classes": []
 }

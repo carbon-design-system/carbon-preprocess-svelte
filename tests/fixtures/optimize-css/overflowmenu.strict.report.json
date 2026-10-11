@@ -2,10 +2,10 @@
   "ids": [
     "OverflowMenu"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 20685,
-  "reduction_percent": 97.09,
-  "kept_rules": 119,
+  "before_bytes": 561637,
+  "after_bytes": 20428,
+  "reduction_percent": 96.36,
+  "kept_rules": 122,
   "leaked_count": 0,
   "leaked_classes": []
 }
