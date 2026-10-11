@@ -1,5 +1,5 @@
 import type { Expression } from "sveast/walk";
-import { type Node, patternNames } from "./ast";
+import { type Node, patternNames, scopeNames } from "./ast";
 import { type ComponentModel, FUNCTION_DECLARATION } from "./component-model";
 import type { ComponentUsage } from "./usage";
 import {
@@ -146,6 +146,23 @@ export function bindEach(
   const locals = new Map(outer);
   bindPattern(node.context as Node | null, items, locals);
   if (node.index) locals.set(node.index, UNKNOWN);
+  scope.locals = locals;
+  return () => {
+    scope.locals = outer;
+  };
+}
+
+/**
+ * Binds what `node` declares (a function's parameters and locals, a
+ * block's) as unknown while the walk is inside it, so they don't read
+ * as the component's own names; returns the unbinding.
+ */
+export function bindScope(node: Node, scope: Scope): (() => void) | undefined {
+  const names = scopeNames(node);
+  if (!names || names.size === 0) return undefined;
+  const outer = scope.locals;
+  const locals = new Map(outer);
+  for (const name of names) locals.set(name, UNKNOWN);
   scope.locals = locals;
   return () => {
     scope.locals = outer;

@@ -1,7 +1,13 @@
 import { type AST, isReference, SKIP, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
 import { childEntries, type Node } from "./ast";
-import { bindEach, evaluate, isPropsObject, type Scope } from "./evaluate";
+import {
+  bindEach,
+  bindScope,
+  evaluate,
+  isPropsObject,
+  type Scope,
+} from "./evaluate";
 import {
   concat,
   type MappedText,
@@ -338,6 +344,15 @@ export function specializeComponent(
   }
 
   function visit(node: Node, parent: Node | null, field: string): void {
+    const unbind = bindScope(node, scope);
+    try {
+      visitNode(node, parent, field);
+    } finally {
+      unbind?.();
+    }
+  }
+
+  function visitNode(node: Node, parent: Node | null, field: string): void {
     if (node.type.startsWith("TS") && !TS_VALUE_WRAPPERS.has(node.type)) return;
 
     switch (node.type) {

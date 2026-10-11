@@ -3,7 +3,14 @@ import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
 import { type AST, type Expression, isReference, walk } from "sveast/walk";
 import { parse } from "../indexer/parser";
-import { forEachNode, lineAt, type Node, patternNames, rootName } from "./ast";
+import {
+  forEachNode,
+  lineAt,
+  type Node,
+  patternNames,
+  rootName,
+  scopeNames,
+} from "./ast";
 
 /** Marks the names `pattern` binds as unknown, with why. */
 function markUnknown(
@@ -272,8 +279,8 @@ export function buildComponentModel(
     ...model.props.keys(),
     ...model.declarations.keys(),
   ]);
-  const nested = nestedBindings(ast);
-  for (const name of nested) {
+  const nested = nestedBindings(ast, true);
+  for (const name of nestedBindings(ast, false)) {
     if (topLevel.has(name)) {
       markNameUnknown(model, name, "is shadowed by a nested binding");
     }
@@ -744,39 +751,17 @@ function readPropsRune(model: ComponentModel, pattern: Node): void {
   }
 }
 
-/** Names bound anywhere but the top level of a `<script>`. */
-function nestedBindings(ast: AST.Root): Set<string> {
+/**
+ * Names bound anywhere but the top level of a `<script>`. Those a
+ * function, block or `catch` binds (`scripts`) the walks bind as unknown
+ * where they apply (see `bindScope`), as they do `{#each}` contexts; the
+ * markup's others (`{#await}`, snippet parameters, `let:`, `{@const}`)
+ * they don't.
+ */
+function nestedBindings(ast: AST.Root, scripts: boolean): Set<string> {
   const names = new Set<string>();
-  const declaredInside = (node: Node) =>
-    forEachNode(node, (inner) => {
-      if (inner.type === "VariableDeclarator") patternNames(inner.id, names);
-      if (inner.type === "FunctionDeclaration" && inner.id) {
-        names.add(inner.id.name);
-      }
-    });
-
   forEachNode(ast, (node) => {
     switch (node.type) {
-      case "FunctionDeclaration":
-      case "FunctionExpression":
-      case "ArrowFunctionExpression":
-        for (const param of node.params) patternNames(param, names);
-        declaredInside(node.body);
-        break;
-      case "BlockStatement":
-      case "ForStatement":
-      case "ForInStatement":
-      case "ForOfStatement":
-      case "SwitchStatement":
-        declaredInside(node);
-        break;
-      case "CatchClause":
-        patternNames(node.param, names);
-        break;
-      case "EachBlock":
-        patternNames(node.context, names);
-        if (node.index) names.add(node.index);
-        break;
       case "AwaitBlock":
         patternNames(node.value, names);
         patternNames(node.error, names);
@@ -785,14 +770,23 @@ function nestedBindings(ast: AST.Root): Set<string> {
         for (const param of node.parameters) patternNames(param, names);
         break;
       case "LetDirective":
-        names.add(node.name);
+        // `let:direction={actual}` binds `actual`; `let:direction`, `direction`.
         if (node.expression) patternNames(node.expression as Node, names);
+        else names.add(node.name);
         break;
       case "ConstTag":
         for (const declarator of node.declaration.declarations) {
           patternNames(declarator.id, names);
         }
         break;
+      case "EachBlock":
+        if (scripts) {
+          patternNames(node.context, names);
+          if (node.index) names.add(node.index);
+        }
+        break;
+      default:
+        if (scripts) for (const name of scopeNames(node) ?? []) names.add(name);
     }
   });
   return names;

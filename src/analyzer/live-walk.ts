@@ -4,6 +4,7 @@ import { childNodes, lineAt, type Node } from "./ast";
 import { UnsupportedComponentError } from "./component-model";
 import {
   bindEach,
+  bindScope,
   evaluate,
   type PassedProp,
   type Scope,
@@ -84,6 +85,15 @@ function visitBranches(
 }
 
 function visit(node: Node, scope: Scope, result: LiveResult): void {
+  const unbind = bindScope(node, scope);
+  try {
+    visitNode(node, scope, result);
+  } finally {
+    unbind?.();
+  }
+}
+
+function visitNode(node: Node, scope: Scope, result: LiveResult): void {
   switch (node.type) {
     // Import bindings aren't uses.
     case "ImportDeclaration":
