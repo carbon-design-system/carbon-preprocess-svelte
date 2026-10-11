@@ -3,9 +3,9 @@
     "Button"
   ],
   "before_bytes": 709971,
-  "after_bytes": 69355,
-  "reduction_percent": 90.23,
-  "kept_rules": 380,
+  "after_bytes": 64201,
+  "reduction_percent": 90.96,
+  "kept_rules": 350,
   "leaked_count": 0,
   "leaked_classes": []
 }

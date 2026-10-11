@@ -5,9 +5,9 @@
     "FileUploaderItem"
   ],
   "before_bytes": 709971,
-  "after_bytes": 68236,
-  "reduction_percent": 90.39,
-  "kept_rules": 395,
+  "after_bytes": 63396,
+  "reduction_percent": 91.07,
+  "kept_rules": 367,
   "leaked_count": 0,
   "leaked_classes": []
 }
