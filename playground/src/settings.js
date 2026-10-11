@@ -22,8 +22,8 @@ export const tabGroups = writable({});
 export const terminalTheme = writable(undefined);
 export const syntaxMode = writable("build"); // "build" | "runtime" | "off"
 
-/** The hover card: what to show, and where. */
-export const hover = writable(null); // { info, rect, owner, line } | null
+/** The hover card: what to show, and the text range it's for. */
+export const hover = writable(null); // { info, range, owner, line, viaKeyboard, lang } | null
 
 let apiPromise;
 /** The component API, loaded once, on first use. */
