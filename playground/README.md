@@ -21,7 +21,9 @@ Prose, point the playground at a checkout that has it, once, in
 CCS_DIR=../../carbon-components-svelte
 ```
 
-or for one run: `CCS_DIR=../carbon-components-svelte bun run playground`. The
+or for one run: `CCS_DIR=../carbon-components-svelte bun run playground`.
+The dev server restarts itself when the library rebuilds (`bun run build`):
+Vite loads `markdown()` once, at startup. The
 tests and the e2e build ignore `.env.local` (set `CCS_DIR` in the environment
 to test against a checkout).
 
@@ -117,10 +119,11 @@ Every setting is in the URL, by its key:
 
 - **KitchenSink** shows every Markdown element and code-block feature. Its
   Button `tooltip` example is a deliberate type error.
-- **Try markdown()** compiles Markdown in the browser as you type (the
-  compiler has no Node dependencies; the page imports it from `src/`): a
-  Prose preview, the Svelte component `markdown()` writes, and the headings
-  and frontmatter it exports. The draft stays in `LocalStorage`.
+- **Try markdown()** compiles Markdown in the browser as you type, with
+  `carbon-preprocess-svelte/code`'s `markdownToHtml` (a Prose preview, with
+  placeholders for components) and `compileMarkdown` (the Svelte component
+  `markdown()` writes, and the headings and frontmatter it exports). The
+  draft stays in `LocalStorage`.
 - **Matrix** lays out element groups (`src/samples/*.sample`) against one
   option, each cell in its own theme.
 - **Stress** is a load and scroll fixture: one 1,600-line block and 60 small

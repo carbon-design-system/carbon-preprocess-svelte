@@ -298,6 +298,53 @@ function stressPage() {
 }
 
 /**
+ * Restarts the dev server when the library rebuilds (`bun run build` in the
+ * repo root): Vite loads preprocessors once, at startup, so a running server
+ * would keep compiling pages with the old `markdown()`.
+ */
+function restartOnLibraryBuild() {
+  // The build copies package.json into a fresh dist first and rewrites it
+  // last, with its `./dist/` paths made `./`: that one is a finished build.
+  const manifest = path.join(HERE, "../dist/package.json");
+  const finished = () => {
+    if (!existsSync(manifest)) return undefined;
+    const text = readFileSync(manifest, "utf8");
+    return text.includes('"./dist/') ? undefined : statSync(manifest).mtimeMs;
+  };
+  // The build restarted for, kept across restarts (each reloads this
+  // config): one write can fire more than one event.
+  const seen = globalThis as { __playgroundLibraryBuild?: number };
+  seen.__playgroundLibraryBuild ??= finished();
+  return {
+    name: "playground-restart-on-library-build",
+    apply: "serve" as const,
+    configureServer(server: {
+      watcher: {
+        add: (path: string) => void;
+        on: (event: string, listener: (file: string) => void) => void;
+      };
+      restart: () => Promise<void>;
+      config: { logger: { info: (message: string) => void } };
+    }) {
+      server.watcher.add(manifest);
+      const onChange = (file: string) => {
+        if (file !== manifest) return;
+        const build = finished();
+        if (build === undefined || build === seen.__playgroundLibraryBuild)
+          return;
+        seen.__playgroundLibraryBuild = build;
+        server.config.logger.info(
+          "carbon-preprocess-svelte rebuilt: restarting",
+        );
+        server.restart();
+      };
+      server.watcher.on("add", onChange);
+      server.watcher.on("change", onChange);
+    },
+  };
+}
+
+/**
  * Fails a build whose output names a local directory (the home directory,
  * this repo, or the CCS checkout), so a define or a diagnostic can't ship
  * where the playground was built.
@@ -699,6 +746,7 @@ export default {
     stressPage(),
     ccsPages(),
     noLocalPaths(),
+    restartOnLibraryBuild(),
   ],
   // What the app shows about the CCS in use (a banner when it has no Prose).
   define: {
