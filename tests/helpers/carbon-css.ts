@@ -122,10 +122,15 @@ const sharedClasses: Set<string> = (() => {
   );
 })();
 
+/** Classes some component owns. */
+const ownedClasses = new Set(
+  Object.values(components).flatMap((component) => component.classes),
+);
+
 /**
  * True if `name` is allowed: exact match, `-` prefix (`.bx--btn--` matches
- * `.bx--btn--primary`), or BEM child (`--` / `__`). Same rules as
- * `strict-css-optimizer.ts`.
+ * `.bx--btn--primary`), or BEM child (`--` / `__`) of an allowed class that
+ * no component owns. Same rules as `strict-css-optimizer.ts`.
  */
 export function matchesAllowlist(
   name: string,
@@ -137,6 +142,8 @@ export function matchesAllowlist(
     if (EXACT_ONLY_CLASSES.has(selector)) continue;
     if (selector.endsWith("-") && name.startsWith(selector)) return true;
   }
+
+  if (ownedClasses.has(name)) return false;
 
   for (let i = 1; i < name.length - 1; i++) {
     const a = name[i];
