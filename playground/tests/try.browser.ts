@@ -72,7 +72,7 @@ describe("try", () => {
     await page.waitForTimeout(300);
     await page.reload({ waitUntil: "networkidle" });
     expect(await page.getByLabel("Markdown").inputValue()).toBe("# Draft");
-    await page.getByRole("button", { name: "Reset" }).click();
+    await page.getByRole("button", { name: "Reset to the sample" }).click();
     expect(await page.getByLabel("Markdown").inputValue()).toContain(
       "# Getting started",
     );
@@ -83,8 +83,8 @@ describe("try", () => {
     const { page } = await openTry();
     await page.getByLabel("Markdown").fill("> [!TIP]\n> Hi.");
     await page
-      .getByRole("switch", { name: 'alerts: "InlineNotification"' })
-      .click({ force: true });
+      .getByRole("checkbox", { name: 'alerts: "InlineNotification"' })
+      .check({ force: true });
     await page.getByRole("tab", { name: "Svelte" }).last().click();
     await page.waitForTimeout(1500);
     expect(await page.locator(".codeview").textContent()).toContain(
