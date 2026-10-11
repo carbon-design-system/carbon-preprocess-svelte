@@ -65,20 +65,20 @@
     "css": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 314.97,
-      "reduction_percent": 43.49
+      "after_kb": 313.81,
+      "reduction_percent": 43.7
     },
     "full": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 197.83,
-      "reduction_percent": 64.51
+      "after_kb": 196.8,
+      "reduction_percent": 64.69
     },
     "prop-aware": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 197.83,
-      "reduction_percent": 64.51
+      "after_kb": 196.8,
+      "reduction_percent": 64.69
     }
   },
   "vite": {
@@ -91,40 +91,40 @@
     "css": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 316.6,
-      "reduction_percent": 43.69
+      "after_kb": 315.44,
+      "reduction_percent": 43.9
     },
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 199.26,
-      "reduction_percent": 64.56
+      "after_kb": 198.22,
+      "reduction_percent": 64.75
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 199.26,
-      "reduction_percent": 64.56
+      "after_kb": 198.22,
+      "reduction_percent": 64.75
     }
   },
   "vite-matrix@svelte-5": {
     "css": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 314.97,
-      "reduction_percent": 43.49
+      "after_kb": 313.81,
+      "reduction_percent": 43.7
     },
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 197.83,
-      "reduction_percent": 64.51
+      "after_kb": 196.8,
+      "reduction_percent": 64.69
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 197.83,
-      "reduction_percent": 64.51
+      "after_kb": 196.8,
+      "reduction_percent": 64.69
     }
   },
   "vite@carbon-0.85": {
