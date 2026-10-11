@@ -34,8 +34,8 @@ export type UsageAnalysis = {
   /** Merged call sites per Carbon module key. */
   usages: Map<string, ComponentUsage>;
   /**
-   * Whether no rendered component can apply `cls` (`.bx--btn--danger`),
-   * though a bundled one could under some props.
+   * Whether no rendered component can apply `cls`: `.bx--btn--danger` when
+   * no button is danger, and every class of a component that can't render.
    */
   isPruned(cls: string): boolean;
   /**
@@ -103,18 +103,14 @@ type Pass = {
 function runPass(
   modelOf: (key: string) => ComponentModel,
   roots: CallSite[],
-  /** `null`: every prop and context unknown. */
-  context: ((provided: Set<string>) => ContextResolver) | null,
+  context: (provided: Set<string>) => ContextResolver,
 ): Pass {
-  const forceOpen = context === null;
   let provided = new Set<string>();
   for (;;) {
     const usages = new Map<string, ComponentUsage>();
     const live = new Map<string, ReturnType<typeof walkLive>>();
     const queue: string[] = [];
-    const resolver: ContextResolver = context
-      ? context(provided)
-      : () => UNKNOWN;
+    const resolver = context(provided);
 
     const enqueue = (site: CallSite) => {
       const model = modelOf(site.component);
@@ -123,8 +119,7 @@ function runPass(
         usage = newComponentUsage();
         usages.set(site.component, usage);
       }
-      const merged = forceOpen ? { ...site, open: true } : site;
-      if (addCallSite(usage, merged, model.propNames.values())) {
+      if (addCallSite(usage, site, model.propNames.values())) {
         queue.push(site.component);
       }
     };
@@ -147,7 +142,7 @@ function runPass(
         next.add(contextKey);
       }
     }
-    if (forceOpen || next.size === provided.size) {
+    if (next.size === provided.size) {
       const classes = new Set<string>();
       const prefixes = new Set<string>();
       for (const result of live.values()) {
@@ -171,10 +166,11 @@ function assumedValue(values: Array<string | number | boolean | null>): Value {
 
 /**
  * Which Carbon classes the app can never render, given how it calls each
- * component. Compares two walks of the bundled components: one with every
- * prop unknown (what the bundle could render), one with the app's props
- * (what it does render). A class only the first produces is pruned, unless
- * one of Carbon's `.js` modules names it.
+ * component: every class the components it renders can't apply under the
+ * app's props, unless one of Carbon's `.js` modules names it. The walk
+ * collects every class literal and template prefix in what renders, so a
+ * class it doesn't see can't be applied: one only a dead branch applies,
+ * or one of a component that never renders at all.
  *
  * Throws if a component can't be modeled; callers fall back to pruning
  * without props.
@@ -264,17 +260,6 @@ export async function analyzeUsage(input: {
         : UNDEFINED,
   );
 
-  const everything = runPass(
-    modelOf,
-    [...bundled, ...precise.usages.keys()].map((component) => ({
-      component,
-      open: true,
-      props: new Map(),
-      slots: null,
-    })),
-    null,
-  );
-
   const scriptPrefixes = [...sources.scriptTokens].filter((token) =>
     token.endsWith("-"),
   );
@@ -282,9 +267,11 @@ export async function analyzeUsage(input: {
   const isPruned = (cls: string): boolean => {
     let verdict = verdicts.get(cls);
     if (verdict === undefined) {
+      // Not only the classes a bundled component could apply under other
+      // props: the index also lists, for a component, classes its CSS is
+      // written against (`.bx--date-picker` for every input DatePicker can
+      // wrap), and those can't render unless their own component is live.
       verdict =
-        (everything.classes.has(cls) ||
-          startsWithAny(cls, everything.prefixes)) &&
         !precise.classes.has(cls) &&
         !startsWithAny(cls, precise.prefixes) &&
         !sources.scriptTokens.has(cls) &&
