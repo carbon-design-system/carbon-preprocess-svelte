@@ -7,7 +7,7 @@ import {
   resolveCarbonRoot,
 } from "../src/indexer/build-index";
 import {
-  extractCssIndexAdditions,
+  extractCssOrphans,
   resolveCarbonCssPath,
 } from "../src/indexer/extract-css-context";
 import {
@@ -100,13 +100,8 @@ group("buildComponentIndex phases", () => {
     });
   });
 
-  task("extractCssIndexAdditions (white.css)", () => {
-    extractCssIndexAdditions({
-      componentClasses,
-      slotWrapperClasses: new Map(),
-      subComponents: new Map(),
-      css: carbonCss,
-    });
+  task("extractCssOrphans (white.css)", () => {
+    extractCssOrphans({ componentClasses, css: carbonCss });
   });
 
   task("buildRuntimeClassMap (svelte graph pre-scanned)", async () => {

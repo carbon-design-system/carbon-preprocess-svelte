@@ -3,9 +3,9 @@
     "Select"
   ],
   "before_bytes": 709971,
-  "after_bytes": 38256,
-  "reduction_percent": 94.61,
-  "kept_rules": 225,
+  "after_bytes": 28415,
+  "reduction_percent": 96,
+  "kept_rules": 162,
   "leaked_count": 0,
   "leaked_classes": []
 }

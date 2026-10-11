@@ -3,10 +3,7 @@ import path from "node:path";
 import { CarbonSvelte } from "../constants";
 import { isSvelteFile } from "../utils";
 import { readCarbonExports } from "./carbon-exports";
-import {
-  extractCssIndexAdditions,
-  resolveCarbonCssPath,
-} from "./extract-css-context";
+import { extractCssOrphans, resolveCarbonCssPath } from "./extract-css-context";
 import {
   buildRuntimeClassMap,
   type ModuleGraphCache,
@@ -58,7 +55,6 @@ export async function buildComponentIndex(options?: {
   const exportedKeys = new Set(exportedModules.values());
 
   const subComponents = new Map<string, string[]>();
-  const slotWrapperClasses = new Map<string, string[]>();
   const internalComponents = new Map<string, ComponentEntry>();
   /** src-relative module path -> its scanned entry. */
   const fileEntries = new Map<string, ComponentEntry>();
@@ -98,9 +94,6 @@ export async function buildComponentIndex(options?: {
 
         if (result.components.length > 0) {
           subComponents.set(moduleName, result.components);
-        }
-        if (result.slotWrappers.length > 0) {
-          slotWrapperClasses.set(moduleName, result.slotWrappers);
         }
 
         moduleGraph.importsByModule.set(file, result.imports);
@@ -142,12 +135,10 @@ export async function buildComponentIndex(options?: {
     [...exportsMap].map(([name, entry]) => [name, new Set(entry.classes)]),
   );
 
-  const [{ context, orphans }, runtimeClasses] = await Promise.all([
+  const [orphans, runtimeClasses] = await Promise.all([
     timed("css index", onTiming, async () =>
-      extractCssIndexAdditions({
+      extractCssOrphans({
         componentClasses: markupClasses,
-        slotWrapperClasses,
-        subComponents,
         css: await readFile(resolveCarbonCssPath(carbonRoot), "utf8"),
       }),
     ),
@@ -156,7 +147,7 @@ export async function buildComponentIndex(options?: {
     ),
   ]);
 
-  for (const additions of [runtimeClasses, context, orphans]) {
+  for (const additions of [runtimeClasses, orphans]) {
     for (const [component, classes] of additions) {
       const entry = exportsMap.get(component);
       if (entry) entry.classes = [...new Set([...entry.classes, ...classes])];

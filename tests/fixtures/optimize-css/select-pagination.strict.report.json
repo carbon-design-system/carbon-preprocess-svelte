@@ -4,9 +4,9 @@
     "Pagination"
   ],
   "before_bytes": 709971,
-  "after_bytes": 100911,
-  "reduction_percent": 85.79,
-  "kept_rules": 619,
+  "after_bytes": 88218,
+  "reduction_percent": 87.57,
+  "kept_rules": 527,
   "leaked_count": 0,
   "leaked_classes": []
 }

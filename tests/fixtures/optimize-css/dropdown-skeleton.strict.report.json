@@ -4,9 +4,9 @@
     "DropdownSkeleton"
   ],
   "before_bytes": 709971,
-  "after_bytes": 58540,
-  "reduction_percent": 91.75,
-  "kept_rules": 397,
+  "after_bytes": 54511,
+  "reduction_percent": 92.32,
+  "kept_rules": 365,
   "leaked_count": 0,
   "leaked_classes": []
 }

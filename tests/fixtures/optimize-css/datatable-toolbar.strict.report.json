@@ -5,9 +5,9 @@
     "ToolbarSearch"
   ],
   "before_bytes": 709971,
-  "after_bytes": 76061,
-  "reduction_percent": 89.29,
-  "kept_rules": 533,
+  "after_bytes": 71272,
+  "reduction_percent": 89.96,
+  "kept_rules": 492,
   "leaked_count": 0,
   "leaked_classes": []
 }

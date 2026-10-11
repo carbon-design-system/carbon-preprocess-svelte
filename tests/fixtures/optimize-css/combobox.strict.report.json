@@ -3,9 +3,9 @@
     "ComboBox"
   ],
   "before_bytes": 709971,
-  "after_bytes": 54206,
-  "reduction_percent": 92.37,
-  "kept_rules": 354,
+  "after_bytes": 52212,
+  "reduction_percent": 92.65,
+  "kept_rules": 339,
   "leaked_count": 0,
   "leaked_classes": []
 }

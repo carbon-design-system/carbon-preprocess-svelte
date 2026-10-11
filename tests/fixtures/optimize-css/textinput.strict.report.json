@@ -3,9 +3,9 @@
     "TextInput"
   ],
   "before_bytes": 709971,
-  "after_bytes": 30525,
-  "reduction_percent": 95.7,
-  "kept_rules": 188,
+  "after_bytes": 28019,
+  "reduction_percent": 96.05,
+  "kept_rules": 169,
   "leaked_count": 0,
   "leaked_classes": []
 }

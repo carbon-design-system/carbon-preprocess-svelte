@@ -3,9 +3,9 @@
     "NumberInput"
   ],
   "before_bytes": 709971,
-  "after_bytes": 40033,
-  "reduction_percent": 94.36,
-  "kept_rules": 220,
+  "after_bytes": 37527,
+  "reduction_percent": 94.71,
+  "kept_rules": 201,
   "leaked_count": 0,
   "leaked_classes": []
 }

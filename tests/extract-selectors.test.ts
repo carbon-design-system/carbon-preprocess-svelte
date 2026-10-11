@@ -163,23 +163,6 @@ describe("extractFromSvelte", () => {
     });
     expect(result.classes).toEqual([]);
   });
-  test("treats an element with a bx-- class directive around a slot as a slot wrapper", () => {
-    const result = extract({
-      code: `
-        <button class:bx--btn={true} class:bx--btn--sm={small} class:other={x}>
-          {#if iconOnly}
-            <span class:bx--assistive-text={true}></span>
-          {:else}
-            <slot />
-          {/if}
-        </button>
-        <div class:bx--no-slot={true}><span></span></div>
-      `,
-      filename: "test.svelte",
-    });
-    expect(result.slotWrappers).toEqual([".bx--btn", ".bx--btn--sm"]);
-  });
-
   test("names a dynamic component only when `this` is an identifier", () => {
     const result = extract({
       code: `
