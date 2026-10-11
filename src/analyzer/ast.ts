@@ -30,9 +30,30 @@ export function childEntries(node: Node): Array<[field: string, child: Node]> {
   return children;
 }
 
+/**
+ * Child nodes by node: the analysis walks each component's (unchanging)
+ * tree again on every pass.
+ */
+const childrenOf = new WeakMap<Node, readonly Node[]>();
+
 /** A node's child nodes, in source order. */
-export function childNodes(node: Node): Node[] {
-  return childEntries(node).map(([, child]) => child);
+export function childNodes(node: Node): readonly Node[] {
+  let children = childrenOf.get(node);
+  if (!children) {
+    const list: Node[] = [];
+    const fields = node as unknown as Record<string, unknown>;
+    for (const key of keysByType[node.type] ?? []) {
+      const value = fields[key];
+      if (Array.isArray(value)) {
+        for (const item of value) if (isNode(item)) list.push(item);
+      } else if (isNode(value)) {
+        list.push(value);
+      }
+    }
+    children = list;
+    childrenOf.set(node, children);
+  }
+  return children;
 }
 
 /** Calls `visit` on `node` and every descendant, depth-first. */
@@ -85,12 +106,28 @@ export function patternNames(
   }
 }
 
+const MAX_LINE_INDEXES = 256;
+/** Offsets of each line break, by source: the analysis asks per call site. */
+const lineBreaks = new Map<string, number[]>();
+
 /** 1-based line of `offset` in `code`. */
 export function lineAt(code: string, offset: number): number {
-  let line = 1;
-  for (let i = code.indexOf("\n"); i !== -1 && i < offset; ) {
-    line++;
-    i = code.indexOf("\n", i + 1);
+  let breaks = lineBreaks.get(code);
+  if (!breaks) {
+    breaks = [];
+    for (let i = code.indexOf("\n"); i !== -1; i = code.indexOf("\n", i + 1)) {
+      breaks.push(i);
+    }
+    if (lineBreaks.size >= MAX_LINE_INDEXES) lineBreaks.clear();
+    lineBreaks.set(code, breaks);
   }
-  return line;
+  // The number of breaks before `offset`.
+  let low = 0;
+  let high = breaks.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (breaks[middle] < offset) low = middle + 1;
+    else high = middle;
+  }
+  return low + 1;
 }

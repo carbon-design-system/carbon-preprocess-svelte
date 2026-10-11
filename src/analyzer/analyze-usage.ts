@@ -3,7 +3,7 @@ import path from "node:path";
 import { listJsAndSvelteFiles } from "../indexer/list-files";
 import { collectCarbonTokens } from "../plugins/scan-content";
 import type { CarbonComponents, ModuleUsage } from "./call-sites";
-import { loadComponentModel } from "./component-model";
+import { type ComponentModel, loadComponentModel } from "./component-model";
 import { type ContextResolver, createScope, type Scope } from "./evaluate";
 import { walkLive } from "./live-walk";
 import {
@@ -101,7 +101,7 @@ type Pass = {
  * of the child live, and so on.
  */
 function runPass(
-  carbonSrc: string,
+  modelOf: (key: string) => ComponentModel,
   roots: CallSite[],
   /** `null`: every prop and context unknown. */
   context: ((provided: Set<string>) => ContextResolver) | null,
@@ -117,7 +117,7 @@ function runPass(
       : () => UNKNOWN;
 
     const enqueue = (site: CallSite) => {
-      const model = loadComponentModel(carbonSrc, site.component);
+      const model = modelOf(site.component);
       let usage = usages.get(site.component);
       if (!usage) {
         usage = newComponentUsage();
@@ -131,7 +131,7 @@ function runPass(
 
     for (const site of roots) enqueue(site);
     for (let key = queue.shift(); key; key = queue.shift()) {
-      const model = loadComponentModel(carbonSrc, key);
+      const model = modelOf(key);
       const usage = usages.get(key);
       if (!usage) continue;
       const result = walkLive(createScope(model, usage, resolver));
@@ -143,8 +143,7 @@ function runPass(
     // it. Rendering more can provide more, so repeat until that settles.
     const next = new Set(provided);
     for (const key of usages.keys()) {
-      for (const contextKey of loadComponentModel(carbonSrc, key)
-        .providedContexts) {
+      for (const contextKey of modelOf(key).providedContexts) {
         next.add(contextKey);
       }
     }
@@ -192,6 +191,17 @@ export async function analyzeUsage(input: {
   const sources = await readCarbonSources(carbonSrc);
   const bundled = [...input.bundled];
   const options = input.options ?? {};
+  // Each model once per analysis: `loadComponentModel` checks the file's
+  // mtime, and the passes ask for the same models thousands of times.
+  const models = new Map<string, ComponentModel>();
+  const modelOf = (key: string): ComponentModel => {
+    let model = models.get(key);
+    if (!model) {
+      model = loadComponentModel(carbonSrc, key);
+      models.set(key, model);
+    }
+    return model;
+  };
 
   const excluded = new Set(
     (options.exclude ?? []).flatMap((name) => {
@@ -242,7 +252,7 @@ export async function analyzeUsage(input: {
   }
 
   const precise = runPass(
-    carbonSrc,
+    modelOf,
     roots,
     (provided) => (key) =>
       provided.has(key) ||
@@ -255,7 +265,7 @@ export async function analyzeUsage(input: {
   );
 
   const everything = runPass(
-    carbonSrc,
+    modelOf,
     [...bundled, ...precise.usages.keys()].map((component) => ({
       component,
       open: true,
@@ -291,11 +301,7 @@ export async function analyzeUsage(input: {
     scopeFor(key) {
       const usage = precise.usages.get(key);
       return usage
-        ? createScope(
-            loadComponentModel(carbonSrc, key),
-            usage,
-            precise.resolver,
-          )
+        ? createScope(modelOf(key), usage, precise.resolver)
         : undefined;
     },
   };

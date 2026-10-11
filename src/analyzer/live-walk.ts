@@ -250,10 +250,9 @@ function explainAt(
   node: { start: number },
   scope: Scope,
 ): (expression: Expression) => string | undefined {
-  const where = whereIn(node, scope);
   return (expression) => {
     const why = whyUnknown(expression, scope);
-    return why && `${where} ${why}`;
+    return why && `${whereIn(node, scope)} ${why}`;
   };
 }
 
