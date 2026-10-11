@@ -183,6 +183,8 @@
   }
 
   $: lines = source.split("\n").length;
+  // Reset has something to do only once the draft differs from its sample.
+  $: changed = source !== SAMPLES.find((s) => s.id === sample)?.source;
 </script>
 
 {#if !shared}<LocalStorage key="playground:try" bind:value={source} />{/if}
@@ -229,7 +231,7 @@
           <Select size="sm" inline labelText="Start from" selected={sample} on:update={(e) => start(e.detail)}>
             {#each SAMPLES as s (s.id)}<SelectItem value={s.id} text={s.label} />{/each}
           </Select>
-          <Button kind="ghost" size="small" icon={Reset} iconDescription="Reset to the sample" on:click={() => start(sample)} />
+          <Button kind="ghost" size="small" icon={Reset} iconDescription="Reset to the sample" disabled={!changed} on:click={() => start(sample)} />
           <Button kind="ghost" size="small" icon={copied ? Checkmark : LinkIcon} iconDescription={copied ? "Link copied" : "Copy a link to this draft"} on:click={copyLink} />
         </div>
       </div>
