@@ -10,3 +10,6 @@ screenshots
 .env.local
 src/gallery/
 src/pages/Options.svx
+src/pages/Readme.svx
+src/pages/Contributing.svx
+src/pages/PlaygroundReadme.svx

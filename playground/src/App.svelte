@@ -32,6 +32,7 @@
     Theme,
   } from "carbon-components-svelte";
   import Asleep from "carbon-icons-svelte/lib/Asleep.svelte";
+  import Book from "carbon-icons-svelte/lib/Book.svelte";
   import Carbon from "carbon-icons-svelte/lib/Carbon.svelte";
   import ChartColumn from "carbon-icons-svelte/lib/ChartColumn.svelte";
   import Code from "carbon-icons-svelte/lib/Code.svelte";
@@ -73,6 +74,14 @@
         { name: "Options", text: "Options gallery", icon: SettingsAdjust },
         { name: "Matrix", text: "Matrix", icon: GridIcon },
         { name: "Stress", text: "Stress", icon: Dashboard },
+      ],
+    },
+    {
+      label: "This repo's docs",
+      pages: [
+        { name: "Readme", text: "README", icon: Book },
+        { name: "Contributing", text: "Contributing", icon: Book },
+        { name: "PlaygroundReadme", text: "Playground README", icon: Book },
       ],
     },
     {
