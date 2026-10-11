@@ -18,6 +18,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 // The built-in highlighter: Carbon syntax tokens, no Prism.
@@ -278,6 +279,32 @@ function stressPage() {
       // Rewritten only when it changes, so Vite doesn't reload for nothing.
       if (!existsSync(file) || readFileSync(file, "utf8") !== page)
         writeFileSync(file, page);
+    },
+  };
+}
+
+/**
+ * Fails a build whose output names a local directory (the home directory,
+ * this repo, or the CCS checkout), so a define or a diagnostic can't ship
+ * where the playground was built.
+ */
+function noLocalPaths() {
+  const paths = [...new Set([homedir(), path.dirname(HERE), CCS])].filter(
+    (p) => p.length > 1,
+  );
+  return {
+    name: "playground-no-local-paths",
+    apply: "build" as const,
+    generateBundle(
+      _: unknown,
+      bundle: Record<string, { code?: string; source?: string | Uint8Array }>,
+    ) {
+      for (const [name, file] of Object.entries(bundle)) {
+        const text =
+          file.code ?? (typeof file.source === "string" ? file.source : "");
+        const found = paths.find((p) => text.includes(p));
+        if (found) throw new Error(`${name} contains a local path: ${found}`);
+      }
     },
   };
 }
@@ -649,12 +676,14 @@ export default {
     optimizeCss(),
     stressPage(),
     ccsPages(),
+    noLocalPaths(),
   ],
   // What the app shows about the CCS in use (a banner when it has no Prose).
   define: {
     __PLAYGROUND__: JSON.stringify({
       prose: HAS_PROSE,
-      ccs: CCS_DIR ?? `carbon-components-svelte@${CCS_VERSION} (installed)`,
+      // A version, never a path: the build shouldn't say where it was built.
+      ccs: `carbon-components-svelte@${CCS_VERSION} (${CCS_DIR ? "checkout" : "installed"})`,
     }),
   },
   // Every Carbon component, every page: big chunks are expected here.
