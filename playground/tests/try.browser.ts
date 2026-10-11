@@ -79,6 +79,71 @@ describe("try", () => {
     await page.close();
   });
 
+  test("options change the Svelte output, and Svelte's compiler checks it", async () => {
+    const { page } = await openTry();
+    await page.getByLabel("Markdown").fill("> [!TIP]\n> Hi.");
+    await page
+      .getByRole("switch", { name: 'alerts: "InlineNotification"' })
+      .click({ force: true });
+    await page.getByRole("tab", { name: "Svelte" }).last().click();
+    await page.waitForTimeout(1500);
+    expect(await page.locator(".codeview").textContent()).toContain(
+      "<InlineNotification",
+    );
+    expect(await page.getByText("Svelte compiles this.").count()).toBe(1);
+
+    await page.getByLabel("Markdown").fill('<img src="x" onerror="go()">');
+    await page.waitForTimeout(1500);
+    expect(await page.getByText("Svelte can't compile this.").count()).toBe(1);
+    expect(await page.getByText(/^Line \d+:/).count()).toBe(1);
+    await page.close();
+  });
+
+  test("the preview drops what runs code", async () => {
+    const { page } = await openTry();
+    await page
+      .getByLabel("Markdown")
+      .fill(
+        '<img src="x" onerror="window.__ran = 1">\n\n<a href="javascript:window.__ran = 2">link</a>\n\n<script>window.__ran = 3</script>',
+      );
+    await page.waitForTimeout(600);
+    const preview = page.getByRole("region", { name: "Preview" });
+    expect(await preview.locator("[onerror], script").count()).toBe(0);
+    expect(await preview.locator("a").getAttribute("href")).toBeNull();
+    expect(await page.evaluate(() => "__ran" in window)).toBe(false);
+    await page.close();
+  });
+
+  test("a shared link opens its draft without replacing the reader's own", async () => {
+    let { page } = await openTry();
+    await page.getByLabel("Markdown").fill("# Mine");
+    await page.waitForTimeout(400);
+    // The link for a different draft.
+    await page.getByLabel("Markdown").fill("# Shared");
+    await page.waitForTimeout(400);
+    await page
+      .getByRole("button", { name: "Copy a link to this draft" })
+      .click();
+    const link = await page.evaluate(() => navigator.clipboard.readText());
+    expect(link).toContain("#draft=");
+    await page.getByLabel("Markdown").fill("# Mine");
+    await page.waitForTimeout(400);
+
+    // A new tab, as a reader opens a link (a hash change alone doesn't reload).
+    await page.close();
+    page = await context().newPage();
+    await page.goto(link, { waitUntil: "networkidle" });
+    await page.waitForTimeout(300);
+    expect(await page.getByLabel("Markdown").inputValue()).toBe("# Shared");
+    expect(await page.getByText("A shared draft.").count()).toBe(1);
+    await page.getByLabel("Markdown").fill("# Shared, edited");
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: "Back to my draft" }).click();
+    await page.waitForTimeout(300);
+    expect(await page.getByLabel("Markdown").inputValue()).toBe("# Mine");
+    await page.close();
+  });
+
   test("axe finds no violations", async () => {
     const { page } = await openTry();
     await page.addScriptTag({ path: AXE });
