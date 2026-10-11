@@ -82,6 +82,8 @@ and the same plugins as its pages:
   values, default, group, and control). The settings panel, the URL, the
   tags, and the Matrix's axes all read it, so a new option is one entry plus
   whatever applies it in `App.svelte`.
+- **About this build** names the CCS by version (installed or checkout),
+  never its path: the build fails if its output contains a local directory.
 - `?chrome=0` hides the shell, for screenshots and the tests.
 
 Every setting is in the URL, by its key:
