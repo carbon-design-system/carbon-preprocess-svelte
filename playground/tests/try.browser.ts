@@ -42,6 +42,18 @@ describe("try", () => {
     await page.close();
   });
 
+  test("compiles once per edit, and not while idle", async () => {
+    const { page } = await openTry();
+    await page.getByLabel("Markdown").fill("# Once");
+    await page.waitForTimeout(400);
+    const count = () =>
+      page.evaluate(() => performance.getEntriesByName("try:compile").length);
+    const before = await count();
+    await page.waitForTimeout(1000);
+    expect(await count()).toBe(before);
+    await page.close();
+  });
+
   test("components show as placeholders, with a note", async () => {
     const { page } = await openTry();
     await page.getByLabel("Start from").selectOption("svelte");
