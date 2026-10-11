@@ -73,6 +73,7 @@ const BY_LANG: Record<string, string> = {
 };
 
 const PATH_SEPARATOR = /[\\/]/;
+const DIFF_PREFIX = /^diff-/;
 
 const STATUS: Record<string, string> = {
   error: "ErrorFilled",
@@ -92,7 +93,8 @@ export function carbonCodeIconName(target: CodeIconTarget): string {
   return (
     BY_NAME[base] ??
     (extension ? BY_EXTENSION[extension] : undefined) ??
-    BY_LANG[target.lang.toLowerCase()] ??
+    // A diff's language (`diff-svelte`) is the code's.
+    BY_LANG[target.lang.toLowerCase().replace(DIFF_PREFIX, "")] ??
     "Code"
   );
 }
