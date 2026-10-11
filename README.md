@@ -448,7 +448,7 @@ DataTable (1 call site)
 ```
  The same options work on `OptimizeCssPlugin`, `optimizeCarbonCss` (which needs `content`), and the CLI (`--prop-aware`).
 
-Across 2,416 apps covering every Carbon component and prop value, it left 36% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](#optimizecomponents).
+Across 2,416 apps covering every Carbon component and prop value, it left 46% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](#optimizecomponents).
 
 #### `optimizeComponents`
 

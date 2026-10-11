@@ -240,6 +240,20 @@ describe("analyzeUsage", () => {
     expect([...liveComponents]).toEqual([BUTTON]);
   });
 
+  test("a component that never renders keeps none of its classes", async () => {
+    // The index lists `.bx--date-picker` for TextInput (DatePicker can
+    // wrap one), but no DatePicker is bundled here.
+    const { isPruned } = await analyze(
+      app(
+        `import { TextInput } from "carbon-components-svelte";`,
+        `<TextInput labelText="Name" />`,
+      ),
+    );
+    expect(isPruned(".bx--text-input")).toBe(false);
+    expect(isPruned(".bx--date-picker")).toBe(true);
+    expect(isPruned(".bx--date-picker--fluid")).toBe(true);
+  });
+
   test("a dynamic or spread prop keeps every value", async () => {
     const dynamic = await analyze(
       app(`${IMPORT_BUTTON}\nexport let kind;`, `<Button {kind}>Hi</Button>`),
