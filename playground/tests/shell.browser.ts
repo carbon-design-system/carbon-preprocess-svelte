@@ -85,6 +85,42 @@ describe("shell", () => {
     await page.close();
   });
 
+  test("search finds a heading on another page and goes to it", async () => {
+    const { page, errors } = await openShell("page=MountBench");
+    await page.getByRole("button", { name: "Search" }).first().click();
+    await page.keyboard.type("code feat");
+    const result = page.getByRole("menuitem", { name: /Code features/ });
+    expect(await result.textContent()).toContain("Kitchen sink");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(800);
+    expect(new URL(page.url()).hash).toBe("#code-features");
+    expect(await page.getByRole("heading", { level: 1 }).textContent()).toBe(
+      "Kitchen sink",
+    );
+    // Below the 48px header, in view.
+    const top = await page.evaluate(
+      () =>
+        document.getElementById("code-features")?.getBoundingClientRect().top,
+    );
+    expect(top).toBeGreaterThanOrEqual(48);
+    expect(top).toBeLessThan(200);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+
+  test("previous and next follow the side nav", async () => {
+    const { page } = await openShell("page=Matrix");
+    const nav = page.getByRole("navigation", {
+      name: "Previous and next pages",
+    });
+    expect(await nav.textContent()).toContain("Try markdown()");
+    expect(await nav.textContent()).toContain("Stress");
+    await nav.getByRole("link", { name: /Next/ }).click();
+    await page.waitForTimeout(300);
+    expect(new URL(page.url()).searchParams.get("page")).toBe("Stress");
+    await page.close();
+  });
+
   test("settings from the URL show as changed", async () => {
     const { page } = await openShell("code=ts&pm=bun");
     const tags = page.getByRole("region", { name: "Changed settings" });
