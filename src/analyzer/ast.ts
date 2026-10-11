@@ -11,10 +11,3 @@ export function forEachNode(
   visit(node);
   for (const child of children(node)) forEachNode(child, visit);
 }
-
-/** The identifier at the root of `a`, `a.b`, `a[b].c`; `""` for anything else. */
-export function rootName(node: Node | null | undefined): string {
-  let current = node;
-  while (current?.type === "MemberExpression") current = current.object;
-  return current?.type === "Identifier" ? current.name : "";
-}
