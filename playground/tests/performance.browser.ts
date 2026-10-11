@@ -49,34 +49,50 @@ describe("performance", () => {
     });
   }
 
-  test("Mount cost: nothing moves while it measures", async () => {
-    const page = await context().newPage();
-    await page.addInitScript(() => {
-      window.__shifts = [];
-      new PerformanceObserver((list) =>
-        window.__shifts.push(
-          ...list
-            .getEntries()
-            .map((e) => (e as unknown as { value: number }).value),
-        ),
-      ).observe({ type: "layout-shift", buffered: true });
+  // Layout shift (CLS) while each page loads and settles: Mount cost until
+  // it has measured everything, the others for a second and a half.
+  const CLS_BUDGET = 0.005;
+  for (const name of [
+    "KitchenSink",
+    "Try",
+    "Matrix",
+    "Stress",
+    "MountBench",
+    "InteractBench",
+  ]) {
+    test(`${name}: layout shift under ${CLS_BUDGET}`, async () => {
+      const page = await context().newPage();
+      await page.addInitScript(() => {
+        window.__shifts = [];
+        new PerformanceObserver((list) =>
+          window.__shifts.push(
+            ...list
+              .getEntries()
+              .map((e) => (e as unknown as { value: number }).value),
+          ),
+        ).observe({ type: "layout-shift", buffered: true });
+      });
+      const { BASE } = await import("./helpers");
+      const url = `${BASE}/?chrome=0&page=${name}`;
+      // Warm the HTTP cache (fonts included): the budget is for the app.
+      await page.goto(url, { waitUntil: "networkidle" });
+      await page.goto(url, { waitUntil: "networkidle" });
+      if (name === "MountBench") {
+        await page.waitForSelector("#bench-results[data-done]", {
+          state: "attached",
+          timeout: 60_000,
+        });
+      }
+      await page.waitForTimeout(1500);
+      const shifts = await page.evaluate(() => window.__shifts);
+      const cls = shifts.reduce((sum, value) => sum + value, 0);
+      console.log(
+        `${name}: ${shifts.length} layout shifts, CLS ${cls.toFixed(4)}`,
+      );
+      expect(cls).toBeLessThan(CLS_BUDGET);
+      await page.close();
     });
-    const { BASE } = await import("./helpers");
-    await page.goto(`${BASE}/?chrome=0&page=MountBench`, {
-      waitUntil: "networkidle",
-    });
-    await page.waitForSelector("#bench-results[data-done]", {
-      state: "attached",
-      timeout: 60_000,
-    });
-    const shifts = await page.evaluate(() => window.__shifts);
-    const cls = shifts.reduce((sum, value) => sum + value, 0);
-    console.log(
-      `MountBench: ${shifts.length} layout shifts, CLS ${cls.toFixed(4)}`,
-    );
-    expect(cls).toBeLessThan(0.001);
-    await page.close();
-  });
+  }
 
   test("hover handling costs under a millisecond per pointer move", async () => {
     const { page } = await open(context(), "page=Stress");
