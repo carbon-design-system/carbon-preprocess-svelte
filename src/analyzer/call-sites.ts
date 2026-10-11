@@ -452,10 +452,10 @@ const MODULE_EXTENSIONS = [
 function importedConstants(
   model: ComponentModel,
   file: string,
-  constants: ReadonlyMap<string, ReadonlyMap<string, Value>> | undefined,
+  constants: ModuleConstants | undefined,
 ): Map<string, Value> {
   const values = new Map<string, Value>();
-  if (!constants || constants.size === 0) return values;
+  if (!constants) return values;
   for (const script of [model.ast.module, model.ast.instance]) {
     for (const statement of (script?.content.body ?? []) as Node[]) {
       if (statement.type !== "ImportDeclaration") continue;
@@ -463,7 +463,7 @@ function importedConstants(
       if (!source.startsWith(".")) continue;
       const base = path.resolve(path.dirname(file), source);
       const exports = MODULE_EXTENSIONS.map((ext) =>
-        constants.get(base + ext),
+        constants(base + ext),
       ).find(Boolean);
       if (!exports) continue;
       for (const specifier of statement.specifiers) {
@@ -489,9 +489,14 @@ export type SvelteUsageOptions = {
   usage?: ComponentUsage;
   /** This component's model, if already built. */
   model?: ComponentModel;
-  /** Exported constants of the app's own modules, by file then name. */
-  constants?: ReadonlyMap<string, ReadonlyMap<string, Value>>;
+  /** Exported constants of the app's own modules. */
+  constants?: ModuleConstants;
 };
+
+/** The constants app module `file` exports, by name; `undefined` if none. */
+export type ModuleConstants = (
+  file: string,
+) => ReadonlyMap<string, Value> | undefined;
 
 const BLANK = /^\s*$/;
 
