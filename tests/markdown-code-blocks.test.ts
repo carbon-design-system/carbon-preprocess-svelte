@@ -115,6 +115,7 @@ describe("carbonCodeIcon", () => {
     expect(file(undefined, "python")).toBe("LogoPython");
     expect(file("notes", "rust")).toBe("Code");
     expect(file("x", "sh", true)).toBe("Terminal");
+    expect(file(undefined, "diff-svelte")).toBe("LogoSvelte");
     expect(
       carbonCodeIconName({
         type: "file",
