@@ -1,4 +1,5 @@
 ---
+title: Kitchen sink
 description: Every construct markdown() renders, in one page, for checking Prose's type, spacing, and themes.
 ---
 
@@ -526,7 +527,7 @@ rm -rf node_modules && bun install
 
 :::
 
-A block in its own theme, `theme="g100"`. Terminal sessions follow the toolbar's terminal setting.
+A block in its own theme, `theme="g100"`. Terminal sessions follow Settings › Code › Terminal theme.
 
 ```sh theme="g100"
 $ bun run build
@@ -534,7 +535,7 @@ vite v7.1.0 building for production...
 ✓ 412 modules transformed.
 ```
 
-Compact type and spacing for one block, `variant="compact"`; the toolbar's "Code" setting does it for every block.
+Compact type and spacing for one block, `variant="compact"`; Settings › Code › Code size does it for every block.
 
 ```js variant="compact" title="ports.js"
 export const ports = { dev: 5173, preview: 4173 };
