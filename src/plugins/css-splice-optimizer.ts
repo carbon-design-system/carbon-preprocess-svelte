@@ -28,8 +28,8 @@ export function spliceOptimizeCss(
 
   const result = filterCss(css, {
     readDecls: READ_DECLS,
-    rule({ selector }) {
-      const pruned = pruneRuleSelector(selector, options);
+    rule(rule) {
+      const pruned = pruneRuleSelector(rule, options);
       if (!pruned) return;
       removed += pruned.removed;
       return pruned.selector ?? false;

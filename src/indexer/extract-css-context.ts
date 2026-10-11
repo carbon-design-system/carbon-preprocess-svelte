@@ -1,11 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { filterCss } from "caligula";
-import {
-  getCarbonClassesFromNormalized,
-  splitSelectorList,
-  stripNotPseudoClasses,
-} from "./css-selector-utils";
+import { type ParsedSelector, requiredClasses } from "caligula/selector";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
 
 /**
@@ -52,14 +48,14 @@ function buildClassOwners(
   return owners;
 }
 
-/** Calls `onRule` with each rule's selector; throws on CSS caligula can't model. */
+/** Calls `onRule` with each rule's parsed selectors; throws on CSS caligula can't model. */
 function forEachRuleSelector(
   css: string,
-  onRule: (selector: string) => void,
+  onRule: (selectors: readonly ParsedSelector[]) => void,
 ): void {
   const { skipped } = filterCss(css, {
-    rule({ selector }) {
-      onRule(selector);
+    rule({ parsed }) {
+      onRule(parsed);
     },
   });
   if (skipped) {
@@ -67,6 +63,26 @@ function forEachRuleSelector(
       "forEachRuleSelector: input is outside the shape caligula models",
     );
   }
+}
+
+/**
+ * The Carbon classes a selector requires, as `.bx--x` (legacy `.bx-x` read
+ * as `.bx--x`, listed after the others).
+ */
+function carbonClassesOf(selector: ParsedSelector): string[] {
+  const classes: string[] = [];
+  const legacy: string[] = [];
+  for (const cls of requiredClasses(selector, { prefix: "bx-" })) {
+    if (cls.startsWith("bx--")) {
+      if (cls.length > 4) classes.push(`.${cls}`);
+    } else if (cls.length > 3) {
+      legacy.push(`.bx--${cls.slice(3)}`);
+    }
+  }
+  for (const cls of legacy) {
+    if (!classes.includes(cls)) classes.push(cls);
+  }
+  return classes;
 }
 
 export type CssOrphanOptions = {
@@ -88,11 +104,9 @@ export function extractCssOrphans(
   const markupClasses = new Set(classOwners.keys());
   const orphans = new Map<string, Set<string>>();
 
-  forEachRuleSelector(css, (selectorList) => {
-    for (const branch of splitSelectorList(selectorList)) {
-      const classes = getCarbonClassesFromNormalized(
-        stripNotPseudoClasses(branch),
-      );
+  forEachRuleSelector(css, (selectors) => {
+    for (const branch of selectors) {
+      const classes = carbonClassesOf(branch);
       const branchOrphans = classes.filter((cls) => !markupClasses.has(cls));
       if (branchOrphans.length === 0) continue;
 
