@@ -176,7 +176,7 @@ export function createComponentOptimizer(
   /** Real paths of app components whose props came from analyzed call sites. */
   let closed = new Set<string>();
   /** Those rendered from somewhere else, and by what. */
-  const escaped = new Map<string, string>();
+  const escaped = new Map<string, string[]>();
   /**
    * The last analysis and a hash of the `content` it read: watch rebuilds
    * and SvelteKit's second (server or client) build reuse it unless a
@@ -323,15 +323,13 @@ export function createComponentOptimizer(
       if (outside.length === 0) return;
       escaped.set(
         name,
-        [...new Set(outside)]
-          .map((importer) =>
-            importer === undefined
-              ? "the bundler"
-              : path.isAbsolute(stripQuery(importer))
-                ? relativeTo(root, stripQuery(importer))
-                : importer,
-          )
-          .join(", "),
+        [...new Set(outside)].map((importer) =>
+          importer === undefined
+            ? "the bundler"
+            : path.isAbsolute(stripQuery(importer))
+              ? relativeTo(root, stripQuery(importer))
+              : importer,
+        ),
       );
     },
 
@@ -340,12 +338,12 @@ export function createComponentOptimizer(
       const errors: string[] = [];
       for (const [component, importers] of escaped) {
         errors.push(
-          `${name} read the props of ${component} from its call sites in \`content\`, but ${importers} also render(s) it. Add those files to \`content\`.`,
+          `${name} read the props of ${component} from its call sites in \`content\`, but ${importers.join(", ")} also ${importers.length === 1 ? "renders" : "render"} it. Add those files to \`content\`.`,
         );
       }
       if (missed.size > 0) {
         errors.push(
-          `${name} rewrote Carbon components before seeing ${[...missed].join(", ")}, which import(s) them. Add those files to \`content\` (now ${JSON.stringify(content)}); only a pattern that names \`node_modules\` reaches inside it.`,
+          `${name} rewrote Carbon components before seeing ${[...missed].join(", ")}, which ${missed.size === 1 ? "imports" : "import"} them. Add those files to \`content\` (now ${JSON.stringify(content)}); only a pattern that names \`node_modules\` reaches inside it.`,
         );
       }
       if (virtual.size > 0) {

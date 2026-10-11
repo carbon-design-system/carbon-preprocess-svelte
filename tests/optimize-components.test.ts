@@ -45,7 +45,7 @@ function context(aliases: Record<string, string> = {}): Context & GraphContext {
 
 const REWROTE = /^rewrote \d+ Carbon components for this app/;
 const MISSED_TOOLBAR =
-  /before seeing lib\/Toolbar\.ts.*Add those files to `content`/;
+  /before seeing lib\/Toolbar\.ts, which imports them\. Add those files to `content`/;
 const ANALYSIS_FAILED =
   /optimizeComponents could not analyze this build .*Carbon components were bundled unchanged/;
 const VIRTUAL_MODULE =
@@ -55,7 +55,7 @@ const VIRTUAL_MODULES =
 const BUTTON_REPORT =
   /Button +\d+ edits +no longer renders .*ButtonSkeleton[\s\S]*No longer bundled \(\d+\): .*ButtonSkeleton/;
 const WRAPPER_ESCAPED =
-  /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]Page\.svelte also render/;
+  /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]Page\.svelte also renders it\./;
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 
 /** A project with `src/App.svelte` and Carbon linked into its `node_modules`. */
