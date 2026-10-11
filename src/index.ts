@@ -7,15 +7,19 @@ export {
   stripAnsi,
 } from "./markdown/ansi";
 export { carbonCodeIcon, carbonCodeIconName } from "./markdown/code-icons";
-export type {
-  CodeIcon,
-  CodeIconTarget,
-  ImageOptions,
-  MarkdownHeading,
-  MarkdownOptions,
-  MarkdownRenderers,
-  MarkdownTree,
-  RenderContext,
+export {
+  type CodeIcon,
+  type CodeIconTarget,
+  type CompiledMarkdown,
+  compileMarkdown,
+  type ImageOptions,
+  type MarkdownHeading,
+  type MarkdownHtmlOptions,
+  type MarkdownOptions,
+  type MarkdownRenderers,
+  type MarkdownTree,
+  markdownToHtml,
+  type RenderContext,
 } from "./markdown/compile";
 export {
   decodeTokens,

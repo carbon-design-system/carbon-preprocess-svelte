@@ -3,8 +3,10 @@ import { dirname, join, resolve } from "node:path";
 import {
   ansiToHtml,
   carbonCodeIcon,
+  compileMarkdown,
   decodeTokens,
   encodeTokens,
+  markdownToHtml,
   prepareFence,
   renderCodeLines,
   tokenName,
@@ -52,5 +54,12 @@ describe("carbon-preprocess-svelte/code", () => {
     ];
     expect(helpers.every((helper) => typeof helper === "function")).toBe(true);
     expect(tokenName("controlKeyword")).toBe("control-keyword");
+  });
+
+  test("exports the Markdown compiler", async () => {
+    const { code } = await compileMarkdown("# Hi");
+    expect(code).toContain("<Prose");
+    const { html } = await markdownToHtml("# Hi");
+    expect(html).toBe('<h1 id="hi">Hi</h1>');
   });
 });
