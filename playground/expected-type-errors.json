@@ -1,0 +1,14 @@
+[
+  {
+    "origin": "playground:src/pages/KitchenSink.svx",
+    "code": 2353,
+    "includes": "\"tooltip\"",
+    "reason": "Deliberate: the unknown-prop example (Button has no `tooltip`) shows the type error squiggle and the hover card's \"did you mean\"."
+  },
+  {
+    "origin": "playground:src/pages/KitchenSink.md",
+    "code": 2353,
+    "includes": "\"tooltip\"",
+    "reason": "The same page, compiled with one Prose for the page."
+  }
+]

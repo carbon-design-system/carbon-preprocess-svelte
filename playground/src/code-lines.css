@@ -1,0 +1,477 @@
+/*
+ * Line features for fenced code: highlighted, inserted, deleted, and
+ * focused lines, line numbers, soft wrap, and terminal prompts. One rule set
+ * for the preprocessor's build-time output (`<span class="line">` inside a
+ * Prose `pre`) and CodeView, which renders the same markup.
+ *
+ * Each line is a full-width row, so its band reaches both edges of the
+ * block: the `pre` drops its inline padding and the lines carry it, plus a
+ * gutter for line numbers and diff signs.
+ */
+pre:has(> code > .line),
+.bx--prose pre:has(> code > .line) {
+  --code-pad: var(--ccs-prose-block-padding, var(--cds-spacing-05));
+  padding-inline: 0;
+}
+
+:root,
+[theme="white"],
+[theme="g10"],
+.t-white,
+.t-g10 {
+  --code-band-base: #ffffff;
+  /* OKLCH lightness for adapted ANSI colors: dark enough for 4.5:1. */
+  --ansi-l: 0.47;
+}
+
+[theme="g80"],
+[theme="g90"],
+[theme="g100"],
+.t-g80,
+.t-g90,
+.t-g100 {
+  --code-band-base: #161616;
+  --ansi-l: 0.8;
+}
+
+pre[data-line-numbers] {
+  --code-numbers: 4.5ch;
+}
+
+pre:has(.line:is([data-ins], [data-del])) {
+  --code-sign: 2ch;
+}
+
+pre > code:has(> .line) {
+  display: block;
+  /* As wide as the longest line, so bands span the scrolled width too. */
+  width: max-content;
+  min-width: 100%;
+}
+
+.line {
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  width: 100%;
+  /* An empty line has no line box of its own. */
+  min-height: 1lh;
+  vertical-align: top;
+  padding-inline: calc(
+      var(--code-pad) +
+      var(--code-numbers, 0px) +
+      var(--code-sign, 0px) +
+      var(--code-indent, 0px)
+    )
+    var(--code-pad);
+}
+
+/* Numbers and signs are generated content: not selected, not copied. */
+pre[data-line-numbers] .line::before {
+  position: absolute;
+  left: var(--code-pad);
+  width: 3ch;
+  color: var(--cds-text-helper);
+  content: counter(line);
+  counter-increment: line;
+  text-align: right;
+}
+
+.line:is([data-ins], [data-del])::after {
+  position: absolute;
+  left: calc(var(--code-pad) + var(--code-numbers, 0px));
+}
+
+/* The second `content` gives screen readers a word for the sign; browsers
+   without alt text for generated content keep the first. */
+.line[data-ins]::after {
+  color: var(--cds-support-02);
+  content: "+";
+  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  content: "+" / "added";
+}
+
+.line[data-del]::after {
+  color: var(--cds-support-01);
+  content: "−";
+  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  content: "−" / "removed";
+}
+
+/* Marked lines: a 2px edge in the accent over a faint tint of it. The tint
+   starts from the page's extreme (white, or #161616 in dark themes), so a
+   band raises contrast rather than lowering it: every Carbon syntax color
+   stays at 4.5:1 or more on every band, in every theme (contrast-check.ts). */
+.line[data-highlight] {
+  background-color: color-mix(
+    in srgb,
+    var(--cds-interactive-04) 6%,
+    var(--code-band-base)
+  );
+  box-shadow: inset 2px 0 0 var(--cds-interactive-04);
+}
+
+.line[data-ins] {
+  background-color: color-mix(
+    in srgb,
+    var(--cds-support-02) 6%,
+    var(--code-band-base)
+  );
+  box-shadow: inset 2px 0 0 var(--cds-support-02);
+}
+
+.line[data-del] {
+  background-color: color-mix(
+    in srgb,
+    var(--cds-support-01) 6%,
+    var(--code-band-base)
+  );
+  box-shadow: inset 2px 0 0 var(--cds-support-01);
+}
+
+/* A linked line (`#code-3-L14`), like a search hit. */
+.line[data-target] {
+  background-color: color-mix(
+    in srgb,
+    var(--cds-support-03) 6%,
+    var(--code-band-base)
+  );
+  box-shadow: inset 2px 0 0 var(--cds-support-03);
+}
+
+/* Focus: other lines recede until the reader points at or tabs into the block. */
+pre[data-has-focus] .line {
+  transition: opacity 110ms cubic-bezier(0.2, 0, 0.38, 0.9);
+}
+
+/* Dimmed lines fall below 4.5:1 by design: they lift on hover and keyboard
+   focus, and not at all for readers who ask for more contrast. */
+pre[data-has-focus] .line:not([data-focus]) {
+  opacity: 0.6;
+}
+
+@media (prefers-contrast: more) {
+  pre[data-has-focus] .line:not([data-focus]) {
+    opacity: 1;
+  }
+}
+
+pre[data-has-focus]:is(:hover, :focus-within) .line {
+  opacity: 1;
+}
+
+/* Terminal: the prompt isn't part of the command; output reads quieter. */
+.line > .prompt {
+  color: var(--cds-text-helper);
+  user-select: none;
+}
+
+.line[data-output] {
+  /* Under the command text, past the `$ ` prompt. */
+  --code-indent: 2ch;
+  color: var(--cds-text-02);
+}
+
+/* Folded sections (`collapse={…}`) in plain output: a <details> row. Line
+   numbers count folded lines too, so the numbers after a fold stay right. */
+.code-fold {
+  display: block;
+}
+
+.code-fold:not([open]) {
+  counter-increment: line var(--lines);
+}
+
+.code-fold__summary {
+  display: block;
+  padding-inline: calc(
+    var(--code-pad) +
+    var(--code-numbers, 0px) +
+    var(--code-sign, 0px)
+  );
+  color: var(--cds-text-02);
+  cursor: pointer;
+  list-style: none;
+}
+
+.code-fold__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The visible label; screen readers get the assistive text instead. */
+.code-fold__summary::before {
+  content: "▸ Show " attr(data-count);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  content: "▸ Show " attr(data-count) / "";
+}
+
+.code-fold[open] > .code-fold__summary::before {
+  content: "▾ Hide " attr(data-count);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  content: "▾ Hide " attr(data-count) / "";
+}
+
+.code-fold__summary:hover {
+  color: var(--cds-text-01);
+}
+
+.code-fold__summary:focus-visible {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: -2px;
+}
+
+/* Diff headers (`@@ … @@`): context, not code. */
+.line[data-diff-header] {
+  color: var(--cds-text-helper);
+}
+
+/* Soft wrap: continuation rows stay clear of the gutter. */
+pre[data-wrap] > code:has(> .line) {
+  width: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The header above a block: the file's icon and name, and a status. */
+.code-block {
+  color: var(--cds-text-01);
+}
+
+.code-block__header {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: var(--cds-spacing-03);
+  padding-inline: var(--ccs-prose-block-padding, var(--cds-spacing-05));
+  border-bottom: 1px solid var(--cds-ui-03);
+  background-color: var(--cds-ui-01);
+  color: var(--cds-text-02);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+}
+
+.code-block__title {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.code-block__icon {
+  flex: none;
+  fill: currentColor;
+}
+
+.code-block__icon-only {
+  display: inline-flex;
+}
+
+/* A status: an icon in its support color, a label, and a 2px top edge, so
+   the status never rests on color alone. */
+.code-block__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cds-spacing-02);
+  margin-inline-start: auto;
+  color: var(--cds-text-01);
+  font-weight: 600;
+}
+
+[data-kind] {
+  --code-kind: var(--cds-interactive-04);
+}
+
+[data-kind="error"] {
+  --code-kind: var(--cds-support-01);
+}
+
+[data-kind="warning"] {
+  --code-kind: var(--cds-support-03);
+}
+
+[data-kind="success"] {
+  --code-kind: var(--cds-support-02);
+}
+
+.code-block[data-kind] {
+  border-top: 2px solid var(--code-kind);
+}
+
+[data-kind] .code-block__status .code-block__icon {
+  color: var(--code-kind);
+}
+
+/* Do and don't side by side when there's room for both, else stacked.
+   Stacked, they're apart enough that two status edges don't run into each
+   other (24px), and closer to each other than to what's around them (32px,
+   like a code block on its own), so they still read as a pair. */
+.code-compare {
+  display: grid;
+  gap: var(--cds-spacing-06);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  margin-block: var(--cds-spacing-07);
+}
+
+/* Over Prose's flow spacing. */
+.bx--prose .code-compare {
+  margin-block: var(--cds-spacing-07);
+}
+
+.bx--prose .code-block > pre {
+  margin-top: 0;
+}
+
+/* Code type and spacing apart from Prose's variant: `variant="compact"` on
+   a block, or `data-code-variant` on the page (CCS: Prose `codeVariant`). */
+:root {
+  --code-font-size: var(--cds-code-02-font-size);
+  --code-line-height: var(--cds-code-02-line-height);
+  --code-gap: var(--cds-spacing-05);
+}
+
+[data-code-variant="compact"],
+[data-variant="compact"] {
+  --code-font-size: var(--cds-code-01-font-size);
+  --code-line-height: var(--cds-code-01-line-height);
+  --code-gap: var(--cds-spacing-04);
+}
+
+[data-code-variant="compact"] .bx--prose pre,
+.bx--prose pre[data-variant="compact"] {
+  --ccs-prose-code-font-size: var(--cds-code-01-font-size);
+  --ccs-prose-code-line-height: var(--cds-code-01-line-height);
+  --ccs-prose-block-padding: var(--cds-spacing-04);
+}
+
+/* ANSI colors in terminal output, mapped to theme tokens: they follow the
+   theme and keep their contrast. */
+.ansi-bold {
+  font-weight: 600;
+}
+
+/* Muted, but not helper text: that's under 4.5:1 in g90. */
+.ansi-dim {
+  color: var(--cds-text-02);
+}
+
+.ansi-italic {
+  font-style: italic;
+}
+
+.ansi-underline {
+  text-decoration: underline;
+}
+
+.ansi-strike {
+  text-decoration: line-through;
+}
+
+.ansi-black,
+.ansi-bright-black {
+  color: var(--cds-text-02);
+}
+
+.ansi-red,
+.ansi-bright-red {
+  color: var(--cds-support-01);
+}
+
+.ansi-green,
+.ansi-bright-green {
+  color: var(--cds-support-02);
+}
+
+/* Carbon's yellow is too light for text on light themes: the syntax gold. */
+.ansi-yellow,
+.ansi-bright-yellow {
+  color: var(--cds-syntax-function);
+}
+
+.ansi-blue,
+.ansi-bright-blue {
+  color: var(--cds-link-01);
+}
+
+.ansi-magenta,
+.ansi-bright-magenta {
+  color: var(--cds-syntax-control-keyword);
+}
+
+.ansi-cyan,
+.ansi-bright-cyan {
+  color: var(--cds-syntax-class-name);
+}
+
+.ansi-white,
+.ansi-bright-white {
+  color: var(--cds-text-01);
+}
+
+[class*="ansi-bg-"]:not(.ansi-bg-rgb) {
+  background-color: color-mix(
+    in srgb,
+    var(--ansi-bg-color) 35%,
+    var(--code-band-base)
+  );
+}
+
+.ansi-bg-red,
+.ansi-bg-bright-red {
+  --ansi-bg-color: var(--cds-support-01);
+}
+
+.ansi-bg-green,
+.ansi-bg-bright-green {
+  --ansi-bg-color: var(--cds-support-02);
+}
+
+.ansi-bg-yellow,
+.ansi-bg-bright-yellow {
+  --ansi-bg-color: var(--cds-support-03);
+}
+
+.ansi-bg-blue,
+.ansi-bg-bright-blue {
+  --ansi-bg-color: var(--cds-interactive-04);
+}
+
+.ansi-bg-magenta,
+.ansi-bg-bright-magenta {
+  --ansi-bg-color: var(--cds-syntax-control-keyword);
+}
+
+.ansi-bg-cyan,
+.ansi-bg-bright-cyan {
+  --ansi-bg-color: var(--cds-syntax-class-name);
+}
+
+.ansi-bg-black,
+.ansi-bg-bright-black,
+.ansi-bg-white,
+.ansi-bg-bright-white {
+  --ansi-bg-color: var(--cds-text-helper);
+}
+
+/* 256-color and truecolor: keep the hue and chroma, set the lightness for
+   the theme, so any color reads on any background. */
+.ansi-rgb {
+  color: oklch(from var(--ansi-fg) var(--ansi-l) min(c, 0.2) h);
+}
+
+.ansi-bg-rgb {
+  background-color: color-mix(
+    in oklch,
+    var(--ansi-bg) 35%,
+    var(--code-band-base)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  pre[data-has-focus] .line {
+    transition: none;
+  }
+}
+
+/* High contrast drops backgrounds and shadows: keep an edge on marked lines. */
+@media (forced-colors: active) {
+  .line:is([data-highlight], [data-ins], [data-del]) {
+    border-inline-start: 2px solid CanvasText;
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
+    "types": ["bun", "jest"]
+  },
+  "include": [
+    "types.d.ts",
+    "vite.config.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

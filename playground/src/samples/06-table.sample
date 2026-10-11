@@ -1,0 +1,9 @@
+| Setting | Default | Notes |
+| :-- | :-: | --: |
+| `name` | — | **Required** |
+| `region` | `us-south` | Closest region |
+
+| Key | Action |
+| --- | --- |
+| <DocKbd label="Enter" /> | Select |
+| <DocKbd label="Escape" /> | Close |

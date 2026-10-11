@@ -1,0 +1,9 @@
+<DocKbd label="Ctrl" /> + <DocKbd label="Shift" /> + <DocKbd label="P" /> opens the palette. <DocKbd label="ArrowDown" /> and <DocKbd label="ArrowUp" /> move the highlight; <DocKbd label="Enter" /> selects it.
+
+Keys in the middle of running copy, wrapping across lines: once the menu is open, press <DocKbd label="Home" /> or <DocKbd label="End" /> to jump to the first or last option, <DocKbd label="PageUp" /> and <DocKbd label="PageDown" /> to move ten at a time, and <DocKbd label="Escape" /> to close it without changing the selection. Holding <DocKbd label="Shift" /> while pressing <DocKbd label="Tab" /> moves focus back to the field, where <DocKbd label="Alt" /> + <DocKbd label="ArrowDown" /> reopens the menu.
+
+- Press <DocKbd label="Space" /> to toggle the focused row.
+- Press <DocKbd label="Ctrl" /> + <DocKbd label="A" /> to select all rows, then <DocKbd label="Delete" /> to remove them.
+
+> [!TIP]
+> Press <DocKbd label="?" /> anywhere to see every shortcut.

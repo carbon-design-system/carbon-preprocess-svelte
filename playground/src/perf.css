@@ -1,0 +1,17 @@
+/*
+ * `content-visibility: auto` for code blocks (`?cv=0` turns it off): the
+ * browser skips style, layout, and paint for blocks off screen, and keeps
+ * them in find in page, anchor navigation, and the accessibility tree.
+ * Code blocks are safe to contain: they scroll internally and draw focus
+ * rings inside. Each block reserves its estimated height
+ * (`contain-intrinsic-size`); `auto` keeps the real height once rendered.
+ */
+body[data-cv] .bx--prose pre {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 10rem;
+}
+
+/* A block a line link points into stays rendered, so it can scroll to the line. */
+body[data-cv] .codeview:not(.linked) {
+  content-visibility: auto;
+}

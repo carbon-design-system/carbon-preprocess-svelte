@@ -57,6 +57,18 @@ files = [
 ]
 rules = { "no-await-in-loop" = "off" }
 
+# The playground's scripts and pages build regular expressions from their
+# inputs where they're used, so the hoisting selector is off there.
+[[lint.overrides]]
+files = ["playground/**"]
+rules = { "no-restricted-syntax" = [
+  "error",
+  { selector = "UnaryExpression[operator='delete'] > MemberExpression[computed=false]", message = "Avoid the delete operator; assign undefined or rebuild the object." },
+  { selector = "ExportAllDeclaration", message = "Export names explicitly instead of re-exporting everything." },
+  { selector = "ImportDeclaration[importKind!='type'] > ImportNamespaceSpecifier", message = "Import names explicitly instead of a namespace." },
+  { selector = "TSEnumDeclaration", message = "Use a union of literals or a const object instead of an enum." },
+] }
+
 # Rules for the markup of `.svelte` files, which `bun lint` can't read:
 # svelte-lint (`bun run lint:svelte`) lints their scripts and markup
 # expressions with the rules above, and their markup with these.
@@ -68,7 +80,14 @@ rules = { "svelte/require-each-key" = "off", "svelte/compiler" = "error" }
 [fmt]
 # Markdown and YAML stay hand-formatted. Fixtures are inputs the tests
 # compare byte for byte.
-ignorePatterns = ["**/*.md", "**/*.yml", "**/*.yaml", "tests/fixtures/**"]
+ignorePatterns = [
+  "**/*.md",
+  "**/*.yml",
+  "**/*.yaml",
+  "tests/fixtures/**",
+  # The playground's pages and examples are laid out as they read.
+  "playground/**/*.svelte",
+]
 
 [fmt.svelte]
 sortOrder = "none"
