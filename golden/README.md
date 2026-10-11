@@ -15,10 +15,16 @@ own wrappers), written the way apps are, not to exercise one feature.
 # Rewrite each app and compare its SSR HTML with the original
 bun scripts/eval-specialize.ts --golden
 
+# Build each app with Vite (unoptimized, `optimizeCss`, prop-aware, and
+# with `optimizeComponents`) and click through it in Chromium: every step
+# must give the same DOM and pixels as the unoptimized build
+bun scripts/eval-interactions.ts --examples golden/admin-dashboard
+
 # What still keeps every variant, ranked across the apps
 bun scripts/golden-report.ts [--only admin-dashboard] [--full]
 ```
 
 They compile with this repo's Svelte 5, so they're not built for
-Svelte 3 or 4. Add an app as `golden/<name>/src/App.svelte` plus
-whatever it imports.
+Svelte 3 or 4. Add an app as `golden/<name>/` with an `index.html`,
+`src/main.ts` mounting `src/App.svelte`, and its steps in
+`scripts/golden-steps.ts`.
