@@ -7,7 +7,10 @@ await p.goto(
   `${process.env.PLAYGROUND_URL ?? "http://localhost:5173"}/?chrome=0&lazy=0&page=MountBench`,
   { waitUntil: "networkidle" },
 );
-await p.waitForSelector("#bench-results[data-done]", { timeout: 60000 });
+await p.waitForSelector("#bench-results[data-done]", {
+  state: "attached",
+  timeout: 60000,
+});
 const results = JSON.parse((await p.textContent("#bench-results")) ?? "[]") as {
   name: string;
   msPerInstance: number;
