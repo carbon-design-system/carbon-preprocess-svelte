@@ -130,15 +130,15 @@
   "vite@carbon-0.85": {
     "file": "assets/index-*.css",
     "before_kb": 606.42,
-    "after_kb": 95.92,
-    "reduction_percent": 84.18
+    "after_kb": 88.22,
+    "reduction_percent": 85.45
   },
   "vite@svelte-5": {
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 76.18,
-      "reduction_percent": 89.04
+      "after_kb": 71.27,
+      "reduction_percent": 89.75
     },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
@@ -167,8 +167,8 @@
     "modal": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 76.18,
-      "reduction_percent": 89.04
+      "after_kb": 71.27,
+      "reduction_percent": 89.75
     },
     "multiselect": {
       "file": "assets/index-*.css",
@@ -179,14 +179,14 @@
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 86.93,
-      "reduction_percent": 87.49
+      "after_kb": 81.81,
+      "reduction_percent": 88.23
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 47.23,
-      "reduction_percent": 93.2
+      "after_kb": 43.12,
+      "reduction_percent": 93.8
     },
     "textinput": {
       "file": "assets/index-*.css",

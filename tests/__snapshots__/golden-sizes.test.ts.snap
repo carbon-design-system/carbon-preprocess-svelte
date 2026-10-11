@@ -7,7 +7,7 @@ exports[`golden app sizes admin-dashboard 1`] = `
     "js_kb": 229.45,
   },
   "css": {
-    "css_kb": 261.1,
+    "css_kb": 261.36,
     "js_kb": 229.45,
   },
   "full": {
@@ -28,7 +28,7 @@ exports[`golden app sizes signup-wizard 1`] = `
     "js_kb": 186.61,
   },
   "css": {
-    "css_kb": 210.22,
+    "css_kb": 210.09,
     "js_kb": 186.61,
   },
   "full": {
@@ -49,7 +49,7 @@ exports[`golden app sizes docs-site 1`] = `
     "js_kb": 153.01,
   },
   "css": {
-    "css_kb": 156.31,
+    "css_kb": 151.3,
     "js_kb": 153.01,
   },
   "full": {
@@ -70,7 +70,7 @@ exports[`golden app sizes product-catalog 1`] = `
     "js_kb": 226.8,
   },
   "css": {
-    "css_kb": 250.31,
+    "css_kb": 250.18,
     "js_kb": 226.8,
   },
   "full": {
