@@ -13,7 +13,6 @@ const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;
 export type ExtractFromSvelteResult = {
   classes: string[];
   components: string[];
-  slotWrappers: string[];
   imports: string[];
   runtimeClasses: string[];
   /**
@@ -62,11 +61,7 @@ export function extractFromSvelte(props: {
   const ast = parse(code, { comments: false, script: false });
   const selectors = new Set<string>();
   const components = new Set<string>();
-  const slotWrappers = new Set<string>();
   const moduleClasses = new Set<string>();
-  // Elements with `bx--` class directives the walk is inside of: a `<slot>`
-  // anywhere under one makes its classes wrap slotted content.
-  const openWrappers: { node: AST.SvelteNode; classes: string[] }[] = [];
 
   const moduleStrings = scriptStrings(code, ast.module);
   // The walk visits the module script, then the instance, before the markup.
@@ -119,25 +114,6 @@ export function extractFromSvelte(props: {
 
       // A string may hold several classes, a selector, or markup.
       for (const cls of literalClasses(node)) selectors.add(cls);
-
-      if (node.type === "RegularElement" || node.type === "SvelteElement") {
-        const classes = node.attributes.flatMap((attribute) =>
-          attribute.type === "ClassDirective" &&
-          attribute.name.startsWith("bx--")
-            ? [`.${attribute.name}`]
-            : [],
-        );
-        if (classes.length > 0) openWrappers.push({ node, classes });
-      }
-
-      if (node.type === "SlotElement") {
-        for (const wrapper of openWrappers) {
-          for (const cls of wrapper.classes) slotWrappers.add(cls);
-        }
-      }
-    },
-    leave(node) {
-      if (node === openWrappers.at(-1)?.node) openWrappers.pop();
     },
   });
 
@@ -151,7 +127,6 @@ export function extractFromSvelte(props: {
   return {
     classes: [...classes],
     components: [...components],
-    slotWrappers: [...slotWrappers],
     imports: [...new Set(componentImports(code, ast, moduleKey))],
     runtimeClasses: extractRuntimeClassesFromSource(code),
     moduleClasses: [...moduleClasses],

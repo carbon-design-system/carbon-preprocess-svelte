@@ -3,9 +3,11 @@
     "HeaderGlobalAction"
   ],
   "before_bytes": 709971,
-  "after_bytes": 72449,
-  "reduction_percent": 89.8,
-  "kept_rules": 413,
-  "leaked_count": 0,
-  "leaked_classes": []
+  "after_bytes": 71077,
+  "reduction_percent": 89.99,
+  "kept_rules": 396,
+  "leaked_count": 1,
+  "leaked_classes": [
+    ".bx--header__global"
+  ]
 }

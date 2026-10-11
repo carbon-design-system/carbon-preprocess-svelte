@@ -3,9 +3,9 @@
     "Dropdown"
   ],
   "before_bytes": 709971,
-  "after_bytes": 49803,
-  "reduction_percent": 92.99,
-  "kept_rules": 343,
+  "after_bytes": 47809,
+  "reduction_percent": 93.27,
+  "kept_rules": 328,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -3,9 +3,11 @@
     "Header"
   ],
   "before_bytes": 709971,
-  "after_bytes": 17725,
-  "reduction_percent": 97.5,
-  "kept_rules": 95,
-  "leaked_count": 0,
-  "leaked_classes": []
+  "after_bytes": 17648,
+  "reduction_percent": 97.51,
+  "kept_rules": 94,
+  "leaked_count": 1,
+  "leaked_classes": [
+    ".bx--header__global"
+  ]
 }

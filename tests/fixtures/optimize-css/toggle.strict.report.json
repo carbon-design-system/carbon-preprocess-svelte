@@ -3,9 +3,9 @@
     "Toggle"
   ],
   "before_bytes": 709971,
-  "after_bytes": 22823,
-  "reduction_percent": 96.79,
-  "kept_rules": 122,
+  "after_bytes": 20354,
+  "reduction_percent": 97.13,
+  "kept_rules": 107,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -3,9 +3,9 @@
     "Breadcrumb"
   ],
   "before_bytes": 709971,
-  "after_bytes": 18934,
-  "reduction_percent": 97.33,
-  "kept_rules": 112,
+  "after_bytes": 17810,
+  "reduction_percent": 97.49,
+  "kept_rules": 101,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -3,9 +3,9 @@
     "DataTable"
   ],
   "before_bytes": 709971,
-  "after_bytes": 49396,
-  "reduction_percent": 93.04,
-  "kept_rules": 348,
+  "after_bytes": 44280,
+  "reduction_percent": 93.76,
+  "kept_rules": 312,
   "leaked_count": 0,
   "leaked_classes": []
 }

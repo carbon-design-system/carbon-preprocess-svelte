@@ -4,9 +4,9 @@
     "Accordion"
   ],
   "before_bytes": 709971,
-  "after_bytes": 76569,
-  "reduction_percent": 89.22,
-  "kept_rules": 451,
+  "after_bytes": 75274,
+  "reduction_percent": 89.4,
+  "kept_rules": 435,
   "leaked_count": 0,
   "leaked_classes": []
 }
