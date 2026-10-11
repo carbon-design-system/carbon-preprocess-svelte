@@ -407,3 +407,43 @@ describe("Carbon Button for kind=tertiary", () => {
     }
   });
 });
+
+describe("destructuring and stores", () => {
+  const GROUP = `<script>
+  import { getContext } from "svelte";
+  import { readable } from "svelte/store";
+  export let invalid = false;
+  const ctx = getContext("carbon:Group");
+  const { invalid: groupInvalid, size = "md" } = ctx ?? { invalid: readable(false) };
+  $: showInvalid = $groupInvalid || invalid;
+</script>
+{#if showInvalid}<p class="invalid">!</p>{/if}
+<span class={size}>x</span>`;
+
+  test("a destructured name reads its path, defaults included", () => {
+    const code = specialize(GROUP);
+    expect(code).toContain(`class={"md"}`);
+  });
+
+  test("a `readable` store with no group to provide one keeps its value", () => {
+    expect(specialize(GROUP)).not.toContain(`class="invalid"`);
+    expect(specialize(GROUP, { invalid: true })).toContain(`class="invalid"`);
+  });
+
+  test("a rest element, or a store something can set, stays unknown", () => {
+    const rest = `<script>
+  const { a, ...others } = { a: 1, b: 2 };
+</script>
+{#if others.b}<p class="b">b</p>{/if}<i>{a}</i>`;
+    const code = specialize(rest);
+    expect(code).toContain(`class="b"`);
+    expect(code).toContain("<i>{1}</i>");
+
+    const writable = `<script>
+  import { writable } from "svelte/store";
+  const open = writable(false);
+</script>
+{#if $open}<p class="open">open</p>{/if}`;
+    expect(specialize(writable)).toContain(`class="open"`);
+  });
+});

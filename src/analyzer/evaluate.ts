@@ -10,6 +10,7 @@ import {
   isNullish,
   isObject,
   isShape,
+  isStore,
   isStructured,
   isTruthy,
   itemsOf,
@@ -19,6 +20,7 @@ import {
   possible,
   readProperty,
   shape,
+  store,
   stringify,
   truthOf,
   typeOf,
@@ -222,10 +224,12 @@ function resolve(name: string, scope: Scope): Value {
   const imported = scope.imported.get(name);
   if (imported && model.otherImports.has(name)) return imported;
 
-  // `$store` reads a store's value: `undefined` only if the store itself is.
+  // `$store` reads a store's value: `undefined` if the store itself is,
+  // and a `readable` one's never changes.
   if (name.startsWith("$") && !name.startsWith("$$") && name.length > 1) {
-    const store = lookup(name.slice(1), scope);
-    return isOnly(store, undefined) ? UNDEFINED : UNKNOWN;
+    const holder = lookup(name.slice(1), scope);
+    if (isOnly(holder, undefined)) return UNDEFINED;
+    return flatMap(holder, (p) => (isStore(p) ? p.value : UNKNOWN));
   }
 
   return UNKNOWN;
@@ -539,6 +543,20 @@ function evaluateCall(
         ? scope.context(first.value)
         : UNKNOWN;
     default: {
+      // `readable(value)` with no start function: a store that never
+      // changes. One holding an object could have it mutated through `$`.
+      if (
+        scope.model.storeImports.get(callee.name) === "readable" &&
+        args.length <= 1 &&
+        !scope.locals.has(callee.name)
+      ) {
+        const value = first ? argument() : UNDEFINED;
+        return possible(
+          store(
+            value !== UNKNOWN && [...value].some(isObject) ? UNKNOWN : value,
+          ),
+        );
+      }
       const fn = knownFunction(callee.name, scope);
       return fn ? returnValue(fn, scope) : UNKNOWN;
     }
