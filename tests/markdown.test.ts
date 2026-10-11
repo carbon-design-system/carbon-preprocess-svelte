@@ -325,6 +325,35 @@ export let proseProps = {};
     expect(local.code).not.toContain("import { Prose }");
   });
 
+  test("imports Prose when the page binds it under another name", async () => {
+    const compiled = (scripts: string[]) =>
+      Promise.all(
+        scripts.map(async (script) => {
+          const { code } = await compileMarkdown(
+            `<script>\n  ${script}\n</script>\n\nHi`,
+          );
+          return code.includes("import { Prose }");
+        }),
+      );
+    expect(
+      await compiled([
+        'import { Prose as P } from "carbon-components-svelte";',
+        'import * as Prose2 from "x";',
+        "const { Prose: P } = lib;",
+        "let { a, Prose: P = Fallback, ...rest } = lib;",
+      ]),
+    ).toEqual([true, true, true, true]);
+    expect(
+      await compiled([
+        'import Prose from "./MyProse.svelte";',
+        'import Base, { type Props, Prose } from "x";',
+        'import { Button as B, Prose as Prose } from "x";',
+        "let { title, Prose = Fallback } = lib;",
+        "function Prose() {}",
+      ]),
+    ).toEqual([false, false, false, false, false]);
+  });
+
   test("auto-imports components the page renders but doesn't import", async () => {
     const { code } = await compileMarkdown('Press <Kbd label="Tab" />.', {
       prose: false,
