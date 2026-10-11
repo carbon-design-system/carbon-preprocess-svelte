@@ -84,6 +84,18 @@ const CCS_VERSION: string = JSON.parse(
   readFileSync(path.join(CCS, "package.json"), "utf8"),
 ).version;
 const SCRIPT_BLOCK = /^<script\b/;
+const MD_IMAGE = /!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])/g;
+const MD_LINK = /\[([^\]]*)\](?:\([^)]*\)|\[[^\]]*\])/g;
+const MD_MARKS = /`|\*\*/g;
+
+/** A paragraph's Markdown as plain text, for a page description. */
+const plainText = (markdown: string) =>
+  markdown
+    .replace(MD_IMAGE, "")
+    .replace(MD_LINK, "$1")
+    .replace(MD_MARKS, "")
+    .replace(/\s+/g, " ")
+    .trim();
 const FILE_SOURCE_SRC = /src="([^"]+)"/;
 const DOCS_ONLY =
   /^[ \t]*(?:\/\/|<!--)[ \t]*docs-only:start\b[\s\S]*?^[ \t]*(?:\/\/|<!--)[ \t]*docs-only:end\b.*(?:\r?\n|$)/gm;
@@ -277,28 +289,23 @@ const apiIndex = () => API_INDEX;
  * git-ignored): one 1,600-line block of this repo's own source, and 60
  * small Svelte blocks.
  */
-function stressPage() {
-  return {
-    name: "playground-stress-page",
-    buildStart() {
-      const file = path.join(HERE, "src/pages/Stress.svx");
-      const source = ["blocks.ts", "inline.ts", "compile.ts"]
-        .map((name) =>
-          readFileSync(path.join(HERE, "../src/markdown", name), "utf8"),
-        )
-        .join("\n")
-        .split("\n")
-        .slice(0, 1600)
-        .join("\n");
-      const small =
-        '```svelte {2}\n<script>\n  import { ComboBox } from "carbon-components-svelte";\n  let selectedId;\n</script>\n\n<ComboBox labelText="Region" items={[]} bind:selectedId />\n```\n';
-      const fence = "````";
-      const page = `---\ntitle: Stress\ndescription: "One 1,600-line block and 60 small ones: a load and scroll fixture."\n---\n\n${fence}ts showLineNumbers\n${source}\n${fence}\n\n${Array.from({ length: 60 }, () => small).join("\n")}`;
-      // Rewritten only when it changes, so Vite doesn't reload for nothing.
-      if (!existsSync(file) || readFileSync(file, "utf8") !== page)
-        writeFileSync(file, page);
-    },
-  };
+function writeStressPage() {
+  const file = path.join(HERE, "src/pages/Stress.svx");
+  const source = ["blocks.ts", "inline.ts", "compile.ts"]
+    .map((name) =>
+      readFileSync(path.join(HERE, "../src/markdown", name), "utf8"),
+    )
+    .join("\n")
+    .split("\n")
+    .slice(0, 1600)
+    .join("\n");
+  const small =
+    '```svelte {2}\n<script>\n  import { ComboBox } from "carbon-components-svelte";\n  let selectedId;\n</script>\n\n<ComboBox labelText="Region" items={[]} bind:selectedId />\n```\n';
+  const fence = "````";
+  const page = `---\ntitle: Stress\ndescription: "One 1,600-line block and 60 small ones: a load and scroll fixture."\n---\n\n${fence}ts showLineNumbers\n${source}\n${fence}\n\n${Array.from({ length: 60 }, () => small).join("\n")}`;
+  // Rewritten only when it changes, so Vite doesn't reload for nothing.
+  if (!existsSync(file) || readFileSync(file, "utf8") !== page)
+    writeFileSync(file, page);
 }
 
 /**
@@ -380,65 +387,59 @@ function noLocalPaths() {
  * lays them out, `src/pages/Options.svx`, written at startup (git-ignored).
  * Without Prose in the CCS in use, every variant is compiled without it.
  */
-function optionsGallery() {
+async function writeOptionsGallery(): Promise<void> {
   const write = (file: string, text: string) => {
     if (!existsSync(file) || readFileSync(file, "utf8") !== text)
       writeFileSync(file, text);
   };
-  return {
-    name: "playground-options-gallery",
-    async buildStart() {
-      const dir = path.join(HERE, "src/gallery");
-      mkdirSync(dir, { recursive: true });
-      // Every variant compiled at once; then the page, option by option.
-      const compiled = await Promise.all(
-        GALLERY.flatMap((option) =>
-          option.variants.map(async (variant, n) => {
-            const name = `${option.name}-${n}`;
-            const { code } = await compileMarkdown(option.sample, {
-              ...GALLERY_BASE,
-              ...variant.options,
-              prose: HAS_PROSE ? (variant.options.prose ?? true) : false,
-              filename: `${name}.md`,
-            });
-            write(path.join(dir, `${name}.svelte`), code);
-            return { option, variant, name, local: `G_${option.name}_${n}` };
-          }),
-        ),
+  const dir = path.join(HERE, "src/gallery");
+  mkdirSync(dir, { recursive: true });
+  // Every variant compiled at once; then the page, option by option.
+  const compiled = await Promise.all(
+    GALLERY.flatMap((option) =>
+      option.variants.map(async (variant, n) => {
+        const name = `${option.name}-${n}`;
+        const { code } = await compileMarkdown(option.sample, {
+          ...GALLERY_BASE,
+          ...variant.options,
+          prose: HAS_PROSE ? (variant.options.prose ?? true) : false,
+          filename: `${name}.md`,
+        });
+        write(path.join(dir, `${name}.svelte`), code);
+        return { option, variant, name, local: `G_${option.name}_${n}` };
+      }),
+    ),
+  );
+  const imports = compiled.map(
+    ({ name, local }) => `  import ${local} from "../gallery/${name}.svelte";`,
+  );
+  const sections = GALLERY.map((option) => {
+    const items = compiled
+      .filter((c) => c.option === option)
+      .map(
+        ({ variant, local }) =>
+          `{ label: ${JSON.stringify(variant.label)}, component: ${local} }`,
       );
-      const imports = compiled.map(
-        ({ name, local }) =>
-          `  import ${local} from "../gallery/${name}.svelte";`,
-      );
-      const sections = GALLERY.map((option) => {
-        const items = compiled
-          .filter((c) => c.option === option)
-          .map(
-            ({ variant, local }) =>
-              `{ label: ${JSON.stringify(variant.label)}, component: ${local} }`,
-          );
-        const configs = option.variants
-          .map((v) => `// ${v.label}\n${v.config};`)
-          .join("\n\n");
-        return [
-          `## ${option.name}`,
-          option.description,
-          option.name === "prose" && !HAS_PROSE
-            ? "> [!NOTE]\n> The CCS in use has no Prose, so both are plain HTML here."
-            : "",
-          `\`\`\`\`md title="Sample"\n${option.sample}\n\`\`\`\``,
-          `\`\`\`js title="svelte.config.js"\n${configs}\n\`\`\``,
-          `<GalleryRow items={[${items.join(", ")}]} />`,
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-      });
-      write(
-        path.join(HERE, "src/pages/Options.svx"),
-        `---\ntitle: Options gallery\ndescription: "One sample under each markdown() option: the default first, then the option's other values, each compiled by compileMarkdown."\nexamples: false\n---\n\n<script>\n  import GalleryRow from "../GalleryRow.svelte";\n${imports.join("\n")}\n</script>\n\n${sections.join("\n\n")}\n`,
-      );
-    },
-  };
+    const configs = option.variants
+      .map((v) => `// ${v.label}\n${v.config};`)
+      .join("\n\n");
+    return [
+      `## ${option.name}`,
+      option.description,
+      option.name === "prose" && !HAS_PROSE
+        ? "> [!NOTE]\n> The CCS in use has no Prose, so both are plain HTML here."
+        : "",
+      `\`\`\`\`md title="Sample"\n${option.sample}\n\`\`\`\``,
+      `\`\`\`js title="svelte.config.js"\n${configs}\n\`\`\``,
+      `<GalleryRow items={[${items.join(", ")}]} />`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  });
+  write(
+    path.join(HERE, "src/pages/Options.svx"),
+    `---\ntitle: Options gallery\ndescription: "One sample under each markdown() option: the default first, then the option's other values, each compiled by compileMarkdown."\nexamples: false\n---\n\n<script>\n  import GalleryRow from "../GalleryRow.svelte";\n${imports.join("\n")}\n</script>\n\n${sections.join("\n\n")}\n`,
+  );
 }
 
 /**
@@ -597,6 +598,72 @@ function buildReport() {
           },
         }),
       );
+    },
+  };
+}
+
+/**
+ * The repo's own docs as pages (`src/pages/{Readme,Contributing,
+ * PlaygroundReadme}.svx`, git-ignored): real-world Markdown through
+ * `markdown()`. Each takes its title from its first heading (which the page
+ * header then shows), and relative links point at the file on GitHub.
+ * Rewritten when a source changes.
+ */
+const REPO_DOCS = [
+  { page: "Readme", file: "README.md" },
+  { page: "Contributing", file: "CONTRIBUTING.md" },
+  { page: "PlaygroundReadme", file: "playground/README.md" },
+];
+const GITHUB =
+  "https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main";
+const FIRST_HEADING = /^# (.+)\n+/m;
+const BADGE_LINES = /^(?:\[?!\[.*\n)+\n*/;
+const TAGLINE = /^> (.+)\n+/;
+const RELATIVE_LINK =
+  /\]\((?!https?:|#|mailto:|\/)([^)\s]+)((?:\s+"[^"]*")?)\)/g;
+
+function repoDocs() {
+  const root = path.join(HERE, "..");
+  const write = (doc: (typeof REPO_DOCS)[number]) => {
+    let text = readFileSync(path.join(root, doc.file), "utf8");
+    const title = FIRST_HEADING.exec(text)?.[1] ?? doc.page;
+    text = text.replace(FIRST_HEADING, "");
+    // The README's opening: badges (dropped), then a quoted tagline (the
+    // page's description).
+    text = text.replace(BADGE_LINES, "");
+    const tagline = TAGLINE.exec(text)?.[1];
+    if (tagline) text = text.replace(TAGLINE, "");
+    const dir = path.posix.dirname(doc.file);
+    text = text.replace(
+      RELATIVE_LINK,
+      (_, target: string, title: string) =>
+        `](${GITHUB}/${path.posix.normalize(path.posix.join(dir, target))}${title})`,
+    );
+    const description = tagline
+      ? `description: ${JSON.stringify(plainText(tagline))}\n`
+      : "";
+    const page = `---\ntitle: ${JSON.stringify(title)}\n${description}examples: false\n---\n\n${text}`;
+    const out = path.join(HERE, "src/pages", `${doc.page}.svx`);
+    if (!existsSync(out) || readFileSync(out, "utf8") !== page)
+      writeFileSync(out, page);
+  };
+  for (const doc of REPO_DOCS) write(doc);
+  return {
+    name: "playground-repo-docs",
+    configureServer(server: {
+      watcher: {
+        add: (path: string) => void;
+        on: (event: string, listener: (file: string) => void) => void;
+      };
+    }) {
+      const sources = new Map(
+        REPO_DOCS.map((doc) => [path.join(root, doc.file), doc]),
+      );
+      for (const file of sources.keys()) server.watcher.add(file);
+      server.watcher.on("change", (file) => {
+        const doc = sources.get(file);
+        if (doc) write(doc);
+      });
     },
   };
 }
@@ -942,7 +1009,9 @@ const shared: MarkdownOptions = {
     ) {
       intro.push((tree.blocks.splice(at, 1)[0] as { text: string }).text);
     }
-    if (intro.length) tree.metadata.description = intro.join(" ");
+    // Shown as text: images (badges) go, links keep their text.
+    const description = intro.map(plainText).filter(Boolean).join(" ");
+    if (description) tree.metadata.description = description;
     // A page's `title` frontmatter, else its file name.
     tree.metadata.title ??= path
       .basename(tree.filename ?? "")
@@ -998,6 +1067,13 @@ const shared: MarkdownOptions = {
     },
   },
 };
+
+// Generated pages, written before any plugin runs: optimizeComponents lists
+// its `content` files in buildStart, and Rollup runs buildStart hooks in
+// parallel, so a page written in one could be missed (a fresh checkout's
+// build failed). Repo docs are written by repoDocs() itself.
+writeStressPage();
+await writeOptionsGallery();
 
 /** The `.svx` pages' preprocessor: one Prose per run of Markdown. */
 const svxPages = markdown({
@@ -1101,8 +1177,7 @@ export default {
     // Prune Carbon CSS the build doesn't use, down to the prop variants it
     // renders (the e2e snapshot records it; see OPTIMIZE).
     ...(OPTIMIZE ? [optimizeCss({ propAware: true })] : []),
-    stressPage(),
-    optionsGallery(),
+    repoDocs(),
     ccsPages(),
     noLocalPaths(),
     restartOnLibraryBuild(),

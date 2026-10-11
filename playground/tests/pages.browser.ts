@@ -11,6 +11,9 @@ const PAGES = [
   "MountBench",
   "InteractBench",
   "BuildReport",
+  "Readme",
+  "Contributing",
+  "PlaygroundReadme",
 ];
 
 describe("pages", () => {
@@ -83,6 +86,30 @@ describe("build report", () => {
     expect(await diff.textContent()).toContain(
       "carbon-components-svelte/src/UIShell/Header.svelte",
     );
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+});
+
+describe("the repo's docs", () => {
+  test("the README renders, with Markdown inside its <details> and links to GitHub", async () => {
+    const { page, errors } = await open(context(), "page=Readme");
+    expect(await page.getByRole("heading", { level: 1 }).textContent()).toBe(
+      "carbon-preprocess-svelte",
+    );
+    // Its intro, as text: the badges drop out.
+    expect(await page.locator(".intro").textContent()).toMatch(
+      /^Zero-dependency Svelte preprocessors/,
+    );
+    // A fence inside <details> is a code view, not raw text.
+    expect(await page.locator("details .codeview").count()).toBeGreaterThan(0);
+    expect(
+      await page
+        .locator(
+          "a[href^='https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/examples/']",
+        )
+        .count(),
+    ).toBeGreaterThan(0);
     expect(errors).toEqual([]);
     await page.close();
   });
