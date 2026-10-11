@@ -302,6 +302,29 @@ export let proseProps = {};
     expect(own.code).toContain("<Prose>");
   });
 
+  test("leaves a page's own `proseProps` declaration alone", async () => {
+    const { code } = await compileMarkdown(
+      "<script>\n  export let proseProps = {};\n</script>\n\n<Child {proseProps} />\n\nHi",
+    );
+    expect(code.match(/export let proseProps/g)).toHaveLength(1);
+    expect(code).toContain("<Prose {...proseProps}>");
+  });
+
+  test("imports Prose when the page's script only mentions it", async () => {
+    const { code } = await compileMarkdown(
+      '<script>\n  // Wrapped in Prose.\n  const label = "Prose";\n  import { Button } from "carbon-components-svelte";\n  let a = Button;\n</script>\n\nHi',
+    );
+    expect(code).toContain('import { Prose } from "carbon-components-svelte";');
+    const own = await compileMarkdown(
+      '<script>\n  import { Button, Prose as P, Prose } from "carbon-components-svelte";\n</script>\n\nHi',
+    );
+    expect(own.code).not.toContain("import { Prose }");
+    const local = await compileMarkdown(
+      "<script>\n  const { Prose } = components;\n</script>\n\nHi",
+    );
+    expect(local.code).not.toContain("import { Prose }");
+  });
+
   test("auto-imports components the page renders but doesn't import", async () => {
     const { code } = await compileMarkdown('Press <Kbd label="Tab" />.', {
       prose: false,
