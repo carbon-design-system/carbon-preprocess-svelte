@@ -93,8 +93,10 @@
     margin-top: var(--cds-spacing-06);
   }
 
+  /* Block-level: inline, it would sit on the label's baseline, with room
+     for descenders below, and ride 1.5px high. */
   .view {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: var(--cds-spacing-03);
   }

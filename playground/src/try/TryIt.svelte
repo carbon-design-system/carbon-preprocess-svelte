@@ -17,7 +17,7 @@
   import {
     Button,
     Column,
-    CopyButton,
+    Checkbox,
     Grid,
     InlineNotification,
     LocalStorage,
@@ -28,9 +28,10 @@
     TabContent,
     Tabs,
     TextArea,
-    Toggle,
   } from "carbon-components-svelte";
+  import Checkmark from "carbon-icons-svelte/lib/Checkmark.svelte";
   import CheckmarkFilled from "carbon-icons-svelte/lib/CheckmarkFilled.svelte";
+  import LinkIcon from "carbon-icons-svelte/lib/Link.svelte";
   import LogoSvelte from "carbon-icons-svelte/lib/LogoSvelte.svelte";
   import Reset from "carbon-icons-svelte/lib/Reset.svelte";
   import TableOfContents from "carbon-icons-svelte/lib/TableOfContents.svelte";
@@ -79,6 +80,21 @@
       backToMine();
     }
   });
+  // The compile options, by `options` key, labeled as written in a config.
+  const OPTION_FIELDS = [
+    { key: "anchors", label: "anchors" },
+    { key: "alerts", label: 'alerts: "InlineNotification"' },
+    { key: "codeSnippet", label: "codeSnippet" },
+    { key: "expressions", label: "expressions" },
+  ];
+
+  let copied = false;
+  async function copyLink() {
+    await navigator.clipboard.writeText(shareUrl);
+    copied = true;
+    setTimeout(() => (copied = false), 2000);
+  }
+
   function backToMine() {
     shared = false;
     history.replaceState(null, "", location.pathname + location.search);
@@ -172,20 +188,6 @@
 {#if !shared}<LocalStorage key="playground:try" bind:value={source} />{/if}
 
 <Grid noGutter>
-  <Row>
-    <Column lg={16}>
-      <div class="toolbar">
-        <Select size="sm" inline labelText="Start from" selected={sample} on:update={(e) => start(e.detail)}>
-          {#each SAMPLES as s (s.id)}<SelectItem value={s.id} text={s.label} />{/each}
-        </Select>
-        <Button kind="ghost" size="small" icon={Reset} on:click={() => start(sample)}>Reset</Button>
-        <CopyButton text={shareUrl} iconDescription="Copy a link to this draft" feedback="Link copied" />
-        <p class="status bx--type-helper-text-01">
-          {#if result}{lines} lines · compiled in {result.ms < 1 ? result.ms.toFixed(2) : result.ms.toFixed(1)} ms{/if}
-        </p>
-      </div>
-    </Column>
-  </Row>
   {#if shared}
     <Row>
       <Column lg={16}>
@@ -206,22 +208,39 @@
   <Row>
     <Column lg={16}>
       <fieldset class="options">
-        <legend class="bx--label">Options</legend>
-        <Toggle size="sm" labelText="anchors" labelA="Off" labelB="On" bind:toggled={options.anchors} />
-        <Toggle size="sm" labelText={'alerts: "InlineNotification"'} labelA="Off" labelB="On" bind:toggled={options.alerts} />
-        <Toggle size="sm" labelText="codeSnippet" labelA="Off" labelB="On" bind:toggled={options.codeSnippet} />
-        <Toggle size="sm" labelText="expressions" labelA="Off" labelB="On" bind:toggled={options.expressions} />
-        <p class="bx--form__helper-text">Alerts, CodeSnippet, and expressions change the Svelte tab; the preview is plain HTML.</p>
+        <legend class="bx--label">Compile options</legend>
+        <div class="checks">
+          {#each OPTION_FIELDS as { key, label } (key)}
+            <Checkbox bind:checked={options[key]}>
+              <svelte:fragment slot="labelChildren"><code>{label}</code></svelte:fragment>
+            </Checkbox>
+          {/each}
+        </div>
+        <p class="bx--form__helper-text">Alerts, codeSnippet, and expressions change the Svelte tab; the preview is plain HTML.</p>
       </fieldset>
     </Column>
   </Row>
   <Row>
+    <!-- Two panes: the Markdown with its actions, the output with its tabs. -->
     <Column lg={8} md={8}>
+      <div class="pane-head">
+        <label class="bx--label" for="try-editor">Markdown</label>
+        <div class="actions">
+          <Select size="sm" inline labelText="Start from" selected={sample} on:update={(e) => start(e.detail)}>
+            {#each SAMPLES as s (s.id)}<SelectItem value={s.id} text={s.label} />{/each}
+          </Select>
+          <Button kind="ghost" size="small" icon={Reset} iconDescription="Reset to the sample" on:click={() => start(sample)} />
+          <Button kind="ghost" size="small" icon={copied ? Checkmark : LinkIcon} iconDescription={copied ? "Link copied" : "Copy a link to this draft"} on:click={copyLink} />
+        </div>
+      </div>
       <TextArea
+        id="try-editor"
         class="editor"
         labelText="Markdown"
+        hideLabel
         rows={28}
         spellcheck="false"
+        helperText={result ? `${lines} lines · compiled in ${result.ms < 1 ? result.ms.toFixed(2) : result.ms.toFixed(1)} ms` : ""}
         invalid={Boolean(error)}
         invalidText={error?.message}
         bind:value={source}
@@ -284,28 +303,53 @@
 </Grid>
 
 <style>
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: var(--cds-spacing-05);
-    margin-bottom: var(--cds-spacing-05);
-  }
-
   .options {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: var(--cds-spacing-03) var(--cds-spacing-07);
     margin-bottom: var(--cds-spacing-06);
   }
 
-  .options legend {
-    width: 100%;
+  .checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--cds-spacing-07);
+  }
+
+  /* Each as wide as its label, not a share of the row; and without the
+     3px Carbon adds above the first and below the last of a vertical group,
+     which in a row drops the first box below the others. */
+  .checks :global(.bx--form-item) {
+    flex: none;
+    margin: 0;
+  }
+
+  .checks code {
+    font: 0.8125rem/1.29 "IBM Plex Mono", monospace;
   }
 
   .options .bx--form__helper-text {
-    width: 100%;
+    margin-top: var(--cds-spacing-02);
+  }
+
+  /* As tall as the container tabs beside it, so both panes start level. */
+  .pane-head {
+    display: flex;
+    min-height: 3rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cds-spacing-05);
+  }
+
+  .pane-head .bx--label {
     margin: 0;
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-02);
+  }
+
+  .actions :global(.bx--select--inline) {
+    margin-right: var(--cds-spacing-03);
   }
 
   .compiles {
@@ -318,12 +362,6 @@
 
   .compiles :global(svg) {
     fill: var(--cds-support-02);
-  }
-
-  .status {
-    margin-left: auto;
-    color: var(--cds-text-02);
-    font-variant-numeric: tabular-nums;
   }
 
   :global(.editor) {
@@ -344,6 +382,5 @@
     max-height: 36rem;
     overflow: auto;
     padding: var(--cds-spacing-05) var(--cds-spacing-05) var(--cds-spacing-07);
-    border: 1px solid var(--cds-ui-03);
   }
 </style>
