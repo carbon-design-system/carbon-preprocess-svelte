@@ -17,10 +17,15 @@ for (const [, theme = "white", body] of cssText.matchAll(ROOT_BLOCK)) {
 
 const dark = new Set(["g80", "g90", "g100"]);
 
-/** CSS for `.t-<theme>` and `[theme=<theme>]` regions. */
+/**
+ * CSS for `.t-<theme>` and `[theme=<theme>]` regions. A theme's block in
+ * all.css lists only the tokens that differ from white's, so each region
+ * gets white's full set first, then its own: a Gray 10 region inside a dark
+ * page must not inherit the page's light text.
+ */
 export const themeScopeCss = Object.entries(vars)
-  .map(
-    ([theme, decls]) =>
-      `.t-${theme},[theme="${theme}"]:not(:root){${decls.join(";")};color-scheme:${dark.has(theme) ? "dark" : "light"}}`,
-  )
+  .map(([theme, decls]) => {
+    const all = theme === "white" ? decls : [...vars.white, ...decls];
+    return `.t-${theme},[theme="${theme}"]:not(:root){${all.join(";")};color-scheme:${dark.has(theme) ? "dark" : "light"}}`;
+  })
   .join("\n");

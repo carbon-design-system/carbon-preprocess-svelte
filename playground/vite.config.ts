@@ -571,7 +571,8 @@ const shared: MarkdownOptions = {
       intro.push((tree.blocks.shift() as { text: string }).text);
     }
     if (intro.length) tree.metadata.description = intro.join(" ");
-    tree.metadata.title = path
+    // A page's `title` frontmatter, else its file name.
+    tree.metadata.title ??= path
       .basename(tree.filename ?? "")
       .replace(/\.(svx|md)$/, "");
   },

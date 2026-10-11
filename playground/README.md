@@ -12,7 +12,7 @@ bun run playground            # from the repo root: install, then `vite`
 
 It uses the installed `carbon-components-svelte`, which has no `Prose` yet:
 pages then render as plain HTML (Carbon's reset leaves them without spacing),
-the Prose options are off, and a note under the toolbar says so. To work on
+Prose's settings are off, and a notice above the page says so. To work on
 Prose, point the playground at a checkout that has it, once, in
 `playground/.env.local` (git-ignored, paths relative to `playground/`):
 
@@ -45,6 +45,9 @@ reuses the last build and install. Against a running instance:
 
 - **`pages`:** every page loads without errors, with the loading techniques
   on and off.
+- **`shell`:** side nav navigation, settings into the URL and the changed
+  tags (and back), the no-Prose notice, and axe on the header, side nav, and
+  settings panel.
 - **`code-views`:** hover cards and their underlines, the package manager
   switch, per-command copy, line links (and reloading to them), links into
   collapsed lines, Show more, file tabs and their overflow, folds, synced
@@ -61,21 +64,39 @@ reuses the last build and install. Against a running instance:
   checkout's own docs are reported, not failed. `--strict` adds implicit-any
   and null checks.
 
-## Pages and options
+## The shell
 
-Every option is in the toolbar and the URL:
+The playground is itself a Carbon app, built with carbon-components-svelte
+and the same plugins as its pages:
+
+- **UI Shell:** the header holds a light/dark switch, **About this build**
+  (the CCS in use, Prose, the page count), and **Settings**. The side nav lists
+  the pages, with the CCS checkout's docs pages in their own section.
+- **Settings** are grouped (Prose, Code, Appearance, Loading) as Carbon
+  controls: a select, a content switcher for two to four values, a toggle for
+  on/off. Settings that need Prose are off without it; loading settings reload
+  the page.
+- **Changed settings** show above the page as tags: dismiss one to reset it.
+- **One registry:** `src/shell/options.js` lists every option once (its
+  values, default, group, and control). The settings panel, the URL, the
+  tags, and the Matrix's axes all read it, so a new option is one entry plus
+  whatever applies it in `App.svelte`.
+- `?chrome=0` hides the shell, for screenshots and the tests.
+
+Every setting is in the URL, by its key:
 
 | Param | Values |
 | --- | --- |
 | `page` | `KitchenSink`, `Matrix`, `Stress`, `MountBench`, `InteractBench`, and with `CCS_DIR`, CCS docs pages |
 | `scope` | `runs`: one Prose per run of Markdown between components (`.svx`, `proseScope: "markdown"`). `page`: one Prose for the page (`.md`, a symlink) |
-| `variant` | Prose's variant: `auto`, `condensed`, `compact`, `spacious`, `expressive` |
+| `variant`, `measure`, `linkTone`, `tableWidth`, `kbd`, `dividers`, `scrollMargin` | Prose's props |
 | `theme` | `system`, `white`, `g10`, `g80`, `g90`, `g100` |
 | `codeVariant`, `terminal` | Code type apart from Prose's variant (`compact`); a theme for terminal blocks (`g100`) |
 | `syntax` | `build` (spans), `runtime` (CSS Custom Highlight API), `off` |
 | `code`, `pm` | `ts` for the TypeScript views; `pnpm`, `yarn`, `bun` for npm commands |
 | `lazy`, `cv`, `aot` | `0` turns a loading technique off, for comparison |
-| `chrome=0` | Hides the toolbar |
+| `columns`, `group` | The Matrix's axes (also on the Matrix page) |
+| `chrome=0` | Hides the shell |
 
 - **KitchenSink** shows every Markdown element and code-block feature. Its
   Button `tooltip` example is a deliberate type error.
