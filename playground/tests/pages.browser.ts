@@ -10,6 +10,7 @@ const PAGES = [
   "Stress",
   "MountBench",
   "InteractBench",
+  "BuildReport",
 ];
 
 describe("pages", () => {
@@ -58,6 +59,30 @@ describe("options gallery", () => {
     expect([await anchors(0), await anchors(1), await anchors(2)]).toEqual([
       0, 2, 1,
     ]);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+});
+
+describe("build report", () => {
+  test("lists the examples' CSS and each file's import rewrites", async () => {
+    const { page, errors } = await open(context(), "page=BuildReport");
+    const examples = page.locator("h2#css-across-the-examples ~ .table table");
+    expect(await examples.textContent()).toContain("astro");
+    expect(await examples.textContent()).toContain("+ optimizeComponents");
+    // The last build, or how to make one (a fresh checkout has none yet).
+    expect(
+      await page
+        .getByText(/optimizeComponents|No build yet/)
+        .first()
+        .isVisible(),
+    ).toBe(true);
+    const app = page.getByRole("row", { name: /src\/App\.svelte/ });
+    await app.getByRole("button").click();
+    const diff = page.locator("[data-child-row] .codeview").first();
+    expect(await diff.textContent()).toContain(
+      "carbon-components-svelte/src/UIShell/Header.svelte",
+    );
     expect(errors).toEqual([]);
     await page.close();
   });

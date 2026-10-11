@@ -1,0 +1,29 @@
+---
+title: Build report
+description: "What the build plugins do: optimizeCss across every example, this playground's last build, and optimizeImports file by file."
+examples: false
+---
+
+<script>
+  import ExamplesTable from "../report/ExamplesTable.svelte";
+  import ImportRewrites from "../report/ImportRewrites.svelte";
+  import LastBuild from "../report/LastBuild.svelte";
+</script>
+
+## CSS across the examples
+
+Each example under `examples/`, built by the e2e suite: Carbon's CSS before and after `optimizeCss`, and with `optimizeComponents` and prop-aware pruning where the example has an optimized build. From `tests/__snapshots__/e2e.json`.
+
+<ExamplesTable />
+
+## This playground's last build
+
+What `optimizeCss` and `optimizeComponents` logged, and the largest files the build wrote.
+
+<LastBuild />
+
+## Import rewrites
+
+`optimizeImports` rewrites each import from `carbon-components-svelte` and `carbon-icons-svelte` to the component's own file, so the bundler skips the barrel. Expand a file for its diff.
+
+<ImportRewrites />
