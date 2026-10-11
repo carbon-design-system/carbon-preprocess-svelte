@@ -22,6 +22,9 @@ on:
       - "examples/astro/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
+      - "scripts/wrapper-cases.ts"
+      - "scripts/golden-*.ts"
+      - "golden/**"
       - ".github/workflows/eval.yml"
   push:
     branches: [main]
@@ -41,6 +44,9 @@ on:
       - "examples/astro/**"
       - "scripts/eval-*.ts"
       - "scripts/prop-aware-cases.ts"
+      - "scripts/wrapper-cases.ts"
+      - "scripts/golden-*.ts"
+      - "golden/**"
       - ".github/workflows/eval.yml"
   workflow_dispatch:
 
@@ -136,6 +142,35 @@ jobs:
         with:
           name: specialize-svelte${{ matrix.svelte }}-unwrap-${{ matrix.unwrap }}
           path: eval.json
+
+  golden:
+    name: golden apps
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Evaluate
+        run: |
+          set -o pipefail
+          bun scripts/eval-specialize.ts --golden --json eval.json | tee eval.log
+          bun scripts/golden-report.ts | tee report.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### golden apps'
+            echo '```'
+            sed -n '/specialize accuracy/,$p' eval.log | head -30
+            echo
+            cat report.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   interactions:
     name: interactions (examples)
