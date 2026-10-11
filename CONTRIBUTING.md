@@ -47,6 +47,7 @@ bun install
 | `bun run typecheck` | `bun check` (Bun's built-in type checker) over `bench/`, `scripts/`, `src/`, `tests/`. |
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
 | `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). Set `EXAMPLES=vite,vite@svelte-5` to build (and update) only those examples. |
+| `bun run snapshots:from-ci` | When a pull request changes sizes on purpose: rewrite `e2e.json` with what CI's e2e step observed for the current commit (needs `gh`), without building the examples locally. |
 | `bun run test:fixtures:update` | Rewrite the `optimize-css` fixture baselines under [`tests/fixtures/`](tests/fixtures/optimize-css). |
 | `bun run lint` | `biome ci --error-on-warnings` (lint + format check, no write). |
 | `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
