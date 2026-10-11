@@ -52,14 +52,17 @@ reuses the last build and install. Against a running instance:
 `PLAYGROUND_URL=http://localhost:5173 bun test ./playground/tests/code-views.browser.ts`.
 
 - **`pages`:** every page loads without errors, with the loading techniques
-  on and off.
+  on and off; the options gallery's variants differ; the build report's
+  tables; the README's Markdown inside `<details>`.
 - **`shell`:** side nav navigation, settings into the URL and the changed
   tags (and back), both Reset all buttons, tall live examples scrolling in
-  their region, the no-Prose notice, and axe on the header, side nav, and
-  settings panel.
+  their region, search, previous and next, the source view, the no-Prose
+  notice, and axe on the header, side nav, and settings panel.
 - **`try`:** typing compiles (the preview, the Svelte output, the headings),
-  components as placeholders, the draft across reloads, and axe.
-- **`code-views`:** hover cards and their underlines, the package manager
+  components as placeholders, options and the compile check, the
+  sanitized preview, shared links, the draft across reloads, and axe.
+- **`code-views`:** hover cards (placed by `FloatingPortal`, following a
+  scroll) and their underlines, the package manager
   switch, per-command copy, line links (and reloading to them), links into
   collapsed lines, Show more, file tabs and their overflow, folds, synced
   groups, type error squiggles, and "Open in Svelte Playground".
@@ -67,7 +70,8 @@ reuses the last build and install. Against a running instance:
   on every line band and ANSI colors on the background at 4.5:1 or more
   (white, g10, g100; axe can't see Highlight API colors).
 - **`performance`:** no load or scroll task over 200 ms
-  (`PLAYGROUND_LONG_TASK_MS`), hover under 1 ms per pointer move.
+  (`PLAYGROUND_LONG_TASK_MS`), including opening Stress's compiled source;
+  layout shift under 0.005 on every page; hover under 1 ms per pointer move.
 - **Type-checked examples** (`bun run typecheck:examples` in this folder):
   every live and framed example's JSDoc and TypeScript views, through
   svelte-check against CCS's types. It fails on an error
@@ -88,6 +92,12 @@ and the same plugins as its pages:
   on/off. Settings that need Prose are off without it; loading settings reload
   the page.
 - **Changed settings** show above the page as tags: dismiss one to reset it.
+- **Search** (in the header) finds pages and their h2 and h3 headings, from
+  an index `markdownToHtml` builds; each page ends with previous and next
+  tiles in the side nav's order.
+- **Source view:** every Markdown page's header switches between the page,
+  its Markdown, and the Svelte `markdown()` compiles it to (through the same
+  preprocessor, with build-time token data).
 - **One registry:** `src/shell/options.js` lists every option once (its
   values, default, group, and control). The settings panel, the URL, the
   tags, and the Matrix's axes all read it, so a new option is one entry plus
@@ -106,7 +116,7 @@ Every setting is in the URL, by its key:
 
 | Param | Values |
 | --- | --- |
-| `page` | `KitchenSink`, `Try`, `Matrix`, `Stress`, `MountBench`, `InteractBench`, and with `CCS_DIR`, CCS docs pages |
+| `page` | `KitchenSink`, `Try`, `Options`, `Matrix`, `Stress`, `Readme`, `Contributing`, `PlaygroundReadme`, `MountBench`, `InteractBench`, `BuildReport`, and with `CCS_DIR`, CCS docs pages |
 | `scope` | `runs`: one Prose per run of Markdown between components (`.svx`, `proseScope: "markdown"`). `page`: one Prose for the page (`.md`, a symlink) |
 | `variant`, `measure`, `linkTone`, `tableWidth`, `kbd`, `dividers`, `scrollMargin` | Prose's props |
 | `theme` | `system`, `white`, `g10`, `g80`, `g90`, `g100` |
@@ -122,14 +132,29 @@ Every setting is in the URL, by its key:
 - **Try markdown()** compiles Markdown in the browser as you type, with
   `carbon-preprocess-svelte/code`'s `markdownToHtml` (a Prose preview, with
   placeholders for components) and `compileMarkdown` (the Svelte component
-  `markdown()` writes, and the headings and frontmatter it exports). The
-  draft stays in `LocalStorage`.
+  `markdown()` writes, and the headings and frontmatter it exports). Toggles
+  set options; Svelte's compiler (loaded with the Svelte tab) checks the
+  output. The draft stays in `LocalStorage`; **Copy link** shares it in the
+  URL, and the preview drops scripts, event handlers, and `javascript:` URLs.
+- **Options gallery** (`gallery.ts`) compiles one sample under each value of
+  eight `markdown()` options, side by side. Its components and page are
+  written at startup (git-ignored).
 - **Matrix** lays out element groups (`src/samples/*.sample`) against one
   option, each cell in its own theme.
 - **Stress** is a load and scroll fixture: one 1,600-line block and 60 small
   ones, written at startup (git-ignored).
+- **README**, **Contributing**, and **Playground README** are this repo's
+  docs through `markdown()`, written at startup (git-ignored) with their
+  relative links pointed at GitHub.
 - **MountBench** and **InteractBench** measure CCS components:
   `scripts/mount-bench.ts` and `scripts/interact-bench.ts`.
+- **Build report:** `optimizeCss` across every example (the e2e snapshot),
+  what `optimizeCss` and `optimizeComponents` logged in the last build, and
+  each file's `optimizeImports` rewrites.
+
+Generated pages (Stress, the gallery, the repo's docs) are written when the
+config loads, before any plugin runs: `optimizeComponents` lists its
+`content` in `buildStart`, which Rollup runs in parallel for every plugin.
 
 ## Code views
 
