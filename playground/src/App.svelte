@@ -16,13 +16,18 @@
     Header,
     HeaderAction,
     HeaderGlobalAction,
+    HeaderSearch,
     HeaderUtilities,
+    ClickableTile,
+    Column,
+    Grid,
     InlineNotification,
     LocalStorage,
     SideNav,
     SideNavItems,
     SideNavLink,
     SideNavMenu,
+    Row,
     SkipToContent,
     Theme,
   } from "carbon-components-svelte";
@@ -31,12 +36,14 @@
   import Code from "carbon-icons-svelte/lib/Code.svelte";
   import Dashboard from "carbon-icons-svelte/lib/Dashboard.svelte";
   import Document from "carbon-icons-svelte/lib/Document.svelte";
-  import Grid from "carbon-icons-svelte/lib/Grid.svelte";
+  import GridIcon from "carbon-icons-svelte/lib/Grid.svelte";
   import Information from "carbon-icons-svelte/lib/Information.svelte";
   import Light from "carbon-icons-svelte/lib/Light.svelte";
   import Meter from "carbon-icons-svelte/lib/Meter.svelte";
   import Settings from "carbon-icons-svelte/lib/Settings.svelte";
   import ccsPages from "virtual:ccs-pages";
+  import searchIndex from "virtual:search-index";
+  import { tick } from "svelte";
   import { clearHighlights, highlightAll } from "./highlight-dom.js";
   import Hovercard from "./intel/Hovercard.svelte";
   import Matrix from "./Matrix.svelte";
@@ -60,7 +67,7 @@
       pages: [
         { name: "KitchenSink", text: "Kitchen sink", icon: Document },
         { name: "Try", text: "Try markdown()", icon: Code },
-        { name: "Matrix", text: "Matrix", icon: Grid },
+        { name: "Matrix", text: "Matrix", icon: GridIcon },
         { name: "Stress", text: "Stress", icon: Dashboard },
       ],
     },
@@ -201,6 +208,40 @@
         ? modules[key]()
         : Promise.reject(new Error(`No page ${pageName}`));
 
+  // Search: pages and their h2 and h3 headings (virtual:search-index).
+  const ENTRIES = searchIndex.flatMap(({ page, title, headings }) => [
+    { page, title, text: title, description: "Page" },
+    ...headings.map((h) => ({ page, title, hash: h.id, text: h.text, description: title })),
+  ]);
+  let query = "";
+  $: terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  $: results = terms.length
+    ? ENTRIES.filter((e) => terms.every((t) => `${e.text} ${e.description}`.toLowerCase().includes(t)))
+        .slice(0, 12)
+        .map((e) => ({ ...e, id: `${e.page}#${e.hash ?? ""}`, href: `${queryFor({ ...state, page: e.page })}${e.hash ? `#${e.hash}` : ""}` }))
+    : [];
+
+  /** Open a page, then scroll to the heading once it has rendered. */
+  async function open(page, hash) {
+    if (state.page !== page) {
+      state.page = page;
+      window.scrollTo(0, 0);
+      await tick();
+      await loading;
+      await tick();
+    }
+    if (hash) {
+      document.getElementById(hash)?.scrollIntoView({ block: "start" });
+      history.replaceState(null, "", `${location.search}#${hash}`);
+    }
+  }
+
+  // Previous and next: the side nav's order.
+  $: order = [...NAV.flatMap((section) => section.pages.map((p) => ({ name: p.name, text: p.text }))), ...CCS_NAV.map((name) => ({ name, text: name }))];
+  $: at = order.findIndex((p) => p.name === state.page);
+  $: previous = at > 0 ? order[at - 1] : undefined;
+  $: next = at >= 0 && at < order.length - 1 ? order[at + 1] : undefined;
+
   let isSideNavOpen = false;
   let settingsOpen = false;
   let aboutOpen = false;
@@ -212,6 +253,12 @@
       <SkipToContent />
     </svelte:fragment>
     <HeaderUtilities>
+      <HeaderSearch
+        bind:value={query}
+        {results}
+        placeholder="Search pages and headings"
+        on:select={(e) => open(e.detail.selectedResult.page, e.detail.selectedResult.hash)}
+      />
       <HeaderGlobalAction
         iconDescription={isDark ? "Light theme" : "Dark theme"}
         tooltipAlignment="end"
@@ -297,9 +344,64 @@
       <InlineNotification kind="error" lowContrast hideCloseButton title="Can't load the page." subtitle={error.message} />
     {/await}
   {/if}
+
+  {#if chrome && (previous || next)}
+    <!-- In the page's grid, under its content column. -->
+    <Grid>
+      <Row>
+        <Column lg={12} md={6}>
+          <nav class="page-nav" aria-label="Previous and next pages">
+            {#if previous}
+              <ClickableTile href={queryFor({ ...state, page: previous.name })} on:click={(event) => goTo(event, previous.name)}>
+                <span class="bx--type-label-01">Previous</span>
+                <span class="bx--type-productive-heading-02">{previous.text}</span>
+              </ClickableTile>
+            {/if}
+            {#if next}
+              <ClickableTile class="next" href={queryFor({ ...state, page: next.name })} on:click={(event) => goTo(event, next.name)}>
+                <span class="bx--type-label-01">Next</span>
+                <span class="bx--type-productive-heading-02">{next.text}</span>
+              </ClickableTile>
+            {/if}
+          </nav>
+        </Column>
+      </Row>
+    </Grid>
+  {/if}
 </Content>
 
 <style>
+  /* Previous and next, as Carbon's docs end a page: two tiles, next on the right. */
+  .page-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    margin: var(--cds-spacing-10) 0 var(--cds-spacing-07);
+  }
+
+  /* Results name their page as written ("Kitchen sink"), not lowercased. */
+  :global(.bx--header-search-menu-description) {
+    text-transform: none;
+  }
+
+  /* A linked heading clears the 48px header. Zero specificity past [id],
+     so Prose's own scroll margin (a setting) wins where there's Prose. */
+  :global(:where(.bx--content.with-shell) :where(h1, h2, h3, h4)[id]) {
+    scroll-margin-top: calc(3rem + var(--cds-spacing-05));
+  }
+
+  .page-nav :global(.bx--tile) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cds-spacing-02);
+  }
+
+  .page-nav :global(.next) {
+    grid-column: 2;
+    align-items: flex-end;
+    text-align: end;
+  }
+
   /* Section labels in the side nav, in Carbon's sentence case. */
   .nav-label {
     margin: 0 var(--cds-spacing-05);
