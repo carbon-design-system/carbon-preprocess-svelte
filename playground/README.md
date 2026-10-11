@@ -10,12 +10,19 @@ snapshot) and runs its browser tests.
 bun run playground            # from the repo root: install, then `vite`
 ```
 
-It uses the installed `carbon-components-svelte`. To try unreleased CCS work,
-such as Prose, point it at a checkout:
+It uses the installed `carbon-components-svelte`, which has no `Prose` yet:
+pages then render as plain HTML (Carbon's reset leaves them without spacing),
+the Prose options are off, and a note under the toolbar says so. To work on
+Prose, point the playground at a checkout that has it, once, in
+`playground/.env.local` (git-ignored, paths relative to `playground/`):
 
 ```sh
-CCS_DIR=../carbon-components-svelte bun run playground
+CCS_DIR=../../carbon-components-svelte
 ```
+
+or for one run: `CCS_DIR=../carbon-components-svelte bun run playground`. The
+tests and the e2e build ignore `.env.local` (set `CCS_DIR` in the environment
+to test against a checkout).
 
 With `CCS_DIR`, the app also lists the checkout's docs pages (`CCS_PAGES`,
 default `ComboBox,Form,FloatingPortal,Prose,SessionStorage`), renders their

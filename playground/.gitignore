@@ -6,3 +6,5 @@ src/pages/Stress.svx
 .typecheck
 # Screenshot output (scripts/screenshot.ts).
 screenshots
+# Local settings, such as CCS_DIR (see README).
+.env.local

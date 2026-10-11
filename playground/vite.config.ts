@@ -34,13 +34,21 @@ import {
   terminalLines,
 } from "carbon-preprocess-svelte";
 import { sveld } from "sveld";
+import { loadEnv } from "vite";
 import { analyze } from "./src/intel/analyze.js";
 import { toJSDoc, toTypeScript } from "./src/intel/typescript.js";
 
 const HERE = import.meta.dirname;
-const CCS_DIR = process.env.CCS_DIR
-  ? path.resolve(process.env.CCS_DIR)
-  : undefined;
+// `CCS_DIR` from the environment, else from `playground/.env.local`
+// (git-ignored, relative to the playground), so a checkout sticks. An empty
+// `CCS_DIR` in the environment means the installed package, whatever the
+// file says: the tests and e2e builds set it.
+const LOCAL_ENV = loadEnv("", HERE, "");
+const CCS_DIR_SETTING =
+  process.env.CCS_DIR !== undefined
+    ? process.env.CCS_DIR && path.resolve(process.env.CCS_DIR)
+    : LOCAL_ENV.CCS_DIR && path.resolve(HERE, LOCAL_ENV.CCS_DIR);
+const CCS_DIR = CCS_DIR_SETTING || undefined;
 const CCS = CCS_DIR ?? path.join(HERE, "node_modules/carbon-components-svelte");
 // A checkout's docs: pages, framed example sources, and COMPONENT_API.json.
 const DOCS =
@@ -50,8 +58,13 @@ const DOCS =
 const HAS_PROSE = existsSync(path.join(CCS, "src/Prose/Prose.svelte"));
 // The checkout's docs pages to list (each must build on its own).
 const CCS_PAGES = (
-  process.env.CCS_PAGES ?? "ComboBox,Form,FloatingPortal,Prose,SessionStorage"
+  process.env.CCS_PAGES ??
+  LOCAL_ENV.CCS_PAGES ??
+  "ComboBox,Form,FloatingPortal,Prose,SessionStorage"
 ).split(",");
+const CCS_VERSION: string = JSON.parse(
+  readFileSync(path.join(CCS, "package.json"), "utf8"),
+).version;
 const FILE_SOURCE_SRC = /src="([^"]+)"/;
 const DOCS_ONLY =
   /^[ \t]*(?:\/\/|<!--)[ \t]*docs-only:start\b[\s\S]*?^[ \t]*(?:\/\/|<!--)[ \t]*docs-only:end\b.*(?:\r?\n|$)/gm;
@@ -637,6 +650,13 @@ export default {
     stressPage(),
     ccsPages(),
   ],
+  // What the app shows about the CCS in use (a banner when it has no Prose).
+  define: {
+    __PLAYGROUND__: JSON.stringify({
+      prose: HAS_PROSE,
+      ccs: CCS_DIR ?? `carbon-components-svelte@${CCS_VERSION} (installed)`,
+    }),
+  },
   // Every Carbon component, every page: big chunks are expected here.
   build: { chunkSizeWarningLimit: 4000 },
   resolve: {
