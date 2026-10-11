@@ -1,0 +1,628 @@
+---
+description: Every construct markdown() renders, in one page, for checking Prose's type, spacing, and themes.
+---
+
+<script>
+  import { Button, ComboBox, InlineLoading, Stack, Tag } from "carbon-components-svelte";
+  import Add from "carbon-icons-svelte/lib/Add.svelte";
+
+  let count = 0;
+
+  const regions = [
+    { id: "us-south", text: "Dallas" },
+    { id: "eu-de", text: "Frankfurt" },
+    { id: "jp-tok", text: "Tokyo", disabled: true },
+  ];
+
+  let selectedId = "us-south";
+  let status = "";
+
+  $: selected = regions.find((region) => region.id === selectedId);
+
+  function filterRegions(item, value) {
+    return item.text.toLowerCase().includes(value.toLowerCase());
+  }
+
+  function handleSelect(event) {
+    status = `Deploying to ${event.detail.selectedItem.text}`;
+  }
+</script>
+
+## Running copy
+
+Prose sets body copy at a comfortable measure. This paragraph is long enough to wrap several times, so you can judge line length, line height, and the space between paragraphs. It mixes *emphasis*, **strong text**, ***both at once***, ~~strikethrough~~, and `inline code` in the middle of a sentence.
+
+A second paragraph follows, with links of every kind: an [inline link](https://carbondesignsystem.com "Carbon Design System"), a [reference link][carbon], a [collapsed reference][], an autolink <https://svelte.dev>, and a link wrapping code: [`TableOfContents`](#tables). Press <DocKbd label="Ctrl" /> + <DocKbd label="K" /> to search, or <DocKbd label="Escape" /> to close.
+
+Inline code next to punctuation: (`value`), "`key`", `a`/`b`, and `selectedIds`. Braces stay literal: `{ id, text }` in code and { id, text } in prose. Escapes: \*not emphasis\*, \`not code\`, and a literal \\ backslash.
+
+Bare URLs link themselves: https://carbondesignsystem.com and www.svelte.dev, and so do emails like team@example.com, but a version like carbon-components-svelte@0.113.1 stays text. Footnotes collect at the end of the page.[^prose] A second reference reuses its number.[^prose] Another note.[^svelte]
+
+[^prose]: Prose styles the plain HTML that `markdown()` renders.
+[^svelte]: Svelte markup passes through as written.
+
+A line with a hard break at the end  
+continues on the next line, and this one has a backslash break\
+too.
+
+[carbon]: https://carbondesignsystem.com
+[collapsed reference]: https://github.com/carbon-design-system/carbon-components-svelte
+
+## Keyboard keys
+
+Keys sit inside running copy without pushing lines apart. Open the command palette with <DocKbd label="Ctrl" /> + <DocKbd label="Shift" /> + <DocKbd label="P" />, type to filter, then use <DocKbd label="ArrowDown" /> and <DocKbd label="ArrowUp" /> to move through the results. <DocKbd label="Enter" /> runs the highlighted command and <DocKbd label="Escape" /> closes the palette. On a Mac, use <DocKbd label="Cmd" /> instead of <DocKbd label="Ctrl" />, and <DocKbd label="Option" /> instead of <DocKbd label="Alt" />.
+
+The same paragraph without keys, for comparing line spacing: open the command palette with Ctrl + Shift + P, type to filter, then use ArrowDown and ArrowUp to move through the results. Enter runs the highlighted command and Escape closes the palette. On a Mac, use Cmd instead of Ctrl, and Option instead of Alt.
+
+## Headings
+
+The page title is the `h1`. Below are the levels Markdown pages use.
+
+### Third level heading
+
+Copy under a third level heading.
+
+#### Fourth level heading
+
+Copy under a fourth level heading.
+
+##### Fifth level heading
+
+Copy under a fifth level heading.
+
+###### Sixth level heading
+
+Copy under a sixth level heading.
+
+### Heading with `code` and a [link](#headings)
+
+A heading can hold inline markup; its id and the `headings` export use the plain text.
+
+## Lists
+
+An unordered list, tight:
+
+- Create a project
+- Generate an API key
+  - Scope it to one environment
+  - Rotate it every 90 days
+- Install the CLI
+
+An ordered list that starts at 3, loose:
+
+3. Scale `replicas` to `0`.
+
+4. Delete the service. This item is long enough to wrap, so you can see how a wrapped line aligns with the text above it rather than the marker.
+
+5. Revoke the API key.
+
+A task list:
+
+- [x] Write the guide
+- [x] Add the examples
+- [ ] Review with the team
+- [ ] Publish
+
+Mixed nesting:
+
+1. Configure the service
+   - `name`, required
+   - `region`, defaults to `us-south`
+2. Deploy it
+
+   ```sh
+   acme deploy --project my-app
+   ```
+
+3. Verify the deployment
+
+## Quotes and alerts
+
+> A plain blockquote. Use it for quotations, not for notices.
+>
+> It can span paragraphs, and hold `code` and **emphasis**.
+>
+> > A nested quote.
+
+> [!NOTE]
+> Keys are scoped to one project.
+
+> [!TIP]
+> Use one key per environment, so revoking one doesn't break the others.
+
+> [!IMPORTANT]
+> Regions can't be changed after you create a project.
+
+> [!WARNING]
+> Requests over the limit return `429`. Retry with backoff.
+
+> [!CAUTION]
+> Revoking a key breaks every client that uses it.
+>
+> This alert has a second paragraph.
+
+## Tables
+
+| Setting | Type | Default | Notes |
+| :-- | :-- | :-: | --: |
+| `name` | `string` | — | **Required** |
+| `region` | `"us-south" \| "eu-de"` | `"us-south"` | Closest to most users |
+| `replicas` | `number` | `2` | Scale with traffic |
+| `labels` | `Record<string, string>` | `{}` | Shown in the [dashboard](#tables) |
+
+A narrow table:
+
+| Key | Action |
+| --- | --- |
+| <DocKbd label="Enter" /> | Select |
+| <DocKbd label="Escape" /> | Close |
+
+## Code
+
+A JavaScript block:
+
+```js
+export default {
+  port: Number(process.env.PORT ?? 8080),
+  env: { LOG_LEVEL: process.env.LOG_LEVEL ?? "info" },
+};
+```
+
+A Svelte block with a long line, to check horizontal scrolling:
+
+```svelte
+<script>
+  import { Button } from "carbon-components-svelte";
+</script>
+
+<Button kind="primary" size="field" icon={Add} iconDescription="Add a new item to the list" on:click={() => (open = true)}>Add item</Button>
+```
+
+A shell block:
+
+```sh
+bun add -d carbon-preprocess-svelte
+```
+
+## Code features
+
+Fence metadata and inline markers, in the syntaxes Docusaurus, VitePress, and Expressive Code use.
+
+Highlighted lines and a file name: `title="…" {6-9,16}`.
+
+```svelte title="RegionPicker.svelte" {6-9,16}
+<script>
+  import { ComboBox } from "carbon-components-svelte";
+
+  export let regions = [];
+
+  /** Match anywhere in the name, ignoring case. */
+  function shouldFilterItem(item, value) {
+    return item.text.toLowerCase().includes(value.toLowerCase());
+  }
+</script>
+
+<ComboBox
+  labelText="Region"
+  placeholder="Select a region"
+  items={regions}
+  {shouldFilterItem}
+/>
+```
+
+A change, marked with `// [!code ++]` and `// [!code --]` at line ends:
+
+```js title="svelte.config.js"
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import { optimizeImports } from "carbon-preprocess-svelte"; // [!code --]
+import { markdown, optimizeImports } from "carbon-preprocess-svelte"; // [!code ++]
+
+export default {
+  extensions: [".svelte", ".md"], // [!code ++]
+  preprocess: [vitePreprocess(), optimizeImports()], // [!code --]
+  preprocess: [markdown(), vitePreprocess(), optimizeImports()], // [!code ++]
+};
+```
+
+Focus on the lines that matter; the rest recede until you point at the block: `focus={14-18}`.
+
+```svelte focus={14-18}
+<script>
+  import {
+    DataTable,
+    Toolbar,
+    ToolbarContent,
+    ToolbarSearch,
+  } from "carbon-components-svelte";
+
+  export let headers = [];
+  export let rows = [];
+</script>
+
+<DataTable {headers} {rows}>
+  <Toolbar>
+    <ToolbarContent>
+      <ToolbarSearch persistent shouldFilterRows />
+    </ToolbarContent>
+  </Toolbar>
+</DataTable>
+```
+
+Line numbers, starting where an excerpt starts: `showLineNumbers=12`. Marks still count from the block's first line: `{3-6}`. Click a number to copy a link to the line; shift-click another for a range.
+
+```js showLineNumbers=12 {3-6}
+export function formatBytes(bytes) {
+  const units = ["B", "KB", "MB", "GB"];
+  const exponent = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  const value = bytes / 1024 ** exponent;
+  return `${value.toFixed(1)} ${units[exponent]}`;
+}
+```
+
+A terminal session: `$ ` lines are commands, the rest is output. Copy takes the commands only, and each command has its own copy button on hover.
+
+```sh
+$ bun add -d carbon-preprocess-svelte
+bun add v1.3.0
+
+installed carbon-preprocess-svelte@0.11.49
+
+1 package installed [412.00ms]
+$ bun run dev
+
+  VITE v7.1.0  ready in 386 ms
+
+  ➜  Local:   http://localhost:5173/
+```
+
+A command continued with `\` copies as one command:
+
+```sh
+$ npx sv create my-app \
+    --template minimal \
+    --types ts
+$ cd my-app
+```
+
+npm commands come in every package manager. The choice applies to every block on the page, and the URL keeps it (`?pm=bun`).
+
+```sh
+npm install -D carbon-preprocess-svelte
+npm run dev -- --open
+```
+
+Files that belong together, as tabs: `::: code-group`, with each file named by `[label]` or `title="…"`.
+
+::: code-group
+
+```svelte [+page.svelte]
+<script>
+  import RegionPicker from "$lib/RegionPicker.svelte";
+  import { regions } from "./regions.js";
+</script>
+
+<RegionPicker {regions} />
+```
+
+```js [regions.js]
+export const regions = [
+  { id: "us-south", text: "Dallas" },
+  { id: "eu-de", text: "Frankfurt" },
+  { id: "jp-tok", text: "Tokyo" },
+];
+```
+
+```js title="svelte.config.js"
+import { markdown, optimizeImports } from "carbon-preprocess-svelte";
+
+export default {
+  extensions: [".svelte", ".md"],
+  preprocess: [markdown(), optimizeImports()],
+};
+```
+
+:::
+
+Many files: the tabs scroll sideways, the selected one stays in view, and arrows at the edges show there's more.
+
+::: code-group
+
+```svelte [src/routes/+layout.svelte]
+<slot />
+```
+
+```svelte [src/routes/+page.svelte]
+<h1>Regions</h1>
+```
+
+```js [src/routes/+page.js]
+export const load = () => ({ regions: [] });
+```
+
+```svelte [src/lib/RegionPicker.svelte]
+<ComboBox labelText="Region" items={regions} />
+```
+
+```svelte [src/lib/RegionTable.svelte]
+<DataTable {headers} rows={regions} />
+```
+
+```js [src/lib/regions.js]
+export const regions = [];
+```
+
+```js [src/lib/format-bytes.js]
+export const formatBytes = (n) => `${n} B`;
+```
+
+```json [package.json]
+{ "name": "regions", "private": true }
+```
+
+```js [svelte.config.js]
+export default { extensions: [".svelte", ".md"] };
+```
+
+```js [vite.config.js]
+export default { server: { port: 5173 } };
+```
+
+:::
+
+A long block collapses past 15 lines, as Carbon's CodeSnippet does. Find in page still finds the hidden lines, and opens the block.
+
+```svelte
+<script>
+  import { Button, Modal, TextInput } from "carbon-components-svelte";
+
+  let open = false;
+  let name = "";
+
+  function submit() {
+    open = false;
+    name = "";
+  }
+</script>
+
+<Button on:click={() => (open = true)}>Rename project</Button>
+
+<Modal
+  bind:open
+  modalHeading="Rename project"
+  primaryButtonText="Rename"
+  primaryButtonDisabled={!name}
+  secondaryButtonText="Cancel"
+  on:click:button--secondary={() => (open = false)}
+  on:submit={submit}
+>
+  <TextInput labelText="Project name" bind:value={name} />
+</Modal>
+```
+
+Soft wrap for long lines: `wrap`.
+
+```js wrap
+export const description = "Combo boxes pair a text input with a list of options, so people can filter a long list by typing or pick from it directly.";
+```
+
+---
+
+Above is a thematic break.
+
+## Code folds, diffs, and synced tabs
+
+Boilerplate folds away, `collapse={2-9}`, so the lines that matter come first. The fold opens without JavaScript in plain output, and copy takes everything.
+
+```svelte collapse={2-9} {14}
+<script>
+  import { ComboBox } from "carbon-components-svelte";
+
+  const regions = [
+    { id: "us-south", text: "Dallas" },
+    { id: "us-east", text: "Washington DC" },
+    { id: "eu-de", text: "Frankfurt" },
+    { id: "jp-tok", text: "Tokyo" },
+  ];
+</script>
+
+<ComboBox
+  labelText="Region"
+  shouldFilterItem={(item, value) => item.text.toLowerCase().includes(value.toLowerCase())}
+  items={regions}
+/>
+```
+
+A diff, as `git diff` prints it: ` ```diff-svelte `. The `+` and `-` columns become added and removed lines, and the rest is highlighted as Svelte.
+
+```diff-svelte
+@@ -1,5 +1,5 @@
+ <script>
+   import { ComboBox } from "carbon-components-svelte";
+-  let selectedIndex = 0;
++  let selectedId = "us-south";
+ </script>
+-<ComboBox {items} bind:selectedIndex />
++<ComboBox {items} bind:selectedId />
+```
+
+Tabs that sync: every `::: code-group group="svelte"` on the page (and the next visit) shows the version you picked.
+
+::: code-group group="svelte"
+
+```svelte [Svelte 5]
+<Button onclick={() => count++}>Clicked {count} times</Button>
+```
+
+```svelte [Svelte 4]
+<Button on:click={() => count++}>Clicked {count} times</Button>
+```
+
+:::
+
+The same group, further down: pick "Svelte 4" above and this one follows.
+
+::: code-group group="svelte"
+
+```svelte [Svelte 5]
+<script>
+  let { open = $bindable(false) } = $props();
+</script>
+
+<Modal bind:open modalHeading="Rename project" />
+```
+
+```svelte [Svelte 4]
+<script>
+  export let open = false;
+</script>
+
+<Modal bind:open modalHeading="Rename project" />
+```
+
+:::
+
+## Code status, themes, and output
+
+Every header gets an icon: the file's, from its name (`App.svelte`, `package.json`), else the language's. Carbon icons by default; a site can add its own.
+
+A status, from `kind="error"`, `warning`, `success`, or `info`, with an optional `label`:
+
+```js title="legacy.js" kind="warning" label="Deprecated"
+import { Search } from "carbon-components-svelte/src/Search";
+```
+
+A status with no file name: the language and the status.
+
+```js kind="warning" label="Deprecated"
+import Search from "carbon-components-svelte/src/Search/Search.svelte";
+```
+
+An icon and no name, `iconOnly`: the name stays for screen readers and as a tooltip.
+
+```svelte iconOnly
+<Tag type="green">Passing</Tag>
+```
+
+With a status too:
+
+```sh iconOnly kind="error" label="Fails on Windows"
+rm -rf node_modules && bun install
+```
+
+`dont` and `do` label the pair, and `::: compare` sets them side by side when there's room. A `dont` block has no copy button.
+
+::: compare
+
+```svelte dont
+<Button on:click={save}><Save /></Button>
+```
+
+```svelte do
+<Button icon={Save} iconDescription="Save" on:click={save} />
+```
+
+:::
+
+A block in its own theme, `theme="g100"`. Terminal sessions follow the toolbar's terminal setting.
+
+```sh theme="g100"
+$ bun run build
+vite v7.1.0 building for production...
+✓ 412 modules transformed.
+```
+
+Compact type and spacing for one block, `variant="compact"`; the toolbar's "Code" setting does it for every block.
+
+```js variant="compact" title="ports.js"
+export const ports = { dev: 5173, preview: 4173 };
+```
+
+Test output in its ANSI colors, mapped to theme tokens:
+
+```sh
+$ bun test
+[1mtests/markdown.test.ts:[0m
+[32m✓[0m renders headings [2m[0.42ms][0m
+[32m✓[0m renders lists [2m[0.18ms][0m
+[31m✗[0m renders tables [2m[1.03ms][0m
+  [31mExpected:[0m [32m"<table>"[0m
+  [31mReceived:[0m [31m"<p>"[0m
+
+ [32m2 pass[0m
+ [31m1 fail[0m
+```
+
+An `ansi` block takes the escapes as typed (`\e[31m`), and adapts 256-color and truecolor values to the theme: the hue stays, the lightness changes.
+
+```ansi
+\e[1mBuild summary\e[0m
+\e[38;5;208m⚠ 2 warnings\e[0m  \e[38;2;255;221;0mbundle 412 kB (limit 400 kB)\e[0m
+\e[38;2;120;200;255mℹ info\e[0m  \e[38;5;141mtree-shaken 38 modules\e[0m  \e[48;2;0;120;60m\e[97m PASS \e[0m
+```
+
+## HTML in Markdown
+
+<details>
+  <summary>Details and summary</summary>
+  <p>Hidden content, revealed on click.</p>
+</details>
+
+<dl>
+  <dt>Term</dt>
+  <dd>The definition of the term.</dd>
+  <dt>Another term</dt>
+  <dd>Its definition.</dd>
+</dl>
+
+<figure>
+  <svg viewBox="0 0 640 160" width="100%" role="img" aria-label="Placeholder figure"><rect width="640" height="160" fill="var(--cds-ui-03)" /></svg>
+  <figcaption>A figure with a caption.</figcaption>
+</figure>
+
+## Live components
+
+A component block, with a blank line inside it:
+
+<Stack orientation="horizontal" gap={4}>
+  <Button on:click={() => count++}>Increment</Button>
+
+  <Button kind="ghost" on:click={() => (count = 0)}>Reset</Button>
+</Stack>
+
+{#if count > 0}
+<p>Clicked {count} {count === 1 ? "time" : "times"}.</p>
+{/if}
+
+A ComboBox with state, a callback prop, and a typed event. Hover anything in the code. The JS view types it with JSDoc; switch to TS for the same types as annotations.
+
+<ComboBox
+  labelText="Region"
+  placeholder="Choose a region"
+  items={regions}
+  bind:selectedId
+  shouldFilterItem={filterRegions}
+  on:select={handleSelect}
+  on:clear={() => (status = "")}
+/>
+<p>{status || `Selected: ${selected?.text ?? "none"}`}</p>
+
+A prop that isn't in the component's API, passed through to the element:
+
+<Button kind="tertiary" icon={Add} tooltip="Add a region" on:click={(event) => (count += event.shiftKey ? 10 : 1)}>Add region ({count})</Button>
+
+Components inline in copy: the build is <Tag size="sm" type="green">passing</Tag> and the deploy is running.
+
+<InlineLoading description="Deploying…" />
+
+## Framed example
+
+<FileSource src="/framed/KitchenSink/Placeholder" />
+
+The paragraph after a framed example.
+
+A framed example that imports a local module: the module becomes a second file tab, with no extra markup.
+
+<FileSource src="/framed/KitchenSink/RegionTable" />

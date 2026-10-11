@@ -1,0 +1,39 @@
+Inline `code`, then a block:
+
+```js
+export default { port: 8080, env: { LOG_LEVEL: "info" } };
+```
+
+With a title, a highlighted line, and a change:
+
+```js title="vite.config.js" {4} showLineNumbers
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+
+export default {
+  plugins: [svelte({ preprocess: [markdown()] })],
+  server: { port: 8080 }, // [!code --]
+  server: { port: 5173 }, // [!code ++]
+};
+```
+
+```sh
+$ bun run build
+✓ built in 1.2s
+```
+
+A fold and a diff:
+
+```js showLineNumbers collapse={2-4}
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { markdown } from "carbon-preprocess-svelte";
+import { optimizeImports } from "carbon-preprocess-svelte";
+import path from "node:path";
+
+export default { plugins: [svelte()] };
+```
+
+```diff-js
+@@ -1 +1 @@
+-export default { port: 8080 };
++export default { port: 5173 };
+```

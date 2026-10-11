@@ -37,3 +37,10 @@ jobs:
           name: e2e-snapshots
           path: e2e-observed.json
           if-no-files-found: ignore
+
+      # The playground: the preprocessor's docs-site testbed, in a browser.
+      - name: Install Chromium for Playwright
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run playground tests
+        run: bun run test:playground

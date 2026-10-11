@@ -1,0 +1,72 @@
+/* A stand-in for the docs' Preview: a bordered live-example region. */
+.example {
+  /* The Prose measure: 68ch of default body copy, or the chosen width. */
+  max-width: var(--demo-measure, 40.75rem);
+  padding: var(--cds-spacing-06);
+  border: 1px solid var(--cds-ui-03);
+}
+
+.example.frame {
+  display: grid;
+  min-height: 7rem;
+  place-items: center;
+  background: var(--cds-ui-01);
+  color: var(--cds-text-02);
+}
+
+.example.frame span {
+  font:
+    0.75rem / 1 "IBM Plex Mono",
+    monospace;
+}
+
+/*
+ * Everything else the preview used to prototype (structural spacing, link
+ * tone, table edges and width, keycaps, footnotes) now ships in Prose and
+ * is set through its props.
+ */
+
+/* Forced link states for the matrix: these mirror Prose's own rules. */
+.bx--prose a.force-hover {
+  color: var(--cds-hover-primary-text);
+}
+
+.bx--prose--link-muted a.force-hover {
+  color: var(--cds-link-01);
+}
+
+.bx--prose a.force-focus {
+  outline: 1px solid var(--cds-focus);
+}
+
+/* Code views: symbols with a hover card get a quiet dotted underline from
+   the start, so the affordance is visible before anyone points; the token
+   under the pointer gets a solid one, and its related tokens a band. */
+::highlight(intel-available) {
+  text-decoration: underline dotted var(--cds-text-helper);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* Type errors from typecheck-examples.ts: a wavy underline, as editors draw them. */
+::highlight(type-error) {
+  text-decoration: underline wavy var(--cds-support-01);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+::highlight(type-warning) {
+  text-decoration: underline wavy var(--cds-support-03);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+::highlight(intel-related) {
+  background-color: var(--cds-highlight);
+}
+
+::highlight(intel-hover) {
+  text-decoration: underline solid var(--cds-text-02);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
