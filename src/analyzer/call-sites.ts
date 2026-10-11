@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
 import type { AST, Expression } from "sveast/walk";
@@ -33,14 +34,28 @@ export type CarbonComponents = Map<string, string>;
 
 const SRC_PREFIX = `${CarbonSvelte.Components}/src/`;
 
+const componentsCache = new Map<
+  string,
+  { mtimeMs: number; components: CarbonComponents }
+>();
+
+/**
+ * Carbon's exported components. Cached by the modification time of its
+ * `src/index.js`, so a linked Carbon checkout edited between
+ * `vite build --watch` rebuilds is read again.
+ */
 export function readCarbonComponents(carbonRoot: string): CarbonComponents {
+  const { mtimeMs } = statSync(path.join(carbonRoot, "src", "index.js"));
+  const cached = componentsCache.get(carbonRoot);
+  if (cached?.mtimeMs === mtimeMs) return new Map(cached.components);
   const components: CarbonComponents = new Map();
   for (const [name, target] of readCarbonExports(carbonRoot)) {
     if (target.name === "default" && target.path.endsWith(".svelte")) {
       components.set(name, target.path.slice(SRC_PREFIX.length));
     }
   }
-  return components;
+  componentsCache.set(carbonRoot, { mtimeMs, components });
+  return new Map(components);
 }
 
 /** What one app module contributes to the analysis. */
