@@ -24,6 +24,10 @@ bun scripts/eval-interactions.ts --examples golden/admin-dashboard
 bun scripts/golden-report.ts [--only admin-dashboard] [--full]
 ```
 
+Their built CSS and JS sizes, per variant, are snapshotted in
+`tests/golden-sizes.test.ts`; update them with
+`bun test tests/golden-sizes.test.ts --update-snapshots`.
+
 They compile with this repo's Svelte 5, so they're not built for
 Svelte 3 or 4. Add an app as `golden/<name>/` with an `index.html`,
 `src/main.ts` mounting `src/App.svelte`, and its steps in
