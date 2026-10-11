@@ -141,8 +141,13 @@ type Outcome = {
   todayBytes?: number;
   propAwareBytes?: number;
   lost?: string[];
+  /** Rendered selectors default pruning (no `propAware`) removed. */
+  defaultLost?: string[];
   error?: string;
 };
+
+/** Every selector in the full stylesheet: what default pruning starts from. */
+const fullSelectors = selectors(css);
 
 const outcomes: Outcome[] = [];
 let n = 0;
@@ -212,6 +217,18 @@ for (const testCase of cases) {
     propAware: args.control ? { ...result, isPruned: () => true } : result,
   }).css;
 
+  // Default pruning must keep every rule the app's rendered classes match.
+  const defaultLost: string[] = [];
+  for (const [selector, classes] of fullSelectors) {
+    if (
+      classes.length > 0 &&
+      classes.every((cls) => rendered.has(cls)) &&
+      !today.selectors.has(selector)
+    ) {
+      defaultLost.push(selector);
+    }
+  }
+
   const kept = selectors(propAware);
   const lost: string[] = [];
   for (const [selector, classes] of today.selectors) {
@@ -229,6 +246,7 @@ for (const testCase of cases) {
     todayBytes: Buffer.byteLength(today.css),
     propAwareBytes: Buffer.byteLength(propAware),
     lost: lost.length > 0 ? lost : undefined,
+    defaultLost: defaultLost.length > 0 ? defaultLost : undefined,
   });
   if (n % 100 === 0) {
     console.log(
@@ -257,6 +275,7 @@ prop-aware accuracy (${names.size} components, ${cases.length} apps, ${((perform
   UNSOUND         ${count("unsound")}
   render error    ${count("render-error")}  (app didn't SSR; not evaluated)
   analysis error  ${count("analysis-error")}
+  default pruning lost a rendered selector in ${outcomes.filter((o) => o.defaultLost).length} apps
 
   CSS vs today (sound + unsound apps)
     median saving   ${pct(quantile(0.5))}   p10 ${pct(quantile(0.1))}   p90 ${pct(quantile(0.9))}
@@ -269,6 +288,13 @@ if (unsound.length > 0) {
   );
   for (const o of unsound.slice(0, 50))
     console.log(`  ${o.id}\n    ${o.lost?.join(" ")}`);
+}
+
+const defaultUnsound = outcomes.filter((o) => o.defaultLost);
+if (defaultUnsound.length > 0) {
+  console.log("\nDefault pruning removed selectors matching rendered classes:");
+  for (const o of defaultUnsound.slice(0, 50))
+    console.log(`  ${o.id}\n    ${o.defaultLost?.join(" ")}`);
 }
 
 const renderErrors = outcomes.filter((o) => o.status === "render-error");
@@ -288,4 +314,4 @@ if (args.json) {
   console.log(`\nWrote ${args.json}`);
 }
 
-process.exit(unsound.length > 0 ? 1 : 0);
+process.exit(unsound.length > 0 || defaultUnsound.length > 0 ? 1 : 0);
