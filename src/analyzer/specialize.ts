@@ -56,6 +56,8 @@ type Edit = {
   start: number;
   end: number;
   print: (rewrite: Rewrite) => MappedText | string;
+  /** Only silences a warning: not counted as an edit. */
+  silences?: boolean;
 };
 
 /** TypeScript nodes that hold a value; every other `TS*` node is a type. */
@@ -682,6 +684,25 @@ export function specializeComponent(
     if (node) visit(node as Node, null, field);
   }
 
+  // Markup the edits remove can leave a selector in the component's own
+  // `<style>` unused. The mark goes right after the last markup, not
+  // before `<style>`: Svelte 3/4 would then render the whitespace between
+  // them. Only where `<style>` comes last, for the same reason.
+  const { css } = ast as { css?: { start: number } | null };
+  const lastMarkup = ast.fragment.nodes
+    .filter(
+      (node) => !(node.type === "Text" && ONLY_WHITESPACE.test(node.data)),
+    )
+    .at(-1);
+  if (css && lastMarkup && lastMarkup.end <= css.start && edits.length > 0) {
+    edits.push({
+      start: lastMarkup.end,
+      end: lastMarkup.end,
+      print: () => IGNORE_UNUSED_CSS,
+      silences: true,
+    });
+  }
+
   // Outermost edit wins; an edit's printer rewrites what's inside it.
   const sorted = [...edits]
     .sort((a, b) => a.start - b.start || b.end - a.end)
@@ -694,7 +715,7 @@ export function specializeComponent(
       if (edit.start < cursor || edit.end > end || edit.start >= end) continue;
       parts.push(sliceOf(code, cursor, edit.start), edit.print(rewrite));
       cursor = edit.end;
-      applied++;
+      if (!edit.silences) applied++;
     }
     parts.push(sliceOf(code, cursor, end));
     return concat(...parts);
@@ -861,6 +882,10 @@ function isDeclaredName(parent: Node | null, key: string | null): boolean {
       return false;
   }
 }
+
+/** Above `<style>`: Svelte 3/4 read the first code, Svelte 5 the second. */
+const IGNORE_UNUSED_CSS =
+  "<!-- svelte-ignore css-unused-selector css_unused_selector -->";
 
 const IGNORE_UNUSED_PROP =
   "// svelte-ignore unused-export-let export_let_unused\n  ";

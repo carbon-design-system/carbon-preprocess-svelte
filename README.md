@@ -452,7 +452,7 @@ Across 2,416 apps covering every Carbon component and prop value, it left 36% le
 
 #### `optimizeComponents`
 
-Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). It's the JavaScript counterpart of prop-aware pruning, using the same analysis.
+Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). Your own wrapper components are rewritten the same way when every place that renders them is in `content`. It's the JavaScript counterpart of prop-aware pruning, using the same analysis.
 
 ```js
 // vite.config.js
@@ -513,8 +513,9 @@ It skips dev servers because it analyzes the whole app up front, dev rebuilds of
 - **Fails the build instead of shipping wrong code** if a module outside `content` imports a Carbon component, or a wrapper whose props were read from its call sites.
 - **SvelteKit and Astro:** the server and client builds are rewritten alike, so prerendered pages hydrate as before.
 - **Watch mode:** a rebuild reanalyzes `content` only when a file in it changed.
-- **Source maps** point devtools and stack traces at Carbon's original source.
-- **Same output:** across every Carbon component and prop value, the rewritten components render identical HTML on Svelte 3, 4 and 5, and every example's optimized build renders the same DOM and pixels through scripted clicks, menus, modals and tooltips.
+- **Source maps** point devtools and stack traces at the original source.
+- **Your wrappers' styles:** a selector only a removed branch could match no longer warns as unused.
+- **Same output:** across every Carbon component and prop value, and generated apps that render Carbon through their own wrappers, the rewritten components render identical HTML on Svelte 3, 4 and 5, and every example's optimized build renders the same DOM and pixels through scripted clicks, menus, modals and tooltips.
 
 JavaScript removed in the examples:
 

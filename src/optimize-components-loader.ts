@@ -10,7 +10,7 @@ type LoaderContext = {
 
 /**
  * The webpack/Rspack loader `OptimizeComponentsPlugin` runs before Svelte's
- * on Carbon's `.svelte` files: it serves each one rewritten for the app.
+ * on `.svelte` files: it serves the ones it rewrote for the app.
  */
 export default function optimizeComponentsLoader(
   this: LoaderContext,
@@ -19,7 +19,9 @@ export default function optimizeComponentsLoader(
 ): void {
   const optimizer = optimizerRegistry().get(this.getOptions().id);
   // Rewritten for what `content` held: rebuild when any of it changes.
-  for (const file of optimizer?.analyzed ?? []) this.addDependency(file);
+  if (optimizer?.rewritable(this.resourcePath)) {
+    for (const file of optimizer.analyzed) this.addDependency(file);
+  }
   const rewritten = optimizer?.load(this.resourcePath + this.resourceQuery);
   if (rewritten) this.callback(null, rewritten.code, rewritten.map);
   else this.callback(null, source, map);

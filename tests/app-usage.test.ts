@@ -6,6 +6,8 @@ import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 const carbon = readCarbonComponents(resolveCarbonRoot());
 const KIND_REASSIGNED =
   /kind +dynamic: Card\.svelte:5 `kind` is assigned at line 3/;
+const APP_REWRITE_REPORT =
+  /Rewrote 1 of 1 app components whose every call site is known:\n +\S*Card\.svelte +\d+ edits?/;
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 const MAIN = {
   file: "/app/src/main.ts",
@@ -320,4 +322,86 @@ export const DEFAULTS = { kind: "danger" };`,
       ).toEqual(["primary", "danger", "ghost"]);
     },
   );
+});
+
+describe("rewriting the app's own components", () => {
+  /** What `specializeFiles` serves for each app file, by file name. */
+  async function appSources(files: Array<{ file: string; code: string }>) {
+    const result = await specializeFiles({
+      projectRoot: process.cwd(),
+      files,
+    });
+    if ("warning" in result) throw new Error(result.warning);
+    const sources = new Map<string, string>();
+    for (const [file, { code }] of result.sources) {
+      if (file.startsWith("/app/")) sources.set(file.slice(5), code);
+    }
+    return { sources, apps: result.apps, report: result.report() };
+  }
+
+  const card = (script: string, markup: string) => ({
+    file: "/app/src/Card.svelte",
+    code: `<script>${IMPORT_BUTTON}\n${script}</script>\n${markup}`,
+  });
+
+  test("a wrapper whose every call site is known is rewritten for them", async () => {
+    const { sources, apps, report } = await appSources([
+      MAIN,
+      appRendering(`<Card tone="danger" />`),
+      card(
+        `export let tone = "primary";\nexport let icon = undefined;`,
+        `{#if icon}<p class="icon">icon</p>{/if}<Button kind={tone} />`,
+      ),
+    ]);
+    expect(apps).toBe(1);
+    const rewritten = sources.get("src/Card.svelte");
+    expect(rewritten).toContain(`kind={"danger"}`);
+    expect(rewritten).not.toContain(`class="icon"`);
+    // `App.svelte` is mounted by something the analysis can't see.
+    expect(sources.has("src/App.svelte")).toBe(false);
+    expect(report.join("\n")).toMatch(APP_REWRITE_REPORT);
+  });
+
+  test("one rendered from somewhere unseen keeps every prop value", async () => {
+    const { sources, apps } = await appSources([
+      appRendering(`<svelte:component this={Card} tone="danger" />`),
+      card(`export let tone = "primary";`, `<Button kind={tone} />`),
+    ]);
+    expect(apps).toBe(0);
+    expect(sources.size).toBe(0);
+  });
+
+  test("runes and TypeScript", async () => {
+    const { sources } = await appSources([
+      MAIN,
+      appRendering(`<Card title="A" />`),
+      {
+        file: "/app/src/Card.svelte",
+        code: `<script lang="ts">${IMPORT_BUTTON}
+  let { title, icon = undefined }: { title: string; icon?: unknown } = $props();
+  let open = $state(false);
+</script>
+{#if icon}<p class="icon">icon</p>{/if}
+<Button onclick={() => (open = !open)}>{title}</Button>`,
+      },
+    ]);
+    const rewritten = sources.get("src/Card.svelte") ?? "";
+    expect(rewritten).not.toContain(`class="icon"`);
+    expect(rewritten).toContain(`{"A"}`);
+    expect(rewritten).toContain("let open = $state(false);");
+  });
+
+  test("its styles don't warn about the selectors the rewrite leaves unused", async () => {
+    const { sources } = await appSources([
+      MAIN,
+      appRendering(`<Card />`),
+      card(
+        `export let icon = undefined;`,
+        `<div class:icon><Button /></div>\n<style>.icon { color: red; }</style>`,
+      ),
+    ]);
+    expect(sources.get("src/Card.svelte")).toContain(
+      "</div><!-- svelte-ignore css-unused-selector css_unused_selector -->\n<style>",
+    );
+  });
 });

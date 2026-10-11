@@ -279,6 +279,15 @@ function formatCallSites(result: PropAwareResult, root: string): string[] {
   return lines;
 }
 
+/** `file` through symlinks, as the build plugins key sources. */
+function realpath(file: string): string {
+  try {
+    return realpathSync(file);
+  } catch {
+    return file;
+  }
+}
+
 /** Carbon components rewritten for an app, by real path of their source. */
 export type SpecializedComponents = {
   sources: Map<string, { code: string; map: SourceMap }>;
@@ -288,6 +297,8 @@ export type SpecializedComponents = {
    * the analyzed files: nothing else may render them.
    */
   closed: Set<string>;
+  /** How many of the app's own components `sources` holds. */
+  apps: number;
   /** Lines for `optimizeComponents({ report: true })`. */
   report: () => string[];
 };
@@ -344,6 +355,7 @@ export async function specializeFiles(input: {
     /** Module keys of the children it no longer renders. */
     unrendered: () => string[];
   }> = [];
+  const appRewrites: Array<{ file: string; edits: number }> = [];
   try {
     for (const key of result.analysis.liveComponents) {
       const scope = result.analysis.scopeFor(key);
@@ -369,6 +381,24 @@ export async function specializeFiles(input: {
         ),
       });
     }
+    // The app's own components whose every call site is known: nothing
+    // outside `content` renders them, which the build plugins check.
+    for (const file of appUsage.closed) {
+      const scope = appUsage.scopeFor(file);
+      if (!scope) continue;
+      const specialized = specializeComponent(scope, input.options);
+      appRewrites.push({ file, edits: specialized.edits });
+      if (specialized.edits === 0) continue;
+      edits += specialized.edits;
+      sources.set(realpath(file), {
+        code: specialized.code,
+        map: toSourceMap(
+          specialized.mapped,
+          scope.model.code,
+          path.basename(file),
+        ),
+      });
+    }
   } catch (error) {
     return { warning: failure(error, SPECIALIZE_FAILURE) };
   }
@@ -376,7 +406,9 @@ export async function specializeFiles(input: {
     sources,
     edits,
     closed: appUsage.closed,
-    report: () => formatSpecializeReport(result, rewrites, input.projectRoot),
+    apps: appRewrites.filter((rewrite) => rewrite.edits > 0).length,
+    report: () =>
+      formatSpecializeReport(result, rewrites, appRewrites, input.projectRoot),
   };
 }
 
@@ -389,6 +421,7 @@ function formatSpecializeReport(
     /** Module keys of the children it no longer renders. */
     unrendered: () => string[];
   }>,
+  appRewrites: Array<{ file: string; edits: number }>,
   root: string,
 ): string[] {
   const name = (key: string) => nameOf(result, key);
@@ -417,6 +450,21 @@ function formatSpecializeReport(
     lines.push(
       `    ${name(rewrite.key).padEnd(width)}   ${String(rewrite.edits).padStart(4)} edit${rewrite.edits === 1 ? " " : "s"}${stops}`,
     );
+  }
+  const appChanged = appRewrites
+    .filter((rewrite) => rewrite.edits > 0)
+    .map((rewrite) => ({ ...rewrite, name: path.relative(root, rewrite.file) }))
+    .sort((a, b) => b.edits - a.edits || a.name.localeCompare(b.name));
+  if (appRewrites.length > 0) {
+    lines.push(
+      `  Rewrote ${appChanged.length} of ${appRewrites.length} app components whose every call site is known:`,
+    );
+    const appWidth = Math.max(0, ...appChanged.map(({ name }) => name.length));
+    for (const rewrite of appChanged) {
+      lines.push(
+        `    ${rewrite.name.padEnd(appWidth)}   ${String(rewrite.edits).padStart(4)} edit${rewrite.edits === 1 ? "" : "s"}`,
+      );
+    }
   }
   lines.push(
     `  No longer bundled (${unbundled.size}): ${[...unbundled].map(name).sort().join(", ") || "none"}`,
