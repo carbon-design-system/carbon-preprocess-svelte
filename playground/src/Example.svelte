@@ -8,7 +8,7 @@
    * its region, so its code stays in view. Only tall ones: a scroll container
    * would clip a short example's menus.
    */
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import CodeView from "./CodeView.svelte";
   import { perf } from "./settings.js";
 
@@ -32,22 +32,38 @@
   const cap = () =>
     Math.min(24 * parseFloat(getComputedStyle(document.documentElement).fontSize), innerHeight / 2);
 
+  const measure = () => body && (tall = body.offsetHeight > cap());
+
   onMount(() => {
     if (!body) return;
-    const observer = new ResizeObserver(() => (tall = body.offsetHeight > cap()));
+    const observer = new ResizeObserver(measure);
     observer.observe(body);
     return () => observer.disconnect();
   });
 
+  // Once the example mounts, in the same frame: a ResizeObserver reports a
+  // frame late, which would paint it uncapped first.
+  $: if (mounted) tick().then(measure);
+
+  // Near the viewport already: mount now, before the first paint, so the
+  // placeholder never shows (it would shift what's below when replaced).
+  // Examples read their positions before any mounts, so it's one layout.
+  const NEAR = 600;
+
   onMount(() => {
     if (mounted || !region) return;
+    const { top, bottom } = region.getBoundingClientRect();
+    if (top < innerHeight + NEAR && bottom > -NEAR) {
+      mounted = true;
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
         mounted = true;
         observer.disconnect();
       },
-      { rootMargin: "600px 0px" },
+      { rootMargin: `${NEAR}px 0px` },
     );
     observer.observe(region);
     return () => observer.disconnect();
