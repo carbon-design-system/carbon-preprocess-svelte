@@ -31,8 +31,12 @@ export { type ImageSize, imageSize } from "./markdown/image-size";
 export {
   type CodeKind,
   type CodeMeta,
+  type DiffLines,
+  diffLines,
   type LineMark,
+  type PreparedFence,
   parseCodeMeta,
+  prepareFence,
   renderCodeLines,
   splitHtmlLines,
   stripCodeMarkers,
