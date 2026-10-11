@@ -1,6 +1,7 @@
 <script>
   // Mount cost per CCS component: 40 instances each, mounted, flushed, and
-  // laid out, median of 3 runs. Results land in #bench-results as JSON.
+  // laid out, median of 3 runs. Results show in a table, and land in
+  // #bench-results as JSON for scripts/mount-bench.ts.
   import { flushSync, mount, onMount, unmount } from "svelte";
   import {
     Button,
@@ -9,6 +10,7 @@
     ComboBox,
     DataTable,
     Dropdown,
+    InlineLoading,
     MultiSelect,
     NumberInput,
     OverflowMenu,
@@ -41,6 +43,14 @@
 
   let results = [];
 
+  const resultHeaders = [
+    { key: "name", value: "Component" },
+    { key: "msPerInstance", value: "ms per instance", display: (ms) => ms.toFixed(3) },
+    { key: "nodesPerInstance", value: "Elements per instance" },
+  ];
+  $: resultRows = results.map((r) => ({ id: r.name, ...r }));
+  $: done = results.length === cases.length;
+
   function run(Component, props) {
     const target = document.createElement("div");
     document.body.append(target);
@@ -66,4 +76,9 @@
   });
 </script>
 
-<pre id="bench-results" data-done={results.length === cases.length || undefined}>{JSON.stringify(results, null, 1)}</pre>
+<InlineLoading
+  status={done ? "finished" : "active"}
+  description={done ? `Measured ${cases.length} components` : `Measuring ${results.length + 1} of ${cases.length}…`}
+/>
+<DataTable size="compact" sortable headers={resultHeaders} rows={resultRows} />
+<pre id="bench-results" hidden data-done={done || undefined}>{JSON.stringify(results)}</pre>

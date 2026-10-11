@@ -53,6 +53,38 @@ describe("shell", () => {
     await page.close();
   });
 
+  test("Reset all, above the page and in Settings, resets every setting", async () => {
+    const { page } = await openShell("page=Matrix&syntax=off&pm=bun");
+    const tags = page.getByRole("region", { name: "Changed settings" });
+    await tags.getByRole("button", { name: "Reset all" }).click();
+    await page.waitForTimeout(200);
+    expect(await tags.count()).toBe(0);
+    expect(new URL(page.url()).search).toBe("?page=Matrix");
+
+    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByLabel("Syntax colors").selectOption("off");
+    const reset = page
+      .locator(".bx--header-panel")
+      .getByRole("button", { name: "Reset all" });
+    await reset.click();
+    await page.waitForTimeout(200);
+    expect(new URL(page.url()).searchParams.get("syntax")).toBeNull();
+    expect(await page.getByLabel("Syntax colors").inputValue()).toBe("build");
+    expect(await reset.isDisabled()).toBe(true);
+    await page.close();
+  });
+
+  test("a tall live example scrolls in its region, so its code stays in view", async () => {
+    const { page } = await openShell("page=MountBench");
+    const example = page.getByRole("region", { name: "Live example" });
+    await example.waitFor();
+    const box = await example.boundingBox();
+    expect(box?.height).toBeLessThanOrEqual(900 / 2 + 1);
+    const code = await page.locator(".codeview").first().boundingBox();
+    expect(code?.y).toBeLessThan(900);
+    await page.close();
+  });
+
   test("settings from the URL show as changed", async () => {
     const { page } = await openShell("code=ts&pm=bun");
     const tags = page.getByRole("region", { name: "Changed settings" });

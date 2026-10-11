@@ -13,25 +13,33 @@
 <Grid>
   <Row>
     <Column lg={12} md={6}>
-      <h1 class="bx--type-productive-heading-06">{title}</h1>
-      <p class="bx--type-body-long-02 intro">{description}</p>
+      <header>
+        <h1 class="bx--type-productive-heading-06">{title}</h1>
+        {#if description}<p class="bx--type-body-long-02 intro">{description}</p>{/if}
+      </header>
       <slot />
     </Column>
     <Column lg={4} md={2} sm={0}>
-      <nav class="toc" aria-label="On this page">
-        <p class="bx--type-label-01">On this page</p>
-        {#each toc as h (h.id)}
-          <Link href="#{h.id}" class={h.depth === 3 ? "sub" : ""}>{h.text}</Link>
-        {/each}
-      </nav>
+      {#if toc.length}
+        <nav class="toc" aria-label="On this page">
+          <p class="bx--type-label-01">On this page</p>
+          {#each toc as h (h.id)}
+            <Link href="#{h.id}" class={h.depth === 3 ? "sub" : ""}>{h.text}</Link>
+          {/each}
+        </nav>
+      {/if}
     </Column>
   </Row>
 </Grid>
 
 <style>
+  header {
+    margin-bottom: var(--cds-spacing-07);
+  }
+
   .intro {
     max-width: 68ch;
-    margin: var(--cds-spacing-05) 0 var(--cds-spacing-07);
+    margin: var(--cds-spacing-05) 0 0;
     color: var(--cds-text-02);
   }
 
