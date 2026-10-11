@@ -108,6 +108,23 @@ describe("shell", () => {
     await page.close();
   });
 
+  test("a page's source view shows its Markdown and the Svelte it compiles to", async () => {
+    const { page, errors } = await openShell("page=Stress");
+    const views = page.getByRole("tablist", { name: "View" });
+    await views.getByRole("tab", { name: "Markdown" }).click();
+    await page.waitForTimeout(500);
+    const code = page.locator(".codeview").first();
+    expect(await code.textContent()).toContain("title: Stress");
+    await views.getByRole("tab", { name: "Compiled" }).click();
+    await page.waitForTimeout(500);
+    expect(await code.textContent()).toContain("export const headings");
+    expect(await code.textContent()).toContain("import MarkdownLayout");
+    await views.getByRole("tab", { name: "Page" }).click();
+    expect(await page.locator(".codeview").first().isVisible()).toBe(true);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+
   test("previous and next follow the side nav", async () => {
     const { page } = await openShell("page=Matrix");
     const nav = page.getByRole("navigation", {

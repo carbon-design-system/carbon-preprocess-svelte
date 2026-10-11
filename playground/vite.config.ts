@@ -81,6 +81,7 @@ const CCS_PAGE_FILES = DOCS
 const CCS_VERSION: string = JSON.parse(
   readFileSync(path.join(CCS, "package.json"), "utf8"),
 ).version;
+const SCRIPT_BLOCK = /^<script\b/;
 const FILE_SOURCE_SRC = /src="([^"]+)"/;
 const DOCS_ONLY =
   /^[ \t]*(?:\/\/|<!--)[ \t]*docs-only:start\b[\s\S]*?^[ \t]*(?:\/\/|<!--)[ \t]*docs-only:end\b.*(?:\r?\n|$)/gm;
@@ -694,10 +695,23 @@ const shared: MarkdownOptions = {
     CodeView: "/src/CodeView.svelte",
   },
   transform(tree) {
-    // As the CCS docs do: leading paragraphs become the description.
+    // As the CCS docs do: leading paragraphs become the description (after
+    // the page's `<script>`, if it starts with one).
     const intro: string[] = [];
-    while (tree.blocks[0]?.type === "paragraph") {
-      intro.push((tree.blocks.shift() as { text: string }).text);
+    let at = 0;
+    while (
+      tree.blocks[at]?.type === "svelte" &&
+      SCRIPT_BLOCK.test((tree.blocks[at] as { value: string }).value)
+    )
+      at++;
+    // After a script, only without a frontmatter description (Kitchen sink
+    // has both, and keeps its first paragraphs in the page).
+    const after = at > 0;
+    while (
+      (!after || tree.metadata.description === undefined) &&
+      tree.blocks[at]?.type === "paragraph"
+    ) {
+      intro.push((tree.blocks.splice(at, 1)[0] as { text: string }).text);
     }
     if (intro.length) tree.metadata.description = intro.join(" ");
     // A page's `title` frontmatter, else its file name.
@@ -756,6 +770,70 @@ const shared: MarkdownOptions = {
   },
 };
 
+/** The `.svx` pages' preprocessor: one Prose per run of Markdown. */
+const svxPages = markdown({
+  ...shared,
+  extensions: [".svx"],
+  proseScope: "markdown",
+});
+
+/**
+ * `virtual:page-sources`: for each page, a loader for its Markdown and the
+ * Svelte component `markdown()` compiles it to (through `svxPages` itself,
+ * so it's exactly what Svelte gets). Each page's is its own module, loaded
+ * when a reader opens the source view.
+ */
+function pageSources() {
+  const index = "virtual:page-sources";
+  const prefix = "virtual:page-source/";
+  const pageFiles = () => {
+    const dir = path.join(HERE, "src/pages");
+    return new Map(
+      [
+        ...readdirSync(dir)
+          .filter((file) => file.endsWith(".svx"))
+          .map((file) => path.join(dir, file)),
+        ...CCS_PAGE_FILES,
+      ].map((file) => [path.basename(file, ".svx"), file]),
+    );
+  };
+  return {
+    name: "playground-page-sources",
+    resolveId: (source: string) =>
+      source === index || source.startsWith(prefix) ? `\0${source}` : undefined,
+    async load(
+      this: { addWatchFile: (file: string) => void },
+      resolved: string,
+    ) {
+      if (resolved === `\0${index}`) {
+        const entries = [...pageFiles().keys()].map(
+          (page) =>
+            `  ${JSON.stringify(page)}: () => import(${JSON.stringify(`${prefix}${page}`)}),`,
+        );
+        return `export default {\n${entries.join("\n")}\n};`;
+      }
+      if (!resolved.startsWith(`\0${prefix}`)) return;
+      const file = pageFiles().get(resolved.slice(prefix.length + 1));
+      if (!file) return "export default undefined;";
+      this.addWatchFile(file);
+      const markdownSource = readFileSync(file, "utf8");
+      const compiled = await svxPages.markup?.({
+        content: markdownSource,
+        filename: file,
+      });
+      // Token data from the build, as the pages' code views get: thousands
+      // of lines would freeze the browser tokenizing them.
+      const page = path.basename(file, ".svx");
+      const views = (code: string, title: string) =>
+        prepareViews(code, "svelte", `title="${title}" showLineNumbers`);
+      return `export default ${JSON.stringify({
+        markdown: views(markdownSource, `${page}.svx`),
+        svelte: views(compiled?.code ?? "", "Compiled by markdown()"),
+      })};`;
+    },
+  };
+}
+
 export default {
   plugins: [
     // Before svelte(): it hands Svelte Carbon's components rewritten for the
@@ -769,10 +847,11 @@ export default {
       : []),
     ccsApi(),
     searchIndex(),
+    pageSources(),
     svelte({
       extensions: [".svelte", ".svx", ".md", ".sample"],
       preprocess: [
-        markdown({ ...shared, extensions: [".svx"], proseScope: "markdown" }),
+        svxPages,
         markdown({ ...shared, extensions: [".md"], proseScope: "page" }),
         // Matrix samples: one element group each, no layout.
         markdown({
