@@ -72,31 +72,37 @@ export type StrictCssOptimizerOptions = {
   isPruned?: (cls: string) => boolean;
 };
 
-const sharedClassesCache = new WeakMap<ComponentIndex, Set<string>>();
+type Ownership = {
+  /** Classes some component renders. */
+  owned: Set<string>;
+  /** Classes more than one component renders. */
+  shared: Set<string>;
+};
 
-/** Classes more than one component renders. */
-function getSharedClasses(components: ComponentIndex): Set<string> {
-  const cached = sharedClassesCache.get(components);
+const ownershipCache = new WeakMap<ComponentIndex, Ownership>();
+
+function getOwnership(components: ComponentIndex): Ownership {
+  const cached = ownershipCache.get(components);
   if (cached) return cached;
 
-  const seen = new Set<string>();
+  const owned = new Set<string>();
   const shared = new Set<string>();
 
   for (const component of Object.values(components)) {
     for (const cls of component.classes) {
-      if (seen.has(cls)) shared.add(cls);
-      else seen.add(cls);
+      if (owned.has(cls)) shared.add(cls);
+      else owned.add(cls);
     }
   }
 
-  sharedClassesCache.set(components, shared);
-  return shared;
+  const ownership = { owned, shared };
+  ownershipCache.set(components, ownership);
+  return ownership;
 }
 
-type AllowlistIndex = {
+type AllowlistIndex = Ownership & {
   exact: Set<string>;
   hyphenPrefixes: string[];
-  shared: Set<string>;
   /**
    * Per-class verdicts: Carbon's stylesheet repeats ~1.3k class names across
    * ~14k selector positions, so the walk runs once per distinct class.
@@ -118,7 +124,7 @@ function getAllowlistIndex(
     hyphenPrefixes: [...allowlist].filter(
       (selector) => selector.endsWith("-") && !EXACT_ONLY_CLASSES.has(selector),
     ),
-    shared: getSharedClasses(components),
+    ...getOwnership(components),
     verdicts: new Map(),
   };
   allowlistIndexCache.set(allowlist, index);
@@ -140,6 +146,12 @@ function computeAllowlistMatch(name: string, index: AllowlistIndex): boolean {
   for (const prefix of index.hyphenPrefixes) {
     if (name.startsWith(prefix)) return true;
   }
+
+  // A BEM child of an allowed class stands in for classes the index
+  // doesn't attribute to anyone; one it attributes to some component
+  // stays with that component (`.bx--header__menu` with `HeaderNav`, not
+  // `Header`).
+  if (index.owned.has(name)) return false;
 
   for (let i = 1; i < name.length - 1; i++) {
     const a = name[i];
