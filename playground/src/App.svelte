@@ -41,6 +41,7 @@
   import Light from "carbon-icons-svelte/lib/Light.svelte";
   import Meter from "carbon-icons-svelte/lib/Meter.svelte";
   import Settings from "carbon-icons-svelte/lib/Settings.svelte";
+  import SettingsAdjust from "carbon-icons-svelte/lib/SettingsAdjust.svelte";
   import ccsPages from "virtual:ccs-pages";
   import searchIndex from "virtual:search-index";
   import { setContext, tick } from "svelte";
@@ -68,6 +69,7 @@
       pages: [
         { name: "KitchenSink", text: "Kitchen sink", icon: Document },
         { name: "Try", text: "Try markdown()", icon: Code },
+        { name: "Options", text: "Options gallery", icon: SettingsAdjust },
         { name: "Matrix", text: "Matrix", icon: GridIcon },
         { name: "Stress", text: "Stress", icon: Dashboard },
       ],
