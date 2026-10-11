@@ -1,0 +1,7 @@
+<script>
+  import MountBench from "../MountBench.svelte";
+</script>
+
+# Mount bench
+
+<MountBench />

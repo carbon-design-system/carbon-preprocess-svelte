@@ -1,0 +1,3 @@
+Body copy with *emphasis*, **strong**, ~~struck~~, `inline code`, an [inline link](#), and a [link with `code`](#). Press <DocKbd label="Ctrl" /> + <DocKbd label="K" /> to search.
+
+A second paragraph, to show the space between paragraphs and how a long line wraps at the measure.

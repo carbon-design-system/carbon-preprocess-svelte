@@ -13,6 +13,12 @@
       "reduction_percent": 95.77
     }
   },
+  "playground": {
+    "file": "assets/index-*.css",
+    "before_kb": 668.06,
+    "after_kb": 328.51,
+    "reduction_percent": 50.83
+  },
   "rolldown": {
     "default": {
       "file": "bundle-*.css",
