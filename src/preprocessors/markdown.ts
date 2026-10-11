@@ -57,8 +57,9 @@ function detectSvelteMajor(): 3 | 4 | 5 {
 }
 
 /** Whether the installed `carbon-components-svelte` ships `Prose`. */
-function hasProse(): boolean {
-  const dir = resolvePackageDir(CarbonSvelte.Components);
+/** Whether `carbon-components-svelte` (installed, or at `carbonDir`) ships `Prose`. */
+function hasProse(carbonDir?: string): boolean {
+  const dir = carbonDir ?? resolvePackageDir(CarbonSvelte.Components);
   return (
     dir !== undefined && existsSync(path.join(dir, "src/Prose/Prose.svelte"))
   );
@@ -97,13 +98,15 @@ export function markdown(options: MarkdownOptions = {}) {
       if (!extensions.some((extension) => filename.endsWith(extension))) return;
       svelte ??= detectSvelteMajor();
       if (proseChecked === undefined) {
-        proseChecked = hasProse();
+        proseChecked = hasProse(options.carbonDir);
         if (prose === undefined) {
           // Unset: use Prose when the installed Carbon has it, else plain HTML.
           prose = proseChecked;
         } else if (prose !== false && !proseChecked) {
           console.warn(
-            `${LOG_PREFIX} markdown: the installed ${CarbonSvelte.Components} has no Prose; set \`prose: false\` or upgrade it.`,
+            options.carbonDir
+              ? `${LOG_PREFIX} markdown: the ${CarbonSvelte.Components} at ${options.carbonDir} has no Prose; set \`prose: false\` or point \`carbonDir\` at one that does.`
+              : `${LOG_PREFIX} markdown: the installed ${CarbonSvelte.Components} has no Prose; set \`prose: false\` or upgrade it.`,
           );
         }
       }

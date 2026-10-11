@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { markdown } from "carbon-preprocess-svelte";
 import {
   compileMarkdown,
@@ -349,6 +352,28 @@ describe("markdown preprocessor", () => {
     expect(second?.code).toContain("<Prose {...proseProps}>");
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0][0])).toContain("has no Prose");
+    warn.mockRestore();
+  });
+
+  test("`carbonDir` checks an aliased checkout for Prose instead of the installed package", async () => {
+    const withProse = mkdtempSync(path.join(tmpdir(), "ccs-"));
+    mkdirSync(path.join(withProse, "src/Prose"), { recursive: true });
+    writeFileSync(path.join(withProse, "src/Prose/Prose.svelte"), "");
+    const auto = await markdown({ carbonDir: withProse }).markup({
+      content: "Hi",
+      filename: "a.md",
+    });
+    expect(auto?.code).toContain("<Prose {...proseProps}>");
+
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const without = mkdtempSync(path.join(tmpdir(), "ccs-"));
+    await markdown({ prose: true, carbonDir: without }).markup({
+      content: "Hi",
+      filename: "a.md",
+    });
+    expect(String(warn.mock.calls[0][0])).toContain(
+      `at ${without} has no Prose`,
+    );
     warn.mockRestore();
   });
 
