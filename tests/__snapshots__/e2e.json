@@ -3,236 +3,236 @@
     "default": {
       "file": "_astro/index.*.css",
       "before_kb": 707.04,
-      "after_kb": 49.34,
-      "reduction_percent": 93.02
+      "after_kb": 44.23,
+      "reduction_percent": 93.74
     },
     "optimized": {
       "file": "_astro/index.*.css",
       "before_kb": 707.04,
-      "after_kb": 31.83,
-      "reduction_percent": 95.5
+      "after_kb": 30.2,
+      "reduction_percent": 95.73
     }
   },
   "rolldown": {
     "default": {
       "file": "bundle-*.css",
       "before_kb": 709.84,
-      "after_kb": 49.42,
-      "reduction_percent": 93.04
+      "after_kb": 44.31,
+      "reduction_percent": 93.76
     },
     "optimized": {
       "file": "bundle-*.css",
       "before_kb": 709.84,
-      "after_kb": 31.85,
-      "reduction_percent": 95.51
+      "after_kb": 30.21,
+      "reduction_percent": 95.74
     }
   },
   "rollup": {
     "default": {
       "file": "bundle-*.css",
       "before_kb": 709.84,
-      "after_kb": 49.42,
-      "reduction_percent": 93.04
+      "after_kb": 44.31,
+      "reduction_percent": 93.76
     },
     "optimized": {
       "file": "bundle-*.css",
       "before_kb": 709.84,
-      "after_kb": 31.85,
-      "reduction_percent": 95.51
+      "after_kb": 30.21,
+      "reduction_percent": 95.74
     }
   },
   "rspack": {
     "default": {
       "file": "build/bundle.*.css",
       "before_kb": 831.66,
-      "after_kb": 53.09,
-      "reduction_percent": 93.62
+      "after_kb": 47.93,
+      "reduction_percent": 94.24
     },
     "optimized": {
       "file": "build/bundle.*.css",
       "before_kb": 831.66,
-      "after_kb": 35.44,
-      "reduction_percent": 95.74
+      "after_kb": 33.8,
+      "reduction_percent": 95.94
     }
   },
   "sveltekit": {
     "file": "_app/immutable/assets/2.*.css",
     "before_kb": 695.03,
-    "after_kb": 49.32,
-    "reduction_percent": 92.9
+    "after_kb": 44.21,
+    "reduction_percent": 93.64
   },
   "sveltekit-matrix@svelte-5": {
     "css": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 313.81,
-      "reduction_percent": 43.7
+      "after_kb": 294.15,
+      "reduction_percent": 47.23
     },
     "full": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 196.8,
-      "reduction_percent": 64.69
+      "after_kb": 179.73,
+      "reduction_percent": 67.75
     },
     "prop-aware": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 196.8,
-      "reduction_percent": 64.69
+      "after_kb": 179.73,
+      "reduction_percent": 67.75
     }
   },
   "vite": {
     "file": "assets/index-*.css",
     "before_kb": 710.39,
-    "after_kb": 49.68,
-    "reduction_percent": 93.01
+    "after_kb": 44.56,
+    "reduction_percent": 93.73
   },
   "vite-matrix@svelte-4": {
     "css": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 315.44,
-      "reduction_percent": 43.9
+      "after_kb": 295.7,
+      "reduction_percent": 47.41
     },
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 198.22,
-      "reduction_percent": 64.75
+      "after_kb": 181.08,
+      "reduction_percent": 67.79
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 198.22,
-      "reduction_percent": 64.75
+      "after_kb": 181.08,
+      "reduction_percent": 67.79
     }
   },
   "vite-matrix@svelte-5": {
     "css": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 313.81,
-      "reduction_percent": 43.7
+      "after_kb": 294.15,
+      "reduction_percent": 47.23
     },
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 196.8,
-      "reduction_percent": 64.69
+      "after_kb": 179.73,
+      "reduction_percent": 67.75
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 196.8,
-      "reduction_percent": 64.69
+      "after_kb": 179.73,
+      "reduction_percent": 67.75
     }
   },
   "vite@carbon-0.85": {
     "file": "assets/index-*.css",
     "before_kb": 606.42,
-    "after_kb": 96.81,
-    "reduction_percent": 84.04
+    "after_kb": 95.92,
+    "reduction_percent": 84.18
   },
   "vite@svelte-5": {
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 78.22,
-      "reduction_percent": 88.75
+      "after_kb": 76.04,
+      "reduction_percent": 89.06
     },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
       "before_kb": 695.12,
-      "after_kb": 64.45,
-      "reduction_percent": 90.73
+      "after_kb": 56.23,
+      "reduction_percent": 91.91
     },
     "datatable-toolbar": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 75.96,
-      "reduction_percent": 89.07
+      "after_kb": 71.37,
+      "reduction_percent": 89.73
     },
     "datepicker": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 37.47,
-      "reduction_percent": 94.61
+      "after_kb": 36.87,
+      "reduction_percent": 94.69
     },
     "dropdown": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 47.88,
-      "reduction_percent": 93.11
+      "after_kb": 46.14,
+      "reduction_percent": 93.36
     },
     "modal": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 77.56,
-      "reduction_percent": 88.84
+      "after_kb": 76.04,
+      "reduction_percent": 89.06
     },
     "multiselect": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 70.28,
-      "reduction_percent": 89.89
+      "after_kb": 65.76,
+      "reduction_percent": 90.54
     },
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 98.72,
-      "reduction_percent": 85.8
+      "after_kb": 86.78,
+      "reduction_percent": 87.51
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 52.07,
-      "reduction_percent": 92.51
+      "after_kb": 47.23,
+      "reduction_percent": 93.2
     },
     "textinput": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 29.7,
-      "reduction_percent": 95.73
+      "after_kb": 27.45,
+      "reduction_percent": 96.05
     },
     "timepicker-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 48.45,
-      "reduction_percent": 93.03
+      "after_kb": 46.2,
+      "reduction_percent": 93.35
     },
     "uishell": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 23.1,
-      "reduction_percent": 96.68
+      "after_kb": 22.44,
+      "reduction_percent": 96.77
     }
   },
   "webpack": {
     "default": {
       "file": "build/bundle.*.css",
       "before_kb": 709.84,
-      "after_kb": 49.42,
-      "reduction_percent": 93.04
+      "after_kb": 44.31,
+      "reduction_percent": 93.76
     },
     "optimized": {
       "file": "build/bundle.*.css",
       "before_kb": 709.84,
-      "after_kb": 31.85,
-      "reduction_percent": 95.51
+      "after_kb": 30.22,
+      "reduction_percent": 95.74
     }
   },
   "webpack@svelte-5": {
     "default": {
       "file": "build/bundle.*.css",
       "before_kb": 709.84,
-      "after_kb": 49.42,
-      "reduction_percent": 93.04
+      "after_kb": 44.31,
+      "reduction_percent": 93.76
     },
     "optimized": {
       "file": "build/bundle.*.css",
       "before_kb": 709.84,
-      "after_kb": 31.85,
-      "reduction_percent": 95.51
+      "after_kb": 30.22,
+      "reduction_percent": 95.74
     }
   }
 }
