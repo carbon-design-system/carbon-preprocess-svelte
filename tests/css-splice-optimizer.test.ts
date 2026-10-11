@@ -169,3 +169,19 @@ describe("css-splice-optimizer syntax errors", () => {
     });
   }
 });
+
+describe("selectors a minifier wrapped in :is()", () => {
+  // Vite's CSS minifier merges rules into one `:is(A, B)`: it can match
+  // only when one of its branches can. Parsed whole, it would require
+  // only the classes the branches share (`.bx--btn`).
+  const merged =
+    ":is(.bx--data-table .bx--btn,.bx--modal-container .bx--btn){padding:0}";
+
+  test("goes when no branch can match", () => {
+    expect(spliced(merged, SCENARIOS.button).css).toBe("");
+  });
+
+  test("stays when a branch can", () => {
+    expect(spliced(merged, { ids: ["Button", "Modal"] }).css).toBe(merged);
+  });
+});

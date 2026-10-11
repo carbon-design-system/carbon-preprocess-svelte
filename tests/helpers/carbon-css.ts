@@ -1,11 +1,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { parseSelector, requiredClasses } from "caligula/selector";
+import {
+  parseSelector,
+  requiredClasses,
+  splitSelectorList,
+} from "caligula/selector";
 import {
   ALWAYS_ON_CLASSES,
   CONTEXT_ANCESTORS,
 } from "carbon-preprocess-svelte/constants";
+import { wrappedSelectorList } from "../../src/plugins/strict-css-optimizer";
 import { components } from "./component-index";
 
 const require = createRequire(import.meta.url);
@@ -62,6 +67,13 @@ export function shouldKeepStrictSelector(
   selector: string,
   allowlist: Set<string>,
 ): boolean {
+  // A selector that is one `:is()`/`:where()` keeps if any branch does.
+  const list = wrappedSelectorList(selector.trim());
+  if (list !== undefined) {
+    return splitSelectorList(list).some((branch) =>
+      shouldKeepStrictSelector(branch, allowlist),
+    );
+  }
   const { compounds } = parseSelector(selector);
   const subjectClasses = carbonClasses(compounds[compounds.length - 1].classes);
   const ancestorClasses = carbonClasses(

@@ -1,4 +1,4 @@
-import type { ParsedSelector } from "caligula/selector";
+import { type ParsedSelector, parseSelectorList } from "caligula/selector";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { isSafelisted, type SafelistEntry } from "./safelist";
@@ -263,6 +263,38 @@ export function pruneRuleSelector(
   };
 }
 
+/**
+ * The list inside a selector that is one `:is(…)` or `:where(…)` and
+ * nothing else, as CSS minifiers emit when they merge rules
+ * (`:is(.a .b, .c .d)`); `undefined` for any other selector.
+ */
+export function wrappedSelectorList(text: string): string | undefined {
+  const open = text.startsWith(":is(")
+    ? 3
+    : text.startsWith(":where(")
+      ? 6
+      : -1;
+  if (open === -1 || !text.endsWith(")")) return undefined;
+  let depth = 0;
+  let quote = "";
+  for (let i = open; i < text.length; i++) {
+    const char = text[i];
+    if (quote) {
+      if (char === "\\") i++;
+      else if (char === quote) quote = "";
+    } else if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      depth++;
+    } else if (char === ")" && --depth === 0) {
+      return i === text.length - 1
+        ? text.slice(open + 1, text.length - 1)
+        : undefined;
+    }
+  }
+  return undefined;
+}
+
 function keepSelectee(
   selectee: ParsedSelector,
   safelist: readonly SafelistEntry[],
@@ -272,6 +304,14 @@ function keepSelectee(
 ): boolean {
   const { text } = selectee;
   if (isSafelisted(text, safelist)) return true;
+  // `:is(A, B)` matches what `A, B` does: keep it if any branch can match.
+  // Parsed whole, it would require only the classes every branch shares.
+  const list = wrappedSelectorList(text);
+  if (list !== undefined) {
+    return parseSelectorList(list).some((branch) =>
+      keepSelectee(branch, safelist, dropFlatpickr, index, isPruned),
+    );
+  }
   if (isPruned && needsPrunedClass(selectee, isPruned)) return false;
   if (dropFlatpickr && FLATPICKR_SELECTOR.test(text)) return false;
   return !text.includes("bx-") || shouldKeepSelector(selectee, index);
