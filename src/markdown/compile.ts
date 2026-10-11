@@ -486,7 +486,7 @@ export async function renderMarkdown(
           block.value,
           block.lang,
           block.meta,
-          (code) => options.highlight?.(code, block.lang, block.meta),
+          (code, lang) => options.highlight?.(code, lang, block.meta),
         );
         if (lines) {
           return codeWithLines(block.lang, lines, {
@@ -524,7 +524,10 @@ export async function renderMarkdown(
         // Without a renderer: the blocks in a row, each under its label.
         // A docs site renders tabs through `renderers.codeGroup`.
         const kind = block.layout === "compare" ? "code-compare" : "code-group";
-        return `<div class="${kind}">\n${await renderBlocks(block.children, false)}\n</div>`;
+        const group = block.group
+          ? ` data-group="${escapeText(block.group)}"`
+          : "";
+        return `<div class="${kind}"${group}>\n${await renderBlocks(block.children, false)}\n</div>`;
       }
       case "thematicBreak":
         return "<hr />";
