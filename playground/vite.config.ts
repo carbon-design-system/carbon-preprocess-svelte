@@ -263,7 +263,6 @@ function stressPage() {
     name: "playground-stress-page",
     buildStart() {
       const file = path.join(HERE, "src/pages/Stress.svx");
-      if (existsSync(file)) return;
       const source = ["blocks.ts", "inline.ts", "compile.ts"]
         .map((name) =>
           readFileSync(path.join(HERE, "../src/markdown", name), "utf8"),
@@ -275,10 +274,10 @@ function stressPage() {
       const small =
         '```svelte {2}\n<script>\n  import { ComboBox } from "carbon-components-svelte";\n  let selectedId;\n</script>\n\n<ComboBox labelText="Region" items={[]} bind:selectedId />\n```\n';
       const fence = "````";
-      writeFileSync(
-        file,
-        `# Stress\n\nOne 1,600-line block and 60 small ones: a load and scroll fixture.\n\n${fence}ts showLineNumbers\n${source}\n${fence}\n\n${Array.from({ length: 60 }, () => small).join("\n")}`,
-      );
+      const page = `---\ntitle: Stress\ndescription: "One 1,600-line block and 60 small ones: a load and scroll fixture."\n---\n\n${fence}ts showLineNumbers\n${source}\n${fence}\n\n${Array.from({ length: 60 }, () => small).join("\n")}`;
+      // Rewritten only when it changes, so Vite doesn't reload for nothing.
+      if (!existsSync(file) || readFileSync(file, "utf8") !== page)
+        writeFileSync(file, page);
     },
   };
 }

@@ -46,7 +46,8 @@ reuses the last build and install. Against a running instance:
 - **`pages`:** every page loads without errors, with the loading techniques
   on and off.
 - **`shell`:** side nav navigation, settings into the URL and the changed
-  tags (and back), the no-Prose notice, and axe on the header, side nav, and
+  tags (and back), both Reset all buttons, tall live examples scrolling in
+  their region, the no-Prose notice, and axe on the header, side nav, and
   settings panel.
 - **`code-views`:** hover cards and their underlines, the package manager
   switch, per-command copy, line links (and reloading to them), links into
@@ -129,6 +130,8 @@ Every setting is in the URL, by its key:
   `variant`.
 - **Switches:** JS/TS, npm/pnpm/yarn/bun, file tabs (`::: code-group`, synced
   with `group="…"`), and framed examples' local modules as tabs.
+- **Live examples** taller than half the viewport (or 24rem) scroll in their
+  region, so the code under them stays in view.
 - **Show more:** past 15 lines, with `hidden="until-found"` so find in page
   still reaches hidden lines.
 - **Loading:** controls, painting, and live examples mount near the viewport;

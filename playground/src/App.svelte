@@ -75,7 +75,7 @@
   const params = new URLSearchParams(location.search);
   const chrome = params.get("chrome") !== "0";
   const page = params.get("page");
-  const state = {
+  let state = {
     ...fromQuery(params),
     page: page && PAGES.has(page) ? page : "KitchenSink",
     columns: params.get("columns") ?? "variant",
@@ -114,7 +114,8 @@
       location.search = queryFor({ ...state, ...DEFAULTS });
       return;
     }
-    Object.assign(state, DEFAULTS);
+    // An assignment, so Svelte sees it.
+    state = { ...state, ...DEFAULTS };
   }
 
   function goTo(event, name) {
