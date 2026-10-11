@@ -515,7 +515,9 @@ type Mismatch = {
 };
 
 rmSync(OUT, { recursive: true, force: true });
-const browser = await chromium.launch();
+// Grayscale text antialiasing: LCD antialiasing can tint a glyph's edge
+// pixels differently from one run to the next.
+const browser = await chromium.launch({ args: ["--disable-lcd-text"] });
 const mismatches: Mismatch[] = [];
 const scriptErrors: string[] = [];
 
