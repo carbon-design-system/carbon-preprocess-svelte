@@ -18,6 +18,16 @@ export async function compressAndEncode(text) {
     .replace(/=+$/, "");
 }
 
+/** The inverse of `compressAndEncode`. */
+export async function decodeAndDecompress(encoded) {
+  const binary = atob(encoded.replaceAll("-", "+").replaceAll("_", "/"));
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes])
+    .stream()
+    .pipeThrough(new DecompressionStream("gzip"));
+  return new Response(stream).text();
+}
+
 const file = (name, contents) => ({
   type: "file",
   name,
