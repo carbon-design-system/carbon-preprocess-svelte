@@ -71,7 +71,7 @@ const TABLE_DELIMITER_CELL = /^:?-+:?$/;
 const ALERT = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(?:\n|$)/i;
 const TASK = /^\[([ xX])\](?=[ \t])[ \t]*/;
 const FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
-const SVELTE_START = /^(?:<(?:[A-Za-z]|!--)|\{[#:/@])/;
+const SVELTE_START = /^(?:<(?:\/?[A-Za-z]|!--)|\{[#:/@])/;
 const SVELTE_INTERRUPT = /^(?:<\/?([A-Za-z][\w-]*)|\{[#:/])/;
 const UNESCAPED_PIPE = /(?<!\\)\|/;
 const ESCAPED_PIPE = /\\\|/g;
@@ -86,6 +86,14 @@ const BLOCK_TAGS = new Set(
     " ",
   ),
 );
+
+/** Block tags whose content is raw text, never Markdown. */
+const RAW_TEXT_TAGS = new Set(["pre", "script", "style", "textarea"]);
+/** A block-level HTML element (lowercase, as in `<details>`), not a component. */
+const isHtmlBlock = (name: string) =>
+  name === name.toLowerCase() &&
+  BLOCK_TAGS.has(name) &&
+  !RAW_TEXT_TAGS.has(name);
 
 const ALERTS: Record<string, AlertType> = {
   NOTE: "note",
@@ -373,7 +381,10 @@ export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
     let tag: ScannedTag | null = null;
     if (source[start] === "<" && !source.startsWith("<!--", start)) {
       tag = scanTag(source, start);
-      if (!tag || tag.closing) return "text";
+      if (!tag) return "text";
+      // A block element's closing tag, as `</details>` after Markdown in it.
+      if (tag.closing)
+        return isHtmlBlock(tag.name) ? blockEnd(i, tag.end) : "text";
     }
     const end = markupEnd(start);
     const lineStop = offsets[i] + lines[i].length;
@@ -386,6 +397,16 @@ export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
     if (end <= lineStop) {
       const tail = source.slice(end, lineStop).trimStart();
       if (tail !== "" && tail[0] !== "<" && tail[0] !== "{") return "text";
+    }
+    // A block element with a blank line in it holds Markdown, as on GitHub
+    // (`<details>`, a blank line, a fence): like a CommonMark HTML block, it
+    // ends at the blank line, the Markdown renders, and the closing tag is a
+    // block of its own. Components keep their whole body.
+    if (tag && isHtmlBlock(tag.name)) {
+      const last = lineOf(end - 1);
+      for (let line = i + 1; line < last; line++) {
+        if (isBlank(lines[line])) return blockEnd(i, tag.end);
+      }
     }
     return blockEnd(lineOf(end - 1), end);
   };

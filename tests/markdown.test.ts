@@ -354,6 +354,30 @@ export let proseProps = {};
     ).toEqual([false, false, false, false, false]);
   });
 
+  test("renders Markdown inside a block element with a blank line, as GitHub does", async () => {
+    const { code } = await compileMarkdown(
+      "<details>\n<summary>S</summary>\n\n```js\nconst a = { b: 1 };\n```\n\n</details>\n\n<div>\n\n**Bold**\n\n</div>",
+      { prose: false },
+    );
+    expect(code).toContain(
+      '<details>\n<summary>S</summary>\n<pre><code class="language-js">const a = &#123; b: 1 &#125;;\n</code></pre>\n</details>',
+    );
+    expect(code).toContain("<div>\n<p><strong>Bold</strong></p>\n</div>");
+    expect(() => compile(code, { filename: "page.md" })).not.toThrow();
+  });
+
+  test("keeps a block element without a blank line, and a component's body, whole", async () => {
+    const html =
+      "<details>\n  <summary>S</summary>\n  <p>Hidden.</p>\n</details>";
+    expect((await compileMarkdown(html, { prose: false })).code).toContain(
+      html,
+    );
+    const component = "<Button>\n\nText\n\n</Button>";
+    expect((await compileMarkdown(component, { prose: false })).code).toContain(
+      component,
+    );
+  });
+
   test("auto-imports components the page renders but doesn't import", async () => {
     const { code } = await compileMarkdown('Press <Kbd label="Tab" />.', {
       prose: false,
