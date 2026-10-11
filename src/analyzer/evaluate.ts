@@ -1,6 +1,11 @@
-import type { Expression } from "sveast/walk";
-import { type Node, patternNames, scopeNames } from "./ast";
-import { type ComponentModel, FUNCTION_DECLARATION } from "./component-model";
+import type { Binding } from "sveast/scope";
+import type { Expression, Identifier } from "sveast/walk";
+import type { Node } from "./ast";
+import {
+  type ComponentModel,
+  FUNCTION_DECLARATION,
+  isTopLevel,
+} from "./component-model";
 import type { ComponentUsage } from "./usage";
 import {
   BOOLEAN,
@@ -41,21 +46,22 @@ export type Scope = {
   /** Names being evaluated, so a cycle reads as unknown instead of looping. */
   pending: Set<string>;
   /**
-   * Names an enclosing `{#each}` binds (its item, its index), shadowing
-   * the component's own. Replaced, never mutated, while walking a body.
+   * What the enclosing `{#each}` blocks' items hold. Replaced, never
+   * mutated, while walking a body.
    */
-  locals: ReadonlyMap<string, Value>;
+  locals: ReadonlyMap<Binding, Value>;
   /** Values of imported names, when known (the app's own constants). */
   imported: ReadonlyMap<string, Value>;
 };
 
-const NO_LOCALS: ReadonlyMap<string, Value> = new Map();
+const NO_LOCALS: ReadonlyMap<Binding, Value> = new Map();
+const NO_IMPORTS: ReadonlyMap<string, Value> = new Map();
 
 export function createScope(
   model: ComponentModel,
   usage: ComponentUsage,
   context: ContextResolver,
-  imported: ReadonlyMap<string, Value> = NO_LOCALS,
+  imported: ReadonlyMap<string, Value> = NO_IMPORTS,
 ): Scope {
   return {
     model,
@@ -68,10 +74,30 @@ export function createScope(
   };
 }
 
+/**
+ * The binding `node` refers to when a nested scope declares it (a
+ * parameter, a local, an `{#each}` item, `let:`, a snippet parameter,
+ * `{@const}`, an `{#await}` value); `undefined` for the component's own
+ * names and globals, which are read by name.
+ */
+function nestedBinding(node: Identifier, scope: Scope): Binding | undefined {
+  const binding = scope.model.scopes.bindingOf(node);
+  return binding && !isTopLevel(binding, scope.model) ? binding : undefined;
+}
+
+/** What `node` holds: an `{#each}` item's value, or the name's. */
+function evaluateIdentifier(node: Identifier, scope: Scope): Value {
+  const nested = nestedBinding(node, scope);
+  if (!nested) return lookup(node.name, scope);
+  // `$item` reads a store a nested binding holds: unknown.
+  return nested.name === node.name
+    ? (scope.locals.get(nested) ?? UNKNOWN)
+    : UNKNOWN;
+}
+
+/** What the component's own name `name` (or a global) holds. */
 function lookup(name: string, scope: Scope): Value {
   if (name === "undefined") return UNDEFINED;
-  const local = scope.locals.get(name);
-  if (local !== undefined) return local;
   const { model } = scope;
   if (model.unknownNames.has(name)) return UNKNOWN;
   const cached = scope.memo.get(name);
@@ -79,15 +105,10 @@ function lookup(name: string, scope: Scope): Value {
   if (scope.pending.has(name)) return UNKNOWN;
 
   scope.pending.add(name);
-  // A top-level name is evaluated where it's declared, outside any
-  // `{#each}` the lookup came from.
-  const locals = scope.locals;
-  scope.locals = NO_LOCALS;
   let value: Value;
   try {
     value = keepIfContained(resolve(name, scope), name, model);
   } finally {
-    scope.locals = locals;
     scope.pending.delete(name);
   }
   scope.memo.set(name, value);
@@ -144,8 +165,7 @@ export function bindEach(
   const items = itemsOf(evaluate(node.expression, scope));
   const outer = scope.locals;
   const locals = new Map(outer);
-  bindPattern(node.context as Node | null, items, locals);
-  if (node.index) locals.set(node.index, UNKNOWN);
+  bindPattern(node.context as Node | null, items, locals, scope);
   scope.locals = locals;
   return () => {
     scope.locals = outer;
@@ -153,63 +173,44 @@ export function bindEach(
 }
 
 /**
- * Binds what `node` declares (a function's parameters and locals, a
- * block's) as unknown while the walk is inside it, so they don't read
- * as the component's own names; returns the unbinding.
+ * Binds the names `pattern` declares to what it reads from `value`, where
+ * that's a plain property; the others, and the index, stay unknown.
  */
-export function bindScope(node: Node, scope: Scope): (() => void) | undefined {
-  const names = scopeNames(node);
-  if (!names || names.size === 0) return undefined;
-  const outer = scope.locals;
-  const locals = new Map(outer);
-  for (const name of names) locals.set(name, UNKNOWN);
-  scope.locals = locals;
-  return () => {
-    scope.locals = outer;
-  };
-}
-
-/** Binds the names `pattern` declares to what it reads from `value`. */
 function bindPattern(
   pattern: Node | null,
   value: Value,
-  locals: Map<string, Value>,
+  locals: Map<Binding, Value>,
+  scope: Scope,
 ): void {
-  if (!pattern) return;
-  if (pattern.type === "Identifier") {
-    locals.set(pattern.name, value);
+  const bind = (node: Identifier, bound: Value) => {
+    const binding = scope.model.scopes.bindingOf(node);
+    if (binding) locals.set(binding, bound);
+  };
+  if (pattern?.type === "Identifier") {
+    bind(pattern, value);
     return;
   }
-  if (pattern.type === "ObjectPattern") {
-    for (const property of pattern.properties) {
-      const key =
-        property.type === "Property" && !property.computed
-          ? property.key.type === "Identifier"
-            ? property.key.name
-            : property.key.type === "Literal"
-              ? String(property.key.value)
-              : undefined
-          : undefined;
-      if (
-        key !== undefined &&
-        property.type === "Property" &&
-        property.value.type === "Identifier"
-      ) {
-        locals.set(
-          property.value.name,
-          flatMap(value, (p) => readProperty(p, key)),
-        );
-        continue;
-      }
-      const names = new Set<string>();
-      patternNames(property as Node, names);
-      for (const name of names) locals.set(name, UNKNOWN);
+  if (pattern?.type !== "ObjectPattern") return;
+  for (const property of pattern.properties) {
+    const key =
+      property.type === "Property" && !property.computed
+        ? property.key.type === "Identifier"
+          ? property.key.name
+          : property.key.type === "Literal"
+            ? String(property.key.value)
+            : undefined
+        : undefined;
+    if (
+      key !== undefined &&
+      property.type === "Property" &&
+      property.value.type === "Identifier"
+    ) {
+      bind(
+        property.value,
+        flatMap(value, (p) => readProperty(p, key)),
+      );
     }
-    return;
   }
-  const names = new Set<string>();
-  patternNames(pattern, names);
-  for (const name of names) locals.set(name, UNKNOWN);
 }
 
 function resolve(name: string, scope: Scope): Value {
@@ -257,11 +258,13 @@ function isOnly(value: Value, p: undefined): boolean {
 }
 
 /** `$$props`, `$$restProps`, or the rest of `$props()`. */
-export function isPropsObject(name: string, scope: Scope): boolean {
+export function isPropsObject(node: Identifier, scope: Scope): boolean {
+  const { name } = node;
   return (
-    name === "$$props" ||
-    name === "$$restProps" ||
-    name === scope.model.restPropsName
+    (name === "$$props" ||
+      name === "$$restProps" ||
+      name === scope.model.restPropsName) &&
+    !nestedBinding(node, scope)
   );
 }
 
@@ -300,7 +303,7 @@ export function spreadProps(
   argument: Expression,
   scope: Scope,
 ): Map<string, PassedProp> | undefined {
-  if (argument.type === "Identifier" && isPropsObject(argument.name, scope)) {
+  if (argument.type === "Identifier" && isPropsObject(argument, scope)) {
     return passedProps(scope, argument.name !== "$$props");
   }
   return spreadObjects(evaluate(argument, scope));
@@ -363,8 +366,12 @@ export function whyUnknown(
   const inner = (child: Node | Expression | null | undefined) =>
     child ? whyUnknown(child, scope, depth + 1) : undefined;
   switch (node.type) {
-    case "Identifier":
-      return whyNameUnknown(node.name, scope, depth);
+    case "Identifier": {
+      const nested = nestedBinding(node, scope);
+      return nested
+        ? `\`${node.name}\` ${NESTED_REASONS[nested.kind] ?? "is declared in a nested scope"}`
+        : whyNameUnknown(node.name, scope, depth);
+    }
     case "CallExpression":
       return `calls \`${snippet(node.callee as Expression, scope)}()\``;
     case "MemberExpression":
@@ -389,6 +396,18 @@ export function whyUnknown(
   }
   return `\`${snippet(node, scope)}\` isn't read by the analysis`;
 }
+
+/** Why a nested binding of each kind is unknown, for the report. */
+const NESTED_REASONS: Partial<Record<Binding["kind"], string>> = {
+  param: "is a parameter",
+  "snippet-param": "is a snippet parameter",
+  each: "is an `{#each}` item the analysis can't read",
+  "each-index": "is an `{#each}` index",
+  "let-directive": "comes from a slot (`let:`)",
+  "const-tag": "is declared by `{@const}`",
+  "await-value": "is what an `{#await}` resolves to",
+  "await-error": "is what an `{#await}` rejects with",
+};
 
 function whyNameUnknown(name: string, scope: Scope, depth: number): string {
   const { model, usage } = scope;
@@ -428,7 +447,7 @@ export function evaluate(node: Node | Expression, scope: Scope): Value {
           : possible(node.value as string | number | boolean | null);
 
     case "Identifier":
-      return lookup(node.name, scope);
+      return evaluateIdentifier(node, scope);
 
     case "TemplateLiteral": {
       let result: Value = possible(node.quasis[0].value.cooked ?? "");
@@ -540,7 +559,8 @@ function evaluateCall(
   const { callee, arguments: args } = node;
   if (
     callee.type !== "Identifier" ||
-    scope.model.unknownNames.has(callee.name)
+    scope.model.unknownNames.has(callee.name) ||
+    nestedBinding(callee, scope)
   ) {
     return UNKNOWN;
   }
@@ -564,8 +584,7 @@ function evaluateCall(
       // changes. One holding an object could have it mutated through `$`.
       if (
         scope.model.storeImports.get(callee.name) === "readable" &&
-        args.length <= 1 &&
-        !scope.locals.has(callee.name)
+        args.length <= 1
       ) {
         const value = first ? argument() : UNDEFINED;
         return possible(
@@ -586,13 +605,12 @@ type FunctionNode = Extract<
 >;
 
 /**
- * The function `name` holds, when the analysis can read its body: a
- * prop's default no call site overrides, or a top-level
- * `const f = (…) => …`.
+ * The function the component's own name `name` holds, when the analysis
+ * can read its body: a prop's default no call site overrides, or a
+ * top-level `const f = (…) => …`.
  */
 function knownFunction(name: string, scope: Scope): FunctionNode | undefined {
   const { model, usage } = scope;
-  if (scope.locals.has(name)) return undefined;
   let node: Node | null | undefined;
   if (model.props.has(name)) {
     const passedAs = model.propNames.get(name) ?? name;
@@ -616,8 +634,9 @@ function knownFunction(name: string, scope: Scope): FunctionNode | undefined {
 
 /**
  * What calling `fn` returns, when its body is an expression or a lone
- * `return`: its parameters are unknown, and every other name it reads is
- * the component's own (it's declared at the top level).
+ * `return`: its parameters are unknown (they're nested bindings), and
+ * every other name it reads is the component's own (it's declared at the
+ * top level).
  */
 function returnValue(fn: FunctionNode, scope: Scope): Value {
   let returned: Node | null;
@@ -636,17 +655,11 @@ function returnValue(fn: FunctionNode, scope: Scope): Value {
 
   const key = `call:${(fn as { start?: number }).start}`;
   if (scope.pending.has(key)) return UNKNOWN;
-  const parameters = new Set<string>();
-  for (const parameter of fn.params)
-    patternNames(parameter as Node, parameters);
-  const outer = scope.locals;
-  scope.locals = new Map([...parameters].map((name) => [name, UNKNOWN]));
   scope.pending.add(key);
   try {
     return evaluate(returned as Expression, scope);
   } finally {
     scope.pending.delete(key);
-    scope.locals = outer;
   }
 }
 
@@ -665,7 +678,7 @@ function evaluateMember(
       if (usage.open || usage.slotsUnknown) return UNKNOWN;
       return usage.slots.get(property.name) ?? UNDEFINED;
     }
-    if (isPropsObject(object.name, scope)) {
+    if (isPropsObject(object, scope)) {
       const key =
         !computed && property.type === "Identifier"
           ? property.name

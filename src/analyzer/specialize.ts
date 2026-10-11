@@ -1,13 +1,14 @@
-import { type AST, isReference, SKIP, walk } from "sveast/walk";
-import { parse } from "../indexer/parser";
-import { childEntries, type Node } from "./ast";
 import {
-  bindEach,
-  bindScope,
-  evaluate,
-  isPropsObject,
-  type Scope,
-} from "./evaluate";
+  type AST,
+  forEachChild,
+  isReference,
+  SKIP,
+  valueVisitorKeys,
+  walk,
+} from "sveast/walk";
+import { parse } from "../indexer/parser";
+import type { Node } from "./ast";
+import { bindEach, evaluate, isPropsObject, type Scope } from "./evaluate";
 import {
   concat,
   type MappedText,
@@ -66,7 +67,7 @@ type Edit = {
   silences?: boolean;
 };
 
-/** TypeScript nodes that hold a value; every other `TS*` node is a type. */
+/** TypeScript expressions that hold the value of theirs. */
 const TS_VALUE_WRAPPERS = new Set([
   "TSAsExpression",
   "TSSatisfiesExpression",
@@ -193,7 +194,7 @@ function isPure(node: Node, scope: Scope): boolean {
       // Svelte's prop objects are plain: reading one runs no getter.
       if (
         node.object.type === "Identifier" &&
-        isPropsObject(node.object.name, scope) &&
+        isPropsObject(node.object, scope) &&
         (!node.computed || node.property.type === "Literal")
       ) {
         return true;
@@ -339,22 +340,16 @@ export function specializeComponent(
     return isPure(test, scope) ? truthOf(valueAt(test)) : "either";
   }
 
+  /** Visits `node`'s children, skipping TypeScript's types. */
   function visitChildren(node: Node): void {
-    for (const [field, child] of childEntries(node)) visit(child, node, field);
+    forEachChild(
+      node,
+      (child, field) => visit(child, node, field),
+      valueVisitorKeys,
+    );
   }
 
   function visit(node: Node, parent: Node | null, field: string): void {
-    const unbind = bindScope(node, scope);
-    try {
-      visitNode(node, parent, field);
-    } finally {
-      unbind?.();
-    }
-  }
-
-  function visitNode(node: Node, parent: Node | null, field: string): void {
-    if (node.type.startsWith("TS") && !TS_VALUE_WRAPPERS.has(node.type)) return;
-
     switch (node.type) {
       // Bindings and patterns: nothing in them is a plain read.
       case "ImportDeclaration":
