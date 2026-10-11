@@ -362,6 +362,9 @@ async function buildExample(
 }
 
 async function main() {
+  // The playground uses the installed carbon-components-svelte here, not a
+  // checkout its `.env.local` may name: its CSS snapshot depends on it.
+  process.env.CCS_DIR ??= "";
   console.log("Building and linking package...\n");
   await $`bun run build && bun link`;
 

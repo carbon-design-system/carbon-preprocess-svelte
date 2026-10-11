@@ -14,6 +14,9 @@ import path from "node:path";
 import { $ } from "bun";
 
 const ROOT = path.join(import.meta.dirname, "../..");
+// The installed carbon-components-svelte unless CCS_DIR is set here:
+// `playground/.env.local` is for local development, not the tests.
+process.env.CCS_DIR ??= "";
 const HERE = path.join(import.meta.dirname, "..");
 
 if (!process.env.PLAYGROUND_SKIP_SETUP) {

@@ -101,6 +101,9 @@
     ],
   };
   const TOGGLES = {};
+  // Options that only Prose acts on: off, with the reason, when the CCS in use has no Prose.
+  const PROSE_ONLY = new Set(["scope", "variant", "measure", "scrollMargin", "linkTone", "tableWidth", "kbd", "dividers"]);
+  const { prose: hasProse, ccs } = __PLAYGROUND__;
   const DEFAULTS = {
     page: "KitchenSink",
     scope: "runs",
@@ -229,7 +232,12 @@
       </select>
     {/if}
     {#each Object.entries(SELECTS) as [name, options]}
-      <select aria-label={name} bind:value={state[name]}>
+      <select
+        aria-label={name}
+        bind:value={state[name]}
+        disabled={!hasProse && PROSE_ONLY.has(name)}
+        title={!hasProse && PROSE_ONLY.has(name) ? "Needs Prose: see the note below the toolbar" : undefined}
+      >
         {#each options as [value, text]}
           <option {value}>{text}</option>
         {/each}
@@ -246,6 +254,13 @@
       </label>
     {/each}
   </div>
+  {#if !hasProse}
+    <p class="no-prose" role="note">
+      No Prose: {ccs} doesn't have it, so pages render as plain HTML (no spacing) and the Prose options are off.
+      Point the playground at a carbon-components-svelte checkout that has Prose: <code>CCS_DIR=../path/to/checkout</code> in
+      <code>playground/.env.local</code>, then restart.
+    </p>
+  {/if}
 {/if}
 
 <Hovercard />
@@ -268,6 +283,19 @@
 {/if}
 
 <style>
+  .no-prose {
+    margin: 0;
+    padding: var(--cds-spacing-04) var(--cds-spacing-05);
+    border-bottom: 1px solid var(--cds-support-03);
+    background-color: color-mix(in srgb, var(--cds-support-03) 16%, var(--cds-ui-background));
+    color: var(--cds-text-01);
+    font-size: 0.875rem;
+  }
+
+  .no-prose code {
+    font-family: "IBM Plex Mono", monospace;
+  }
+
   .toolbar {
     position: sticky;
     z-index: 10;
@@ -291,6 +319,13 @@
     background: var(--cds-field-01);
     color: var(--cds-text-01);
     font: inherit;
+  }
+
+  /* Carbon's disabled field: no Prose, nothing for these to change. */
+  select:disabled {
+    border-bottom-color: transparent;
+    color: var(--cds-disabled-02);
+    cursor: not-allowed;
   }
 
   .toggle {
