@@ -130,7 +130,7 @@ describe("shell", () => {
     const nav = page.getByRole("navigation", {
       name: "Previous and next pages",
     });
-    expect(await nav.textContent()).toContain("Try markdown()");
+    expect(await nav.textContent()).toContain("Options gallery");
     expect(await nav.textContent()).toContain("Stress");
     await nav.getByRole("link", { name: /Next/ }).click();
     await page.waitForTimeout(300);
