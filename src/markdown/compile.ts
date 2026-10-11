@@ -226,6 +226,7 @@ export interface MarkdownOptions {
   svelte?: 3 | 4 | 5;
 }
 
+/** `compileMarkdown`'s result: the Svelte component, and what it exports. */
 export interface CompiledMarkdown {
   code: string;
   headings: MarkdownHeading[];
@@ -340,7 +341,12 @@ function* walk(blocks: Block[]): Generator<Block> {
 /** Parse Markdown and render the body to Svelte markup, without the page shell. */
 export async function renderMarkdown(
   source: string,
-  options: MarkdownOptions & { filename?: string; ids?: boolean } = {},
+  options: MarkdownOptions & {
+    filename?: string;
+    ids?: boolean;
+    /** Emit HTML, not Svelte markup: a code block's lines inline, not `{@html …}`. */
+    html?: boolean;
+  } = {},
 ): Promise<{
   html: string;
   /** The rendered top-level blocks, marking components and Svelte tags. */
@@ -427,6 +433,9 @@ export async function renderMarkdown(
   const renderers = options.renderers ?? {};
   const alerts = options.alerts ?? "blockquote";
   const anchors = options.anchors === true ? {} : options.anchors || undefined;
+  /** Markup Svelte must not escape: as is in HTML, through `{@html}` in Svelte. */
+  const rawHtml = (html: string) =>
+    options.html ? html : `{@html ${JSON.stringify(html)}}`;
   const ctx: RenderContext = {
     filename: options.filename,
     metadata,
@@ -502,6 +511,7 @@ export async function renderMarkdown(
           return codeWithLines(block.lang, lines, {
             ...ctx,
             codeSnippet: options.codeSnippet,
+            rawHtml,
           });
         }
         const highlighted = await options.highlight?.(
@@ -522,13 +532,13 @@ export async function renderMarkdown(
             ? `<${snippet} type="multi" code={${raw}} />`
             : `<${snippet} type="multi" code={${raw}}>{@html ${JSON.stringify(inner)}}</${snippet}>`;
         }
-        if (wholePre) return `{@html ${JSON.stringify(highlighted)}}`;
+        if (wholePre) return rawHtml(highlighted);
         const lang = block.lang
           ? ` class="language-${escapeText(block.lang)}"`
           : "";
         return highlighted === undefined
           ? `<pre><code${lang}>${escapeText(block.value)}</code></pre>`
-          : `<pre${lang}><code${lang}>{@html ${JSON.stringify(highlighted)}}</code></pre>`;
+          : `<pre${lang}><code${lang}>${rawHtml(highlighted)}</code></pre>`;
       }
       case "codeGroup": {
         // Without a renderer: the blocks in a row, each under its label.
@@ -653,6 +663,59 @@ export async function renderMarkdown(
   };
 }
 
+/** `markdownToHtml`'s options: `markdown()`'s, less those that render Svelte. */
+export type MarkdownHtmlOptions = Omit<
+  MarkdownOptions,
+  | "extensions"
+  | "layout"
+  | "prose"
+  | "proseScope"
+  | "carbonDir"
+  | "codeIcons"
+  | "codeSnippet"
+  | "alerts"
+  | "expressions"
+  | "autoImport"
+  | "svelte"
+> & {
+  /**
+   * The HTML for a top-level Svelte block (a component, `{#if}`): a
+   * placeholder, say. Dropped by default. Scripts and styles are always
+   * dropped; tags inside a paragraph stay as written.
+   */
+  svelteBlock?: (markup: string) => string;
+};
+
+/**
+ * Render Markdown to HTML, with no Svelte: for a preview in the browser (a
+ * CMS, an editor) of what `markdown()` builds. Wrap it in Prose to style it
+ * as the page would be. Code blocks have the same line markup; GitHub
+ * alerts are blockquotes, as `markdown()` renders them by default.
+ */
+export async function markdownToHtml(
+  source: string,
+  options: MarkdownHtmlOptions = {},
+): Promise<{
+  html: string;
+  headings: MarkdownHeading[];
+  metadata: Record<string, unknown>;
+}> {
+  const { svelteBlock, ...rest } = options;
+  const { parts, headings, metadata } = await renderMarkdown(source, {
+    ...rest,
+    html: true,
+    codeIcons: false,
+    codeSnippet: false,
+    alerts: "blockquote",
+    expressions: false,
+  });
+  const html = parts
+    .map((part) => (part.svelte ? (svelteBlock?.(part.html) ?? "") : part.html))
+    .filter(Boolean)
+    .join("\n");
+  return { html, headings, metadata };
+}
+
 /**
  * A fenced block with line features: one `<span class="line">` per line
  * (with `data-highlight`, `data-ins`, `data-del`, `data-focus`, or
@@ -663,7 +726,10 @@ export async function renderMarkdown(
 function codeWithLines(
   lang: string,
   lines: NonNullable<Awaited<ReturnType<typeof renderCodeLines>>>,
-  ctx: RenderContext & { codeSnippet?: boolean },
+  ctx: RenderContext & {
+    codeSnippet?: boolean;
+    rawHtml: (html: string) => string;
+  },
 ): string {
   const { title, kind, label, theme, icon, copy, iconOnly } = lines.meta;
   const hasHeader = title !== undefined || kind !== undefined || iconOnly;
@@ -681,7 +747,7 @@ function codeWithLines(
     lines.meta.lineNumbers !== undefined
       ? ` style="counter-reset: line ${lines.meta.lineNumbers - 1}"`
       : "";
-  const body = `{@html ${JSON.stringify(lines.html)}}`;
+  const body = ctx.rawHtml(lines.html);
   const snippet = ctx.codeSnippet ? ctx.use("CodeSnippet") : undefined;
   const block = snippet
     ? `<${snippet} type="multi" code={${JSON.stringify(lines.copy)}}${copy ? "" : " hideCopyButton"}${preAttributes}>${body}</${snippet}>`
