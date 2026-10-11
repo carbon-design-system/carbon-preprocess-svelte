@@ -68,11 +68,20 @@ describe("try", () => {
 
   test("the draft survives a reload, and Reset restores the sample", async () => {
     const { page } = await openTry();
+    // Nothing to reset yet.
+    expect(
+      await page
+        .getByRole("button", { name: "Reset to the sample" })
+        .isDisabled(),
+    ).toBe(true);
     await page.getByLabel("Markdown").fill("# Draft");
     await page.waitForTimeout(300);
     await page.reload({ waitUntil: "networkidle" });
     expect(await page.getByLabel("Markdown").inputValue()).toBe("# Draft");
-    await page.getByRole("button", { name: "Reset to the sample" }).click();
+    const reset = page.getByRole("button", { name: "Reset to the sample" });
+    expect(await reset.isDisabled()).toBe(false);
+    await reset.click();
+    expect(await reset.isDisabled()).toBe(true);
     expect(await page.getByLabel("Markdown").inputValue()).toContain(
       "# Getting started",
     );
