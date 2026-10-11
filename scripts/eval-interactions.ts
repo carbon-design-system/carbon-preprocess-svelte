@@ -16,6 +16,9 @@
  *   `default` vs `optimized`, on a DataTable app.
  * - `astro`: the same, prerendered by Astro and hydrated (`client:load`),
  *   with the SvelteKit example's SSR checks.
+ * - `golden/<app>`: the golden apps, built here with Vite (see
+ *   `golden-build.ts`), `baseline` vs `css`, `prop-aware` and `full`, through
+ *   the scripts in `golden-steps.ts`.
  *
  *   bun scripts/eval-interactions.ts [--examples rollup,rspack] [--no-build]
  *
@@ -28,6 +31,8 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { $ } from "bun";
 import { type Browser, chromium, type Page } from "playwright";
+import { buildGolden, GOLDEN_VARIANTS } from "./golden-build";
+import { GOLDEN_SCENARIOS } from "./golden-steps";
 
 const { values: args } = parseArgs({
   options: {
@@ -251,6 +256,8 @@ type Example = {
   steps: Step[];
   /** Prerendered and hydrated: also compare the server HTML and hydration. */
   ssr?: boolean;
+  /** A golden app: built here, from `golden/<app>`. */
+  golden?: string;
 };
 
 const EXAMPLE_SPECS: Record<string, Example> = {
@@ -290,6 +297,21 @@ const EXAMPLE_SPECS: Record<string, Example> = {
             variant === "default" ? "public" : `public-${variant}`,
           ready: ".bx--data-table",
           steps: DATATABLE_STEPS,
+        },
+      ],
+    ),
+  ),
+  ...Object.fromEntries(
+    Object.entries(GOLDEN_SCENARIOS).map(
+      ([app, scenario]): [string, Example] => [
+        `golden/${app}`,
+        {
+          variants: GOLDEN_VARIANTS,
+          outDir: (variant) =>
+            path.join(ROOT, ".context/golden-build", app, variant),
+          ready: scenario.ready,
+          steps: scenario.steps,
+          golden: app,
         },
       ],
     ),
@@ -423,6 +445,9 @@ async function runScenario(
   const page = await context.newPage();
   const messages: string[] = [];
   page.on("console", (message) => {
+    // Requests this script aborts itself (fonts on Carbon's CDN): pruned
+    // CSS references fewer of them.
+    if (message.text().includes("net::ERR_FAILED")) return;
     if (message.type() === "error" || message.type() === "warning") {
       messages.push(`${message.type()}: ${message.text()}`);
     }
@@ -497,8 +522,10 @@ const scriptErrors: string[] = [];
 for (const example of EXAMPLES) {
   const spec = EXAMPLE_SPECS[example];
   if (!spec) throw new Error(`no interaction scenario for ${example}`);
-  const dir = path.join(ROOT, "examples", example);
-  if (!existsSync(path.join(dir, "node_modules"))) {
+  const dir = spec.golden
+    ? path.join(ROOT, "golden", spec.golden)
+    : path.join(ROOT, "examples", example);
+  if (!spec.golden && !existsSync(path.join(dir, "node_modules"))) {
     throw new Error(
       `${example}: install its dependencies first (see its README)`,
     );
@@ -507,9 +534,10 @@ for (const example of EXAMPLES) {
   for (const variant of spec.variants) {
     if (!args["no-build"]) {
       // biome-ignore lint/performance/noAwaitInLoops: one build at a time
-      await $`cd ${dir} && bun run build:${variant}`.quiet();
+      if (spec.golden) await buildGolden(dir, variant, spec.outDir(variant));
+      else await $`cd ${dir} && bun run build:${variant}`.quiet();
     }
-    const server = serve(path.join(dir, spec.outDir(variant)));
+    const server = serve(path.resolve(dir, spec.outDir(variant)));
     runs.set(variant, await runScenario(browser, server.url.href, spec));
     server.stop(true);
   }
