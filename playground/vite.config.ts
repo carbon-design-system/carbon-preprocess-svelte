@@ -28,6 +28,7 @@ import {
   highlight,
   type MarkdownOptions,
   markdown,
+  markdownToHtml,
   optimizeComponents,
   optimizeCss,
   optimizeImports,
@@ -391,6 +392,51 @@ function ccsPages() {
 }
 
 /**
+ * `virtual:search-index`: every page's title and its h2 and h3 headings,
+ * for the header search. Read with `markdownToHtml`, which returns the
+ * headings and frontmatter `markdown()` exports, without rendering Svelte.
+ */
+function searchIndex() {
+  const id = "virtual:search-index";
+  return {
+    name: "playground-search-index",
+    resolveId: (source: string) => (source === id ? `\0${id}` : undefined),
+    async load(
+      this: { addWatchFile: (file: string) => void },
+      resolved: string,
+    ) {
+      if (resolved !== `\0${id}`) return;
+      const dir = path.join(HERE, "src/pages");
+      const files = [
+        ...readdirSync(dir)
+          .filter((file) => file.endsWith(".svx"))
+          .map((file) => path.join(dir, file)),
+        ...CCS_PAGE_FILES,
+      ];
+      const pages = await Promise.all(
+        files.map(async (file) => {
+          this.addWatchFile(file);
+          const page = path.basename(file, ".svx");
+          const { headings, metadata } = await markdownToHtml(
+            readFileSync(file, "utf8"),
+          );
+          return {
+            page,
+            title: typeof metadata.title === "string" ? metadata.title : page,
+            ccs: CCS_PAGE_FILES.includes(file),
+            headings: headings
+              .filter((h) => h.depth === 2 || h.depth === 3)
+              .map(({ id, text }) => ({ id, text })),
+          };
+        }),
+      );
+      pages.push({ page: "Matrix", title: "Matrix", ccs: false, headings: [] });
+      return `export default ${JSON.stringify(pages)};`;
+    },
+  };
+}
+
+/**
  * `virtual:ccs-api`: a compact component index for the code views' hover
  * cards, from the docs' COMPONENT_API.json (sveld) and each page's
  * frontmatter description. Loaded lazily, on the first hover.
@@ -722,6 +768,7 @@ export default {
         ]
       : []),
     ccsApi(),
+    searchIndex(),
     svelte({
       extensions: [".svelte", ".svx", ".md", ".sample"],
       preprocess: [
