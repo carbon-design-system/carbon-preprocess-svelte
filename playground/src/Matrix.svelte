@@ -1,13 +1,16 @@
 <script>
   // Every element group × one option per column, optionally repeated per
-  // value of a second option. All other options come from the toolbar.
+  // value of a second option. All other options come from Settings.
+  import { Select, SelectItem } from "carbon-components-svelte";
 
   /** Option name -> [value, label][] */
   export let selects;
-  /** The toolbar's values, used for options not on an axis. */
+  /** The options the Matrix can lay out (`axis` in options.js). */
+  export let axes = [];
+  /** The settings, used for options not on an axis. */
   export let state;
   export let columns = "variant";
-  export let group = "theme";
+  export let group = "none";
 
   const samples = Object.entries(import.meta.glob("./samples/*.sample", { eager: true }))
     .sort(([a], [b]) => a.localeCompare(b))
@@ -15,6 +18,9 @@
 
   // Each cell carries its own theme (`.t-<theme>`): see theme-scopes.js.
   import { themeScopeCss as themeCss } from "./theme-scopes.js";
+
+  // Repeating per the column's own setting would show one cell per group.
+  $: if (group === columns) group = "none";
 
   const valuesOf = (name) =>
     name === "none" ? [[null, ""]] : selects[name].filter(([v]) => v !== "system");
@@ -42,11 +48,24 @@
 </svelte:head>
 
 <div class="matrix-page">
-  <p class="hint">
-    Rows: element groups. Columns: <strong>{columns}</strong>{group !== "none" ? `, repeated per ${group}` : ""}.
-    Other options come from the toolbar. Heading anchors are shown at full opacity; the
-    "Hover", "Focus", and "Visited" links are forced states.
-  </p>
+  <header class="matrix-head">
+    <div>
+      <h1 class="bx--type-productive-heading-04">Matrix</h1>
+      <p class="hint">
+        Every element group, side by side across one setting. Other settings apply to every cell. Heading
+        anchors are shown at full opacity, and the "Hover", "Focus", and "Visited" links are forced states.
+      </p>
+    </div>
+    <div class="axes">
+      <Select size="sm" inline labelText="Columns" bind:selected={columns}>
+        {#each axes as axis (axis.key)}<SelectItem value={axis.key} text={axis.label} />{/each}
+      </Select>
+      <Select size="sm" inline labelText="Repeat per" bind:selected={group}>
+        <SelectItem value="none" text="Nothing" />
+        {#each axes.filter((a) => a.key !== columns) as axis (axis.key)}<SelectItem value={axis.key} text={axis.label} />{/each}
+      </Select>
+    </div>
+  </header>
 
   {#each valuesOf(group) as [g, gLabel]}
     {#if group !== "none"}<h2 class="group">{gLabel}</h2>{/if}
@@ -70,14 +89,30 @@
 
 <style>
   .matrix-page {
-    padding: var(--cds-spacing-05);
+    padding-top: var(--cds-spacing-07);
+  }
+
+  .matrix-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--cds-spacing-05) var(--cds-spacing-07);
+    margin-bottom: var(--cds-spacing-07);
   }
 
   .hint {
-    max-width: 90ch;
-    margin-bottom: var(--cds-spacing-05);
+    max-width: 72ch;
+    margin-top: var(--cds-spacing-03);
     color: var(--cds-text-02);
     font-size: 0.875rem;
+    line-height: 1.43;
+  }
+
+  .axes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cds-spacing-05);
   }
 
   .group {

@@ -1,158 +1,153 @@
 <script>
+  /**
+   * The playground's shell: Carbon's UI Shell around the page. The header
+   * holds the theme switch and two panels (about, settings); the side nav
+   * lists pages; changed settings show as tags above the page. Options come
+   * from `shell/options.js` and live in the URL. `?chrome=0` hides the shell,
+   * for screenshots and tests.
+   */
   import "carbon-components-svelte/css/all.css";
   import "./variants.css";
   import "./syntax.css";
   import "./code-lines.css";
-  import { clearHighlights, highlightAll } from "./highlight-dom.js";
-  import Matrix from "./Matrix.svelte";
-  import Hovercard from "./intel/Hovercard.svelte";
-  import { codeLanguage, packageManager, perf, syntaxMode, terminalTheme } from "./settings.js";
-  import { themeScopeCss } from "./theme-scopes.js";
-  import ccsPages from "virtual:ccs-pages";
   import "./perf.css";
+  import {
+    Content,
+    Header,
+    HeaderAction,
+    HeaderGlobalAction,
+    HeaderUtilities,
+    InlineNotification,
+    SideNav,
+    SideNavItems,
+    SideNavLink,
+    SideNavMenu,
+    SkipToContent,
+  } from "carbon-components-svelte";
+  import Asleep from "carbon-icons-svelte/lib/Asleep.svelte";
+  import Carbon from "carbon-icons-svelte/lib/Carbon.svelte";
+  import Dashboard from "carbon-icons-svelte/lib/Dashboard.svelte";
+  import Document from "carbon-icons-svelte/lib/Document.svelte";
+  import Grid from "carbon-icons-svelte/lib/Grid.svelte";
+  import Information from "carbon-icons-svelte/lib/Information.svelte";
+  import Light from "carbon-icons-svelte/lib/Light.svelte";
+  import Meter from "carbon-icons-svelte/lib/Meter.svelte";
+  import Settings from "carbon-icons-svelte/lib/Settings.svelte";
+  import ccsPages from "virtual:ccs-pages";
+  import { clearHighlights, highlightAll } from "./highlight-dom.js";
+  import Hovercard from "./intel/Hovercard.svelte";
+  import Matrix from "./Matrix.svelte";
+  import { codeLanguage, packageManager, perf, syntaxMode, terminalTheme } from "./settings.js";
+  import AboutPanel from "./shell/AboutPanel.svelte";
+  import ChangedTags from "./shell/ChangedTags.svelte";
+  import { DEFAULTS, fromQuery, OPTIONS } from "./shell/options.js";
+  import SettingsPanel from "./shell/SettingsPanel.svelte";
+  import { themeScopeCss } from "./theme-scopes.js";
 
-  // The kitchen sink twice: `.svx` = one Prose per Markdown run, `.md` = one
-  // Prose for the page. With `CCS_DIR`, the checkout's docs pages in `CCS_PAGES`.
+  const build = __PLAYGROUND__;
+
+  // Pages: the playground's own (the kitchen sink twice: `.svx` = one Prose
+  // per Markdown run, `.md` = one for the page), and with `CCS_DIR`, the
+  // checkout's docs pages in `CCS_PAGES`.
   const pageOf = (key) => key.split("/").pop().replace(/\.(svx|md)$/, "");
-  const modules = {
-    ...import.meta.glob("./pages/*.{svx,md}"),
-    ...ccsPages,
-  };
-  const pages = [
-    "Matrix",
-    ...[...new Set(Object.keys(modules).map(pageOf))].sort((a, b) =>
-      a === "KitchenSink" ? -1 : b === "KitchenSink" ? 1 : a.localeCompare(b),
-    ),
+  const modules = { ...import.meta.glob("./pages/*.{svx,md}"), ...ccsPages };
+  const NAV = [
+    {
+      label: "Playground",
+      pages: [
+        { name: "KitchenSink", text: "Kitchen sink", icon: Document },
+        { name: "Matrix", text: "Matrix", icon: Grid },
+        { name: "Stress", text: "Stress", icon: Dashboard },
+      ],
+    },
+    {
+      label: "Benches",
+      pages: [
+        { name: "MountBench", text: "Mount cost", icon: Meter },
+        { name: "InteractBench", text: "Interaction latency", icon: Meter },
+      ],
+    },
   ];
-  const AXIS_LABELS = {
-    variant: "variant",
-    theme: "theme",
-    kbd: "keys",
-    linkTone: "links",
-    tableWidth: "tables",
-    dividers: "dividers",
-  };
+  const CCS_NAV = Object.keys(ccsPages).map(pageOf).sort();
+  const PAGES = new Set(["Matrix", ...Object.keys(modules).map(pageOf)]);
 
-  const SELECTS = {
-    page: pages.map((p) => [p, p]),
-    scope: [
-      ["runs", "Prose per Markdown run"],
-      ["page", "One Prose for the page"],
-    ],
-    variant: [
-      ["auto", "Variant: default"],
-      ["condensed", "Variant: condensed"],
-      ["compact", "Variant: compact"],
-      ["spacious", "Variant: spacious"],
-      ["expressive", "Variant: expressive"],
-    ],
-    measure: [
-      ["auto", "Width: variant's"],
-      ["60ch", "Width: 60ch"],
-      ["68ch", "Width: 68ch"],
-      ["80ch", "Width: 80ch"],
-      ["96ch", "Width: 96ch"],
-      ["none", "Width: none"],
-    ],
-    scrollMargin: [
-      ["0", "Scroll margin: 0"],
-      ["toolbar", "Scroll margin: toolbar"],
-      ["6rem", "Scroll margin: 6rem"],
-    ],
-    // Prose's own props, passed through `proseProps`.
-    linkTone: [
-      ["default", "Links: default"],
-      ["muted", "Links: muted"],
-    ],
-    tableWidth: [
-      ["fit", "Tables: fit"],
-      ["full", "Tables: full"],
-    ],
-    kbd: [
-      ["keycap", "Keys: keycap"],
-      ["muted", "Keys: muted"],
-    ],
-    dividers: [
-      ["0", "Dividers: off"],
-      ["1", "Dividers: on"],
-    ],
-    codeVariant: [
-      ["prose", "Code: Prose variant"],
-      ["compact", "Code: compact"],
-    ],
-    terminal: [
-      ["page", "Terminal: page theme"],
-      ["g100", "Terminal: g100"],
-      ["g90", "Terminal: g90"],
-      ["white", "Terminal: white"],
-    ],
-    syntax: [
-      ["build", "Syntax: build-time spans"],
-      ["runtime", "Syntax: runtime (CSS Highlight API)"],
-      ["off", "Syntax: off"],
-    ],
-    theme: [
-      ["system", "Theme: system"],
-      ["white", "Theme: white"],
-      ["g10", "Theme: g10"],
-      ["g80", "Theme: g80"],
-      ["g90", "Theme: g90"],
-      ["g100", "Theme: g100"],
-    ],
-  };
-  const TOGGLES = {};
-  // Options that only Prose acts on: off, with the reason, when the CCS in use has no Prose.
-  const PROSE_ONLY = new Set(["scope", "variant", "measure", "scrollMargin", "linkTone", "tableWidth", "kbd", "dividers"]);
-  const { prose: hasProse, ccs } = __PLAYGROUND__;
-  const DEFAULTS = {
-    page: "KitchenSink",
-    scope: "runs",
-    variant: "auto",
-    measure: "auto",
-    scrollMargin: "toolbar",
-    linkTone: "default",
-    tableWidth: "fit",
-    kbd: "keycap",
-    theme: "system",
-    dividers: "0",
-    syntax: "build",
-    codeVariant: "prose",
-    terminal: "page",
-    columns: "variant",
-    group: "none",
-  };
-
+  // State: every option, plus the page and the Matrix's axes.
   const params = new URLSearchParams(location.search);
-  const state = Object.fromEntries(
-    Object.entries(DEFAULTS).map(([k, v]) => [k, params.get(k) ?? v]),
-  );
   const chrome = params.get("chrome") !== "0";
-  let toolbarHeight = 0;
+  const page = params.get("page");
+  const state = {
+    ...fromQuery(params),
+    page: page && PAGES.has(page) ? page : "KitchenSink",
+    columns: params.get("columns") ?? "variant",
+    group: params.get("group") ?? "none",
+  };
+  const MATRIX_DEFAULTS = { page: "KitchenSink", columns: "variant", group: "none" };
 
-  $: {
-    const next = new URLSearchParams(
-      Object.entries(state).filter(([k, v]) => v !== DEFAULTS[k]),
+  /** The query for `state` with some keys changed: only what differs from the defaults. */
+  function queryFor(next) {
+    const query = new URLSearchParams(
+      Object.entries(next).filter(([k, v]) => v !== (DEFAULTS[k] ?? MATRIX_DEFAULTS[k])),
     );
-    if (!chrome) next.set("chrome", "0");
-    if ($codeLanguage === "ts") next.set("code", "ts");
-    if ($packageManager !== "npm") next.set("pm", $packageManager);
-    history.replaceState(null, "", `?${next}${location.hash}`);
+    if (next.page !== "Matrix") {
+      query.delete("columns");
+      query.delete("group");
+    }
+    if (!chrome) query.set("chrome", "0");
+    return `?${query}`;
+  }
+
+  $: history.replaceState(null, "", `${queryFor(state)}${location.hash}`);
+
+  function setOption({ key, value }) {
+    const option = OPTIONS.find((o) => o.key === key);
+    // Loading techniques apply when the page loads.
+    if (option?.reload) {
+      location.search = queryFor({ ...state, [key]: value });
+      return;
+    }
+    state[key] = value;
+  }
+
+  function resetOptions() {
+    const reload = OPTIONS.some((o) => o.reload && state[o.key] !== o.default);
+    if (reload) {
+      location.search = queryFor({ ...state, ...DEFAULTS });
+      return;
+    }
+    Object.assign(state, DEFAULTS);
+  }
+
+  function goTo(event, name) {
+    event.preventDefault();
+    state.page = name;
+    if (window.innerWidth < 1056) isSideNavOpen = false;
+    window.scrollTo(0, 0);
   }
 
   // Theme: a Carbon theme, or white/g100 following the OS setting.
   const dark = matchMedia("(prefers-color-scheme: dark)");
   let prefersDark = dark.matches;
   dark.addEventListener("change", (e) => (prefersDark = e.matches));
-  $: document.documentElement.setAttribute(
-    "theme",
-    state.theme === "system" ? (prefersDark ? "g100" : "white") : state.theme,
-  );
+  $: resolvedTheme = state.theme === "system" ? (prefersDark ? "g100" : "white") : state.theme;
+  $: isDark = ["g80", "g90", "g100"].includes(resolvedTheme);
+  $: document.documentElement.setAttribute("theme", resolvedTheme);
 
   $: document.body.className = state.page === "Matrix" ? "matrix" : state.syntax === "build" ? "syntax-build" : "";
 
-  // Code views read these.
+  // Code views read these stores; their own switches write them back.
   $: syntaxMode.set(state.syntax);
-  // Themed regions (`theme="g100"` on a block): see theme-scopes.js.
+  $: terminalTheme.set(state.terminal === "page" ? undefined : state.terminal);
+  // Seeded from the URL before subscribing, so the stores' defaults don't win.
+  codeLanguage.set(state.code);
+  packageManager.set(state.pm);
+  $: codeLanguage.set(state.code);
+  $: packageManager.set(state.pm);
+  codeLanguage.subscribe((value) => value !== state.code && (state.code = value));
+  packageManager.subscribe((value) => value !== state.pm && (state.pm = value));
+  perf.set({ lazy: state.lazy === "1", cv: state.cv === "1", aot: state.aot === "1" });
+  if (state.cv === "1") document.body.dataset.cv = "";
+
+  // Themed regions (`theme="g100"` on a block or a panel): see theme-scopes.js.
   if (!document.getElementById("theme-scopes")) {
     const style = Object.assign(document.createElement("style"), { id: "theme-scopes", textContent: themeScopeCss });
     document.head.append(style);
@@ -160,35 +155,23 @@
   // Code type and spacing apart from Prose's variant (CCS: a `codeVariant` prop).
   $: if (state.codeVariant === "prose") delete document.body.dataset.codeVariant;
   else document.body.dataset.codeVariant = state.codeVariant;
-  $: terminalTheme.set(state.terminal === "page" ? undefined : state.terminal);
-  // The JS/TS choice lives in a store the code views share; the URL mirrors it.
-  codeLanguage.set(params.get("code") === "ts" ? "ts" : "js");
-  // Loading techniques, for A/B: `?lazy=0`, `?cv=0`, `?aot=0`.
-  perf.set({ lazy: params.get("lazy") !== "0", cv: params.get("cv") !== "0", aot: params.get("aot") !== "0" });
-  if ($perf.cv) document.body.dataset.cv = "";
-  // Likewise the package manager for npm commands.
-  packageManager.set(["pnpm", "yarn", "bun"].includes(params.get("pm")) ? params.get("pm") : "npm");
 
   // Runtime highlighting: re-register ranges whenever the page's DOM changes.
   let pending = 0;
-  let highlighted = 0;
   const observer = new MutationObserver(() => {
     cancelAnimationFrame(pending);
     pending = requestAnimationFrame(() => {
-      highlighted = state.syntax === "runtime" ? highlightAll() : 0;
+      if (state.syntax === "runtime") highlightAll();
     });
   });
   observer.observe(document.body, { childList: true, subtree: true });
-  $: if (state.syntax === "runtime") {
-    requestAnimationFrame(() => (highlighted = highlightAll()));
-  } else {
-    clearHighlights();
-  }
+  $: if (state.syntax === "runtime") requestAnimationFrame(() => highlightAll());
+  else clearHighlights();
 
-  // Prose's own custom property; apps set it to their sticky header's height.
+  // Prose's own custom property: room for the 48px header above a linked heading.
   $: document.documentElement.style.setProperty(
     "--ccs-prose-scroll-margin",
-    state.scrollMargin === "toolbar" ? `calc(${toolbarHeight}px + 1rem)` : state.scrollMargin,
+    state.scrollMargin === "header" ? (chrome ? "calc(3rem + 1rem)" : "1rem") : state.scrollMargin,
   );
 
   // Runtime Prose props, passed to the page as `proseProps`.
@@ -200,137 +183,162 @@
     kbd: state.kbd,
     dividers: state.dividers === "1",
   };
-  $: document.documentElement.style.setProperty(
-    "--demo-measure",
-    state.measure === "auto" ? "" : state.measure,
-  );
+  $: document.documentElement.style.setProperty("--demo-measure", state.measure === "auto" ? "" : state.measure);
 
-  $: key = Object.keys(modules).find(
-    (k) => pageOf(k) === state.page && k.endsWith(state.scope === "page" ? ".md" : ".svx"),
-  );
+  // The page loads only when the page or scope changes: through these
+  // primitives, other settings (which change `state`) don't remount it.
+  $: pageName = state.page;
+  $: scope = state.scope;
+  $: key = Object.keys(modules).find((k) => pageOf(k) === pageName && k.endsWith(scope === "page" ? ".md" : ".svx"));
   $: loading =
-    state.page === "Matrix"
+    pageName === "Matrix"
       ? Promise.resolve(null)
       : key
         ? modules[key]()
-        : Promise.reject(new Error(`No page ${state.page}`));
+        : Promise.reject(new Error(`No page ${pageName}`));
+
+  let isSideNavOpen = false;
+  let settingsOpen = false;
+  let aboutOpen = false;
 </script>
 
 {#if chrome}
-  <div class="toolbar" role="toolbar" aria-label="Preview options" bind:clientHeight={toolbarHeight}>
-    {#if state.page === "Matrix"}
-      <select aria-label="Matrix columns" bind:value={state.columns}>
-        {#each Object.entries(AXIS_LABELS) as [value, text]}
-          <option {value}>Columns: {text}</option>
+  <Header companyName="carbon-preprocess-svelte" platformName="Playground" href="?" bind:isSideNavOpen>
+    <svelte:fragment slot="skipToContent">
+      <SkipToContent />
+    </svelte:fragment>
+    <HeaderUtilities>
+      <HeaderGlobalAction
+        iconDescription={isDark ? "Light theme" : "Dark theme"}
+        tooltipAlignment="end"
+        icon={isDark ? Light : Asleep}
+        on:click={() => setOption({ key: "theme", value: isDark ? "white" : "g100" })}
+      />
+      <HeaderAction icon={Information} iconDescription="About this build" tooltipAlignment="end" bind:isOpen={aboutOpen}>
+        <AboutPanel {build} pages={PAGES.size} ccsPages={CCS_NAV.length} />
+      </HeaderAction>
+      <HeaderAction icon={Settings} iconDescription="Settings" tooltipAlignment="end" bind:isOpen={settingsOpen}>
+        <SettingsPanel {state} hasProse={build.prose} on:change={(e) => setOption(e.detail)} on:reset={resetOptions} />
+      </HeaderAction>
+    </HeaderUtilities>
+  </Header>
+
+  <SideNav bind:isOpen={isSideNavOpen} ariaLabel="Pages">
+    <SideNavItems>
+      <!-- Sections start with a label; no SideNavDivider: its <li role="separator">
+           fails axe's list rule (a CCS bug), so the label carries the rule line. -->
+      {#each NAV as section, index (section.label)}
+        <li class="nav-label bx--type-label-01" class:ruled={index > 0}>{section.label}</li>
+        {#each section.pages as item (item.name)}
+          <SideNavLink
+            href={queryFor({ ...state, page: item.name })}
+            text={item.text}
+            icon={item.icon}
+            isSelected={state.page === item.name}
+            on:click={(event) => goTo(event, item.name)}
+          />
         {/each}
-      </select>
-      <select aria-label="Matrix groups" bind:value={state.group}>
-        <option value="none">Group by: none</option>
-        {#each Object.entries(AXIS_LABELS).filter(([v]) => v !== state.columns) as [value, text]}
-          <option {value}>Group by: {text}</option>
-        {/each}
-      </select>
-    {/if}
-    {#each Object.entries(SELECTS) as [name, options]}
-      <select
-        aria-label={name}
-        bind:value={state[name]}
-        disabled={!hasProse && PROSE_ONLY.has(name)}
-        title={!hasProse && PROSE_ONLY.has(name) ? "Needs Prose: see the note below the toolbar" : undefined}
-      >
-        {#each options as [value, text]}
-          <option {value}>{text}</option>
-        {/each}
-      </select>
-    {/each}
-    {#each Object.entries(TOGGLES) as [name, text]}
-      <label class="toggle">
-        <input
-          type="checkbox"
-          checked={state[name] === "1"}
-          on:change={(e) => (state[name] = e.currentTarget.checked ? "1" : "0")}
-        />
-        {text}
-      </label>
-    {/each}
-  </div>
-  {#if !hasProse}
-    <p class="no-prose" role="note">
-      No Prose: {ccs} doesn't have it, so pages render as plain HTML (no spacing) and the Prose options are off.
-      Point the playground at a carbon-components-svelte checkout that has Prose: <code>CCS_DIR=../path/to/checkout</code> in
-      <code>playground/.env.local</code>, then restart.
-    </p>
-  {/if}
+      {/each}
+      {#if CCS_NAV.length}
+        <li class="nav-label bx--type-label-01 ruled">Carbon Components Svelte</li>
+        <SideNavMenu text="CCS docs" icon={Carbon} expanded>
+          {#each CCS_NAV as name (name)}
+            <SideNavLink
+              href={queryFor({ ...state, page: name })}
+              text={name}
+              isSelected={state.page === name}
+              on:click={(event) => goTo(event, name)}
+            />
+          {/each}
+        </SideNavMenu>
+      {/if}
+    </SideNavItems>
+  </SideNav>
 {/if}
 
 <Hovercard />
 
-{#if state.page === "Matrix"}
-  <Matrix
-    selects={SELECTS}
-    {state}
-    columns={state.columns}
-    group={state.group === state.columns ? "none" : state.group}
-  />
-{:else}
-{#await loading then mod}
-  {#key key}
-    <svelte:component this={mod.default} {proseProps} />
-  {/key}
-{:catch error}
-  <p>{error.message}</p>
-{/await}
-{/if}
+<Content class={chrome ? "with-shell" : "no-shell"}>
+  {#if chrome}
+    <ChangedTags {state} on:change={(e) => setOption(e.detail)} on:reset={resetOptions} />
+    {#if !build.prose}
+      <InlineNotification
+        kind="warning"
+        lowContrast
+        hideCloseButton
+        title="No Prose."
+        subtitle="{build.ccs} doesn't have it, so pages render as plain HTML and Prose's settings are off. Set CCS_DIR to a checkout with Prose in playground/.env.local, then restart."
+      />
+    {/if}
+  {/if}
+
+  {#if state.page === "Matrix"}
+    <Matrix
+      selects={Object.fromEntries(OPTIONS.map((o) => [o.key, o.values]))}
+      axes={OPTIONS.filter((o) => o.axis)}
+      {state}
+      bind:columns={state.columns}
+      bind:group={state.group}
+    />
+  {:else}
+    {#await loading then mod}
+      {#key key}
+        <svelte:component this={mod.default} {proseProps} />
+      {/key}
+    {:catch error}
+      <InlineNotification kind="error" lowContrast hideCloseButton title="Can't load the page." subtitle={error.message} />
+    {/await}
+  {/if}
+</Content>
 
 <style>
-  .no-prose {
+  /* Section labels in the side nav, in Carbon's sentence case. */
+  .nav-label {
+    margin: 0 var(--cds-spacing-05);
+    padding: var(--cds-spacing-05) 0 var(--cds-spacing-03);
+    color: var(--cds-text-02);
+  }
+
+  .nav-label.ruled {
+    margin-top: var(--cds-spacing-03);
+    border-top: 1px solid var(--cds-ui-03);
+  }
+
+  /* The settings panel needs room for its fields: wider than Carbon's
+     default 16rem panel, and scrollable. */
+  :global(.bx--header-panel:has(.settings)),
+  :global(.bx--header-panel:has(.about)) {
+    width: 20rem;
+    overflow-y: auto;
+    border-left: 1px solid var(--cds-ui-03);
+    background-color: var(--cds-ui-background);
+  }
+
+  /* Without the shell: the page from the top, with no room for a nav. */
+  :global(.bx--content.no-shell) {
     margin: 0;
-    padding: var(--cds-spacing-04) var(--cds-spacing-05);
-    border-bottom: 1px solid var(--cds-support-03);
-    background-color: color-mix(in srgb, var(--cds-support-03) 16%, var(--cds-ui-background));
-    color: var(--cds-text-01);
-    font-size: 0.875rem;
+    padding: 0;
   }
 
-  .no-prose code {
-    font-family: "IBM Plex Mono", monospace;
+  /* The changed-settings bar runs edge to edge above the page, over the
+     content's top padding. */
+  :global(.bx--content.with-shell > .changed) {
+    margin: calc(-1 * var(--cds-spacing-07)) calc(-1 * var(--cds-spacing-07)) var(--cds-spacing-07);
   }
 
-  .toolbar {
-    position: sticky;
-    z-index: 10;
-    top: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--cds-spacing-03);
-    padding: var(--cds-spacing-03) var(--cds-spacing-05);
-    border-bottom: 1px solid var(--cds-ui-03);
-    background: var(--cds-ui-background);
-    color: var(--cds-text-01);
-    font-size: 0.875rem;
+  :global(.bx--content.with-shell > .bx--inline-notification) {
+    max-width: none;
+    margin: 0 0 var(--cds-spacing-07);
   }
 
-  select {
-    height: 2rem;
-    padding: 0 var(--cds-spacing-03);
-    border: 0;
-    border-bottom: 1px solid var(--cds-ui-04);
-    background: var(--cds-field-01);
-    color: var(--cds-text-01);
-    font: inherit;
+  /* On small screens, the product name alone: the prefix would wrap. */
+  @media (max-width: 41.98rem) {
+    :global(.bx--header__name--prefix) {
+      display: none;
+    }
   }
 
-  /* Carbon's disabled field: no Prose, nothing for these to change. */
-  select:disabled {
-    border-bottom-color: transparent;
-    color: var(--cds-disabled-02);
-    cursor: not-allowed;
-  }
-
-  .toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--cds-spacing-02);
+  :global(.bx--header__name) {
+    white-space: nowrap;
   }
 </style>
