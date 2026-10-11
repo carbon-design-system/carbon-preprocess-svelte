@@ -51,6 +51,8 @@ const DEFAULT_CONTENT = [
   "src/**/*.{svelte,svx,md,mdx,astro,js,jsx,ts,tsx,mjs,mts,cjs,cts}",
 ];
 const PATH_SEPARATOR = /[\\/]/;
+/** Rollup's prefix for virtual module ids. */
+const ROLLUP_VIRTUAL_PREFIX = /^\0/;
 /** Files whose imports `collectCarbonImports` can lex. */
 const LEXABLE = /\.(svelte|[cm]?[jt]sx?)$/;
 
@@ -71,9 +73,14 @@ function globContent(patterns: string[], cwd: string): string[] {
   ];
 }
 
-/** Whether module `code` imports a Carbon component. */
-function importsCarbon(file: string, code: string): boolean {
-  if (!LEXABLE.test(file)) return code.includes(CarbonSvelte.Components);
+/**
+ * Whether module `code` imports a Carbon component. Virtual modules are
+ * JavaScript, so they're lexed too: one that only mentions the package
+ * (data, a path) doesn't count.
+ */
+function importsCarbon(file: string, code: string, virtual = false): boolean {
+  if (!virtual && !LEXABLE.test(file))
+    return code.includes(CarbonSvelte.Components);
   const imported = new Set<string>();
   collectCarbonImports(code, imported);
   return imported.size > 0;
@@ -281,8 +288,10 @@ export function createComponentOptimizer(
       if (isCarbonSvelteImport(file) || RE_EXT_STYLESHEET.test(file)) return;
       const real = realpath(file);
       if (analyzed.has(real ?? file)) return;
-      if (!importsCarbon(file, code)) return;
-      if (id.startsWith("\0") || !path.isAbsolute(file)) virtual.add(id);
+      const isVirtual = id.startsWith("\0") || !path.isAbsolute(file);
+      if (!importsCarbon(file, code, isVirtual)) return;
+      // Named as the app imports it, without Rollup's `\0` prefix.
+      if (isVirtual) virtual.add(id.replace(ROLLUP_VIRTUAL_PREFIX, ""));
       else missed.add(relativeTo(root, file));
     },
 
@@ -341,7 +350,7 @@ export function createComponentOptimizer(
       }
       if (virtual.size > 0) {
         errors.push(
-          `${name} can't analyze ${[...virtual].join(", ")}, which import(s) Carbon components but has no file on disk. Import them from a file in \`content\` instead, or remove ${name}.`,
+          `${name} can't analyze ${[...virtual].join(", ")}, which ${virtual.size === 1 ? "imports Carbon components but has" : "import Carbon components but have"} no file on disk. Import them from a file in \`content\` instead, or remove ${name}.`,
         );
       }
       return errors.length > 0

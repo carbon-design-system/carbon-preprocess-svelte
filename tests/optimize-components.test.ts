@@ -48,7 +48,10 @@ const MISSED_TOOLBAR =
   /before seeing lib\/Toolbar\.ts.*Add those files to `content`/;
 const ANALYSIS_FAILED =
   /optimizeComponents could not analyze this build .*Carbon components were bundled unchanged/;
-const VIRTUAL_MODULE = /can't analyze \0virtual:toolbar.*no file on disk/;
+const VIRTUAL_MODULE =
+  /can't analyze virtual:toolbar, which imports Carbon components but has no file on disk/;
+const VIRTUAL_MODULES =
+  /can't analyze virtual:toolbar, virtual:menu, which import Carbon components but have no file on disk/;
 const BUTTON_REPORT =
   /Button +\d+ edits +no longer renders .*ButtonSkeleton[\s\S]*No longer bundled \(\d+\): .*ButtonSkeleton/;
 const WRAPPER_ESCAPED =
@@ -309,6 +312,34 @@ describe("optimizeComponents", () => {
     await plugin.buildStart.call(ctx);
     plugin.transform(IMPORT_BUTTON, "\0virtual:toolbar");
     expect(() => plugin.buildEnd.call(ctx)).toThrow(VIRTUAL_MODULE);
+  });
+
+  test("names every virtual module that renders Carbon", async () => {
+    const { plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
+    );
+    const ctx = context();
+    await plugin.buildStart.call(ctx);
+    plugin.transform(IMPORT_BUTTON, "\0virtual:toolbar");
+    plugin.transform(IMPORT_BUTTON, "\0virtual:menu");
+    expect(() => plugin.buildEnd.call(ctx)).toThrow(VIRTUAL_MODULES);
+  });
+
+  test("a virtual module that only mentions carbon-components-svelte passes", async () => {
+    const { plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
+    );
+    const ctx = context();
+    await plugin.buildStart.call(ctx);
+    plugin.transform(
+      'export default { Button: { path: "carbon-components-svelte/src/Button/Button.svelte" } };',
+      "\0virtual:api",
+    );
+    plugin.transform(
+      'export default { page: () => import("/docs/carbon-components-svelte/Button.svx") };',
+      "\0virtual:pages",
+    );
+    expect(() => plugin.buildEnd.call(ctx)).not.toThrow();
   });
 
   test("a `content` pattern that names `node_modules` reaches inside it", async () => {
