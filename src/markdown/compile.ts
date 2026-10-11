@@ -241,6 +241,9 @@ const SCRIPT = /^<script\b/;
 const STYLE = /^<style\b/;
 const OPEN_TAG_END = />/;
 const FINAL_NEWLINE = /\n$/;
+/** Comments and string literals, which can mention a name without declaring it. */
+const COMMENT_OR_STRING =
+  /\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
 const CLOSE_SCRIPT = /<\/script>\s*$/;
 
 /** InlineNotification kinds and default titles, matching Prose's alert colors. */
@@ -718,7 +721,12 @@ function codeWithLines(
 
 /** Whether the page's own script already names `name` (imports or declares it). */
 function declares(script: string | undefined, name: string): boolean {
-  return script !== undefined && new RegExp(`\\b${name}\\b`).test(script);
+  if (script === undefined) return false;
+  // Declarations only: a name in a comment or a string isn't one.
+  const code = script.replace(COMMENT_OR_STRING, " ");
+  return new RegExp(
+    `\\bimport\\b(?:(?!\\bfrom\\b)[^;])*\\b${name}\\b|\\b(?:let|const|var|function|class)\\s+${name}\\b|\\b(?:let|const|var)\\s*\\{[^}]*?\\b${name}\\b`,
+  ).test(code);
 }
 
 /** Insert `code` right after the opening tag of a `<script>` block. */
@@ -826,7 +834,8 @@ export async function compileMarkdown(
       imports.push(`import ${name} from ${JSON.stringify(from)};`);
     }
   }
-  if (runtimeProps) {
+  // A page that declares `proseProps` itself (to pass it on, say) keeps its own.
+  if (runtimeProps && !declares(instanceScript, "proseProps")) {
     imports.push(
       RUNES.test(instanceScript ?? "")
         ? "let { proseProps = {} } = $props();"
