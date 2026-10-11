@@ -71,14 +71,14 @@
     "full": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 216.17,
-      "reduction_percent": 61.22
+      "after_kb": 197.83,
+      "reduction_percent": 64.51
     },
     "prop-aware": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 557.37,
-      "after_kb": 216.17,
-      "reduction_percent": 61.22
+      "after_kb": 197.83,
+      "reduction_percent": 64.51
     }
   },
   "vite": {
@@ -97,14 +97,14 @@
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 217.61,
-      "reduction_percent": 61.3
+      "after_kb": 199.26,
+      "reduction_percent": 64.56
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 562.26,
-      "after_kb": 217.61,
-      "reduction_percent": 61.3
+      "after_kb": 199.26,
+      "reduction_percent": 64.56
     }
   },
   "vite-matrix@svelte-5": {
@@ -117,14 +117,14 @@
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 216.17,
-      "reduction_percent": 61.22
+      "after_kb": 197.83,
+      "reduction_percent": 64.51
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 557.37,
-      "after_kb": 216.17,
-      "reduction_percent": 61.22
+      "after_kb": 197.83,
+      "reduction_percent": 64.51
     }
   },
   "vite@carbon-0.85": {
