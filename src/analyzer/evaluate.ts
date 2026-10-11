@@ -1,5 +1,9 @@
 import type { Binding } from "sveast/scope";
-import type { Expression, Identifier } from "sveast/walk";
+import {
+  type Expression,
+  type Identifier,
+  skipTypeWrappers,
+} from "sveast/walk";
 import type { Node } from "./ast";
 import {
   type ComponentModel,
@@ -438,6 +442,8 @@ function whyNameUnknown(name: string, scope: Scope, depth: number): string {
 
 /** Every value `node` can evaluate to under `scope`. */
 export function evaluate(node: Node | Expression, scope: Scope): Value {
+  const value = skipTypeWrappers(node);
+  if (value !== node) return evaluate(value, scope);
   switch (node.type) {
     case "Literal":
       return "regex" in node && node.regex
@@ -513,12 +519,6 @@ export function evaluate(node: Node | Expression, scope: Scope): Value {
 
     case "ChainExpression":
       return evaluate(node.expression, scope);
-
-    case "TSAsExpression":
-    case "TSSatisfiesExpression":
-    case "TSNonNullExpression":
-    case "TSTypeAssertion":
-      return evaluate(node.expression as Expression, scope);
 
     case "ArrayExpression":
       // Fresh: known until something that holds it changes it.
