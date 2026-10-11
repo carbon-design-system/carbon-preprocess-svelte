@@ -116,6 +116,13 @@ export interface MarkdownOptions {
    */
   prose?: boolean | Record<string, string | number | boolean>;
   /**
+   * Where `carbon-components-svelte` is, when the app resolves it somewhere
+   * other than the installed package: a bundler alias to a checkout, as
+   * Carbon's own docs do. The preprocessor looks there for `Prose`.
+   * @default the installed package
+   */
+  carbonDir?: string;
+  /**
    * What `Prose` wraps: the whole page, or each run of Markdown between
    * components, inside a `bx--prose-flow` container that spaces them. With `"markdown"`, a top-level block that renders as a
    * component (`<Name`) or a Svelte tag (`{#if}`) sits outside Prose; plain
