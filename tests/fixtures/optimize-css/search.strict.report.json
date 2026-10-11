@@ -3,9 +3,9 @@
     "Search"
   ],
   "before_bytes": 709971,
-  "after_bytes": 28482,
+  "after_bytes": 28443,
   "reduction_percent": 95.99,
-  "kept_rules": 175,
+  "kept_rules": 174,
   "leaked_count": 0,
   "leaked_classes": []
 }

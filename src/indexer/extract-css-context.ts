@@ -102,7 +102,26 @@ export function extractCssOrphans(
 
   const classOwners = buildClassOwners(componentClasses);
   const markupClasses = new Set(classOwners.keys());
+  const prefixes = [...markupClasses].filter((cls) => cls.endsWith("-"));
   const orphans = new Map<string, Set<string>>();
+
+  /**
+   * The components that render `orphan`'s family: its block class
+   * (`.bx--table-toolbar` for `.bx--table-toolbar--sm`), or a prefix of it
+   * (`.bx--table-toolbar--`, from `bx--table-toolbar--${size}`).
+   */
+  const familyCache = new Map<string, Set<string>>();
+  const familyOwners = (orphan: string): Set<string> => {
+    let owners = familyCache.get(orphan);
+    if (owners) return owners;
+    owners = new Set(classOwners.get(blockOf(orphan)) ?? []);
+    for (const prefix of prefixes) {
+      if (!orphan.startsWith(prefix)) continue;
+      for (const owner of classOwners.get(prefix) ?? []) owners.add(owner);
+    }
+    familyCache.set(orphan, owners);
+    return owners;
+  };
 
   forEachRuleSelector(css, (selectors) => {
     for (const branch of selectors) {
@@ -110,15 +129,28 @@ export function extractCssOrphans(
       const branchOrphans = classes.filter((cls) => !markupClasses.has(cls));
       if (branchOrphans.length === 0) continue;
 
+      // Without a family, the components whose classes share the selector.
       const owners = new Set<string>();
       for (const cls of classes) {
         for (const owner of classOwners.get(cls) ?? []) owners.add(owner);
       }
       for (const orphan of branchOrphans) {
-        for (const component of owners) addToSet(orphans, component, orphan);
+        const family = familyOwners(orphan);
+        for (const component of family.size > 0 ? family : owners) {
+          addToSet(orphans, component, orphan);
+        }
       }
     }
   });
 
   return orphans;
+}
+
+const BEM_SEPARATOR = /__|--/;
+
+/** `.bx--table-toolbar--sm` -> `.bx--table-toolbar`; `.bx--btn__icon` -> `.bx--btn`. */
+function blockOf(cls: string): string {
+  const name = cls.slice(".bx--".length);
+  const end = name.search(BEM_SEPARATOR);
+  return end === -1 ? cls : `.bx--${name.slice(0, end)}`;
 }

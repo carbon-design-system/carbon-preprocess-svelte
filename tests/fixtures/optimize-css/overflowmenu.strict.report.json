@@ -3,7 +3,7 @@
     "OverflowMenu"
   ],
   "before_bytes": 709971,
-  "after_bytes": 20677,
+  "after_bytes": 20685,
   "reduction_percent": 97.09,
   "kept_rules": 119,
   "leaked_count": 0,
