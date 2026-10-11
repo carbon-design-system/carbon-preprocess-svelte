@@ -3,10 +3,10 @@
     "Select",
     "Pagination"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 83064,
-  "reduction_percent": 88.3,
-  "kept_rules": 497,
+  "before_bytes": 561637,
+  "after_bytes": 59676,
+  "reduction_percent": 89.37,
+  "kept_rules": 387,
   "leaked_count": 0,
   "leaked_classes": []
 }

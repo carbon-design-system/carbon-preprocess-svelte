@@ -2,10 +2,10 @@
   "ids": [
     "Dropdown"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 47809,
-  "reduction_percent": 93.27,
-  "kept_rules": 328,
+  "before_bytes": 561637,
+  "after_bytes": 40502,
+  "reduction_percent": 92.79,
+  "kept_rules": 303,
   "leaked_count": 0,
   "leaked_classes": []
 }

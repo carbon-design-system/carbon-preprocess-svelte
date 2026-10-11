@@ -2,10 +2,10 @@
   "ids": [
     "Breadcrumb"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 17810,
-  "reduction_percent": 97.49,
-  "kept_rules": 101,
+  "before_bytes": 561637,
+  "after_bytes": 17827,
+  "reduction_percent": 96.83,
+  "kept_rules": 108,
   "leaked_count": 0,
   "leaked_classes": []
 }

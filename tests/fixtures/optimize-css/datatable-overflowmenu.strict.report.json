@@ -4,10 +4,10 @@
     "OverflowMenu",
     "Link"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 52779,
-  "reduction_percent": 92.57,
-  "kept_rules": 393,
+  "before_bytes": 561637,
+  "after_bytes": 48496,
+  "reduction_percent": 91.37,
+  "kept_rules": 361,
   "leaked_count": 0,
   "leaked_classes": []
 }

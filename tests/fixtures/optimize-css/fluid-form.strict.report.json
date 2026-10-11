@@ -3,10 +3,10 @@
     "TextInput",
     "FluidForm"
   ],
-  "before_bytes": 709971,
-  "after_bytes": 29921,
-  "reduction_percent": 95.79,
-  "kept_rules": 185,
+  "before_bytes": 561637,
+  "after_bytes": 23520,
+  "reduction_percent": 95.81,
+  "kept_rules": 149,
   "leaked_count": 0,
   "leaked_classes": []
 }
