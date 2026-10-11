@@ -18,14 +18,17 @@
     HeaderGlobalAction,
     HeaderUtilities,
     InlineNotification,
+    LocalStorage,
     SideNav,
     SideNavItems,
     SideNavLink,
     SideNavMenu,
     SkipToContent,
+    Theme,
   } from "carbon-components-svelte";
   import Asleep from "carbon-icons-svelte/lib/Asleep.svelte";
   import Carbon from "carbon-icons-svelte/lib/Carbon.svelte";
+  import Code from "carbon-icons-svelte/lib/Code.svelte";
   import Dashboard from "carbon-icons-svelte/lib/Dashboard.svelte";
   import Document from "carbon-icons-svelte/lib/Document.svelte";
   import Grid from "carbon-icons-svelte/lib/Grid.svelte";
@@ -37,7 +40,7 @@
   import { clearHighlights, highlightAll } from "./highlight-dom.js";
   import Hovercard from "./intel/Hovercard.svelte";
   import Matrix from "./Matrix.svelte";
-  import { codeLanguage, packageManager, perf, syntaxMode, terminalTheme } from "./settings.js";
+  import { codeLanguage, packageManager, perf, syntaxMode, tabGroups, terminalTheme } from "./settings.js";
   import AboutPanel from "./shell/AboutPanel.svelte";
   import ChangedTags from "./shell/ChangedTags.svelte";
   import { DEFAULTS, fromQuery, OPTIONS } from "./shell/options.js";
@@ -56,6 +59,7 @@
       label: "Playground",
       pages: [
         { name: "KitchenSink", text: "Kitchen sink", icon: Document },
+        { name: "Try", text: "Try markdown()", icon: Code },
         { name: "Matrix", text: "Matrix", icon: Grid },
         { name: "Stress", text: "Stress", icon: Dashboard },
       ],
@@ -131,7 +135,6 @@
   dark.addEventListener("change", (e) => (prefersDark = e.matches));
   $: resolvedTheme = state.theme === "system" ? (prefersDark ? "g100" : "white") : state.theme;
   $: isDark = ["g80", "g90", "g100"].includes(resolvedTheme);
-  $: document.documentElement.setAttribute("theme", resolvedTheme);
 
   $: document.body.className = state.page === "Matrix" ? "matrix" : state.syntax === "build" ? "syntax-build" : "";
 
@@ -257,6 +260,10 @@
   </SideNav>
 {/if}
 
+<!-- The page's theme (and its color-scheme, for native controls and scrollbars). -->
+<Theme theme={resolvedTheme} />
+<!-- Synced code groups' choices, across pages, reloads, and tabs. -->
+<LocalStorage key="playground:code-groups" bind:value={$tabGroups} />
 <Hovercard />
 
 <Content class={chrome ? "with-shell" : "no-shell"}>

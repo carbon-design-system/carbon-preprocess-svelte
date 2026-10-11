@@ -2,7 +2,14 @@
   // The single hover card for every code view. Carbon "layer" surface: ui-01
   // with a ui-03 border and the overflow-menu shadow; signatures in Plex
   // Mono with the same syntax colors as the code.
-  import { tick } from "svelte";
+  //
+  // CCS's FloatingPortal places it: above the token, flipping below when
+  // there's no room. The token is a text range (one text node per line, for
+  // the Highlight API), not an element, so a fixed, invisible box over it is
+  // the anchor. FloatingPortal doesn't keep a box inside the viewport
+  // horizontally, so the anchor moves left by as much as the card would
+  // overflow.
+  import { FloatingPortal } from "carbon-components-svelte";
   import { highlight } from "carbon-preprocess-svelte/code";
   import { eventType, oneLine as flat, resolveGenerics } from "./analyze.js";
   import { hover, loadApi } from "../settings.js";
@@ -11,11 +18,9 @@
   const SVELTE_DOCS = "https://svelte.dev/docs/svelte/";
   const icons = import.meta.glob("@icons/*.svelte");
 
-  let card;
+  let anchor;
+  let cardWidth = 0;
   let api = {};
-  let top = 0;
-  let left = 0;
-  let below = true;
   loadApi().then((loaded) => (api = loaded));
 
   /** Highlighted HTML for a signature. */
@@ -32,18 +37,10 @@
   const iconLoader = (name) => icons[Object.keys(icons).find((k) => k.endsWith(`/${name}.svelte`))];
 
   $: info = $hover?.info;
-  $: if ($hover && card) tick().then(() => card && position($hover.rect));
+  $: rect = $hover?.rect;
+  // Where the card's left edge goes: 12px before the token, within the viewport.
+  $: anchorLeft = rect ? Math.max(8, Math.min(rect.left - 12, innerWidth - cardWidth - 8)) : 0;
   const unquote = (value) => /^"(.*)"$/.exec(value ?? "")?.[1];
-
-  function position(rect) {
-    const height = card.offsetHeight;
-    const width = card.offsetWidth;
-    // Prefer above the token, so the card doesn't cover the lines a reader
-    // is about to move to; below when there's no room.
-    below = rect.top - 8 - height < 0;
-    top = below ? rect.bottom + 6 : rect.top - height - 6;
-    left = Math.max(8, Math.min(rect.left - 12, innerWidth - width - 8));
-  }
 
   function keep() {
     hover.update((h) => (h ? { ...h, pinned: true } : h));
@@ -71,11 +68,31 @@
 
 {#if info}
   <div
-    bind:this={card}
+    bind:this={anchor}
+    class="anchor"
+    style:top="{rect.top}px"
+    style:left="{anchorLeft}px"
+    style:height="{rect.height}px"
+    aria-hidden="true"
+  ></div>
+{/if}
+<!-- Above the token, so the card doesn't cover the lines a reader is about to move to. -->
+<FloatingPortal
+  {anchor}
+  open={Boolean(info && anchor)}
+  direction="top"
+  intrinsicWidth
+  intrinsicAlign="start"
+  gapTop={6}
+  gapBottom={6}
+  zIndex={9000}
+  let:direction
+>
+  {#if info}
+  <div
+    bind:offsetWidth={cardWidth}
     class="card"
-    class:above={!below}
-    style:top="{top}px"
-    style:left="{left}px"
+    class:above={direction === "top"}
     role="tooltip"
     aria-live={$hover.viaKeyboard ? "polite" : undefined}
     on:pointerenter={keep}
@@ -201,7 +218,8 @@
       {#if info.name}<p class="meta">Current theme: <code>{value || "unset"}</code></p>{/if}
     {/if}
   </div>
-{/if}
+  {/if}
+</FloatingPortal>
 
 <style>
   .tag.error {
@@ -215,9 +233,14 @@
     font-size: 0.75rem;
   }
 
-  .card {
+  .anchor {
     position: fixed;
-    z-index: 9000;
+    width: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .card {
     max-width: 30rem;
     min-width: 16rem;
     padding: var(--cds-spacing-04) var(--cds-spacing-05);

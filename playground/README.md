@@ -1,8 +1,9 @@
 # Playground
 
 carbon-preprocess-svelte's own docs-site testbed: a Vite app whose pages go
-through `markdown()`, whose imports go through `optimizeImports()`, whose CSS
-goes through `optimizeCss()`, and whose code views use the browser-safe
+through `markdown()`, whose imports go through `optimizeImports()`, whose
+Carbon components go through `optimizeComponents()`, whose CSS goes through
+`optimizeCss({ propAware: true })`, and whose code views use the browser-safe
 `carbon-preprocess-svelte/code`. CI builds it (with the examples' CSS
 snapshot) and runs its browser tests.
 
@@ -23,6 +24,11 @@ CCS_DIR=../../carbon-components-svelte
 or for one run: `CCS_DIR=../carbon-components-svelte bun run playground`. The
 tests and the e2e build ignore `.env.local` (set `CCS_DIR` in the environment
 to test against a checkout).
+
+With `CCS_DIR`, the build skips `optimizeComponents()` and `optimizeCss()`:
+they read the installed CCS and don't follow the alias to the checkout, so
+they'd prune the checkout's new components (Prose's CSS). CI builds against
+the installed CCS, with both.
 
 With `CCS_DIR`, the app also lists the checkout's docs pages (`CCS_PAGES`,
 default `ComboBox,Form,FloatingPortal,Prose,SessionStorage`), renders their
@@ -49,6 +55,8 @@ reuses the last build and install. Against a running instance:
   tags (and back), both Reset all buttons, tall live examples scrolling in
   their region, the no-Prose notice, and axe on the header, side nav, and
   settings panel.
+- **`try`:** typing compiles (the preview, the Svelte output, the headings),
+  components as placeholders, the draft across reloads, and axe.
 - **`code-views`:** hover cards and their underlines, the package manager
   switch, per-command copy, line links (and reloading to them), links into
   collapsed lines, Show more, file tabs and their overflow, folds, synced
@@ -84,13 +92,19 @@ and the same plugins as its pages:
   whatever applies it in `App.svelte`.
 - **About this build** names the CCS by version (installed or checkout),
   never its path: the build fails if its output contains a local directory.
+- **CCS components over hand-written code:** `Theme` sets the page's theme
+  (and `color-scheme`), `LocalStorage` keeps synced tab choices and the Try
+  draft, and `FloatingPortal` places the hover cards.
+- **Frontmatter** a page can set: `title`, `wide: true` (no table of
+  contents), and `examples: false` (render components as is, not as live
+  examples with code).
 - `?chrome=0` hides the shell, for screenshots and the tests.
 
 Every setting is in the URL, by its key:
 
 | Param | Values |
 | --- | --- |
-| `page` | `KitchenSink`, `Matrix`, `Stress`, `MountBench`, `InteractBench`, and with `CCS_DIR`, CCS docs pages |
+| `page` | `KitchenSink`, `Try`, `Matrix`, `Stress`, `MountBench`, `InteractBench`, and with `CCS_DIR`, CCS docs pages |
 | `scope` | `runs`: one Prose per run of Markdown between components (`.svx`, `proseScope: "markdown"`). `page`: one Prose for the page (`.md`, a symlink) |
 | `variant`, `measure`, `linkTone`, `tableWidth`, `kbd`, `dividers`, `scrollMargin` | Prose's props |
 | `theme` | `system`, `white`, `g10`, `g80`, `g90`, `g100` |
@@ -103,6 +117,10 @@ Every setting is in the URL, by its key:
 
 - **KitchenSink** shows every Markdown element and code-block feature. Its
   Button `tooltip` example is a deliberate type error.
+- **Try markdown()** compiles Markdown in the browser as you type (the
+  compiler has no Node dependencies; the page imports it from `src/`): a
+  Prose preview, the Svelte component `markdown()` writes, and the headings
+  and frontmatter it exports. The draft stays in `LocalStorage`.
 - **Matrix** lays out element groups (`src/samples/*.sample`) against one
   option, each cell in its own theme.
 - **Stress** is a load and scroll fixture: one 1,600-line block and 60 small
