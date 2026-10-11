@@ -34,6 +34,18 @@ describe("code views", () => {
     const box = await card.boundingBox();
     expect(box && box.y + box.height).toBeLessThanOrEqual(point.y);
     expect(box && box.x + box.width).toBeLessThanOrEqual(1280);
+
+    // A scroll moves the token, and the card with it.
+    await page.evaluate(() => {
+      // Keep the pointer's card: scrolling moves the token out from under it.
+      document
+        .querySelector("[role=tooltip]")
+        ?.dispatchEvent(new PointerEvent("pointerenter"));
+      scrollBy(0, 120);
+    });
+    await page.waitForTimeout(300);
+    const moved = await card.boundingBox();
+    expect(Math.abs((moved?.y ?? 0) - ((box?.y ?? 0) - 120))).toBeLessThan(2);
     await page.close();
   });
 

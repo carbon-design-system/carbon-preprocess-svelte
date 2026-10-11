@@ -37,7 +37,20 @@
   const iconLoader = (name) => icons[Object.keys(icons).find((k) => k.endsWith(`/${name}.svelte`))];
 
   $: info = $hover?.info;
-  $: rect = $hover?.rect;
+  // The token's box, measured again on scroll and resize so the card stays
+  // with it (the range is live; a rect would be a snapshot).
+  let rect;
+  $: rect = $hover?.range?.getBoundingClientRect();
+  let frame = 0;
+  function follow() {
+    if (!$hover?.range) return;
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      rect = $hover?.range?.getBoundingClientRect();
+      // Scrolled out of view: nothing to point at.
+      if (rect && (rect.bottom < 0 || rect.top > innerHeight)) hover.set(null);
+    });
+  }
   // Where the card's left edge goes: 12px before the token, within the viewport.
   $: anchorLeft = rect ? Math.max(8, Math.min(rect.left - 12, innerWidth - cardWidth - 8)) : 0;
   const unquote = (value) => /^"(.*)"$/.exec(value ?? "")?.[1];
@@ -66,7 +79,9 @@
   };
 </script>
 
-{#if info}
+<svelte:window on:scroll|capture|passive={follow} on:resize|passive={follow} />
+
+{#if info && rect}
   <div
     bind:this={anchor}
     class="anchor"
@@ -79,7 +94,7 @@
 <!-- Above the token, so the card doesn't cover the lines a reader is about to move to. -->
 <FloatingPortal
   {anchor}
-  open={Boolean(info && anchor)}
+  open={Boolean(info && rect && anchor)}
   direction="top"
   intrinsicWidth
   intrinsicAlign="start"
