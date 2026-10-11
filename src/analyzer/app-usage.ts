@@ -6,6 +6,7 @@ import {
   collectSvelteUsage,
   indexAppComponents,
   isAppComponent,
+  type ModuleConstants,
   type ModuleUsage,
 } from "./call-sites";
 import { buildComponentModel, type ComponentModel } from "./component-model";
@@ -26,39 +27,58 @@ const SCRIPT_END = /<\/script/i;
  * The exported constants of the app's own JS/TS modules, read with the
  * component model (as a module script). Only strings, numbers, booleans,
  * `null` and `undefined`: an importer could change an exported object.
+ * Each module is read the first time an app component imports from it.
  */
 function moduleConstants(
   modules: ReadonlyArray<{ file: string; code: string }>,
-): Map<string, Map<string, Value>> {
-  const constants = new Map<string, Map<string, Value>>();
+): ModuleConstants {
+  const sources = new Map<string, string>();
   for (const { file, code } of modules) {
-    if (!MODULE_FILE.test(file) || !code.includes("export")) continue;
-    if (SCRIPT_END.test(code)) continue;
-    let model: ComponentModel;
-    try {
-      const lang = TS_FILE.test(file) ? ' lang="ts"' : "";
-      model = buildComponentModel(
-        `<script context="module"${lang}>\n${code}\n</script>`,
-        file,
-      );
-    } catch {
-      continue;
+    if (MODULE_FILE.test(file) && code.includes("export")) {
+      sources.set(file, code);
     }
-    const usage = newComponentUsage();
-    usage.open = true;
-    const scope = createScope(model, usage, () => UNKNOWN);
-    const values = new Map<string, Value>();
-    for (const [exported, local] of exportedNames(model)) {
-      const value = evaluate(
-        { type: "Identifier", name: local } as Expression,
-        scope,
-      );
-      if (value === UNKNOWN || [...value].some(isObject)) continue;
-      values.set(exported, value);
-    }
-    if (values.size > 0) constants.set(file, values);
   }
-  return constants;
+  const constants = new Map<string, ReadonlyMap<string, Value> | undefined>();
+  return (file) => {
+    if (!constants.has(file)) {
+      const code = sources.get(file);
+      constants.set(
+        file,
+        code === undefined ? undefined : readConstants(file, code),
+      );
+    }
+    return constants.get(file);
+  };
+}
+
+function readConstants(
+  file: string,
+  code: string,
+): ReadonlyMap<string, Value> | undefined {
+  if (SCRIPT_END.test(code)) return undefined;
+  let model: ComponentModel;
+  try {
+    const lang = TS_FILE.test(file) ? ' lang="ts"' : "";
+    model = buildComponentModel(
+      `<script context="module"${lang}>\n${code}\n</script>`,
+      file,
+    );
+  } catch {
+    return undefined;
+  }
+  const usage = newComponentUsage();
+  usage.open = true;
+  const scope = createScope(model, usage, () => UNKNOWN);
+  const values = new Map<string, Value>();
+  for (const [exported, local] of exportedNames(model)) {
+    const value = evaluate(
+      { type: "Identifier", name: local } as Expression,
+      scope,
+    );
+    if (value === UNKNOWN || [...value].some(isObject)) continue;
+    values.set(exported, value);
+  }
+  return values.size > 0 ? values : undefined;
 }
 
 /** `[exported name, local name]` for each `export const`/`export { … }`. */
