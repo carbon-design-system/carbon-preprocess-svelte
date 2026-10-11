@@ -1,0 +1,85 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`golden app sizes admin-dashboard 1`] = `
+{
+  "baseline": {
+    "css_kb": 678.87,
+    "js_kb": 229.45,
+  },
+  "css": {
+    "css_kb": 261.1,
+    "js_kb": 229.45,
+  },
+  "full": {
+    "css_kb": 113.63,
+    "js_kb": 172.88,
+  },
+  "prop-aware": {
+    "css_kb": 113.63,
+    "js_kb": 229.45,
+  },
+}
+`;
+
+exports[`golden app sizes signup-wizard 1`] = `
+{
+  "baseline": {
+    "css_kb": 678.87,
+    "js_kb": 186.61,
+  },
+  "css": {
+    "css_kb": 210.22,
+    "js_kb": 186.61,
+  },
+  "full": {
+    "css_kb": 62.12,
+    "js_kb": 138.91,
+  },
+  "prop-aware": {
+    "css_kb": 62.12,
+    "js_kb": 186.61,
+  },
+}
+`;
+
+exports[`golden app sizes docs-site 1`] = `
+{
+  "baseline": {
+    "css_kb": 678.87,
+    "js_kb": 153.01,
+  },
+  "css": {
+    "css_kb": 156.31,
+    "js_kb": 153.01,
+  },
+  "full": {
+    "css_kb": 66.53,
+    "js_kb": 127.02,
+  },
+  "prop-aware": {
+    "css_kb": 66.53,
+    "js_kb": 153.01,
+  },
+}
+`;
+
+exports[`golden app sizes product-catalog 1`] = `
+{
+  "baseline": {
+    "css_kb": 678.87,
+    "js_kb": 226.8,
+  },
+  "css": {
+    "css_kb": 250.31,
+    "js_kb": 226.8,
+  },
+  "full": {
+    "css_kb": 86.15,
+    "js_kb": 178.14,
+  },
+  "prop-aware": {
+    "css_kb": 86.15,
+    "js_kb": 226.8,
+  },
+}
+`;
