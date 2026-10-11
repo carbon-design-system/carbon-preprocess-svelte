@@ -393,7 +393,7 @@
     showTimer = setTimeout(() => {
       hover.set({
         info: { kind: "diagnostic", problem, message: shorten(problem.message), suggestion, view: viewKey === "ts" ? "TypeScript" : "JavaScript (JSDoc)" },
-        rect: range.getBoundingClientRect(),
+        range,
         owner: id,
         viaKeyboard: false,
         lang: displayLang,
@@ -408,7 +408,7 @@
     clearTimeout(hideTimer);
     const related = (analysis.related.get(index) ?? [index]).map((i) => rangeOf(analysis.tokens[i])).filter(Boolean);
     setRanges(relatedOwner, new Map([["intel-related", related], ["intel-hover", [rangeOf(token)]]]));
-    hover.set({ info, rect: rangeOf(token).getBoundingClientRect(), owner: id, line: token.line, viaKeyboard, lang: displayLang });
+    hover.set({ info, range: rangeOf(token), owner: id, line: token.line, viaKeyboard, lang: displayLang });
   }
 
   function hide(delay = 180) {
