@@ -36,6 +36,11 @@ async function emitTypeDeclarations() {
       source: resolve(root, "src/index.ts"),
       outFile: resolve(outDir, "index.d.ts"),
     });
+    await bundleDts({
+      root,
+      source: resolve(root, "src/code.ts"),
+      outFile: resolve(outDir, "code.d.ts"),
+    });
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     if (!isWatchMode) {
@@ -59,20 +64,13 @@ async function slimPackageManifest() {
   )) {
     pkg.bin[name] = path.replace(DIST_PREFIX, "");
   }
-  // Constructed directly from the slimmed main/types above rather than
-  // rewritten from a root `exports` field, so root package.json doesn't
-  // need to carry a duplicate (and easily-drifting) copy of this map.
-  const exports = {
-    ".": { types: pkg.types, import: pkg.main, default: pkg.main },
-  };
-
-  // A new key always appends at the end of JS object order, so rebuild the
-  // manifest to place `exports` right after `types` instead of last.
-  const ordered: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(pkg)) {
-    ordered[key] = value;
-    if (key === "types") ordered.exports = exports;
-  }
+  // The root `exports` map points into `dist/` (so linked examples resolve
+  // subpaths like `carbon-preprocess-svelte/code`); here, `dist/` is the root.
+  const ordered: Record<string, unknown> = JSON.parse(
+    JSON.stringify(pkg, (_key, value) =>
+      typeof value === "string" ? value.replace(DIST_PREFIX, "./") : value,
+    ),
+  );
 
   await writeFile(manifestPath, `${JSON.stringify(ordered, null, 2)}\n`);
 }
@@ -95,9 +93,19 @@ async function buildProject() {
     external: ["svelte", "svelte/*"],
   });
 
-  if (!result.success) {
+  // `carbon-preprocess-svelte/code`: for browsers, one self-contained file,
+  // apart from the Node chunks above.
+  const code = await build({
+    entrypoints: ["./src/code.ts"],
+    outdir: outDir,
+    format: "esm",
+    target: "browser",
+    minify: true,
+  });
+
+  if (!result.success || !code.success) {
     console.error("Build failed");
-    for (const log of result.logs) {
+    for (const log of [...result.logs, ...code.logs]) {
       console.error(log);
     }
     if (!isWatchMode) {
