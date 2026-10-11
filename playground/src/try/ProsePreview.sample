@@ -1,0 +1,7 @@
+<script>
+  // The Try page's preview: HTML in Prose. Compiled by markdown() like the
+  // Matrix samples, so it's in Prose exactly when the CCS in use has it.
+  export let html = "";
+</script>
+
+{@html html}
