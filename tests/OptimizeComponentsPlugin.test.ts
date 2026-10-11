@@ -11,7 +11,7 @@ const SVELTE_LOADER = path.join(
   "helpers/svelte-source-loader.cjs",
 );
 const CARD_ESCAPED =
-  /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]extra\.js also render/;
+  /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]extra\.js also renders it\./;
 const MISSED_TOOLBAR =
   /OptimizeComponentsPlugin rewrote Carbon components before seeing lib[\\/]toolbar\.js/;
 
