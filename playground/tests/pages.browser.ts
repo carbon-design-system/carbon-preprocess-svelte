@@ -4,6 +4,7 @@ import { open, useBrowser } from "./helpers";
 const context = useBrowser();
 const PAGES = [
   "KitchenSink",
+  "Try",
   "Matrix",
   "Stress",
   "MountBench",

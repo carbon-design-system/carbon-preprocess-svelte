@@ -28,9 +28,12 @@ describe("code views", () => {
     });
     await page.mouse.move(point.x, point.y);
     await page.waitForTimeout(1200);
-    expect(await page.locator("[role=tooltip]").textContent()).toContain(
-      "shouldFilterItem",
-    );
+    const card = page.locator("[role=tooltip]");
+    expect(await card.textContent()).toContain("shouldFilterItem");
+    // CCS's FloatingPortal places it above the token, inside the viewport.
+    const box = await card.boundingBox();
+    expect(box && box.y + box.height).toBeLessThanOrEqual(point.y);
+    expect(box && box.x + box.width).toBeLessThanOrEqual(1280);
     await page.close();
   });
 
@@ -165,7 +168,7 @@ describe("code views", () => {
   test("folds open and close; synced groups follow each other and persist", async () => {
     const { page } = await open(context(), "page=KitchenSink");
     await page.evaluate(() =>
-      localStorage.removeItem("ccs-preview:code-groups"),
+      localStorage.removeItem("playground:code-groups"),
     );
     await page.reload({ waitUntil: "networkidle" });
     const folded = page

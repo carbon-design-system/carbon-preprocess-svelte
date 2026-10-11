@@ -1,0 +1,16 @@
+---
+title: Try markdown()
+examples: false
+wide: true
+---
+
+<script>
+  import TryIt from "../try/TryIt.svelte";
+
+  // Declared here too, so the page has it without Prose (markdown() leaves it be).
+  export let proseProps = {};
+</script>
+
+Write Markdown on the left: the browser compiles it as you type, with the same compiler and options as this playground's pages.
+
+<TryIt {proseProps} />

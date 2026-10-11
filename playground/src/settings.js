@@ -13,15 +13,10 @@ export const packageManager = writable("npm"); // "npm" | "pnpm" | "yarn" | "bun
 export const perf = writable({ lazy: true, cv: true, aot: true });
 /**
  * Synced code groups (`::: code-group group="…"`): the label selected in
- * each group, remembered across pages.
+ * each group. App.svelte keeps it in CCS's `LocalStorage`, so it's
+ * remembered across pages and reloads, and synced across tabs.
  */
-const GROUPS_KEY = "ccs-preview:code-groups";
-export const tabGroups = writable(
-  JSON.parse(globalThis.localStorage?.getItem(GROUPS_KEY) ?? "{}"),
-);
-tabGroups.subscribe((groups) =>
-  globalThis.localStorage?.setItem(GROUPS_KEY, JSON.stringify(groups)),
-);
+export const tabGroups = writable({});
 
 /** The theme terminal blocks use: `undefined` follows the page. */
 export const terminalTheme = writable(undefined);
