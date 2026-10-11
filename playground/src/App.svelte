@@ -33,6 +33,7 @@
   } from "carbon-components-svelte";
   import Asleep from "carbon-icons-svelte/lib/Asleep.svelte";
   import Carbon from "carbon-icons-svelte/lib/Carbon.svelte";
+  import ChartColumn from "carbon-icons-svelte/lib/ChartColumn.svelte";
   import Code from "carbon-icons-svelte/lib/Code.svelte";
   import Dashboard from "carbon-icons-svelte/lib/Dashboard.svelte";
   import Document from "carbon-icons-svelte/lib/Document.svelte";
@@ -79,6 +80,7 @@
       pages: [
         { name: "MountBench", text: "Mount cost", icon: Meter },
         { name: "InteractBench", text: "Interaction latency", icon: Meter },
+        { name: "BuildReport", text: "Build report", icon: ChartColumn },
       ],
     },
   ];
