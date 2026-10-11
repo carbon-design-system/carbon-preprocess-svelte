@@ -1,8 +1,8 @@
 // The playground: carbon-preprocess-svelte's own docs-site testbed. Pages go
 // through markdown() (the kitchen sink twice: `.svx` with one Prose per
 // Markdown run, `.md`, a symlink, with one Prose for the page), imports
-// through optimizeImports(), and the build through optimizeCss(). Code views
-// use the browser-safe `carbon-preprocess-svelte/code`.
+// through optimizeImports(), and the build through optimizeComponents() and
+// optimizeCss(). Code views use the browser-safe `carbon-preprocess-svelte/code`.
 //
 // carbon-components-svelte is the installed package. `CCS_DIR=<checkout>`
 // uses a local CCS checkout instead, for unreleased work such as Prose, and
@@ -28,6 +28,7 @@ import {
   highlight,
   type MarkdownOptions,
   markdown,
+  optimizeComponents,
   optimizeCss,
   optimizeImports,
   parseCodeMeta,
@@ -63,6 +64,19 @@ const CCS_PAGES = (
   LOCAL_ENV.CCS_PAGES ??
   "ComboBox,Form,FloatingPortal,Prose,SessionStorage"
 ).split(",");
+/**
+ * The build optimizers (optimizeComponents, optimizeCss) read the installed
+ * CCS: they don't follow `resolve.alias`, so with CCS_DIR they'd skip the
+ * checkout's components and prune the CSS of the ones the installed CCS
+ * doesn't have (Prose's). They run against the installed CCS, as CI builds.
+ */
+const OPTIMIZE = !CCS_DIR;
+/** The checkout's docs pages in `CCS_PAGES` that exist. */
+const CCS_PAGE_FILES = DOCS
+  ? CCS_PAGES.map((name) =>
+      path.join(DOCS, "src/pages/components", `${name}.svx`),
+    ).filter((file) => existsSync(file))
+  : [];
 const CCS_VERSION: string = JSON.parse(
   readFileSync(path.join(CCS, "package.json"), "utf8"),
 ).version;
@@ -320,13 +334,9 @@ function ccsPages() {
     resolveId: (source: string) => (source === id ? `\0${id}` : undefined),
     load(resolved: string) {
       if (resolved !== `\0${id}`) return;
-      const dir = DOCS && path.join(DOCS, "src/pages/components");
-      const pages = dir
-        ? CCS_PAGES.filter((name) => existsSync(path.join(dir, `${name}.svx`)))
-        : [];
-      const entries = pages.map(
-        (name) =>
-          `  ${JSON.stringify(`${name}.svx`)}: () => import(${JSON.stringify(path.join(dir ?? "", `${name}.svx`))}),`,
+      const entries = CCS_PAGE_FILES.map(
+        (file) =>
+          `  ${JSON.stringify(path.basename(file))}: () => import(${JSON.stringify(file)}),`,
       );
       return `export default {\n${entries.join("\n")}\n};`;
     },
@@ -605,6 +615,8 @@ const shared: MarkdownOptions = {
   renderers: {
     svelte(block, ctx) {
       const value = block.value;
+      // A page that is an app (`examples: false`) renders its components as is.
+      if (ctx.metadata.examples === false) return value;
       if (value.startsWith("<FileSource")) {
         const src = FILE_SOURCE_SRC.exec(value)?.[1] ?? "";
         const files = framedFiles(src);
@@ -653,6 +665,15 @@ const shared: MarkdownOptions = {
 
 export default {
   plugins: [
+    // Before svelte(): it hands Svelte Carbon's components rewritten for the
+    // props this app passes (builds only; see OPTIMIZE).
+    ...(OPTIMIZE
+      ? [
+          optimizeComponents({
+            content: ["src/**/*.{svelte,svx,md,sample,js,ts}"],
+          }),
+        ]
+      : []),
     ccsApi(),
     svelte({
       extensions: [".svelte", ".svx", ".md", ".sample"],
@@ -672,8 +693,9 @@ export default {
         optimizeImports(),
       ],
     }),
-    // Prune Carbon CSS the build doesn't use (the e2e snapshot records it).
-    optimizeCss(),
+    // Prune Carbon CSS the build doesn't use, down to the prop variants it
+    // renders (the e2e snapshot records it; see OPTIMIZE).
+    ...(OPTIMIZE ? [optimizeCss({ propAware: true })] : []),
     stressPage(),
     ccsPages(),
     noLocalPaths(),

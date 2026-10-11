@@ -495,8 +495,8 @@
   }
 
   // Synced groups: the label selected anywhere selects it here too.
-  $: if (files && group && $tabGroups[group] !== undefined) {
-    const index = files.findIndex((f) => f.name === $tabGroups[group]);
+  $: if (files && group && $tabGroups?.[group] !== undefined) {
+    const index = files.findIndex((f) => f.name === $tabGroups?.[group]);
     if (index >= 0 && index !== active) showFile(index);
   }
 
