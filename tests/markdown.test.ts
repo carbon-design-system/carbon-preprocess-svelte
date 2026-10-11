@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { markdown } from "carbon-preprocess-svelte";
+import { highlight, markdown, markdownToHtml } from "carbon-preprocess-svelte";
 import {
   compileMarkdown,
   renderMarkdown,
@@ -340,6 +340,39 @@ export let proseProps = {};
       { codeSnippet: true, alerts: "InlineNotification", anchors: true },
     );
     expect(() => compile(code, { filename: "page.md" })).not.toThrow();
+  });
+});
+
+describe("markdownToHtml", () => {
+  test("renders HTML with no Svelte: code lines inline, braces as entities", async () => {
+    const { html, headings, metadata } = await markdownToHtml(
+      '---\ntitle: T\n---\n\n# Hi {x}\n\n```js title="a.js" {1}\nlet a = {};\n```\n\n> [!TIP]\n> Done.',
+      { highlight },
+    );
+    expect(html).not.toContain("{@html");
+    expect(html).toContain('<h1 id="hi-x">Hi &#123;x&#125;</h1>');
+    expect(html).toContain(
+      '<span class="line" data-highlight><span class="tok-definition-keyword">let</span>',
+    );
+    expect(html).toContain('<span class="code-block__title">a.js</span>');
+    expect(html).toContain('<blockquote data-alert="tip"');
+    expect(headings).toEqual([{ id: "hi-x", text: "Hi {x}", depth: 1 }]);
+    expect(metadata).toEqual({ title: "T" });
+  });
+
+  test("drops Svelte blocks and scripts, or renders them through `svelteBlock`", async () => {
+    const source =
+      '<script>\n  import { Button } from "carbon-components-svelte";\n</script>\n\nBefore.\n\n<Button>Save</Button>\n\nAfter.';
+    expect((await markdownToHtml(source)).html).toBe(
+      "<p>Before.</p>\n<p>After.</p>",
+    );
+    const { html } = await markdownToHtml(source, {
+      svelteBlock: (markup) =>
+        `<div class="placeholder">${markup.length}</div>`,
+    });
+    expect(html).toBe(
+      '<p>Before.</p>\n<div class="placeholder">21</div>\n<p>After.</p>',
+    );
   });
 });
 
