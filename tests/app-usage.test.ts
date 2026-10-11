@@ -475,4 +475,17 @@ describe("spreads and calls the analysis can read", () => {
       ),
     ).toEqual(["primary", "danger", "ghost"]);
   });
+
+  test("a nested binding with the name leaves the component's own known", async () => {
+    expect(
+      await buttonKinds(
+        rendering(
+          `const kind = "danger";\nconst echo = (kind) => kind;`,
+          `{#snippet tag(kind)}{kind}{/snippet}
+{#each ["a"] as kind}{kind}{/each}
+<Button {kind} />`,
+        ),
+      ),
+    ).toEqual(["danger"]);
+  });
 });

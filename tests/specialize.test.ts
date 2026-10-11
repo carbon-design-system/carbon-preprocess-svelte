@@ -486,4 +486,24 @@ describe("names a nested scope binds", () => {
 {#if direction === "bottom"}<p class="bottom">bottom</p>{/if}`;
     expect(specialize(source)).not.toContain("{#if direction");
   });
+
+  test("the markup's bindings with a prop's name leave the prop known", () => {
+    const source = `<script>
+  import Inner from "./Inner.svelte";
+  export let size = "sm";
+  export let promise = undefined;
+</script>
+{#snippet row(size)}<i>{size}</i>{/snippet}
+{#await promise then size}<b>{size}</b>{/await}
+<Inner let:size><u>{size}</u></Inner>
+<Inner let:direction={size}><s>{size}</s></Inner>
+<Inner>{@const size = 1}<em>{size}</em></Inner>
+{#if size === "sm"}<p class="sm">sm</p>{/if}`;
+    const code = specialize(source);
+    expect(code).not.toContain("{#if size");
+    // Each nested `size` is its own binding: left alone.
+    for (const tag of ["i", "b", "u", "s"]) {
+      expect(code).toContain(`<${tag}>{size}</${tag}>`);
+    }
+  });
 });
