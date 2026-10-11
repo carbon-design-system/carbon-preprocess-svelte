@@ -242,6 +242,17 @@ const SCRIPT = /^<script\b/;
 const STYLE = /^<style\b/;
 const OPEN_TAG_END = />/;
 const FINAL_NEWLINE = /\n$/;
+/** `import <clause> from`: identifiers, braces, commas, `*`, and keywords only. */
+const IMPORT_CLAUSE = /\bimport\s+([\w$\s{},*]+?)\s*\bfrom\b/g;
+const IMPORT_BRACES = /\{([^}]*)\}/;
+/** A default import, or a namespace's local name (`* as name`). */
+const IMPORT_DEFAULT_OR_NAMESPACE = /(?:^|,|\bas)\s*([\w$]+)\s*(?=,|$)/g;
+const TYPE_PREFIX = /^\s*type\s+/;
+const AS = /\s+as\s+/;
+const DECLARATION = /\b(?:let|const|var|function|class)\s+([\w$]+)/g;
+/** `let { … } =` or `let [ … ] =`, defaults (`a = 1`) included. */
+const DESTRUCTURING = /\b(?:let|const|var)\s*[{[]([^;]*?)[}\]]\s*=(?![=>])/g;
+const IDENTIFIER = /[\w$]+/;
 /** Comments and string literals, which can mention a name without declaring it. */
 const COMMENT_OR_STRING =
   /\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
@@ -787,12 +798,37 @@ function codeWithLines(
 
 /** Whether the page's own script already names `name` (imports or declares it). */
 function declares(script: string | undefined, name: string): boolean {
-  if (script === undefined) return false;
-  // Declarations only: a name in a comment or a string isn't one.
+  return script !== undefined && declaredNames(script).has(name);
+}
+
+/**
+ * The names a script's top-level imports and declarations bind: the local
+ * name of `import { a as b }` or `const { a: b }` is `b`. Comments and
+ * strings are skipped, so a mention isn't a declaration.
+ */
+function declaredNames(script: string): Set<string> {
   const code = script.replace(COMMENT_OR_STRING, " ");
-  return new RegExp(
-    `\\bimport\\b(?:(?!\\bfrom\\b)[^;])*\\b${name}\\b|\\b(?:let|const|var|function|class)\\s+${name}\\b|\\b(?:let|const|var)\\s*\\{[^}]*?\\b${name}\\b`,
-  ).test(code);
+  const names = new Set<string>();
+  for (const [, clause] of code.matchAll(IMPORT_CLAUSE)) {
+    const braces = IMPORT_BRACES.exec(clause)?.[1];
+    const rest = clause.replace(IMPORT_BRACES, " ").replace(TYPE_PREFIX, "");
+    for (const [, local] of rest.matchAll(IMPORT_DEFAULT_OR_NAMESPACE))
+      names.add(local);
+    for (const item of braces?.split(",") ?? []) {
+      const local = item.replace(TYPE_PREFIX, "").split(AS).pop()?.trim();
+      if (local) names.add(local);
+    }
+  }
+  for (const [, name] of code.matchAll(DECLARATION)) names.add(name);
+  for (const [, pattern] of code.matchAll(DESTRUCTURING)) {
+    for (const item of pattern.split(",")) {
+      // `a: b = 1` binds `b`; `...rest` binds `rest`.
+      const local = item.split(":").pop()?.split("=")[0];
+      const name = IDENTIFIER.exec(local ?? "")?.[0];
+      if (name) names.add(name);
+    }
+  }
+  return names;
 }
 
 /** Insert `code` right after the opening tag of a `<script>` block. */
