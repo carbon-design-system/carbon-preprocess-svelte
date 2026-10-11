@@ -31,7 +31,10 @@
     Toggle,
   } from "carbon-components-svelte";
   import CheckmarkFilled from "carbon-icons-svelte/lib/CheckmarkFilled.svelte";
+  import LogoSvelte from "carbon-icons-svelte/lib/LogoSvelte.svelte";
   import Reset from "carbon-icons-svelte/lib/Reset.svelte";
+  import TableOfContents from "carbon-icons-svelte/lib/TableOfContents.svelte";
+  import View from "carbon-icons-svelte/lib/View.svelte";
   import { carbonCodeIcon, compileMarkdown, highlight, markdownToHtml } from "carbon-preprocess-svelte/code";
   import CodeView from "../CodeView.svelte";
   import { compressAndEncode, decodeAndDecompress } from "../intel/playground.js";
@@ -225,10 +228,10 @@
       />
     </Column>
     <Column lg={8} md={8}>
-      <Tabs bind:selected>
-        <Tab label="Preview" />
-        <Tab label="Svelte" />
-        <Tab label="Headings and metadata" />
+      <Tabs type="container" bind:selected>
+        <Tab label="Preview" icon={View} />
+        <Tab label="Svelte" icon={LogoSvelte} />
+        <Tab label="Headings and metadata" icon={TableOfContents} />
         <svelte:fragment slot="content">
           <TabContent>
             {#if result?.usesSvelte}

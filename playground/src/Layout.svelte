@@ -5,7 +5,18 @@
   import { get, writable } from "svelte/store";
   import { Column, ContentSwitcher, Grid, InlineLoading, Link, Row, Switch } from "carbon-components-svelte";
   import sources from "virtual:page-sources";
+  import LogoSvelte from "carbon-icons-svelte/lib/LogoSvelte.svelte";
+  import Markdown from "carbon-icons-svelte/lib/Markdown.svelte";
+  import View from "carbon-icons-svelte/lib/View.svelte";
   import CodeView from "./CodeView.svelte";
+
+  // The views, each with a small icon before its label (a Switch with an
+  // `icon` would be icon-only).
+  const VIEWS = [
+    { text: "Page", icon: View },
+    { text: "Markdown", icon: Markdown },
+    { text: "Compiled", icon: LogoSvelte },
+  ];
 
   export let title = "";
   export let description = "";
@@ -31,10 +42,10 @@
         <h1 class="bx--type-productive-heading-06">{title}</h1>
         {#if description}<p class="bx--type-body-long-02 intro">{description}</p>{/if}
         {#if loadSource}
-          <ContentSwitcher size="sm" class="views" aria-label="View" bind:selectedIndex={view}>
-            <Switch text="Page" />
-            <Switch text="Markdown" />
-            <Switch text="Compiled" />
+          <ContentSwitcher size="sm" lowContrast class="views" aria-label="View" bind:selectedIndex={view}>
+            {#each VIEWS as { text, icon } (text)}
+              <Switch {text}><span class="view"><svelte:component this={icon} />{text}</span></Switch>
+            {/each}
           </ContentSwitcher>
         {/if}
       </header>
@@ -78,8 +89,19 @@
   }
 
   header :global(.views) {
-    max-width: 20rem;
+    max-width: 27rem;
     margin-top: var(--cds-spacing-06);
+  }
+
+  .view {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+  }
+
+  .view :global(svg) {
+    flex: none;
+    fill: currentColor;
   }
 
   .intro {
