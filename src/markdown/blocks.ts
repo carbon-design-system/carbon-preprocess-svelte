@@ -29,9 +29,15 @@ export type Block =
    * Code blocks that belong together. `::: code-group` (VitePress) shows
    * them as tabs, labeled by their `[label]` or `title="…"`; `::: compare`
    * shows them side by side, such as a `dont` block and a `do` block. Other
-   * blocks inside are kept.
+   * blocks inside are kept. `group="svelte"` (on `code-group`) syncs the
+   * selected tab with every other group of that name, by label.
    */
-  | { type: "codeGroup"; layout: "tabs" | "compare"; children: Block[] }
+  | {
+      type: "codeGroup";
+      layout: "tabs" | "compare";
+      group?: string;
+      children: Block[];
+    }
   | { type: "thematicBreak" }
   | { type: "blockquote"; children: Block[]; alert?: AlertType }
   | {
@@ -52,7 +58,8 @@ export interface ListItem {
 }
 
 const FENCE = /^(`{3,}|~{3,})(.*)$/;
-const CODE_GROUP = /^:{3,}[ \t]*(code-group|compare)[ \t]*$/;
+const CODE_GROUP =
+  /^:{3,}[ \t]*(code-group|compare)(?:[ \t]+group=(?:"([^"]*)"|'([^']*)'|(\S+)))?[ \t]*$/;
 const CONTAINER_END = /^:{3,}[ \t]*$/;
 const ATX = /^(#{1,6})(?=[ \t]|$)(.*)$/;
 const ATX_CLOSING = /(?:^|[ \t]+)#+[ \t]*$/;
@@ -493,6 +500,7 @@ export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
       add({
         type: "codeGroup",
         layout: group[1] === "compare" ? "compare" : "tabs",
+        group: group[2] ?? group[3] ?? group[4],
         children: parseBlocks(inner, ctx).blocks,
       });
       continue;

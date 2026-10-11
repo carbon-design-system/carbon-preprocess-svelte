@@ -4,6 +4,7 @@ import {
   carbonCodeIconName,
   parseAnsi,
   parseCodeMeta,
+  prepareFence,
   renderCodeLines,
   stripAnsi,
 } from "carbon-preprocess-svelte";
@@ -214,5 +215,75 @@ describe("code block headers", () => {
       ),
     ).toBe(true);
     expect(html).toContain('<div class="code-block" data-kind="success">');
+  });
+});
+
+describe("collapsible sections", () => {
+  test("`collapse` ranges merge and sort", () => {
+    expect(parseCodeMeta("collapse={8-9,1-3,3-4}").collapse).toEqual([
+      [1, 4],
+      [8, 9],
+    ]);
+  });
+
+  test("fold lines into a <details> row that opens without JavaScript; copy keeps them", async () => {
+    const lines = await renderCodeLines("a\nb\nc\nd\n", "js", "collapse={2-3}");
+    expect(lines?.html).toBe(
+      '<span class="line">a</span><details class="code-fold" style="--lines: 2"><summary class="code-fold__summary" data-count="2 lines"><span class="bx--assistive-text">2 lines</span></summary><span class="line">b</span>\n<span class="line">c</span></details><span class="line">d</span>',
+    );
+    expect(lines?.copy).toBe("a\nb\nc\nd");
+  });
+});
+
+describe("diffs", () => {
+  test("`+` and `-` lines become inserted and deleted, the sign column goes, headers stay plain", async () => {
+    const source =
+      '@@ -1,3 +1,3 @@\n import { Button } from "x";\n-<Button>Old</Button>\n+<Button>New</Button>';
+    const fence = prepareFence(source, "diff-svelte", "");
+    expect(fence.lang).toBe("svelte");
+    expect(fence.code).toBe(
+      '@@ -1,3 +1,3 @@\nimport { Button } from "x";\n<Button>Old</Button>\n<Button>New</Button>',
+    );
+    expect([...fence.plain]).toEqual([1]);
+    expect(
+      Object.fromEntries(
+        [...fence.meta.marks].map(([line, set]) => [line, [...set]]),
+      ),
+    ).toEqual({ 3: ["del"], 4: ["ins"] });
+
+    const lines = await renderCodeLines(
+      source,
+      "diff-svelte",
+      "",
+      (code, lang) => `[${lang}]${code}`,
+    );
+    expect(lines?.html.split("\n")[0]).toBe(
+      '<span class="line" data-diff-header>@@ -1,3 +1,3 @@</span>',
+    );
+    expect(lines?.copy).toBe(
+      'import { Button } from "x";\n<Button>New</Button>',
+    );
+  });
+
+  test("`diff` in the metadata diffs the fence's own language; plain ```diff has nothing to highlight", () => {
+    expect(prepareFence("+a", "js", "diff")).toMatchObject({
+      lang: "js",
+      code: "a",
+    });
+    expect(prepareFence("+a", "diff", "")).toMatchObject({
+      lang: "",
+      code: "a",
+    });
+  });
+});
+
+describe("::: code-group group", () => {
+  test("names a group whose tabs sync by label", async () => {
+    const { html } = await renderMarkdown(
+      '::: code-group group="svelte"\n```svelte [Svelte 5]\na\n```\n:::',
+    );
+    expect(
+      html.startsWith('<div class="code-group" data-group="svelte">'),
+    ).toBe(true);
   });
 });

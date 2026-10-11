@@ -44,6 +44,10 @@ export interface CodeMeta {
    * name (the name stays for screen readers).
    */
   iconOnly: boolean;
+  /** Line ranges folded behind a "Show N lines" row: `collapse={1-8}`. */
+  collapse: [number, number][];
+  /** A diff of code in the fence's language: `svelte diff` (or ` ```diff-svelte `). */
+  diff: boolean;
 }
 
 const META_TOKEN =
@@ -61,6 +65,12 @@ const DO = /^do$/;
 const DONT = /^(?:dont|don't|do-not)$/;
 const COPY = /^(copy|nocopy|no-copy)$/;
 const ICON_ONLY = /^(?:iconOnly|icon-only)$/;
+const COLLAPSE = /^collapse=\{([\d,\s-]*)\}$/;
+const DIFF_KEYWORD = /^diff$/;
+const DIFF_LANG = /^diff(?:-(.+))?$/i;
+// `diff --git`, `index …`, `--- a/x`, `+++ b/x`, and `@@ … @@` hunk headers.
+const DIFF_HEADER =
+  /^(?:diff --git |index [\da-f]|--- |\+\+\+ |@@ |\\ No newline)/;
 const KINDS = new Set<string>(["error", "warning", "success", "info"]);
 const KIND_LABELS: Record<CodeKind, string> = {
   error: "Error",
@@ -120,6 +130,8 @@ export function parseCodeMeta(meta: string): CodeMeta {
     wrap: false,
     copy: true,
     iconOnly: false,
+    collapse: [],
+    diff: false,
   };
   let copy: boolean | undefined;
   for (const [token] of meta.matchAll(META_TOKEN)) {
@@ -146,6 +158,15 @@ export function parseCodeMeta(meta: string): CodeMeta {
       result.kind = "error";
       result.label ??= "Don't";
       copy ??= false;
+    } else if (COLLAPSE.test(token)) {
+      for (const part of (COLLAPSE.exec(token)?.[1] ?? "").split(",")) {
+        const [from, to = from] = part.trim().split("-").map(Number);
+        if (Number.isInteger(from) && Number.isInteger(to) && to >= from) {
+          result.collapse.push([from, to]);
+        }
+      }
+    } else if (DIFF_KEYWORD.test(token)) {
+      result.diff = true;
     } else if (ICON_ONLY.test(token)) {
       result.iconOnly = true;
     } else if (COPY.test(token)) {
@@ -161,6 +182,16 @@ export function parseCodeMeta(meta: string): CodeMeta {
       }
     }
   }
+  // Sorted, without overlaps.
+  result.collapse = result.collapse
+    .sort((a, b) => a[0] - b[0])
+    .reduce<[number, number][]>((ranges, range) => {
+      const last = ranges.at(-1);
+      if (last && range[0] <= last[1] + 1)
+        last[1] = Math.max(last[1], range[1]);
+      else ranges.push([...range]);
+      return ranges;
+    }, []);
   if (result.kind) result.label ??= KIND_LABELS[result.kind];
   result.copy = copy ?? true;
   return result;
@@ -250,6 +281,95 @@ export function splitHtmlLines(html: string): string[] {
   return lines;
 }
 
+export interface DiffLines {
+  /** The code without its `+`, `-`, and ` ` columns. */
+  code: string;
+  /** 1-based header lines (`@@ … @@`, `--- a/x`), shown as plain text. */
+  headers: Set<number>;
+}
+
+/**
+ * A unified diff: `+` lines are inserted, `-` lines deleted, and the sign
+ * column is removed so the rest can be highlighted as its own language.
+ */
+export function diffLines(
+  code: string,
+  marks: Map<number, Set<LineMark>>,
+): DiffLines {
+  const headers = new Set<number>();
+  const lines = code.split("\n").map((line, index) => {
+    const number = index + 1;
+    if (DIFF_HEADER.test(line)) {
+      headers.add(number);
+      return line;
+    }
+    if (line.startsWith("+")) addMark(marks, number, "ins");
+    else if (line.startsWith("-")) addMark(marks, number, "del");
+    else if (!line.startsWith(" ")) return line;
+    return line.slice(1);
+  });
+  return { code: lines.join("\n"), headers };
+}
+
+/** A fence, ready to show: its metadata, the code as shown, and how to treat each line. */
+export interface PreparedFence {
+  meta: CodeMeta;
+  /** The code as shown: line markers, prompts, and diff signs removed. */
+  code: string;
+  /** The language to highlight it as: `diff-svelte` and `svelte diff` give `svelte`. */
+  lang: string;
+  terminal?: TerminalLines;
+  /** 1-based lines shown as plain text: diff headers. */
+  plain: Set<number>;
+  /** A whole ` ```ansi ` block. */
+  ansi: boolean;
+  /** Whether any line feature applies; without one, a block keeps its plain output. */
+  hasFeatures: boolean;
+}
+
+/**
+ * Parse a fence's metadata and turn its value into the code as shown: the
+ * one place the build, a renderer, and a client-side code view derive it.
+ */
+export function prepareFence(
+  value: string,
+  lang: string,
+  metaText: string,
+): PreparedFence {
+  const meta = parseCodeMeta(metaText);
+  const original = value.replace(FINAL_NEWLINE, "");
+  const marked = stripCodeMarkers(original, meta.marks);
+  const diffLang = DIFF_LANG.exec(lang);
+  const diff =
+    diffLang || meta.diff ? diffLines(marked, meta.marks) : undefined;
+  const shownLang = diffLang ? (diffLang[1] ?? "") : lang;
+  const terminal = terminalLines(diff?.code ?? marked, shownLang);
+  const ansi = shownLang.toLowerCase() === "ansi";
+  const hasFeatures =
+    meta.marks.size > 0 ||
+    meta.lineNumbers !== undefined ||
+    meta.wrap ||
+    meta.title !== undefined ||
+    meta.kind !== undefined ||
+    meta.iconOnly ||
+    meta.variant !== undefined ||
+    meta.theme !== undefined ||
+    meta.collapse.length > 0 ||
+    diff !== undefined ||
+    ansi ||
+    terminal !== undefined ||
+    marked !== original;
+  return {
+    meta,
+    code: terminal?.code ?? diff?.code ?? marked,
+    lang: shownLang,
+    terminal,
+    plain: diff?.headers ?? new Set(),
+    ansi,
+    hasFeatures,
+  };
+}
+
 export interface RenderedCode {
   /** The inside of `<code>`: one `<span class="line">` per line. */
   html: string;
@@ -270,29 +390,16 @@ export async function renderCodeLines(
   metaText: string,
   highlight?: (
     code: string,
+    lang: string,
   ) => string | undefined | Promise<string | undefined>,
 ): Promise<(RenderedCode & { meta: CodeMeta }) | undefined> {
-  const meta = parseCodeMeta(metaText);
-  const original = value.replace(FINAL_NEWLINE, "");
-  const marked = stripCodeMarkers(original, meta.marks);
-  const terminal = terminalLines(marked, lang);
-  const ansi = lang.toLowerCase() === "ansi";
-  const hasFeatures =
-    meta.marks.size > 0 ||
-    meta.lineNumbers !== undefined ||
-    meta.wrap ||
-    meta.title !== undefined ||
-    meta.kind !== undefined ||
-    meta.iconOnly ||
-    meta.variant !== undefined ||
-    meta.theme !== undefined ||
-    ansi ||
-    terminal ||
-    marked !== original;
-  if (!hasFeatures) return undefined;
+  const fence = prepareFence(value, lang, metaText);
+  const { meta, code, terminal, plain, ansi } = fence;
+  if (!fence.hasFeatures) return undefined;
 
-  const code = terminal?.code ?? marked;
-  const highlighted = await highlight?.(code);
+  const highlighted = fence.lang
+    ? await highlight?.(code, fence.lang)
+    : undefined;
   // A highlighter that returns a whole `<pre>` (Shiki): keep its `<code>` content.
   const inner = highlighted
     ? (CODE_CONTENT.exec(highlighted)?.[1] ?? highlighted)
@@ -307,27 +414,32 @@ export async function renderCodeLines(
     ansiStyle = result.style;
     return result.html;
   };
-  const html = lines
-    .map((content, index) => {
-      const number = index + 1;
-      const marks = meta.marks.get(number);
-      const attributes = [...(marks ?? [])]
-        .map((mark) => ` data-${mark}`)
-        .join("");
-      const command = terminal?.commands.has(number);
-      const output = terminal && !command ? " data-output" : "";
-      const prompt = terminal?.prompts.has(number)
-        ? '<span class="prompt" aria-hidden="true">$ </span>'
-        : "";
-      // Output isn't shell syntax: show it as plain text, in its ANSI colors.
-      const text = ansi || output ? ansiLine(source[index] ?? "") : content;
-      return `<span class="line"${attributes}${output}>${prompt}${text}</span>`;
-    })
-    .join("\n");
+  const rendered = lines.map((content, index) => {
+    const number = index + 1;
+    const marks = meta.marks.get(number);
+    const attributes = [...(marks ?? [])]
+      .map((mark) => ` data-${mark}`)
+      .join("");
+    const command = terminal?.commands.has(number);
+    const output = terminal && !command ? " data-output" : "";
+    const header = plain.has(number) ? " data-diff-header" : "";
+    const prompt = terminal?.prompts.has(number)
+      ? '<span class="prompt" aria-hidden="true">$ </span>'
+      : "";
+    // Output and diff headers aren't code: plain text, output in its ANSI colors.
+    const text =
+      ansi || output
+        ? ansiLine(source[index] ?? "")
+        : header
+          ? escapeText(source[index] ?? "")
+          : content;
+    return `<span class="line"${attributes}${output}${header}>${prompt}${text}</span>`;
+  });
+  const html = foldLines(rendered, meta.collapse);
   const copy = source
     .filter((_, index) => {
       const number = index + 1;
-      if (meta.marks.get(number)?.has("del")) return false;
+      if (meta.marks.get(number)?.has("del") || plain.has(number)) return false;
       return !terminal || terminal.commands.has(number);
     })
     .map((line) => (ansi ? stripAnsi(line, true) : line))
@@ -341,4 +453,38 @@ export async function renderCodeLines(
   if (ansi) attributes["data-ansi"] = "";
   if (meta.variant) attributes["data-variant"] = meta.variant;
   return { html, copy, attributes, meta };
+}
+
+/**
+ * Join rendered lines, folding `collapse` ranges into `<details>`: a
+ * "Show N lines" row that opens without JavaScript. Lines are separated by
+ * newlines, except next to a fold, which is a block of its own.
+ */
+function foldLines(lines: string[], collapse: [number, number][]): string {
+  if (collapse.length === 0) return lines.join("\n");
+  const items: { html: string; block: boolean }[] = [];
+  let index = 0;
+  for (const [from, to] of collapse) {
+    const start = Math.max(from - 1, index);
+    const end = Math.min(to, lines.length);
+    if (start >= end) continue;
+    for (; index < start; index++)
+      items.push({ html: lines[index], block: false });
+    const count = end - start;
+    const label = `${count} ${count === 1 ? "line" : "lines"}`;
+    items.push({
+      html: `<details class="code-fold" style="--lines: ${count}"><summary class="code-fold__summary" data-count="${label}"><span class="bx--assistive-text">${label}</span></summary>${lines.slice(start, end).join("\n")}</details>`,
+      block: true,
+    });
+    index = end;
+  }
+  for (; index < lines.length; index++)
+    items.push({ html: lines[index], block: false });
+  return items
+    .map((item, i) =>
+      i > 0 && !item.block && !items[i - 1].block
+        ? `\n${item.html}`
+        : item.html,
+    )
+    .join("");
 }
