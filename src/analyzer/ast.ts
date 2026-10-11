@@ -66,6 +66,57 @@ export function forEachNode(
   for (const child of childNodes(node)) forEachNode(child, visit);
 }
 
+/** Script nodes that bind names for the code inside them. */
+const SCOPES = new Set([
+  "FunctionDeclaration",
+  "FunctionExpression",
+  "ArrowFunctionExpression",
+  "BlockStatement",
+  "ForStatement",
+  "ForInStatement",
+  "ForOfStatement",
+  "SwitchStatement",
+  "CatchClause",
+]);
+const scopeNamesOf = new WeakMap<Node, ReadonlySet<string>>();
+
+/**
+ * The names a function, block or `catch` binds for the code inside it:
+ * its parameters and every declaration within it (nested ones too, which
+ * only ever over-approximates). `undefined` for any other node.
+ */
+export function scopeNames(node: Node): ReadonlySet<string> | undefined {
+  if (!SCOPES.has(node.type)) return undefined;
+  let names = scopeNamesOf.get(node);
+  if (names) return names;
+  const found = new Set<string>();
+  const declaredInside = (inner: Node) =>
+    forEachNode(inner, (child) => {
+      if (child.type === "VariableDeclarator") patternNames(child.id, found);
+      if (child.type === "FunctionDeclaration" && child.id) {
+        found.add(child.id.name);
+      }
+    });
+  switch (node.type) {
+    case "FunctionDeclaration":
+    case "FunctionExpression":
+    case "ArrowFunctionExpression":
+      for (const param of node.params) patternNames(param as Node, found);
+      if (node.type === "FunctionExpression" && node.id)
+        found.add(node.id.name);
+      declaredInside(node.body as Node);
+      break;
+    case "CatchClause":
+      patternNames(node.param as Node | null, found);
+      break;
+    default:
+      declaredInside(node);
+  }
+  names = found;
+  scopeNamesOf.set(node, names);
+  return names;
+}
+
 /** The identifier at the root of `a`, `a.b`, `a[b].c`; `""` for anything else. */
 export function rootName(node: Node | null | undefined): string {
   let current = node;

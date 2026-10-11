@@ -447,3 +447,43 @@ describe("destructuring and stores", () => {
     expect(specialize(writable)).toContain(`class="open"`);
   });
 });
+
+describe("names a nested scope binds", () => {
+  test("a parameter with a prop's name leaves the prop known", () => {
+    const source = `<script>
+  export let size = "sm";
+  function label(size) {
+    if (size === "lg") return "large";
+    return "small";
+  }
+</script>
+{#if size === "sm"}<p class="sm">{label("lg")}</p>{/if}`;
+    const code = specialize(source);
+    expect(code).toContain(`<p class="sm">`);
+    expect(code).not.toContain("{#if size");
+    // Inside the function, `size` is the parameter: left alone.
+    expect(code).toContain(`if (size === "lg")`);
+  });
+
+  test("an `{#each}` context with a prop's name leaves the prop known", () => {
+    const source = `<script>
+  export let width = "100%";
+  export let widths = ["50%", "75%"];
+</script>
+{#each widths as width}<span style:width>{width}</span>{/each}
+{#if width === "100%"}<p class="full">full</p>{/if}`;
+    const code = specialize(source);
+    expect(code).not.toContain("{#if width");
+    expect(code).toContain("{#each widths as width}");
+  });
+
+  test("`let:x={y}` binds `y`, not `x`", () => {
+    const source = `<script>
+  import Inner from "./Inner.svelte";
+  export let direction = "bottom";
+</script>
+<Inner let:direction={actual}>{actual}</Inner>
+{#if direction === "bottom"}<p class="bottom">bottom</p>{/if}`;
+    expect(specialize(source)).not.toContain("{#if direction");
+  });
+});
