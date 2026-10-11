@@ -38,7 +38,7 @@ import {
   terminalLines,
 } from "carbon-preprocess-svelte";
 import { sveld } from "sveld";
-import { loadEnv } from "vite";
+import { createLogger, loadEnv } from "vite";
 import { GALLERY, GALLERY_BASE } from "./gallery";
 import { analyze } from "./src/intel/analyze.js";
 import { toJSDoc, toTypeScript } from "./src/intel/typescript.js";
@@ -436,6 +436,166 @@ function optionsGallery() {
       write(
         path.join(HERE, "src/pages/Options.svx"),
         `---\ntitle: Options gallery\ndescription: "One sample under each markdown() option: the default first, then the option's other values, each compiled by compileMarkdown."\nexamples: false\n---\n\n<script>\n  import GalleryRow from "../GalleryRow.svelte";\n${imports.join("\n")}\n</script>\n\n${sections.join("\n\n")}\n`,
+      );
+    },
+  };
+}
+
+/**
+ * The build report (`virtual:build-report`, the Build report page):
+ * - `examples`: every example's CSS before and after, from the e2e snapshot;
+ * - `lastBuild`: this playground's last `vite build`, from what
+ *   `optimizeCss` and `optimizeComponents` logged (through `logger` below)
+ *   and the emitted assets, saved in `node_modules/.cache/playground/`;
+ * - `imports`: what `optimizeImports` rewrites in each file, run here on
+ *   each file's script.
+ */
+const BUILD_REPORT = path.join(
+  HERE,
+  "node_modules/.cache/playground/build-report.json",
+);
+const OPTIMIZED_CSS =
+  /Optimized (\S+)\s+Before:\s+([\d.]+ \w+)\s+After:\s+([\d.]+ \w+) \(-([\d.]+)%\)/;
+const REWROTE = /rewrote (\d+) Carbon components for this app \((\d+) edits\)/;
+const IMPORT_LINE =
+  /^\s*import\b.*["']carbon-(?:components|icons)-svelte[^"']*["'];?\s*$/gm;
+const SCRIPT_CONTENT = /<script(?![^>]*\bmodule\b)[^>]*>([\s\S]*?)<\/script>/;
+
+/** What the optimizers logged in this build. */
+const logged = { css: [] as unknown[], components: undefined as unknown };
+const logger = createLogger();
+const loggerInfo = logger.info;
+logger.info = (message, options) => {
+  const css = OPTIMIZED_CSS.exec(message);
+  if (css) {
+    const [, file, before, after, percent] = css;
+    logged.css.push({
+      file: path.basename(file),
+      before,
+      after,
+      percent: Number(percent),
+    });
+  }
+  const rewrote = REWROTE.exec(message);
+  if (rewrote)
+    logged.components = {
+      rewritten: Number(rewrote[1]),
+      edits: Number(rewrote[2]),
+    };
+  loggerInfo(message, options);
+};
+
+function buildReport() {
+  const id = "virtual:build-report";
+  return {
+    name: "playground-build-report",
+    resolveId: (source: string) => (source === id ? `\0${id}` : undefined),
+    async load(
+      this: { addWatchFile: (file: string) => void },
+      resolved: string,
+    ) {
+      if (resolved !== `\0${id}`) return;
+      const snapshot = path.join(HERE, "../tests/__snapshots__/e2e.json");
+      this.addWatchFile(snapshot);
+      const examples = Object.entries(
+        JSON.parse(readFileSync(snapshot, "utf8")) as Record<
+          string,
+          Record<string, unknown>
+        >,
+      ).flatMap(([example, entry]) =>
+        "before_kb" in entry
+          ? [{ example, build: "default", flat: true, ...entry }]
+          : Object.entries(entry).map(([build, value]) => ({
+              example,
+              build,
+              ...(value as object),
+            })),
+      );
+      const lastBuild = existsSync(BUILD_REPORT)
+        ? JSON.parse(readFileSync(BUILD_REPORT, "utf8"))
+        : undefined;
+      // optimizeImports on each file's instance script: its Carbon imports
+      // before and after.
+      const preprocess = optimizeImports();
+      const files = [
+        ...readdirSync(path.join(HERE, "src"), { recursive: true })
+          .map(String)
+          // Not the gallery's generated components.
+          .filter(
+            (file) =>
+              /\.(svelte|svx)$/.test(file) && !file.startsWith("gallery"),
+          )
+          .map((file) => path.join(HERE, "src", file)),
+      ].sort();
+      const imports = (
+        await Promise.all(
+          files.map(async (file) => {
+            const script = SCRIPT_CONTENT.exec(readFileSync(file, "utf8"))?.[1];
+            if (!script) return undefined;
+            const out = await preprocess.script?.({
+              content: script,
+              filename: file,
+              attributes: {},
+              markup: "",
+            });
+            const before = script.match(IMPORT_LINE) ?? [];
+            const after = (out?.code ?? script).match(IMPORT_LINE) ?? [];
+            if (!out || before.join("\n") === after.join("\n"))
+              return undefined;
+            return {
+              file: path.relative(HERE, file),
+              before: before.map((line) => line.trim()),
+              after: after.map((line) => line.trim()),
+            };
+          }),
+        )
+      ).filter(Boolean);
+      return `export default ${JSON.stringify({ examples, lastBuild, imports })};`;
+    },
+    // After a build: what the optimizers logged, and the emitted assets (in
+    // kB, as the optimizers log them).
+    writeBundle(
+      _: unknown,
+      bundle: Record<
+        string,
+        { type: string; code?: string; source?: string | Uint8Array }
+      >,
+    ) {
+      const assets = Object.entries(bundle)
+        .map(([file, output]) => ({
+          file,
+          type: file.endsWith(".css")
+            ? "css"
+            : file.endsWith(".js")
+              ? "js"
+              : "other",
+          kb:
+            Math.round(
+              Buffer.byteLength(output.code ?? output.source ?? "") / 10,
+            ) / 100,
+        }))
+        .filter((asset) => asset.type !== "other")
+        .sort((a, b) => b.kb - a.kb);
+      mkdirSync(path.dirname(BUILD_REPORT), { recursive: true });
+      writeFileSync(
+        BUILD_REPORT,
+        JSON.stringify({
+          at: new Date().toISOString(),
+          ccs: CCS_DIR ? "checkout" : "installed",
+          optimized: OPTIMIZE,
+          css: logged.css,
+          components: logged.components,
+          assets: assets.slice(0, 12),
+          totals: {
+            js: assets
+              .filter((a) => a.type === "js")
+              .reduce((sum, a) => sum + a.kb, 0),
+            css: assets
+              .filter((a) => a.type === "css")
+              .reduce((sum, a) => sum + a.kb, 0),
+            files: assets.length,
+          },
+        }),
       );
     },
   };
@@ -904,6 +1064,8 @@ function pageSources() {
 }
 
 export default {
+  // Records what the optimizers log, for the build report.
+  customLogger: logger,
   plugins: [
     // Before svelte(): it hands Svelte Carbon's components rewritten for the
     // props this app passes (builds only; see OPTIMIZE).
@@ -917,6 +1079,7 @@ export default {
     ccsApi(),
     searchIndex(),
     pageSources(),
+    buildReport(),
     svelte({
       extensions: [".svelte", ".svx", ".md", ".sample"],
       preprocess: [
