@@ -94,6 +94,29 @@ describe("performance", () => {
     });
   }
 
+  test(`Stress's compiled source opens with no task over ${LONG_TASK_MS} ms`, async () => {
+    // 165,000-character lines (code views' props): their colors are skipped,
+    // or Chrome paints the Highlight API ranges for seconds.
+    const { page } = await open(context(), "page=Stress");
+    await page.evaluate(() => {
+      window.__long = [];
+      new PerformanceObserver((list) =>
+        window.__long.push(...list.getEntries().map((e) => e.duration)),
+      ).observe({ type: "longtask" });
+    });
+    await page
+      .getByRole("tablist", { name: "View" })
+      .getByRole("tab", { name: "Compiled" })
+      .click();
+    await page.waitForTimeout(1500);
+    const long = await page.evaluate(() => window.__long);
+    console.log(
+      `Stress compiled source: longest task ${Math.round(Math.max(0, ...long))} ms`,
+    );
+    expect(Math.max(0, ...long)).toBeLessThan(LONG_TASK_MS);
+    await page.close();
+  });
+
   test("hover handling costs under a millisecond per pointer move", async () => {
     const { page } = await open(context(), "page=Stress");
     const box = await page.locator("pre[data-codeview]").first().boundingBox();

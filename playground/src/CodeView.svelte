@@ -268,6 +268,11 @@
     return starts;
   }
 
+  // Past this, a line stays uncolored: Chrome paints Highlight API ranges
+  // slowly when one text node holds thousands (a 50,000-character line of
+  // JSON froze the page for 17 seconds).
+  const LONG_LINE = 1000;
+
   /** 0-based line of a character offset. */
   function lineOf(offset) {
     let low = 0;
@@ -304,7 +309,8 @@
     const end = collapsedNow ? lineStarts[maxCollapsedLines] : Infinity;
     for (const token of tokens) {
       if (token.start >= end) break;
-      if (!token.type || isOutput(lineOf(token.start) + 1) || features.plain.has(lineOf(token.start) + 1)) continue;
+      const line = lineOf(token.start);
+      if (!token.type || isOutput(line + 1) || features.plain.has(line + 1) || lines[line].length > LONG_LINE) continue;
       // A token crossing the fold is painted up to it.
       const range = rangeAt(token.start, Math.min(token.end, end - 1));
       if (!range) continue;

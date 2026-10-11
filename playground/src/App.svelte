@@ -43,7 +43,8 @@
   import Settings from "carbon-icons-svelte/lib/Settings.svelte";
   import ccsPages from "virtual:ccs-pages";
   import searchIndex from "virtual:search-index";
-  import { tick } from "svelte";
+  import { setContext, tick } from "svelte";
+  import { writable } from "svelte/store";
   import { clearHighlights, highlightAll } from "./highlight-dom.js";
   import Hovercard from "./intel/Hovercard.svelte";
   import Matrix from "./Matrix.svelte";
@@ -207,6 +208,11 @@
       : key
         ? modules[key]()
         : Promise.reject(new Error(`No page ${pageName}`));
+
+  // The page a Layout belongs to, for its source view (virtual:page-sources).
+  const currentPage = writable(state.page);
+  setContext("playground:page", currentPage);
+  $: currentPage.set(pageName);
 
   // Search: pages and their h2 and h3 headings (virtual:search-index).
   const ENTRIES = searchIndex.flatMap(({ page, title, headings }) => [
