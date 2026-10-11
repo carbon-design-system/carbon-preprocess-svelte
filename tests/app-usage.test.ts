@@ -405,3 +405,74 @@ describe("rewriting the app's own components", () => {
     );
   });
 });
+
+describe("spreads and calls the analysis can read", () => {
+  const rendering = (script: string, markup: string, app = `<Card />`) => [
+    MAIN,
+    appRendering(app),
+    {
+      file: "/app/src/Card.svelte",
+      code: `<script>${IMPORT_BUTTON}\n${script}</script>\n${markup}`,
+    },
+  ];
+
+  test("a spread object literal passes its keys", async () => {
+    expect(
+      await buttonKinds(
+        rendering(
+          `export let loud = false;`,
+          `<Button kind="ghost" {...(loud ? { kind: "danger" } : {})} />`,
+          `<Card /><Card loud />`,
+        ),
+      ),
+    ).toEqual(["danger", "ghost"]);
+    expect(
+      await buttonKinds(
+        rendering("", `<Button kind="ghost" {...{ kind: "danger" }} />`),
+      ),
+    ).toEqual(["danger"]);
+  });
+
+  test("a call to a function nothing replaces returns what its body does", async () => {
+    expect(
+      await buttonKinds(
+        rendering(
+          `export let kindOf = (tone) => "danger";`,
+          `<Button kind={kindOf(1)} />`,
+        ),
+      ),
+    ).toEqual(["danger"]);
+    // A caller passing its own function: any kind.
+    expect(
+      await buttonKinds(
+        rendering(
+          `export let kindOf = (tone) => "danger";`,
+          `<Button kind={kindOf(1)} />`,
+          `<Card kindOf={(tone) => tone} />`,
+        ),
+      ),
+    ).toEqual(["primary", "danger", "ghost"]);
+  });
+
+  test("spreading what a function returns, like `itemToInput`", async () => {
+    expect(
+      await buttonKinds(
+        rendering(
+          `export let extra = (item) => {};\nconst pick = () => { return { kind: "danger" }; };`,
+          `<Button kind="ghost" {...extra(1)} /><Button {...pick()} />`,
+        ),
+      ),
+    ).toEqual(["danger", "ghost"]);
+  });
+
+  test("a parameter shadows the component's own name", async () => {
+    expect(
+      await buttonKinds(
+        rendering(
+          `const kind = "danger";\nconst echo = (kind) => kind;`,
+          `<Button kind={echo("ghost")} />`,
+        ),
+      ),
+    ).toEqual(["primary", "danger", "ghost"]);
+  });
+});

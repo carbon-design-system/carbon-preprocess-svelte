@@ -9,6 +9,7 @@ import {
   flatMap,
   isNullish,
   isObject,
+  isShape,
   isStructured,
   isTruthy,
   itemsOf,
@@ -278,10 +279,39 @@ export function spreadProps(
   argument: Expression,
   scope: Scope,
 ): Map<string, PassedProp> | undefined {
-  if (argument.type !== "Identifier" || !isPropsObject(argument.name, scope)) {
-    return undefined;
+  if (argument.type === "Identifier" && isPropsObject(argument.name, scope)) {
+    return passedProps(scope, argument.name !== "$$props");
   }
-  return passedProps(scope, argument.name !== "$$props");
+  return spreadObjects(evaluate(argument, scope));
+}
+
+/**
+ * The props spreading `value` passes, when each value it can be is an
+ * object literal (or `null`/`undefined`, which pass nothing): a key some
+ * of them lack may be absent.
+ */
+function spreadObjects(value: Value): Map<string, PassedProp> | undefined {
+  if (value === UNKNOWN || value.size === 0) return undefined;
+  const objects: Array<ReadonlyMap<string, Value>> = [];
+  for (const p of value) {
+    if (p === undefined || p === null) objects.push(new Map());
+    else if (isShape(p) && p.kind === "object") objects.push(p.props);
+    else return undefined;
+  }
+  const props = new Map<string, PassedProp>();
+  for (const object of objects) {
+    for (const [key, propValue] of object) {
+      const passed = props.get(key);
+      props.set(key, {
+        value: passed ? join(passed.value, propValue) : propValue,
+        maybeAbsent: false,
+      });
+    }
+  }
+  for (const [key, passed] of props) {
+    passed.maybeAbsent = objects.some((object) => !object.has(key));
+  }
+  return props;
 }
 
 const MAX_WHY_DEPTH = 8;
@@ -508,8 +538,80 @@ function evaluateCall(
       return first?.type === "Literal" && typeof first.value === "string"
         ? scope.context(first.value)
         : UNKNOWN;
-    default:
+    default: {
+      const fn = knownFunction(callee.name, scope);
+      return fn ? returnValue(fn, scope) : UNKNOWN;
+    }
+  }
+}
+
+type FunctionNode = Extract<
+  Node,
+  { type: "ArrowFunctionExpression" | "FunctionExpression" }
+>;
+
+/**
+ * The function `name` holds, when the analysis can read its body: a
+ * prop's default no call site overrides, or a top-level
+ * `const f = (…) => …`.
+ */
+function knownFunction(name: string, scope: Scope): FunctionNode | undefined {
+  const { model, usage } = scope;
+  if (scope.locals.has(name)) return undefined;
+  let node: Node | null | undefined;
+  if (model.props.has(name)) {
+    const passedAs = model.propNames.get(name) ?? name;
+    if (usage.open || usage.props.has(passedAs)) return undefined;
+    node = model.props.get(name) as Node | null | undefined;
+  } else {
+    const declaration = model.declarations.get(name);
+    if (declaration === FUNCTION_DECLARATION) return undefined;
+    node = declaration as Node | null | undefined;
+  }
+  if (
+    (node?.type === "ArrowFunctionExpression" ||
+      node?.type === "FunctionExpression") &&
+    !node.async &&
+    !node.generator
+  ) {
+    return node;
+  }
+  return undefined;
+}
+
+/**
+ * What calling `fn` returns, when its body is an expression or a lone
+ * `return`: its parameters are unknown, and every other name it reads is
+ * the component's own (it's declared at the top level).
+ */
+function returnValue(fn: FunctionNode, scope: Scope): Value {
+  let returned: Node | null;
+  if (fn.body.type === "BlockStatement") {
+    const statements = fn.body.body as Node[];
+    if (statements.length === 0) return UNDEFINED;
+    const [only] = statements;
+    if (statements.length > 1 || only.type !== "ReturnStatement") {
       return UNKNOWN;
+    }
+    returned = only.argument as Node | null;
+  } else {
+    returned = fn.body as Node;
+  }
+  if (!returned) return UNDEFINED;
+
+  const key = `call:${(fn as { start?: number }).start}`;
+  if (scope.pending.has(key)) return UNKNOWN;
+  const parameters = new Set<string>();
+  for (const parameter of fn.params)
+    patternNames(parameter as Node, parameters);
+  const outer = scope.locals;
+  scope.locals = new Map([...parameters].map((name) => [name, UNKNOWN]));
+  scope.pending.add(key);
+  try {
+    return evaluate(returned as Expression, scope);
+  } finally {
+    scope.pending.delete(key);
+    scope.locals = outer;
   }
 }
 
