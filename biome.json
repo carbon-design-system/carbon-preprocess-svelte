@@ -76,5 +76,29 @@
         }
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["playground/**"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "useTopLevelRegex": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["playground/**/*.svelte"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
+      }
+    }
+  ]
 }

@@ -370,8 +370,14 @@ async function main() {
   const results: BuildOutcome[] = [];
 
   const examples: string[] = [];
+  const dirs: string[] = [];
   for await (const dir of $`find examples -maxdepth 1 -mindepth 1 -type d`.lines()) {
-    if (!dir) continue;
+    if (dir) dirs.push(dir);
+  }
+  // The playground builds like an example too (its own browser tests run
+  // in `test:playground`).
+  dirs.push("playground");
+  for (const dir of dirs) {
     if (
       ONLY_EXAMPLES &&
       !ONLY_EXAMPLES.includes(dir.replace("examples/", ""))
