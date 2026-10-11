@@ -1,26 +1,30 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
-import { type AST, type Expression, isReference, walk } from "sveast/walk";
-import { parse } from "../indexer/parser";
+import { analyzeScopes, type Binding, type Scopes } from "sveast/scope";
 import {
-  forEachNode,
-  lineAt,
-  type Node,
-  patternNames,
-  rootName,
-  scopeNames,
-} from "./ast";
+  type AST,
+  type Expression,
+  extractIdentifiers,
+  type Identifier,
+  isReference,
+  locate,
+  type Pattern,
+  walk,
+} from "sveast/walk";
+import { parse } from "../indexer/parser";
+import { forEachNode, type Node } from "./ast";
 
-/** Marks the names `pattern` binds as unknown, with why. */
+/** Marks the names `pattern` declares as unknown, with why. */
 function markUnknown(
   model: ComponentModel,
   pattern: Node | null | undefined,
   reason: string,
 ): void {
-  const names = new Set<string>();
-  patternNames(pattern, names);
-  for (const name of names) markNameUnknown(model, name, reason);
+  if (!pattern) return;
+  for (const { name } of extractIdentifiers(pattern as Pattern)) {
+    markNameUnknown(model, name, reason);
+  }
 }
 
 function markNameUnknown(
@@ -45,6 +49,8 @@ export type ComponentModel = {
   /** The source `ast` was parsed from. */
   code: string;
   ast: AST.Root;
+  /** What each name in `ast` refers to: see `isTopLevel`. */
+  scopes: Scopes;
   /** `export let` props and their default expressions. */
   props: Map<string, Expression | null>;
   /**
@@ -57,9 +63,9 @@ export type ComponentModel = {
   /** The `$: x = …` assignments that define a declaration above. */
   reactiveDeclarations: WeakSet<Node>;
   /**
-   * Names the analysis treats as unknown: assigned outside their
-   * declaration (handlers, `bind:`, `$: if …`), or re-bound by a nested
-   * scope (a parameter, `{#each}` context, `let:`) the walk can't tell apart.
+   * Top-level names the analysis treats as unknown: assigned outside
+   * their declaration (handlers, `bind:`, `$: if …`). A name a nested
+   * scope declares is another binding (see `isTopLevel`).
    */
   unknownNames: Set<string>;
   /** Why each of `unknownNames` is unknown, for the report. */
@@ -218,6 +224,7 @@ export function buildComponentModel(
     key,
     code,
     ast,
+    scopes: analyzeScopes(ast),
     props: new Map(),
     propNames: new Map(),
     declarations: new Map(),
@@ -275,46 +282,53 @@ export function buildComponentModel(
     }
   }
 
-  const topLevel = new Set([
-    ...model.props.keys(),
-    ...model.declarations.keys(),
-  ]);
-  const nested = nestedBindings(ast, true);
-  for (const name of nestedBindings(ast, false)) {
-    if (topLevel.has(name)) {
-      markNameUnknown(model, name, "is shadowed by a nested binding");
+  // Each identifier that writes or mutates a top-level binding, and the
+  // name that it makes unknown: `$count = 1` sets the store's value.
+  const writes = new Map<Identifier, string>();
+  for (const binding of topLevelBindings(model.scopes)) {
+    // `x` in `$: x = …` declares it, so it's no reference; it's a write
+    // unless the model reads it as the definition (`reactiveDeclarations`).
+    if (binding.kind === "reactive" && binding.node) {
+      writes.set(binding.node, binding.name);
+    }
+    for (const reference of binding.references) {
+      if (reference.writes || reference.mutates) {
+        writes.set(
+          reference.node,
+          reference.store ? `$${binding.name}` : binding.name,
+        );
+      }
     }
   }
-
   /** Names written after their declaration: a rest name among them is unusable. */
   const written = new Set<string>();
+  const markWritten = (target: Node | null | undefined, reason: string) =>
+    forEachNode(target, (node) => {
+      const name = node.type === "Identifier" && writes.get(node);
+      if (!name) return;
+      writes.delete(node);
+      markNameUnknown(model, name, reason);
+      written.add(name);
+    });
+  const line = (offset: number) => locate(code, offset).line;
   forEachNode(ast, (node) => {
     switch (node.type) {
       case "AssignmentExpression":
-        if (!model.reactiveDeclarations.has(node)) {
-          markUnknown(
-            model,
-            node.left as Node,
-            `is assigned at line ${lineAt(code, node.start)}`,
-          );
-          patternNames(node.left, written);
+        if (model.reactiveDeclarations.has(node)) {
+          // `$: x = …` defines `x` rather than writing it.
+          writes.delete(node.left as Identifier);
+        } else {
+          markWritten(node.left, `is assigned at line ${line(node.start)}`);
         }
         break;
       case "UpdateExpression":
-        markUnknown(
-          model,
-          node.argument as Node,
-          `is updated at line ${lineAt(code, node.start)}`,
-        );
-        patternNames(node.argument, written);
+        markWritten(node.argument, `is updated at line ${line(node.start)}`);
         break;
       case "BindDirective":
-        markNameUnknown(
-          model,
-          rootName(node.expression),
-          `is bound with \`bind:\` at line ${lineAt(code, node.start)}`,
+        markWritten(
+          node.expression,
+          `is bound with \`bind:\` at line ${line(node.start)}`,
         );
-        written.add(rootName(node.expression));
         break;
       case "CallExpression":
         if (node.callee.type === "Identifier") {
@@ -330,11 +344,13 @@ export function buildComponentModel(
         break;
     }
   });
+  // Any other write, such as `for (x of xs)`.
+  for (const [node, name] of writes) {
+    markNameUnknown(model, name, `is assigned at line ${line(node.start)}`);
+    written.add(name);
+  }
 
-  if (
-    model.restPropsName &&
-    (written.has(model.restPropsName) || nested.has(model.restPropsName))
-  ) {
+  if (model.restPropsName && written.has(model.restPropsName)) {
     model.restPropsName = undefined;
   }
 
@@ -751,43 +767,24 @@ function readPropsRune(model: ComponentModel, pattern: Node): void {
   }
 }
 
+/** The bindings `<script module>` and `<script>` declare at their top level. */
+function topLevelBindings(scopes: Scopes): Binding[] {
+  const bindings = [...scopes.instance.declarations.values()];
+  if (scopes.module !== scopes.instance) {
+    bindings.push(...scopes.module.declarations.values());
+  }
+  return bindings;
+}
+
 /**
- * Names bound anywhere but the top level of a `<script>`. Those a
- * function, block or `catch` binds (`scripts`) the walks bind as unknown
- * where they apply (see `bindScope`), as they do `{#each}` contexts; the
- * markup's others (`{#await}`, snippet parameters, `let:`, `{@const}`)
- * they don't.
+ * Whether `binding` is one of the component's own names, declared at the
+ * top level of a `<script>`, rather than a nested scope's (a parameter, a
+ * local, an `{#each}` item, `let:`, a snippet parameter, `{@const}`, an
+ * `{#await}` value) that only reuses the name.
  */
-function nestedBindings(ast: AST.Root, scripts: boolean): Set<string> {
-  const names = new Set<string>();
-  forEachNode(ast, (node) => {
-    switch (node.type) {
-      case "AwaitBlock":
-        patternNames(node.value, names);
-        patternNames(node.error, names);
-        break;
-      case "SnippetBlock":
-        for (const param of node.parameters) patternNames(param, names);
-        break;
-      case "LetDirective":
-        // `let:direction={actual}` binds `actual`; `let:direction`, `direction`.
-        if (node.expression) patternNames(node.expression as Node, names);
-        else names.add(node.name);
-        break;
-      case "ConstTag":
-        for (const declarator of node.declaration.declarations) {
-          patternNames(declarator.id, names);
-        }
-        break;
-      case "EachBlock":
-        if (scripts) {
-          patternNames(node.context, names);
-          if (node.index) names.add(node.index);
-        }
-        break;
-      default:
-        if (scripts) for (const name of scopeNames(node) ?? []) names.add(name);
-    }
-  });
-  return names;
+export function isTopLevel(binding: Binding, model: ComponentModel): boolean {
+  return (
+    binding.scope === model.scopes.instance ||
+    binding.scope === model.scopes.module
+  );
 }

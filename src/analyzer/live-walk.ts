@@ -1,10 +1,9 @@
-import type { AST, Expression } from "sveast/walk";
+import { type AST, children, type Expression, locate } from "sveast/walk";
 import { extractCarbonClassTokens } from "../indexer/extract-runtime-classes";
-import { childNodes, lineAt, type Node } from "./ast";
+import type { Node } from "./ast";
 import { UnsupportedComponentError } from "./component-model";
 import {
   bindEach,
-  bindScope,
   evaluate,
   type PassedProp,
   type Scope,
@@ -85,15 +84,6 @@ function visitBranches(
 }
 
 function visit(node: Node, scope: Scope, result: LiveResult): void {
-  const unbind = bindScope(node, scope);
-  try {
-    visitNode(node, scope, result);
-  } finally {
-    unbind?.();
-  }
-}
-
-function visitNode(node: Node, scope: Scope, result: LiveResult): void {
   switch (node.type) {
     // Import bindings aren't uses.
     case "ImportDeclaration":
@@ -235,12 +225,12 @@ function visitNode(node: Node, scope: Scope, result: LiveResult): void {
       break;
   }
 
-  visitAll(childNodes(node), scope, result);
+  visitAll(children(node), scope, result);
 }
 
 /** `Button.svelte:12`: where `node` is in the component `scope` walks. */
 function whereIn(node: { start: number }, scope: Scope): string {
-  return `${scope.model.key.split("/").pop()}:${lineAt(scope.model.code, node.start)}`;
+  return `${scope.model.key.split("/").pop()}:${locate(scope.model.code, node.start).line}`;
 }
 
 /** Prefixes an open site's reason with where it is, for the report. */

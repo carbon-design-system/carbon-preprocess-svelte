@@ -1,11 +1,11 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
-import type { AST, Expression } from "sveast/walk";
+import { type AST, children, type Expression, locate } from "sveast/walk";
 import { CarbonSvelte } from "../constants";
 import { readCarbonExports } from "../indexer/carbon-exports";
 import { parse } from "../indexer/parser";
-import { childNodes, forEachNode, lineAt, type Node } from "./ast";
+import { forEachNode, type Node } from "./ast";
 import { buildComponentModel, type ComponentModel } from "./component-model";
 import {
   bindEach,
@@ -338,7 +338,7 @@ export function collectImportedUsage(
     for (const match of code.matchAll(SVELTE_SPECIFIER)) {
       for (const key of resolveAppImport(file, match[2], apps)?.keys ?? []) {
         usage.sites.push(
-          openSite(key, file, lineAt(code, match.index), reason),
+          openSite(key, file, locate(code, match.index).line, reason),
         );
       }
     }
@@ -360,7 +360,7 @@ export function collectImportedUsage(
       const key = carbon.get(name.split(IMPORT_AS)[0]);
       if (key)
         usage.sites.push(
-          openSite(key, file, lineAt(code, match.index), reason),
+          openSite(key, file, locate(code, match.index).line, reason),
         );
     }
   }
@@ -369,7 +369,7 @@ export function collectImportedUsage(
   }
   for (const match of code.matchAll(DIRECT_COMPONENT_SPECIFIER)) {
     usage.sites.push(
-      openSite(match[1], file, lineAt(code, match.index), reason),
+      openSite(match[1], file, locate(code, match.index).line, reason),
     );
   }
   return usage;
@@ -638,7 +638,7 @@ export function collectSvelteUsage(
     providedContexts: providedContexts(code),
   };
   const rendered = new Set<string>();
-  const line = (node: { start: number }) => lineAt(code, node.start);
+  const line = (node: { start: number }) => locate(code, node.start).line;
   const props = appEvaluator(code, ast, file, bindings.objects, options);
   const explainAt =
     (node: { start: number }) =>
@@ -760,7 +760,7 @@ export function collectSvelteUsage(
         return;
       }
     }
-    for (const child of childNodes(node)) visit(child, node);
+    for (const child of children(node)) visit(child, node);
   };
 
   for (const node of [ast.module, ast.instance, ast.fragment]) {
