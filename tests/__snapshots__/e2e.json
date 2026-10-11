@@ -137,8 +137,8 @@
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 76.04,
-      "reduction_percent": 89.06
+      "after_kb": 76.18,
+      "reduction_percent": 89.04
     },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
@@ -167,8 +167,8 @@
     "modal": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 76.04,
-      "reduction_percent": 89.06
+      "after_kb": 76.18,
+      "reduction_percent": 89.04
     },
     "multiselect": {
       "file": "assets/index-*.css",
@@ -179,8 +179,8 @@
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 695.03,
-      "after_kb": 86.78,
-      "reduction_percent": 87.51
+      "after_kb": 86.93,
+      "reduction_percent": 87.49
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
