@@ -3,6 +3,7 @@ import {
   forEachChild,
   isReference,
   SKIP,
+  skipTypeWrappers,
   valueVisitorKeys,
   walk,
 } from "sveast/walk";
@@ -67,14 +68,6 @@ type Edit = {
   silences?: boolean;
 };
 
-/** TypeScript expressions that hold the value of theirs. */
-const TS_VALUE_WRAPPERS = new Set([
-  "TSAsExpression",
-  "TSSatisfiesExpression",
-  "TSNonNullExpression",
-  "TSTypeAssertion",
-]);
-
 /** Expression nodes worth trying to fold (literals already are). */
 const FOLDABLE = new Set([
   "Identifier",
@@ -86,7 +79,6 @@ const FOLDABLE = new Set([
   "BinaryExpression",
   "TemplateLiteral",
   "CallExpression",
-  ...TS_VALUE_WRAPPERS,
 ]);
 
 /** Parents whose `field` child is written to or declared, not read. */
@@ -246,10 +238,10 @@ function isPure(node: Node, scope: Scope): boolean {
           p.kind === "init" &&
           isPure(p.value as Node, scope),
       );
-    default:
-      return TS_VALUE_WRAPPERS.has(node.type)
-        ? isPure((node as { expression: Node }).expression, scope)
-        : false;
+    default: {
+      const value = skipTypeWrappers(node);
+      return value !== node && isPure(value, scope);
+    }
   }
 }
 
@@ -321,7 +313,10 @@ export function specializeComponent(
 
   /** Fold `node` to a literal if it's in a read position with one known, pure value. */
   function tryFold(node: Node, parent: Node | null, field: string): boolean {
-    if (!FOLDABLE.has(node.type) || isWritePosition(parent, field)) {
+    if (
+      !FOLDABLE.has(skipTypeWrappers(node).type) ||
+      isWritePosition(parent, field)
+    ) {
       return false;
     }
     if (
@@ -822,10 +817,10 @@ function hasNoSideEffects(node: Node | null | undefined): boolean {
           p.kind === "init" &&
           hasNoSideEffects(p.value as Node),
       );
-    default:
-      return TS_VALUE_WRAPPERS.has(node.type)
-        ? hasNoSideEffects((node as { expression: Node }).expression)
-        : false;
+    default: {
+      const value = skipTypeWrappers(node);
+      return value !== node && hasNoSideEffects(value);
+    }
   }
 }
 
