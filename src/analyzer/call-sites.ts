@@ -14,10 +14,10 @@ import {
   type PassedProp,
   type Scope,
   spreadProps,
-  whyUnknown,
+  whyUnknownLater,
 } from "./evaluate";
 import { importKey } from "./import-key";
-import { callSiteFromElement } from "./live-walk";
+import { callSiteFromElement, type Explain } from "./live-walk";
 import { type CallSite, type ComponentUsage, newComponentUsage } from "./usage";
 import {
   EMPTY_ARRAY,
@@ -414,7 +414,7 @@ function appEvaluator(
 ): {
   value: (expression: Expression) => Value;
   spread: (argument: Expression) => Map<string, PassedProp> | undefined;
-  explain: (expression: Expression) => string | undefined;
+  explain: Explain;
   /** Binds an `{#each}`'s item while its body is read; returns the unbinding. */
   bindEach: (node: Extract<Node, { type: "EachBlock" }>) => () => void;
 } {
@@ -444,7 +444,7 @@ function appEvaluator(
     // A wrapper's `{...$$restProps}`: what its own call sites pass.
     spread: (argument) => (scope ? spreadProps(argument, scope) : undefined),
     explain: (expression) =>
-      scope ? whyUnknown(expression, scope) : "isn't a literal",
+      scope ? whyUnknownLater(expression, scope) : () => "isn't a literal",
     bindEach: (node) => (scope ? bindEach(node, scope) : () => {}),
   };
 }
@@ -640,10 +640,13 @@ export function collectSvelteUsage(
   const line = (node: { start: number }) => locate(code, node.start).line;
   const props = appEvaluator(code, ast, file, bindings.objects, options);
   const explainAt =
-    (node: { start: number }) =>
-    (expression: Expression): string | undefined => {
+    (node: { start: number }): Explain =>
+    (expression) => {
       const why = props.explain(expression);
-      return why && `${path.basename(file)}:${line(node)} ${why}`;
+      return () => {
+        const reason = why();
+        return reason && `${path.basename(file)}:${line(node)} ${reason}`;
+      };
     };
 
   /** Marks the components a branch that can't render names, without sites. */

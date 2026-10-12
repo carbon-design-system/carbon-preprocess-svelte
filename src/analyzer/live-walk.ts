@@ -8,7 +8,7 @@ import {
   type PassedProp,
   type Scope,
   spreadProps,
-  whyUnknown,
+  whyUnknownLater,
 } from "./evaluate";
 import type { CallSite } from "./usage";
 import {
@@ -245,14 +245,20 @@ function locateReason(
   return site;
 }
 
+/**
+ * Why an expression is unknown, for the report: called during the walk,
+ * the reason is worked out only when asked.
+ */
+export type Explain = (expression: Expression) => () => string | undefined;
+
 /** Explains unknown values at `node`, prefixed with where it is. */
-function explainAt(
-  node: { start: number },
-  scope: Scope,
-): (expression: Expression) => string | undefined {
+function explainAt(node: { start: number }, scope: Scope): Explain {
   return (expression) => {
-    const why = whyUnknown(expression, scope);
-    return why && `${whereIn(node, scope)} ${why}`;
+    const why = whyUnknownLater(expression, scope);
+    return () => {
+      const reason = why();
+      return reason && `${whereIn(node, scope)} ${reason}`;
+    };
   };
 }
 
@@ -317,7 +323,7 @@ function filledSlots(fragment: AST.Fragment): Set<string> | null {
   return slots;
 }
 
-function whyOf(site: CallSite): Map<string, string> {
+function whyOf(site: CallSite): NonNullable<CallSite["why"]> {
   site.why ??= new Map();
   return site.why;
 }
@@ -325,17 +331,20 @@ function whyOf(site: CallSite): Map<string, string> {
 /** Why an attribute's value is unknown: its first unknown expression. */
 function attributeWhy(
   attribute: AST.Attribute,
-  explain: (expression: Expression) => string | undefined,
-): string | undefined {
+  explain: Explain,
+): () => string | undefined {
   const { value } = attribute;
-  if (value === true) return undefined;
-  const parts = Array.isArray(value) ? value : [value];
-  for (const part of parts) {
-    if (part.type === "Text") continue;
-    const why = explain(part.expression);
-    if (why) return why;
-  }
-  return undefined;
+  const parts = value === true ? [] : Array.isArray(value) ? value : [value];
+  const whys = parts.flatMap((part) =>
+    part.type === "Text" ? [] : [explain(part.expression)],
+  );
+  return () => {
+    for (const why of whys) {
+      const reason = why();
+      if (reason) return reason;
+    }
+    return undefined;
+  };
 }
 
 /**
@@ -349,8 +358,7 @@ export function callSiteFromElement(
   component: string,
   evaluateExpression: (expression: Expression) => Value,
   spread?: (argument: Expression) => Map<string, PassedProp> | undefined,
-  /** Why an expression is unknown, for the report. */
-  explain?: (expression: Expression) => string | undefined,
+  explain?: Explain,
 ): CallSite {
   const site: CallSite = {
     component,
@@ -386,21 +394,20 @@ export function callSiteFromElement(
         {
           const value = attributeValue(attribute, evaluateExpression);
           site.props.set(attribute.name, value);
-          const why =
-            value === UNKNOWN && explain
-              ? attributeWhy(attribute, explain)
-              : undefined;
-          if (why) whyOf(site).set(attribute.name, why);
+          if (value === UNKNOWN && explain) {
+            whyOf(site).set(attribute.name, attributeWhy(attribute, explain));
+          }
         }
         break;
-      case "BindDirective":
+      case "BindDirective": {
         site.props.set(attribute.name, UNKNOWN);
+        const why = explain?.(attribute.expression as Expression);
         whyOf(site).set(
           attribute.name,
-          explain?.(attribute.expression as Expression) ??
-            "is bound with `bind:`",
+          () => why?.() ?? "is bound with `bind:`",
         );
         break;
+      }
     }
   }
   return site;

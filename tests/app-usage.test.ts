@@ -6,6 +6,7 @@ import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 const carbon = readCarbonComponents(resolveCarbonRoot());
 const KIND_REASSIGNED =
   /kind +dynamic: Card\.svelte:5 `kind` is assigned at line 3/;
+const KIND_IMPORTED = /kind +dynamic: App\.svelte:\d+ `kind` is imported/;
 const APP_REWRITE_REPORT =
   /Rewrote 1 of 1 app components whose every call site is known:\n +\S*Card\.svelte +\d+ edits?/;
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
@@ -231,6 +232,21 @@ const pick = (next) => (kind = next);
     });
     if ("warning" in result) throw new Error(result.warning);
     expect(result.report().join("\n")).toMatch(KIND_REASSIGNED);
+  });
+
+  test("inside `{#each}`, the reason reads the item as the walk did", async () => {
+    const result = await specializeFiles({
+      projectRoot: process.cwd(),
+      files: [
+        MAIN,
+        appRendering(
+          `{#each items as item}<Button kind={item === "a" ? kind : "primary"} />{/each}`,
+          `${IMPORT_BUTTON}\nimport { kind } from "./kind.js";\nconst items = ["a"];`,
+        ),
+      ],
+    });
+    if ("warning" in result) throw new Error(result.warning);
+    expect(result.report().join("\n")).toMatch(KIND_IMPORTED);
   });
 });
 
