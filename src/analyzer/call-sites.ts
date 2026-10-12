@@ -116,52 +116,79 @@ export function isAppComponent(key: string): boolean {
  * The app components `source`, imported from `from`, can be: exactly one
  * for a relative path to a known file; every file of the same name for an
  * alias or package path (`$lib/Card.svelte`), which can't be told apart.
+ * Without `.svelte`, a bundler that adds the extension (webpack's
+ * `resolve.extensions`) may still load one: `./Card` can be `Card.svelte`
+ * or `Card/index.svelte`, and those are possible but not certain.
  */
 function resolveAppImport(
   from: string,
   source: string,
   apps: AppComponents,
 ): { keys: string[]; exact: boolean } | undefined {
-  if (source.startsWith(".")) {
-    const file = path.resolve(path.dirname(from), source);
-    return apps.files.has(file) ? { keys: [file], exact: true } : undefined;
+  if (source.startsWith(SRC_PREFIX)) return undefined;
+  if (source.endsWith(".svelte")) {
+    if (source.startsWith(".")) {
+      const file = path.resolve(path.dirname(from), source);
+      return apps.files.has(file) ? { keys: [file], exact: true } : undefined;
+    }
+    const resolved = apps.resolved?.get(importKey(from, source));
+    if (resolved && apps.files.has(resolved)) {
+      return { keys: [resolved], exact: true };
+    }
+    const keys = apps.byName.get(path.posix.basename(source));
+    return keys ? { keys, exact: false } : undefined;
   }
-  if (!source.endsWith(".svelte") || source.startsWith(SRC_PREFIX)) {
-    return undefined;
-  }
-  const resolved = apps.resolved?.get(importKey(from, source));
-  if (resolved && apps.files.has(resolved)) {
-    return { keys: [resolved], exact: true };
-  }
-  const keys = apps.byName.get(path.posix.basename(source));
-  return keys ? { keys, exact: false } : undefined;
+  const keys = source.startsWith(".")
+    ? [path.resolve(path.dirname(from), source)].flatMap((file) =>
+        [`${file}.svelte`, path.join(file, "index.svelte")].filter((key) =>
+          apps.files.has(key),
+        ),
+      )
+    : [
+        ...(apps.byName.get(`${path.posix.basename(source)}.svelte`) ?? []),
+        ...(apps.byName.get("index.svelte") ?? []).filter(
+          (key) =>
+            path.basename(path.dirname(key)) === path.posix.basename(source),
+        ),
+      ];
+  return keys.length > 0 ? { keys, exact: false } : undefined;
 }
 
-const DYNAMIC_IMPORT = /\bimport\s*\(/g;
+const DYNAMIC_IMPORT = /\b(?:import|require)\s*\(/g;
 /** The literal argument of an `import(`, read from where it ends. */
 const LITERAL_IMPORT = /\s*(["'`])([^"'`$]+)\1\s*\)/y;
+/** A computed argument that starts with Carbon's name (`` `carbon-components-svelte/src/${name}…` ``). */
+const CARBON_ARGUMENT = /\s*["'`]carbon-components-svelte\b/y;
 const IMPORT_META_GLOB = /\bimport\.meta\.glob\b/;
 
 /**
- * `import()` and `import.meta.glob` in `code`: a literal `import()` of an
- * app component renders it with any props; anything else might.
+ * `import()`, `require()` and `import.meta.glob` in `code`, which the
+ * lexer doesn't read. One of a Carbon component or an app component
+ * renders it with any props; one of Carbon's barrel, or computed from
+ * Carbon's name, may render any Carbon component; any other computed one
+ * may render any app component.
  */
 function readDynamicImports(
   code: string,
-  from: string,
-  apps: AppComponents,
   bindings: ImportBindings,
+  app: AppImports,
 ): void {
-  if (!code.includes("import")) return;
+  if (!code.includes("import") && !code.includes("require")) return;
   if (IMPORT_META_GLOB.test(code)) bindings.openApps = true;
   for (const match of code.matchAll(DYNAMIC_IMPORT)) {
-    LITERAL_IMPORT.lastIndex = match.index + match[0].length;
-    const literal = LITERAL_IMPORT.exec(code);
-    if (!literal) {
+    const start = match.index + match[0].length;
+    LITERAL_IMPORT.lastIndex = start;
+    const source = LITERAL_IMPORT.exec(code)?.[2];
+    if (source === undefined) {
       bindings.openApps = true;
+      CARBON_ARGUMENT.lastIndex = start;
+      if (CARBON_ARGUMENT.test(code)) bindings.openAll = true;
       continue;
     }
-    const resolved = resolveAppImport(from, literal[2], apps);
+    if (source === CarbonSvelte.Components) bindings.openAll = true;
+    const direct = DIRECT_COMPONENT_PATH.exec(source)?.[1];
+    if (direct) bindings.dynamic.push(direct);
+    const resolved = app && resolveAppImport(app.from, source, app.apps);
     if (resolved) bindings.openAppComponents.push(...resolved.keys);
   }
 }
@@ -196,7 +223,10 @@ type ImportBindings = {
   objects: Set<string>;
   /** Re-exported Carbon components: rendered somewhere we can't see. */
   reExported: string[];
-  reExportsAll: boolean;
+  /** Carbon components imported with `import()` or `require()`. */
+  dynamic: string[];
+  /** Any Carbon component may render: `export *`, or a dynamic barrel import. */
+  openAll: boolean;
   /**
    * App components imported dynamically, re-exported, or through a path
    * that can't be resolved for sure: rendered with any props.
@@ -212,7 +242,8 @@ function newBindings(): ImportBindings {
     namespaces: new Set(),
     objects: new Set(),
     reExported: [],
-    reExportsAll: false,
+    dynamic: [],
+    openAll: false,
     openAppComponents: [],
     openApps: false,
   };
@@ -227,8 +258,10 @@ function readImports(
   bindings: ImportBindings,
   app: AppImports,
 ): void {
-  if (app) readDynamicImports(code, app.from, app.apps, bindings);
-  if (!code.includes(CarbonSvelte.Components) && !code.includes(".svelte")) {
+  if (
+    !code.includes(CarbonSvelte.Components) &&
+    !(app && (code.includes("import") || code.includes("export")))
+  ) {
     return;
   }
   for (const statement of lexImportsExports(code)) {
@@ -241,8 +274,7 @@ function readImports(
     if (statement.kind === "export") {
       for (const specifier of statement.specifiers) {
         if (specifier.typeOnly) continue;
-        if (isBarrel && specifier.kind !== "named")
-          bindings.reExportsAll = true;
+        if (isBarrel && specifier.kind !== "named") bindings.openAll = true;
         const key = isBarrel ? carbon.get(specifier.local) : directKey;
         if (key) bindings.reExported.push(key);
       }
@@ -302,14 +334,17 @@ export function collectScriptUsage(
   apps?: AppComponents,
 ): ModuleUsage {
   const bindings = newBindings();
-  readImports(code, carbon, bindings, apps && { from: file, apps });
+  const app = apps && { from: file, apps };
+  readImports(code, carbon, bindings, app);
+  readDynamicImports(code, bindings, app);
   return {
     sites: [
       ...bindings.components.values(),
       ...bindings.reExported,
+      ...bindings.dynamic,
       ...bindings.openAppComponents,
     ].map((key) => openSite(key, file, 1, reason)),
-    openAll: bindings.namespaces.size > 0 || bindings.reExportsAll,
+    openAll: bindings.namespaces.size > 0 || bindings.openAll,
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
   };
@@ -334,10 +369,13 @@ export function collectImportedUsage(
     openAll: false,
     providedContexts: providedContexts(code),
   };
+  const bindings = newBindings();
+  readDynamicImports(code, bindings, apps && { from: file, apps });
+  usage.openAll = bindings.openAll;
+  for (const key of bindings.dynamic)
+    usage.sites.push(openSite(key, file, 1, reason));
   if (apps) {
     // Every `.svelte` path it names, imported or not, renders with any props.
-    const bindings = newBindings();
-    readDynamicImports(code, file, apps, bindings);
     usage.openApps = bindings.openApps;
     for (const match of code.matchAll(SVELTE_SPECIFIER)) {
       for (const key of resolveAppImport(file, match[2], apps)?.keys ?? []) {
@@ -616,27 +654,33 @@ export function collectSvelteUsage(
   }
 
   const bindings = newBindings();
+  const app = apps && { from: file, apps };
   for (const script of [ast.module, ast.instance]) {
     if (script) {
       readImports(
         code.slice(script.content.start, script.content.end),
         carbon,
         bindings,
-        apps && { from: file, apps },
+        app,
       );
     }
   }
+  // The markup too: `{#await import("…")}`.
+  readDynamicImports(code, bindings, app);
 
   const usage: ModuleUsage = {
     sites: [
       ...bindings.reExported.map((key) =>
         openSite(key, file, 1, "re-exported"),
       ),
+      ...bindings.dynamic.map((key) =>
+        openSite(key, file, 1, "imported dynamically"),
+      ),
       ...bindings.openAppComponents.map((key) =>
         openSite(key, file, 1, "imported dynamically or through an alias"),
       ),
     ],
-    openAll: bindings.reExportsAll,
+    openAll: bindings.openAll,
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
   };

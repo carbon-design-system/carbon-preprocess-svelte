@@ -55,9 +55,9 @@ const PATH_SEPARATOR = /[\\/]/;
 const ROLLUP_VIRTUAL_PREFIX = /^\0/;
 /** Files whose imports `collectCarbonImports` can lex. */
 const LEXABLE = /\.(svelte|[cm]?[jt]sx?)$/;
-/** An import of the package in a file the lexer can't read (Markdown, MDX, Astro). */
+/** An import or `require` of the package in a file the lexer can't read (Markdown, MDX, Astro). */
 const CARBON_IMPORT_TEXT =
-  /\b(?:from|import)\s*\(?\s*["'`]carbon-components-svelte(?:["'`]|\/)/;
+  /\b(?:from|import|require)\s*\(?\s*["'`]carbon-components-svelte(?:["'`]|\/)/;
 
 const isInNodeModules = (file: string) =>
   file.split(PATH_SEPARATOR).includes("node_modules");

@@ -117,6 +117,32 @@ describe("props through the app's own components", () => {
     ]);
   });
 
+  test.each([
+    ["a relative path", `import Card from "./Card";`],
+    ["an alias", `import Card from "$lib/Card";`],
+  ])(
+    "a wrapper also imported without `.svelte` (%s) keeps those sites",
+    async (_, imports) => {
+      // webpack's `resolve.extensions` can add `.svelte`; the analysis can't
+      // tell, so the wrapper renders with any props.
+      const other = {
+        file: "/app/src/Other.svelte",
+        code: `<script>${imports}</script>\n<Card tone="danger" />`,
+      };
+      expect(
+        await buttonKinds([
+          MAIN,
+          appRendering(
+            `<Card /><Other />`,
+            `import Card from "./Card.svelte"; import Other from "./Other.svelte";`,
+          ),
+          other,
+          LEGACY_CARD,
+        ]),
+      ).toEqual(["primary", "danger", "ghost"]);
+    },
+  );
+
   test("a wrapper's own constants and nested wrappers resolve too", async () => {
     const toolbar = {
       file: "/app/src/Toolbar.svelte",
