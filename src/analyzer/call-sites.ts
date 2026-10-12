@@ -100,7 +100,9 @@ export function indexAppComponents(
   for (const file of files) {
     set.add(file);
     const name = path.basename(file);
-    byName.set(name, [...(byName.get(name) ?? []), file]);
+    const named = byName.get(name);
+    if (named) named.push(file);
+    else byName.set(name, [file]);
   }
   return { files: set, byName, resolved };
 }
@@ -136,7 +138,8 @@ function resolveAppImport(
 }
 
 const DYNAMIC_IMPORT = /\bimport\s*\(/g;
-const LITERAL_IMPORT = /^\s*(["'`])([^"'`$]+)\1\s*\)/;
+/** The literal argument of an `import(`, read from where it ends. */
+const LITERAL_IMPORT = /\s*(["'`])([^"'`$]+)\1\s*\)/y;
 const IMPORT_META_GLOB = /\bimport\.meta\.glob\b/;
 
 /**
@@ -149,11 +152,11 @@ function readDynamicImports(
   apps: AppComponents,
   bindings: ImportBindings,
 ): void {
+  if (!code.includes("import")) return;
   if (IMPORT_META_GLOB.test(code)) bindings.openApps = true;
   for (const match of code.matchAll(DYNAMIC_IMPORT)) {
-    const literal = LITERAL_IMPORT.exec(
-      code.slice(match.index + match[0].length),
-    );
+    LITERAL_IMPORT.lastIndex = match.index + match[0].length;
+    const literal = LITERAL_IMPORT.exec(code);
     if (!literal) {
       bindings.openApps = true;
       continue;
@@ -179,6 +182,7 @@ const COMPONENT_SOURCE = /\.svelte$|^carbon-(icons|pictograms)-svelte(\/|$)/;
 
 function providedContexts(code: string): Set<string> {
   const keys = new Set<string>();
+  if (!code.includes("setContext")) return keys;
   for (const match of code.matchAll(PROVIDED_CONTEXT)) keys.add(match[1]);
   return keys;
 }
