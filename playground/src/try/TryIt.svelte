@@ -18,6 +18,7 @@
     Button,
     Column,
     Checkbox,
+    CheckboxGroup,
     Grid,
     InlineNotification,
     LocalStorage,
@@ -55,7 +56,9 @@
   // The options this playground's pages use (Carbon icons, the built-in
   // highlighter), and the ones the toggles set.
   const OPTIONS = { prose: true, codeIcons: carbonCodeIcon, highlight };
-  let options = { anchors: true, alerts: false, codeSnippet: false, expressions: false };
+  // The checked compile options, by key (CheckboxGroup's `selected`).
+  let selectedOptions = ["anchors"];
+  $: options = Object.fromEntries(OPTION_FIELDS.map(({ key }) => [key, selectedOptions.includes(key)]));
   $: compileOptions = {
     ...OPTIONS,
     anchors: options.anchors && { depths: [2, 3] },
@@ -209,17 +212,21 @@
   {/if}
   <Row>
     <Column lg={16}>
-      <fieldset class="options">
-        <legend class="bx--label">Compile options</legend>
+      <CheckboxGroup
+        class="options"
+        legendText="Compile options"
+        helperText="Alerts, codeSnippet, and expressions change the Svelte tab; the preview is plain HTML."
+        bind:selected={selectedOptions}
+      >
+        <!-- In a row: CheckboxGroup stacks its checkboxes (no orientation prop yet). -->
         <div class="checks">
           {#each OPTION_FIELDS as { key, label } (key)}
-            <Checkbox bind:checked={options[key]}>
+            <Checkbox value={key}>
               <svelte:fragment slot="labelChildren"><code>{label}</code></svelte:fragment>
             </Checkbox>
           {/each}
         </div>
-        <p class="bx--form__helper-text">Alerts, codeSnippet, and expressions change the Svelte tab; the preview is plain HTML.</p>
-      </fieldset>
+      </CheckboxGroup>
     </Column>
   </Row>
   <Row>
@@ -305,7 +312,8 @@
 </Grid>
 
 <style>
-  .options {
+  /* CheckboxGroup's root (the class lands on CCS's element). */
+  :global(.bx--form-item.options) {
     margin-bottom: var(--cds-spacing-06);
   }
 
@@ -327,7 +335,7 @@
     font: 0.8125rem/1.29 "IBM Plex Mono", monospace;
   }
 
-  .options .bx--form__helper-text {
+  :global(.bx--form-item.options .bx--form__helper-text) {
     margin-top: var(--cds-spacing-02);
   }
 
