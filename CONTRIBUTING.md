@@ -1,9 +1,10 @@
 # Contributing
 
-`carbon-preprocess-svelte` ships Svelte preprocessors and build plugins that make [Carbon Design System](https://github.com/carbon-design-system/carbon-components-svelte) apps smaller and faster. Two separate problems:
+`carbon-preprocess-svelte` ships Svelte preprocessors and build plugins that make [Carbon Design System](https://github.com/carbon-design-system/carbon-components-svelte) apps smaller and faster. Three separate problems:
 
 - **`optimizeImports`**, a Svelte _script_ preprocessor that rewrites barrel imports (`import { Button } from "carbon-components-svelte"`) into direct path imports (`import Button from "carbon-components-svelte/src/Button/Button.svelte"`) so bundlers tree-shake and HMR stays fast.
-- **`optimizeCss` / `OptimizeCssPlugin`**, build plugins (Vite/Rollup and Webpack/Rspack) that strip unused Carbon CSS rules from production output.
+- **`optimizeCss` / `OptimizeCssPlugin`**, build plugins (Vite/Rollup and Webpack/Rspack) that strip unused Carbon CSS rules from production output, and with `propAware`, the rules for prop values the app never passes.
+- **`optimizeComponents` / `OptimizeComponentsPlugin`**, build plugins that rewrite each Carbon component the app renders (and the app's own wrappers) for the props it passes, removing code that can't run. `propAware` and these share one analysis, in [`src/analyzer/`](src/analyzer).
 
 Option shapes, usage per bundler, and what each export does are in [README.md](README.md). That file is the source of truth for what the package supports. This file is how the code is built and changed.
 
@@ -53,21 +54,27 @@ bun install
 | `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
 | `bun run upgrade-examples` | `bun update` inside each `examples/*` project. |
 | `bun run eval:prop-aware` | Accuracy check for `propAware`: SSR-renders an app per Carbon component and prop value (plus random mixes), and fails if a selector matching rendered classes was pruned. `--apps <glob>` runs it on existing app files; `--control` prunes everything to prove the check catches it. |
-| `bun run eval:specialize` | Accuracy and size check for component specialization (`src/analyzer/specialize.ts`): rewrites the Carbon components each app renders for its props, then requires byte-identical SSR HTML against the originals (`Math.random` seeded, hydration comments removed) and reports minified JS savings. Same `--only`/`--apps`/`--combos` flags. |
-| `bun run eval:interactions` | Builds the optimized variants of the `vite-matrix`, `sveltekit-matrix`, `astro`, `rollup`, `rolldown`, `webpack`, `webpack@svelte-5` and `rspack` examples and drives each through the same clicks, typing, hovers and key presses as the unoptimized build in Chromium (Playwright), requiring identical DOM and pixels after every step. For the prerendered SvelteKit and Astro examples it also compares the prerendered HTML, console messages, and markup thrown away while hydrating. Catches what SSR can't: effects, hydration, interactive states. Needs each example installed with the package linked (see its README); `--examples a,b` runs a subset. |
+| `bun run eval:specialize` | Accuracy and size check for component specialization (`src/analyzer/specialize.ts`): rewrites the Carbon components each app renders for its props, then requires byte-identical SSR HTML against the originals (`Math.random` seeded, hydration comments removed) and reports minified JS savings. Same `--only`/`--apps`/`--combos` flags, plus `--wrappers` (only the apps with their own wrappers and recursive components, from [`scripts/wrapper-cases.ts`](scripts/wrapper-cases.ts)), `--golden` (the apps in [`golden/`](golden/README.md)), `--unwrap`, `--project <dir>` (another install's Svelte 3, 4 or 5 and Carbon) and `--json <file>`. |
+| `bun run eval:interactions` | Builds the optimized variants of the `vite-matrix`, `sveltekit-matrix`, `astro`, `rollup`, `rolldown`, `webpack`, `webpack@svelte-5` and `rspack` examples and drives each through the same clicks, typing, hovers and key presses as the unoptimized build in Chromium (Playwright), requiring identical DOM and pixels after every step. For the prerendered SvelteKit and Astro examples it also compares the prerendered HTML, console messages, and markup thrown away while hydrating. Catches what SSR can't: effects, hydration, interactive states. Needs each example installed with the package linked (see its README); `--examples a,b` runs a subset (`golden/<app>` too), and `--no-build` reuses the last builds. |
 
-Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds seven real apps.
+Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds every app under [`examples/`](examples).
 
 ## How it works
 
-The package has two entry points, exported from [`src/index.ts`](src/index.ts):
+The package has two entry points: the library, [`src/index.ts`](src/index.ts), and the `optimize-css` CLI, [`src/cli.ts`](src/cli.ts). The library exports:
 
 ```ts
-export { default as OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin"; // Webpack/Rspack
-export { optimizeCarbonCss } from "./plugins/optimize-carbon-css";          // Bundler-agnostic
-export { optimizeCss } from "./plugins/optimize-css";                       // Vite/Rollup
-export { optimizeImports } from "./preprocessors/optimize-imports";         // Svelte preprocessor
+export { OptimizeComponentsPlugin } from "./plugins/OptimizeComponentsPlugin"; // Webpack/Rspack
+export { OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin";               // Webpack/Rspack
+export { optimizeCarbonCss } from "./plugins/optimize-carbon-css";             // Bundler-agnostic
+export { type OptimizeComponentsOptions, optimizeComponents } from "./plugins/optimize-components"; // Vite/Rollup
+export { optimizeCss } from "./plugins/optimize-css";                          // Vite/Rollup
+export type { OptimizeCssOptions } from "./plugins/options";
+export type { SafelistEntry } from "./plugins/safelist";
+export { optimizeImports } from "./preprocessors/optimize-imports";            // Svelte preprocessor
 ```
+
+Keep this surface small: a new export, option or CLI flag is a decision for an issue, not a side effect of another change.
 
 The CSS paths lean on the **component index**, and everything leans on the helpers in [`src/constants.ts`](src/constants.ts) / [`src/utils.ts`](src/utils.ts) (`isSvelteFile`, `isCssFile`, `isCarbonSvelteImport`, the `CarbonSvelte` package-name map, the `bx--` prefix regex).
 
@@ -126,6 +133,20 @@ Pruning is implemented in [`src/plugins/strict-css-optimizer.ts`](src/plugins/st
 
 Supporting modules: [`safelist.ts`](src/plugins/safelist.ts) (string = literal class-token match, RegExp = whole-selector match), [`scan-content.ts`](src/plugins/scan-content.ts) (glob source files for literal `bx--` tokens, for runtime-built class names like `` `bx--btn--${kind}` ``), [`print-diff.ts`](src/plugins/print-diff.ts) (the before/after size log the e2e tests parse; `formatDiff` builds the block as one string, which `logAssetDiff` emits through `config.logger.info` under Vite and `console.log` everywhere else). Safelist and `content` are the user-facing overrides added in [#140](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/140).
 
+### The analyzer: `propAware` and `optimizeComponents`
+
+[`src/analyzer/`](src/analyzer) reads how the app calls each Carbon component and works out what can render. The CSS plugins load it lazily (`await import("../analyzer")`), so builds without `propAware` or `optimizeComponents` never evaluate it.
+
+- [`call-sites.ts`](src/analyzer/call-sites.ts) reads one module: its Carbon imports (static ones with `lexImportsExports`, `import()` and `require()` from the text) and the props each `<Component>` passes. A component it can't follow (used as a value, spread, imported dynamically or through an alias) is **open**: rendered with any props.
+- [`app-usage.ts`](src/analyzer/app-usage.ts) follows props through the app's own components (wrappers), until no wrapper's usage grows. A wrapper whose every call site is known is **closed**, and `optimizeComponents` may rewrite it; the build plugins check the module graph that nothing else imports it.
+- [`analyze-usage.ts`](src/analyzer/analyze-usage.ts) runs the same fixpoint over Carbon's components (a component's child call sites feed its children), then answers `isPruned(cls)` for `propAware`.
+- [`component-model.ts`](src/analyzer/component-model.ts) models one component (props, declarations, what escapes and may change), cached by path and mtime; [`evaluate.ts`](src/analyzer/evaluate.ts) evaluates expressions to the set of values they can take ([`values.ts`](src/analyzer/values.ts): up to 32 values, then `UNKNOWN`); [`live-walk.ts`](src/analyzer/live-walk.ts) walks only what can render, collecting classes and child call sites.
+- [`specialize.ts`](src/analyzer/specialize.ts) rewrites a component's source for its usage, with source maps from [`mapped-text.ts`](src/analyzer/mapped-text.ts).
+
+[`component-optimizer.ts`](src/plugins/component-optimizer.ts) is what [`optimizeComponents`](src/plugins/optimize-components.ts) and [`OptimizeComponentsPlugin`](src/plugins/OptimizeComponentsPlugin.ts) share: analyze `content` before the build, serve the rewritten sources, and fail the build if a module outside `content` imports Carbon. Under webpack and Rspack the sources are served by [a pre-loader](src/optimize-components-loader.ts) that finds its optimizer in a process-wide [registry](src/plugins/optimizer-registry.ts).
+
+**Unknown must mean open.** Anything the analysis can't read has to keep every value, never be skipped: a missed call site prunes styles or removes code the app runs. So don't skip a file because of what its text lacks, and verify a change to what the analysis removes by rendering: `eval:specialize` (with and without `--unwrap`) and `eval:prop-aware`, with the last release as a control that shows the bug.
+
 ## Conventions
 
 Biome enforces most of this in CI (`bun run lint`). Config: [`biome.json`](biome.json), space indent, multiline attributes, imports auto-organized. The recommended preset is on by default. Extra rules in `biome.json` are errors. Warnings also fail CI.
@@ -158,15 +179,15 @@ Three layers, smallest to largest:
 
 ### Unit tests
 
-Per-module behavior: [`utils.test.ts`](tests/utils.test.ts), [`scan-content.test.ts`](tests/scan-content.test.ts), [`print-diff.test.ts`](tests/print-diff.test.ts), [`extract-selectors.test.ts`](tests/extract-selectors.test.ts), [`optimize-imports.test.ts`](tests/optimize-imports.test.ts), [`create-optimized-css.test.ts`](tests/create-optimized-css.test.ts), [`OptimizeCssPlugin.test.ts`](tests/OptimizeCssPlugin.test.ts). Add a focused case here for any logic change.
+Per-module behavior, e.g. [`optimize-imports.test.ts`](tests/optimize-imports.test.ts), [`create-optimized-css.test.ts`](tests/create-optimized-css.test.ts), [`analyzer.test.ts`](tests/analyzer.test.ts), [`app-usage.test.ts`](tests/app-usage.test.ts), [`specialize.test.ts`](tests/specialize.test.ts), [`optimize-components.test.ts`](tests/optimize-components.test.ts) and [`OptimizeComponentsPlugin.test.ts`](tests/OptimizeComponentsPlugin.test.ts), which builds with real webpack. Add a focused case here for any logic change. [`golden-sizes.test.ts`](tests/golden-sizes.test.ts) snapshots the built sizes of the [golden apps](golden/README.md); performance work is measured with the suites in [`bench/`](bench/README.md).
 
 ### CSS optimization fixtures
 
-[`tests/optimize-css-fixtures.test.ts`](tests/optimize-css-fixtures.test.ts) is the main regression check for the optimizer. It runs the optimizer against Carbon's compiled stylesheet (`carbon-components-svelte/css/white.css`) for ~35 scenarios. Each scenario is a set of imported component ids in default or strict mode. Output is compared to committed baselines under [`tests/fixtures/optimize-css/`](tests/fixtures/optimize-css).
+[`tests/optimize-css-fixtures.test.ts`](tests/optimize-css-fixtures.test.ts) is the main regression check for the optimizer. It runs the optimizer against Carbon's compiled stylesheet (`carbon-components-svelte/css/white.css`) for ~35 scenarios. Each scenario is a set of imported component ids. Output is compared to committed baselines under [`tests/fixtures/optimize-css/`](tests/fixtures/optimize-css).
 
 Each scenario has two files:
 
-- `<name>.css`, the pruned, pretty-printed output. **Gitignored**, regenerated every run. Open it to see what survived.
+- `<name>.css`, the pruned, minified output. **Gitignored**, regenerated every run. Open it to see what survived.
 - `<name>.report.json`, the **committed** baseline: `reduction_percent`, `kept_rules`, byte counts, and `leaked_classes` (Carbon classes still present that the import allowlist cannot explain). Strict scenarios target `leaked_count: 0`.
 
 Beyond byte baselines, the test also checks the index: no over-prune (a selector that should survive keeps its classes), no foreign survivor in strict mode, correct multi-class strict pruning. See [`tests/fixtures/optimize-css/README.md`](tests/fixtures/optimize-css/README.md) for the scenario catalog and when to add a fixture (extractor gate change, new typical multi-import bundle, suspected leak/over-prune regression, not a duplicate import set).
@@ -185,7 +206,7 @@ Shared helpers (`buildAllowlist`, `matchesAllowlist`, `shouldKeepStrictSelector`
 
 The examples are real downstream consumers, each linking the package via `"carbon-preprocess-svelte": "link:carbon-preprocess-svelte"`:
 
-- `examples/rollup`, `examples/rolldown`, `examples/vite`, `examples/vite@svelte-5`, `examples/sveltekit`, `examples/astro`: Vite/Rollup plugin path
+- `examples/rollup`, `examples/rolldown`, `examples/vite`, `examples/vite@svelte-5`, `examples/vite@carbon-0.85`, `examples/vite-matrix@svelte-4`, `examples/vite-matrix@svelte-5`, `examples/sveltekit`, `examples/sveltekit-matrix@svelte-5`, `examples/astro`: Vite/Rollup plugin path
 - `examples/webpack`, `examples/webpack@svelte-5`: Webpack plugin path
 - `examples/rspack`: Rspack plugin path, using the same `OptimizeCssPlugin` export as Webpack
 
@@ -203,7 +224,7 @@ bun run test:e2e:update
 
 ## Continuous integration
 
-[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on every PR and on pushes to `main` (macOS runner):
+[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on every PR and on pushes to `main` (Ubuntu runner):
 
 1. `bun ci`
 2. `bun run lint`
@@ -211,7 +232,9 @@ bun run test:e2e:update
 4. `bun run test`
 5. `bun run test:e2e`
 
-Run those locally before pushing. The e2e suite runs in CI, so a snapshot you forgot to update will fail the build.
+Run those locally before pushing. The e2e suite runs in CI, so a snapshot you forgot to update will fail the build; the failed run uploads what it observed, and `bun run snapshots:from-ci` writes it to `e2e.json` when the change is intended.
+
+[`.github/workflows/eval.yml`](.github/workflows/eval.yml) runs the accuracy checks when the analyzer, the indexer, the plugins, the examples or the golden apps change: `eval:prop-aware`, `eval:specialize` on Svelte 3, 4 and 5 (and 5 with `--unwrap`), and the golden apps. [`.github/workflows/bench.yml`](.github/workflows/bench.yml) pairs every benchmark on a PR against its base with `ostia ab` and writes the comparison to the job summary.
 
 ## Commit messages
 
@@ -222,7 +245,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 - Common types: `fix`, `feat`, `perf`, `chore`, `test`, `docs`, `refactor`.
-- Scope is the area touched: `optimize-css`, `optimize-imports`, `index`, `examples`, `e2e`, `deps-dev`, `ci`.
+- Scope is the area touched: `optimize-css`, `optimize-imports`, `optimize-components`, `analyzer`, `index`, `cli`, `webpack`, `examples`, `e2e`, `eval`, `deps-dev`, `ci`.
 - Imperative mood, one concise line. Put detail in the body and reference issues with `Fixes #N`.
 
 Examples from the log:
