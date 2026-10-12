@@ -3,20 +3,20 @@
 exports[`golden app sizes admin-dashboard 1`] = `
 {
   "baseline": {
-    "css_kb": 678.87,
-    "js_kb": 229.45,
+    "css_kb": 544.33,
+    "js_kb": 248.63,
   },
   "css": {
-    "css_kb": 261.36,
-    "js_kb": 229.45,
+    "css_kb": 198.53,
+    "js_kb": 248.63,
   },
   "full": {
-    "css_kb": 113.63,
-    "js_kb": 172.88,
+    "css_kb": 112.57,
+    "js_kb": 187.3,
   },
   "prop-aware": {
-    "css_kb": 113.63,
-    "js_kb": 229.45,
+    "css_kb": 112.57,
+    "js_kb": 248.63,
   },
 }
 `;
@@ -24,20 +24,20 @@ exports[`golden app sizes admin-dashboard 1`] = `
 exports[`golden app sizes signup-wizard 1`] = `
 {
   "baseline": {
-    "css_kb": 678.87,
-    "js_kb": 186.61,
+    "css_kb": 544.33,
+    "js_kb": 200.17,
   },
   "css": {
-    "css_kb": 210.09,
-    "js_kb": 186.61,
+    "css_kb": 152.33,
+    "js_kb": 200.17,
   },
   "full": {
-    "css_kb": 62.12,
-    "js_kb": 138.91,
+    "css_kb": 76.62,
+    "js_kb": 162.84,
   },
   "prop-aware": {
-    "css_kb": 62.12,
-    "js_kb": 186.61,
+    "css_kb": 76.62,
+    "js_kb": 200.17,
   },
 }
 `;
@@ -45,20 +45,20 @@ exports[`golden app sizes signup-wizard 1`] = `
 exports[`golden app sizes docs-site 1`] = `
 {
   "baseline": {
-    "css_kb": 678.87,
-    "js_kb": 153.01,
+    "css_kb": 544.33,
+    "js_kb": 162.09,
   },
   "css": {
-    "css_kb": 151.3,
-    "js_kb": 153.01,
+    "css_kb": 134.83,
+    "js_kb": 162.09,
   },
   "full": {
-    "css_kb": 66.53,
-    "js_kb": 127.02,
+    "css_kb": 65,
+    "js_kb": 132.73,
   },
   "prop-aware": {
-    "css_kb": 66.53,
-    "js_kb": 153.01,
+    "css_kb": 65,
+    "js_kb": 162.09,
   },
 }
 `;
@@ -66,20 +66,20 @@ exports[`golden app sizes docs-site 1`] = `
 exports[`golden app sizes product-catalog 1`] = `
 {
   "baseline": {
-    "css_kb": 678.87,
-    "js_kb": 226.8,
+    "css_kb": 544.33,
+    "js_kb": 251.07,
   },
   "css": {
-    "css_kb": 250.18,
-    "js_kb": 226.8,
+    "css_kb": 188.32,
+    "js_kb": 251.07,
   },
   "full": {
-    "css_kb": 86.15,
-    "js_kb": 178.14,
+    "css_kb": 108.19,
+    "js_kb": 201.92,
   },
   "prop-aware": {
-    "css_kb": 86.15,
-    "js_kb": 226.8,
+    "css_kb": 108.19,
+    "js_kb": 251.07,
   },
 }
 `;
