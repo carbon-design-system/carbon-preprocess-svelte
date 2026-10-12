@@ -56,7 +56,7 @@ export function possible(...values: Primitive[]): Value {
 
 export const UNDEFINED: Value = possible(undefined);
 export const BOOLEAN: Value = possible(true, false);
-export const EMPTY: Value = possible();
+const EMPTY: Value = possible();
 
 export function join(a: Value, b: Value): Value {
   if (a === UNKNOWN || b === UNKNOWN) return UNKNOWN;

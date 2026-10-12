@@ -713,7 +713,7 @@ function findEscapes(ast: AST.Root): Map<string, Escape> {
 }
 
 /** `x` in `<object>.x` or `<object>["x"]`, if `parent` is such a member. */
-function memberKey(parent: Node | null): string | undefined {
+export function memberKey(parent: Node | null): string | undefined {
   if (parent?.type !== "MemberExpression") return undefined;
   const { property, computed } = parent;
   if (!computed && property.type === "Identifier") return property.name;

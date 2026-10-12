@@ -4,10 +4,10 @@
  */
 import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { CarbonSvelte } from "../constants";
+import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
 import type { PropAwareUsage } from "../plugins/create-optimized-css";
-import { isSvelteFile, stripQuery } from "../utils";
+import { errorMessage, isSvelteFile, stripQuery } from "../utils";
 import {
   analyzeUsage,
   carbonModuleKey,
@@ -29,13 +29,14 @@ export type PropAwareResult = PropAwareUsage & {
   carbon: CarbonComponents;
 };
 
-const WARN_PREFIX = "carbon-preprocess-svelte:";
+/** Which feature a failed analysis turns off, for its warning. */
+type Failure = { feature: string; fallback: string };
 
-const PROP_AWARE_FAILURE = {
+const PROP_AWARE_FAILURE: Failure = {
   feature: "propAware",
   fallback: "Carbon CSS was pruned without it",
 };
-const SPECIALIZE_FAILURE = {
+const SPECIALIZE_FAILURE: Failure = {
   feature: "optimizeComponents",
   fallback: "Carbon components were bundled unchanged",
 };
@@ -44,8 +45,7 @@ function failure(
   error: unknown,
   { feature, fallback } = PROP_AWARE_FAILURE,
 ): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return `${WARN_PREFIX} ${feature} could not analyze this build (${message}); ${fallback}.`;
+  return `${LOG_PREFIX} ${feature} could not analyze this build (${errorMessage(error)}); ${fallback}.`;
 }
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/;
@@ -55,7 +55,7 @@ const NODE_MODULES = /[\\/]node_modules[\\/]/;
  * from disk, anything else as the bundler hands it over. Returns
  * `undefined` for a `.svelte` file's sub-module (`?svelte&type=style`).
  */
-export function readModuleSource(
+function readModuleSource(
   id: string,
   code: string,
 ): { file: string; code: string } | undefined {
@@ -155,15 +155,16 @@ export async function analyzeFiles(input: {
   components: Iterable<string>;
   options: PropAwareOptions;
   /** Names the feature in the warning when analysis fails. */
-  failure?: typeof PROP_AWARE_FAILURE;
+  failure?: Failure;
   /** `collectAppUsage(files)`, if the caller already has it. */
   appUsage?: AppUsage;
 }): Promise<PropAwareResult | { warning: string }> {
   try {
     const carbonRoot = resolveCarbonRoot(input.projectRoot);
     const carbon = readCarbonComponents(carbonRoot);
-    // `code` is each file's source here, not a bundler's output.
-    const { modules } = input.appUsage ?? collectAppUsage(input.files, carbon);
+    const modules = [
+      ...(input.appUsage ?? collectAppUsage(input.files, carbon)).modules,
+    ];
 
     const rendered = new Set(
       modules.flatMap((module) => module.sites.map((site) => site.component)),
@@ -314,14 +315,9 @@ export async function specializeFiles(input: {
   /** Aliased `.svelte` imports the bundler resolved, by `importKey`. */
   resolvedImports?: ReadonlyMap<string, string>;
 }): Promise<SpecializedComponents | { warning: string }> {
-  let carbon: CarbonComponents;
-  try {
-    carbon = readCarbonComponents(resolveCarbonRoot(input.projectRoot));
-  } catch (error) {
-    return { warning: failure(error, SPECIALIZE_FAILURE) };
-  }
   let appUsage: AppUsage;
   try {
+    const carbon = readCarbonComponents(resolveCarbonRoot(input.projectRoot));
     appUsage = collectAppUsage(input.files, carbon, input.resolvedImports);
   } catch (error) {
     return { warning: failure(error, SPECIALIZE_FAILURE) };
@@ -348,13 +344,7 @@ export async function specializeFiles(input: {
   );
   const sources: SpecializedComponents["sources"] = new Map();
   let edits = 0;
-  const rewrites: Array<{
-    key: string;
-    edits: number;
-    dropped: number;
-    /** Module keys of the children it no longer renders. */
-    unrendered: () => string[];
-  }> = [];
+  const rewrites: ComponentRewrite[] = [];
   const appRewrites: Array<{ file: string; edits: number }> = [];
   try {
     for (const key of result.analysis.liveComponents) {
@@ -412,15 +402,18 @@ export async function specializeFiles(input: {
   };
 }
 
+/** One Carbon component `specializeFiles` rewrote, for the report. */
+type ComponentRewrite = {
+  key: string;
+  edits: number;
+  dropped: number;
+  /** Module keys of the children it no longer renders. */
+  unrendered: () => string[];
+};
+
 function formatSpecializeReport(
   result: PropAwareResult,
-  rewrites: Array<{
-    key: string;
-    edits: number;
-    dropped: number;
-    /** Module keys of the children it no longer renders. */
-    unrendered: () => string[];
-  }>,
+  rewrites: ComponentRewrite[],
   appRewrites: Array<{ file: string; edits: number }>,
   root: string,
 ): string[] {
