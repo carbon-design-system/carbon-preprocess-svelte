@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,6 +53,8 @@ type WebpackCompiler = {
   hooks: {
     beforeRun: AsyncHook;
     watchRun: AsyncHook;
+    /** webpack 5.40+ and Rspack. */
+    shutdown?: { tap(name: string, callback: () => void): void };
     thisCompilation: {
       tap(
         name: string,
@@ -85,8 +88,6 @@ const LOADER = (() => {
   ];
   return candidates.find((file) => existsSync(file)) ?? candidates[0];
 })();
-
-let nextId = 0;
 
 /** The compiler's resolver, for aliased imports; `undefined` if it has none. */
 function resolveWith(compiler: WebpackCompiler): ImportResolver | undefined {
@@ -140,8 +141,12 @@ export class OptimizeComponentsPlugin {
 
     const { WebpackError } = compiler.webpack;
     const optimizer = createComponentOptimizer(this.options, NAME);
-    const id = String(nextId++);
+    // Unique across copies of this package, which share the registry.
+    const id = randomUUID();
     optimizerRegistry().set(id, optimizer);
+    compiler.hooks.shutdown?.tap(NAME, () => {
+      optimizerRegistry().delete(id);
+    });
 
     // A pre-loader runs before normal loaders, so `svelte-loader` compiles
     // the rewritten source wherever this plugin sits in `plugins`. Every
