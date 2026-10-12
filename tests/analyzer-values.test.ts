@@ -58,6 +58,12 @@ describe("analyzer values", () => {
       possible(false),
     );
     expect(binary("===", possible(OBJECT), possible(OBJECT))).toBe(UNKNOWN);
+    // `==` coerces an object against anything but `null` and `undefined`.
+    expect(binary("==", possible(OBJECT), possible(""))).toBe(UNKNOWN);
+    expect(binary("!=", possible(0), possible(OBJECT))).toBe(UNKNOWN);
+    expect(binary("==", possible(OBJECT), possible(null))).toEqual(
+      possible(false),
+    );
     expect(binary("+", possible(OBJECT), possible("a"))).toBe(UNKNOWN);
   });
 
@@ -87,6 +93,13 @@ describe("analyzer values", () => {
       shape({ kind: "object", props: new Map([["kind", possible(kind)]]) });
     expect(button("ghost")).toBe(button("ghost"));
     expect(button("ghost")).not.toBe(button("danger"));
+    // Strings that look like the key of other values are still their own.
+    expect(button("a|string:b")).not.toBe(
+      shape({ kind: "object", props: new Map([["kind", possible("a", "b")]]) }),
+    );
+    expect(button("1")).not.toBe(
+      shape({ kind: "object", props: new Map([["kind", possible(1)]]) }),
+    );
     expect(readProperty(button("ghost"), "kind")).toEqual(possible("ghost"));
     expect(readProperty(button("ghost"), "text")).toEqual(possible(undefined));
     // Inherited properties are functions, not `undefined`.
