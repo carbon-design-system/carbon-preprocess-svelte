@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.50](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.50) - 2026-10-11
+
+**Features**
+
+- `optimizeComponents`: rewrite the app's own wrapper components
+- `optimizeComponents`: resolve aliased wrappers with the bundler
+- analyzer: follow the app's own branches and module constants
+- analyzer: read object/array literals, spreads, calls, `typeof`, and `$$restProps`
+- analyzer: read destructured constants and `readable` stores
+- analyzer: keep a name known when a nested scope reuses it
+- analyzer: prune the classes no rendered component can apply
+- analyzer: say why a prop value is unknown in the report
+
+**Fixes**
+
+- `optimizeCss`: credit a CSS-only class to its family's component
+- `optimizeCss`: keep other components' classes out of the index
+- `optimizeCss`: keep a component's own classes out of BEM matching
+- `optimizeCss`: judge a merged `:is()` selector by its branches
+- `optimizeComponents`: catch re-exports and dynamic imports of Carbon
+- `optimizeComponents`: lex virtual modules before failing the build
+
+**Performance**
+
+- `index`: ~1.3× faster component index with sveast 0.9.3
+- analyzer: stop repeating work on every analysis pass
+- analyzer: read an app module's constants only when imported
+- analyzer: clean up each rewrite from one parse
+
 ## [0.11.49](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.49) - 2026-10-06
 
 **Breaking Changes**
