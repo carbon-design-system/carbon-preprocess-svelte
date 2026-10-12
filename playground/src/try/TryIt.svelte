@@ -83,12 +83,12 @@
       backToMine();
     }
   });
-  // The compile options, by `options` key, labeled as written in a config.
+  // The compile options, by `options` key.
   const OPTION_FIELDS = [
-    { key: "anchors", label: "anchors" },
-    { key: "alerts", label: 'alerts: "InlineNotification"' },
-    { key: "codeSnippet", label: "codeSnippet" },
-    { key: "expressions", label: "expressions" },
+    { key: "anchors", label: "Heading anchors" },
+    { key: "alerts", label: "Alerts as notifications" },
+    { key: "codeSnippet", label: "Code as CodeSnippet" },
+    { key: "expressions", label: "Expressions in text" },
   ];
 
   let copied = false;
@@ -215,15 +215,13 @@
       <CheckboxGroup
         class="options"
         legendText="Compile options"
-        helperText="Alerts, codeSnippet, and expressions change the Svelte tab; the preview is plain HTML."
+        helperText="Alerts, CodeSnippet, and expressions change the Svelte tab; the preview is plain HTML."
         bind:selected={selectedOptions}
       >
         <!-- In a row: CheckboxGroup stacks its checkboxes (no orientation prop yet). -->
         <div class="checks">
           {#each OPTION_FIELDS as { key, label } (key)}
-            <Checkbox value={key}>
-              <svelte:fragment slot="labelChildren"><code>{label}</code></svelte:fragment>
-            </Checkbox>
+            <Checkbox value={key} labelText={label} />
           {/each}
         </div>
       </CheckboxGroup>
@@ -329,10 +327,6 @@
   .checks :global(.bx--form-item) {
     flex: none;
     margin: 0;
-  }
-
-  .checks code {
-    font: 0.8125rem/1.29 "IBM Plex Mono", monospace;
   }
 
   :global(.bx--form-item.options .bx--form__helper-text) {
