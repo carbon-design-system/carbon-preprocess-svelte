@@ -114,7 +114,7 @@ function valueKey(value: Value): string {
       if (isStore(p)) return `$(${valueKey(p.value)})`;
       if (p === OBJECT) return "o";
       if (p === EMPTY_ARRAY) return "[]";
-      return `${typeof p}:${String(p)}`;
+      return typeof p === "string" ? JSON.stringify(p) : String(p);
     })
     .sort()
     .join("|");
@@ -237,9 +237,15 @@ export function binary(operator: string, a: Value, b: Value): Value {
   return flatMap(a, (x) =>
     flatMap(b, (y) => {
       if (isObject(x) || isObject(y)) {
-        // Two objects may or may not be the same one; an object never
-        // equals a primitive (`==` coercion of objects is not modeled).
-        if (!EQUALITY.has(operator) || (isObject(x) && isObject(y))) {
+        // Two objects may or may not be the same one. An object never
+        // strictly equals a primitive, nor loosely `null` or `undefined`,
+        // but `==` coerces it against anything else (`[] == ""`).
+        const other = isObject(x) ? y : x;
+        if (
+          !EQUALITY.has(operator) ||
+          isObject(other) ||
+          (operator.length === 2 && !isNullish(other))
+        ) {
           return UNKNOWN;
         }
         return possible(operator.startsWith("!"));
