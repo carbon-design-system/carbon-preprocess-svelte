@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { lexImportsExports } from "sveast/lexer";
 import type { SpecializedComponents } from "../analyzer";
 import { importKey } from "../analyzer/import-key";
 import { CarbonSvelte, LOG_PREFIX, RE_EXT_STYLESHEET } from "../constants";
@@ -56,6 +55,9 @@ const PATH_SEPARATOR = /[\\/]/;
 const ROLLUP_VIRTUAL_PREFIX = /^\0/;
 /** Files whose imports `collectCarbonImports` can lex. */
 const LEXABLE = /\.(svelte|[cm]?[jt]sx?)$/;
+/** An import of the package in a file the lexer can't read (Markdown, MDX, Astro). */
+const CARBON_IMPORT_TEXT =
+  /\b(?:from|import)\s*\(?\s*["'`]carbon-components-svelte(?:["'`]|\/)/;
 
 const isInNodeModules = (file: string) =>
   file.split(PATH_SEPARATOR).includes("node_modules");
@@ -77,36 +79,13 @@ function globContent(patterns: string[], cwd: string): string[] {
 /**
  * Whether module `code` imports a Carbon component. Virtual modules are
  * JavaScript, so they're lexed too: one that only mentions the package
- * (data, a path) doesn't count.
+ * (data, a path, `package.json`) doesn't count.
  */
 function importsCarbon(file: string, code: string, virtual = false): boolean {
-  if (!virtual && !LEXABLE.test(file))
-    return code.includes(CarbonSvelte.Components);
-  const imported = new Set<string>();
-  collectCarbonImports(code, imported);
-  if (imported.size > 0) return true;
   if (!code.includes(CarbonSvelte.Components)) return false;
-  // What the scan doesn't name but still bundles Carbon: a re-export
-  // (`export { Button } from …`) or a dynamic `import("…")`.
-  return (
-    CARBON_DYNAMIC_IMPORT.test(code) ||
-    lexImportsExports(code).some(
-      (statement) =>
-        statement.kind === "export" &&
-        !statement.typeOnly &&
-        isCarbonSpecifier(statement.source?.value),
-    )
-  );
-}
-
-const CARBON_DYNAMIC_IMPORT =
-  /\bimport\s*\(\s*(["'`])carbon-components-svelte(?:\/[^"'`]*)?\1\s*\)/;
-
-function isCarbonSpecifier(specifier: string | undefined): boolean {
-  return (
-    specifier === CarbonSvelte.Components ||
-    specifier?.startsWith(`${CarbonSvelte.Components}/`) === true
-  );
+  if (!virtual && !LEXABLE.test(file)) return CARBON_IMPORT_TEXT.test(code);
+  const imported = new Set<string>();
+  return collectCarbonImports(code, imported) || imported.size > 0;
 }
 
 /** `file` relative to `root`, through symlinks when `file` exists. */

@@ -46,6 +46,7 @@ function context(aliases: Record<string, string> = {}): Context & GraphContext {
 const REWROTE = /^rewrote \d+ Carbon components for this app/;
 const MISSED_TOOLBAR =
   /before seeing lib\/Toolbar\.ts, which imports them\. Add those files to `content`/;
+const MISSED_MARKDOWN = /before seeing lib\/Toolbar\.md, which imports them/;
 const ANALYSIS_FAILED =
   /optimizeComponents could not analyze this build .*Carbon components were bundled unchanged/;
 const VIRTUAL_MODULE =
@@ -327,6 +328,7 @@ describe("optimizeComponents", () => {
 
   test.each([
     ["a re-export", `export { Button } from "carbon-components-svelte";`],
+    ["a namespace import", `import * as C from "carbon-components-svelte";`],
     [
       "a dynamic import",
       `export const load = () => import("carbon-components-svelte/src/Button/Button.svelte");`,
@@ -367,6 +369,33 @@ describe("optimizeComponents", () => {
         path.join(project.root, "lib", "types.ts"),
       );
       expect(() => plugin.buildEnd.call(ctx)).not.toThrow();
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("a `package.json` or Markdown that only mentions carbon-components-svelte passes", async () => {
+    const { project, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
+    );
+    try {
+      const ctx = context();
+      await plugin.buildStart.call(ctx);
+      plugin.transform(
+        `{ "dependencies": { "carbon-components-svelte": "^0.113.1" } }`,
+        path.join(project.root, "package.json"),
+      );
+      plugin.transform(
+        "Built with `carbon-components-svelte`.",
+        path.join(project.root, "README.md"),
+      );
+      expect(() => plugin.buildEnd.call(ctx)).not.toThrow();
+
+      plugin.transform(
+        `${IMPORT_BUTTON}\n\n<Button>Save</Button>`,
+        path.join(project.root, "lib", "Toolbar.md"),
+      );
+      expect(() => plugin.buildEnd.call(ctx)).toThrow(MISSED_MARKDOWN);
     } finally {
       project.dispose();
     }
