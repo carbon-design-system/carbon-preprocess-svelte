@@ -108,6 +108,35 @@ describe("cli optimize-css", () => {
     }
   });
 
+  test("keeps the styles of components a file re-exports or imports as a namespace", () => {
+    const dir = createTempProject();
+    try {
+      writeFileSync(
+        join(dir, "src", "carbon.ts"),
+        'export { Accordion } from "carbon-components-svelte";',
+      );
+      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
+      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
+        ".bx--accordion",
+      );
+
+      writeFileSync(
+        join(dir, "dist", "app.css"),
+        ".bx--btn{color:red}\n.bx--tag{color:blue}\n",
+      );
+      writeFileSync(
+        join(dir, "src", "carbon.ts"),
+        'import * as Carbon from "carbon-components-svelte";',
+      );
+      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
+      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
+        ".bx--tag",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("--report prints the detected components summary", () => {
     const dir = createTempProject();
     try {

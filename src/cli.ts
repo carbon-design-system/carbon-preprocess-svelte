@@ -94,9 +94,11 @@ async function main() {
   const contentClasses = new Set<string>();
   const propAware = values["prop-aware"] === true;
   const sources: Array<{ file: string; code: string }> = [];
+  /** Some file may use components it doesn't name (`import * as C`). */
+  let usesAll = false;
 
   for (const source of readFiles(globSync(contentGlobs, { cwd }), cwd)) {
-    collectCarbonImports(source.code, components);
+    usesAll = collectCarbonImports(source.code, components) || usesAll;
     collectCarbonTokens(source.code, contentClasses);
     if (propAware) sources.push(source);
   }
@@ -106,7 +108,7 @@ async function main() {
     if (trimmed) components.add(trimmed);
   }
 
-  if (components.size === 0) {
+  if (components.size === 0 && !usesAll) {
     throw new Error(
       `no carbon-components-svelte imports found in ${JSON.stringify(contentGlobs)}; pass --components or fix --content`,
     );
@@ -118,6 +120,7 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+  if (usesAll) for (const name of Object.keys(index)) components.add(name);
 
   const safelist = parseSafelist(values.safelist ?? []);
   const options = {
