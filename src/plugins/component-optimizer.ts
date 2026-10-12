@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
+import { lexImportsExports } from "sveast/lexer";
 import type { SpecializedComponents } from "../analyzer";
 import { importKey } from "../analyzer/import-key";
 import { CarbonSvelte, LOG_PREFIX, RE_EXT_STYLESHEET } from "../constants";
@@ -83,7 +84,29 @@ function importsCarbon(file: string, code: string, virtual = false): boolean {
     return code.includes(CarbonSvelte.Components);
   const imported = new Set<string>();
   collectCarbonImports(code, imported);
-  return imported.size > 0;
+  if (imported.size > 0) return true;
+  if (!code.includes(CarbonSvelte.Components)) return false;
+  // What the scan doesn't name but still bundles Carbon: a re-export
+  // (`export { Button } from …`) or a dynamic `import("…")`.
+  return (
+    CARBON_DYNAMIC_IMPORT.test(code) ||
+    lexImportsExports(code).some(
+      (statement) =>
+        statement.kind === "export" &&
+        !statement.typeOnly &&
+        isCarbonSpecifier(statement.source?.value),
+    )
+  );
+}
+
+const CARBON_DYNAMIC_IMPORT =
+  /\bimport\s*\(\s*(["'`])carbon-components-svelte(?:\/[^"'`]*)?\1\s*\)/;
+
+function isCarbonSpecifier(specifier: string | undefined): boolean {
+  return (
+    specifier === CarbonSvelte.Components ||
+    specifier?.startsWith(`${CarbonSvelte.Components}/`) === true
+  );
 }
 
 /** `file` relative to `root`, through symlinks when `file` exists. */
