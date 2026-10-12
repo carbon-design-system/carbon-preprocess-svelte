@@ -10,6 +10,9 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "bun scripts/build.ts",
     "test": "rm -rf node_modules/.cache/carbon-preprocess-svelte && bun test --parallel",
