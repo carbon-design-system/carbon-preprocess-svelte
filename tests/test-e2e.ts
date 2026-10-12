@@ -116,8 +116,8 @@ function parseOptimizationOutput(output: string): OptimizationResult | null {
 function normalizeFile(file: string): string {
   return file
     .replace(/\.[a-f0-9]{16,}\./g, ".*.")
-    .replace(/-[A-Za-z0-9_-]{6,}\./g, "-*.")
-    .replace(/\.[A-Za-z0-9_-]{6,}\./g, ".*.");
+    .replace(/\.[A-Za-z0-9_-]{6,}\./g, ".*.")
+    .replace(/-[A-Za-z0-9_-]{6,}\./g, "-*.");
 }
 
 function normalizeResult(parsed: OptimizationResult): OptimizationResult {
