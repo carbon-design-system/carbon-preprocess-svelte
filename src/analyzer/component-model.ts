@@ -570,7 +570,7 @@ function readTopLevelStatement(
 /**
  * Whether `parent` only tests or renders `child`, never hands it on: a
  * condition, a comparison, `{text}`, or an element's attribute (a
- * component's props are handed on).
+ * component's props and a slot's are handed on).
  */
 function onlyTests(
   parent: Node | undefined,
@@ -585,7 +585,8 @@ function onlyTests(
         owner?.type === "Attribute" &&
         (element?.type === "Component" ||
           element?.type === "SvelteComponent" ||
-          element?.type === "SvelteSelf")
+          element?.type === "SvelteSelf" ||
+          element?.type === "SlotElement")
       );
     }
     case "IfStatement":
@@ -633,8 +634,11 @@ function findEscapes(ast: AST.Root): Map<string, Escape> {
     }
     return found;
   };
-  /** `[array, item]` for each `{#each array as item}`. */
-  const eachItems: Array<[string, string]> = [];
+  /**
+   * `[array, item, destructured]` for each `{#each array as item}`, and
+   * for each name `{#each array as { a, b }}` declares.
+   */
+  const eachItems: Array<[string, string, boolean]> = [];
   const stack: Node[] = [];
   walk(ast, {
     enter(node, parent, key) {
@@ -642,9 +646,16 @@ function findEscapes(ast: AST.Root): Map<string, Escape> {
       if (
         node.type === "EachBlock" &&
         node.expression.type === "Identifier" &&
-        node.context?.type === "Identifier"
+        node.context
       ) {
-        eachItems.push([node.expression.name, node.context.name]);
+        const array = node.expression.name;
+        if (node.context.type === "Identifier") {
+          eachItems.push([array, node.context.name, false]);
+        } else {
+          for (const { name } of extractIdentifiers(node.context as Pattern)) {
+            eachItems.push([array, name, true]);
+          }
+        }
       }
       if (node.type !== "Identifier" || !isReference(node, parent)) return;
       if (node.name === "$$props") {
@@ -689,12 +700,13 @@ function findEscapes(ast: AST.Root): Map<string, Escape> {
     },
   });
   // What happens to an item happens to its array's elements: an item
-  // handed on is a path that matters only if items are objects.
-  for (const [array, item] of eachItems.reverse()) {
+  // handed on is a path that matters only if items are objects. A name
+  // destructured from an item is some path of it, so the whole item.
+  for (const [array, item, destructured] of eachItems.reverse()) {
     const itemEscape = escapes.get(item);
     if (!itemEscape) continue;
     const target = entry(array);
-    if (itemEscape.full) target.paths.push(["[]"]);
+    if (itemEscape.full || destructured) target.paths.push(["[]"]);
     for (const path of itemEscape.paths) target.paths.push(["[]", ...path]);
   }
   return escapes;
