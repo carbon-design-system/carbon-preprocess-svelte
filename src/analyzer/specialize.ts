@@ -31,10 +31,10 @@ import {
 } from "./values";
 
 /**
- * Rewrites a Carbon component's source for the values its call sites pass
- * (see `.context/source-rewriting-reference.md`): expressions with one
- * known value become literals, operands and branches that can't run are
- * removed, and `{#if}` chains keep only their live branches. Child
+ * Rewrites a Carbon component's source for the values its call sites pass:
+ * expressions with one known value become literals, operands and branches
+ * that can't run are removed, and `{#if}` chains keep only their live
+ * branches. Child
  * components only dead branches render lose their last use, so the bundler
  * drops them.
  *
@@ -309,7 +309,7 @@ export function specializeComponent(
     edits.push({ start, end, print: () => text });
   };
 
-  const valueAt = (node: Node) => evaluate(node as never, scope);
+  const valueAt = (node: Node) => evaluate(node, scope);
 
   /** Fold `node` to a literal if it's in a read position with one known, pure value. */
   function tryFold(node: Node, parent: Node | null, field: string): boolean {
@@ -827,12 +827,6 @@ function hasNoSideEffects(node: Node | null | undefined): boolean {
 const MAX_CLEANUP_PASSES = 8;
 
 /**
- * Removes top-level `$: x = …`, `const x = …` and `let x = …` (not props)
- * that nothing reads once branches are gone, when their right-hand side has
- * no side effects. Svelte compiles `$:` into effects a minifier must keep,
- * so this is the only way they go. Repeats until nothing more is removed.
- */
-/**
  * How often each name is read anywhere in the component, not counting the
  * `owned` identifier nodes (the names being declared).
  */
@@ -951,6 +945,7 @@ function unusedPropMarks(
   return [...marks];
 }
 
+/** `cleanUp`'s removal of unread declarations on its own, for tests. */
 export function dropUnusedDeclarations(source: string): {
   code: string;
   dropped: number;

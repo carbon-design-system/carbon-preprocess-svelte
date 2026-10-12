@@ -51,8 +51,8 @@ function addStrings(value: Value, result: LiveResult): void {
  * Walks `scope.model`'s script and markup, skipping whatever its usage
  * proves can't run: the falsy side of `&&`, `||`, `??`, ternaries, `if`
  * statements, `{#if}` branches, `{#each}` over an array that stays empty,
- * and falsy `class:` directives. Everything
- * else is assumed live, including every function body.
+ * and falsy `class:` directives. Everything else is assumed live,
+ * including every function body.
  */
 export function walkLive(scope: Scope): LiveResult {
   const result: LiveResult = {

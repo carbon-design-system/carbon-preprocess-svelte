@@ -9,6 +9,7 @@ import {
   type ComponentModel,
   FUNCTION_DECLARATION,
   isTopLevel,
+  memberKey,
 } from "./component-model";
 import type { ComponentUsage } from "./usage";
 import {
@@ -240,7 +241,6 @@ function resolve(name: string, scope: Scope): Value {
   if (declaration !== undefined) {
     return declaration ? evaluate(declaration, scope) : UNDEFINED;
   }
-  if (model.declarations.has(name)) return UNDEFINED;
 
   if (model.componentImports.has(name)) return possible(OBJECT);
   const imported = scope.imported.get(name);
@@ -250,15 +250,15 @@ function resolve(name: string, scope: Scope): Value {
   // and a `readable` one's never changes.
   if (name.startsWith("$") && !name.startsWith("$$") && name.length > 1) {
     const holder = lookup(name.slice(1), scope);
-    if (isOnly(holder, undefined)) return UNDEFINED;
+    if (isOnlyUndefined(holder)) return UNDEFINED;
     return flatMap(holder, (p) => (isStore(p) ? p.value : UNKNOWN));
   }
 
   return UNKNOWN;
 }
 
-function isOnly(value: Value, p: undefined): boolean {
-  return value !== UNKNOWN && value.size === 1 && value.has(p);
+function isOnlyUndefined(value: Value): boolean {
+  return value !== UNKNOWN && value.size === 1 && value.has(undefined);
 }
 
 /** `$$props`, `$$restProps`, or the rest of `$props()`. */
@@ -283,7 +283,7 @@ export type PassedProp = { value: Value; maybeAbsent: boolean; why?: string };
  * component doesn't declare): every key a call site passes. `undefined`
  * when some site spreads props or the component is used as a value.
  */
-export function passedProps(
+function passedProps(
   scope: Scope,
   rest: boolean,
 ): Map<string, PassedProp> | undefined {
@@ -699,20 +699,13 @@ function evaluateMember(
       return usage.slots.get(property.name) ?? UNDEFINED;
     }
     if (isPropsObject(object, scope)) {
-      const key =
-        !computed && property.type === "Identifier"
-          ? property.name
-          : computed &&
-              property.type === "Literal" &&
-              typeof property.value === "string"
-            ? property.value
-            : undefined;
+      const key = memberKey(node);
       const props =
         key === undefined
           ? undefined
           : passedProps(scope, object.name !== "$$props");
-      const prop = props?.get(key as string);
-      if (!props) return UNKNOWN;
+      if (key === undefined || !props) return UNKNOWN;
+      const prop = props.get(key);
       if (!prop) return UNDEFINED;
       return prop.maybeAbsent ? join(prop.value, UNDEFINED) : prop.value;
     }
@@ -720,7 +713,7 @@ function evaluateMember(
   if (object.type === "Super") return UNKNOWN;
   const target = evaluate(object, scope);
   // `undefined?.x` is `undefined`.
-  if (optional && isOnly(target, undefined)) return UNDEFINED;
+  if (optional && isOnlyUndefined(target)) return UNDEFINED;
   const key = computed
     ? singleKey(evaluate(property as Expression, scope))
     : property.type === "Identifier"
