@@ -17,8 +17,11 @@ export type CallSite = {
   location?: { file: string; line: number };
   /** Why the site is `open`, for the report. */
   reason?: string;
-  /** Why each prop the site passes as unknown is unknown, for the report. */
-  why?: Map<string, string>;
+  /**
+   * Why each prop the site passes as unknown is unknown, for the report.
+   * A function is only asked when no earlier site gave a reason.
+   */
+  why?: Map<string, string | (() => string | undefined)>;
 };
 
 /** Every call site of one component, merged. */
@@ -87,7 +90,9 @@ export function addCallSite(
     changed = true;
   }
   for (const [name, why] of site.why ?? []) {
-    if (!usage.unknownBecause.has(name)) usage.unknownBecause.set(name, why);
+    if (usage.unknownBecause.has(name)) continue;
+    const reason = typeof why === "string" ? why : why();
+    if (reason) usage.unknownBecause.set(name, reason);
   }
 
   /** Keys earlier sites passed: a key first seen here was absent there. */

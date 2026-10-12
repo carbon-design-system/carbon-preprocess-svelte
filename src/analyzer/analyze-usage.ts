@@ -110,7 +110,8 @@ function runPass(
   for (;;) {
     const usages = new Map<string, ComponentUsage>();
     const live = new Map<string, ReturnType<typeof walkLive>>();
-    const queue: string[] = [];
+    // A component queued twice is walked once, with its usage as it is then.
+    const queue = new Set<string>();
     const resolver = context(provided);
 
     const enqueue = (site: CallSite) => {
@@ -125,12 +126,13 @@ function runPass(
         site = { ...site, open: true, reason: "excluded" };
       }
       if (addCallSite(usage, site, model.propNames.values())) {
-        queue.push(site.component);
+        queue.add(site.component);
       }
     };
 
     for (const site of roots) enqueue(site);
-    for (let key = queue.shift(); key; key = queue.shift()) {
+    for (const key of queue) {
+      queue.delete(key);
       const model = modelOf(key);
       const usage = usages.get(key);
       if (!usage) continue;
@@ -163,10 +165,6 @@ function runPass(
 function startsWithAny(cls: string, prefixes: Iterable<string>): boolean {
   for (const prefix of prefixes) if (cls.startsWith(prefix)) return true;
   return false;
-}
-
-function assumedValue(values: Array<string | number | boolean | null>): Value {
-  return possible(...values);
 }
 
 /**
@@ -219,7 +217,7 @@ export async function analyzeUsage(input: {
       new Map(
         Object.entries(props).map(([prop, values]) => [
           prop,
-          assumedValue(values),
+          possible(...values),
         ]),
       ),
     );

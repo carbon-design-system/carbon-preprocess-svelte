@@ -401,6 +401,26 @@ export function whyUnknown(
   return `\`${snippet(node, scope)}\` isn't read by the analysis`;
 }
 
+/**
+ * `whyUnknown`, worked out only when asked: with the `{#each}` bindings in
+ * place now, which a walk has moved past by then.
+ */
+export function whyUnknownLater(
+  node: Node | Expression,
+  scope: Scope,
+): () => string | undefined {
+  const locals = scope.locals;
+  return () => {
+    const current = scope.locals;
+    scope.locals = locals;
+    try {
+      return whyUnknown(node, scope);
+    } finally {
+      scope.locals = current;
+    }
+  };
+}
+
 /** Why a nested binding of each kind is unknown, for the report. */
 const NESTED_REASONS: Partial<Record<Binding["kind"], string>> = {
   param: "is a parameter",

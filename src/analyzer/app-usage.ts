@@ -192,7 +192,7 @@ export function collectAppUsage(
 
   const usages = new Map<string, ComponentUsage>();
   const latest = new Map<string, ModuleUsage>();
-  const queue: string[] = [];
+  const queue = new Set<string>();
   const enqueue = (site: CallSite) => {
     if (!sources.has(site.component)) return;
     let usage = usages.get(site.component);
@@ -202,7 +202,7 @@ export function collectAppUsage(
     }
     const merged = openApps ? { ...site, open: true } : site;
     const propNames = modelOf(site.component)?.propNames.values() ?? [];
-    if (addCallSite(usage, merged, propNames)) queue.push(site.component);
+    if (addCallSite(usage, merged, propNames)) queue.add(site.component);
   };
 
   for (const key of sources.keys()) {
@@ -215,7 +215,8 @@ export function collectAppUsage(
       if (isAppComponent(site.component)) enqueue(site);
     }
   }
-  for (let key = queue.shift(); key; key = queue.shift()) {
+  for (const key of queue) {
+    queue.delete(key);
     const module = collect(key, usages.get(key));
     latest.set(key, module);
     for (const site of module.sites) {
