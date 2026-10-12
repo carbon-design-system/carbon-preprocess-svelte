@@ -22,7 +22,7 @@ const MISSED_TOOLBAR =
  */
 async function build(
   files: Record<string, string>,
-  mode: "production" | "development" = "production",
+  mode: "production" | "development" | undefined = "production",
 ) {
   const project = createFakeProject();
   project.linkCarbon();
@@ -66,6 +66,16 @@ describe("OptimizeComponentsPlugin", () => {
     try {
       expect(stats.hasErrors()).toBe(false);
       expect(code).toContain(String.raw`\"bx--btn--tertiary\"`);
+      expect(code).not.toContain("<ButtonSkeleton");
+    } finally {
+      dispose();
+    }
+  });
+
+  test("a config without `mode` builds for production, like webpack", async () => {
+    const { stats, code, dispose } = await build(APP, undefined);
+    try {
+      expect(stats.hasErrors()).toBe(false);
       expect(code).not.toContain("<ButtonSkeleton");
     } finally {
       dispose();

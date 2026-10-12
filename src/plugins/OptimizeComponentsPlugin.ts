@@ -7,6 +7,7 @@ import {
   type OptimizeComponentsOptions,
 } from "./component-optimizer";
 import { optimizerRegistry } from "./optimizer-registry";
+import { isProduction } from "./webpack-mode";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
@@ -135,7 +136,7 @@ export class OptimizeComponentsPlugin {
     // Production builds only, like `optimizeComponents`: the analysis
     // runs for the whole app up front, and the dev server's rebuilds of
     // single modules would leave rewritten components stale.
-    if (compiler.options.mode !== "production") return;
+    if (!isProduction(compiler)) return;
 
     const { WebpackError } = compiler.webpack;
     const optimizer = createComponentOptimizer(this.options, NAME);

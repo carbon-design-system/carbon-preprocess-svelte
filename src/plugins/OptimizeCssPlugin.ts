@@ -8,6 +8,7 @@ import { optimizeAssets } from "./optimize-assets";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
+import { isProduction } from "./webpack-mode";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
@@ -76,7 +77,7 @@ export class OptimizeCssPlugin {
   }
 
   public apply(compiler: WebpackCompiler) {
-    if (compiler.options.mode !== "production") return;
+    if (!isProduction(compiler)) return;
 
     const {
       webpack: {
