@@ -16,8 +16,8 @@
   "playground": {
     "file": "assets/index-*.css",
     "before_kb": 670.78,
-    "after_kb": 351.02,
-    "reduction_percent": 47.67
+    "after_kb": 326.54,
+    "reduction_percent": 51.32
   },
   "rolldown": {
     "default": {
