@@ -116,6 +116,23 @@ a { color: blue }
 }`);
   });
 
+  test("reads quoted @font-face families and keeps the app's own Plex faces", () => {
+    const kept = [
+      "@font-face { font-family: 'IBM Plex Mono'; font-weight: normal }",
+      "@font-face { font-family: IBM Plex Serif; font-style: normal; font-weight: 400 }",
+      "@font-face { font-family: IBM Plex Sans; font-style: normal; font-weight: 100 700 }",
+    ];
+    const result = createOptimizedCss({
+      components,
+      source: [
+        `@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 700 }`,
+        ...kept,
+      ].join("\n"),
+      ids: ["/Accordion.svelte"],
+    });
+    expect(result).toEqual(kept.join("\n"));
+  });
+
   test("keeps IBM Plex Sans italic faces for `<Text italic>`", () => {
     const result = createOptimizedCss({
       components,

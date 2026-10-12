@@ -348,14 +348,18 @@ export function isFlatpickrKeyframes(
 }
 
 const IBM_PLEX_SANS_WEIGHTS = ["300", "400", "600"];
+const QUOTED = /^(["'])(.*)\1$/;
+const SINGLE_WEIGHT = /^\d+$/;
 
 /** Class `<Text italic>` renders: the only Carbon rule that uses italic Plex. */
 const ITALIC_TYPE_CLASS = ".bx--type-italic";
 
 /**
  * Whether an IBM Plex `@font-face` rule is one no Carbon Svelte component
- * uses. Kept: Plex Sans 300/400/600 normal (italic only if `.bx--type-italic`
- * is allowlisted) and Plex Mono 400 normal. Other families are never dropped.
+ * uses. Only the IBM Plex Sans and Mono faces Carbon ships are dropped:
+ * Plex Sans 300/400/600 normal stay (italic only if `.bx--type-italic` is
+ * allowlisted), and Plex Mono 400 normal. Any other family, including
+ * the app's own Plex Serif or Condensed, and a weight range stay.
  */
 export function isUnusedIbmPlexFontFace(
   family: string,
@@ -363,20 +367,22 @@ export function isUnusedIbmPlexFontFace(
   weight: string,
   options: Pick<StrictCssOptimizerOptions, "allowlist" | "components">,
 ): boolean {
-  if (!family.startsWith("IBM Plex")) return false;
+  const name = family.replace(QUOTED, "$2");
+  if (name !== "IBM Plex Sans" && name !== "IBM Plex Mono") return false;
+  const faceWeight = weight === "" || weight === "normal" ? "400" : weight;
+  if (!SINGLE_WEIGHT.test(faceWeight)) return false;
+  const faceStyle = style || "normal";
 
-  const isMono =
-    style === "normal" && family === "IBM Plex Mono" && weight === "400";
-
-  const isSans =
-    family === "IBM Plex Sans" &&
-    IBM_PLEX_SANS_WEIGHTS.includes(weight) &&
-    (style === "normal" ||
-      (style === "italic" &&
+  if (name === "IBM Plex Mono") {
+    return !(faceStyle === "normal" && faceWeight === "400");
+  }
+  return !(
+    IBM_PLEX_SANS_WEIGHTS.includes(faceWeight) &&
+    (faceStyle === "normal" ||
+      (faceStyle === "italic" &&
         matchesAllowlist(
           ITALIC_TYPE_CLASS,
           getAllowlistIndex(options.allowlist, options.components),
-        )));
-
-  return !(isSans || isMono);
+        )))
+  );
 }
