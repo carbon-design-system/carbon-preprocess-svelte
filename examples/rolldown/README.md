@@ -28,7 +28,7 @@ Run the app in development mode. This should only apply the `optimizeImports` pr
 bun run dev
 ```
 
-Build the app for production. This should run both the `optimizeImports` and `optimizeCss` preprocessors. The CSS file is content-hashed (e.g. `bundle-<hash>.css`); `index.html` (a template — the served `public/` dir is gitignored and regenerated on every build) is rewritten with the real filename.
+Build the app for production. This should run both the `optimizeImports` preprocessor and the `optimizeCss` plugin. The CSS file is content-hashed (e.g. `bundle-<hash>.css`); `index.html` (a template — the served `public/` dir is gitignored and regenerated on every build) is rewritten with the real filename.
 
 ```sh
 bun run build

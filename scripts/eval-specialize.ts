@@ -1,6 +1,6 @@
 /**
  * Accuracy and payoff check for specializing Carbon components
- * (`src/analyzer/specialize.ts`), the core of a future `optimizeComponents`.
+ * (`src/analyzer/specialize.ts`), the core of `optimizeComponents`.
  *
  * For each app in the prop-aware corpus (see `./prop-aware-cases.ts`):
  *

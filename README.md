@@ -7,7 +7,7 @@
 
 ## Installation
 
-Install `carbon-preprocess-svelte` as a development dependency.
+Install `carbon-preprocess-svelte` as a development dependency. It requires Node.js 22 or later.
 
 ```sh
 # npm
@@ -446,7 +446,8 @@ Button (4 call sites)
 DataTable (1 call site)
   page             dynamic: App.svelte:231 `page` is bound with `bind:` at line 253
 ```
- The same options work on `OptimizeCssPlugin`, `optimizeCarbonCss` (which needs `content`), and the CLI (`--prop-aware`).
+
+The same options work on `OptimizeCssPlugin` and `optimizeCarbonCss` (which needs `content`). The CLI's `--prop-aware` turns it on without `exclude` or `assume`.
 
 Across 2,416 apps covering every Carbon component and prop value, it left 46% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](#optimizecomponents).
 
@@ -461,7 +462,7 @@ import { optimizeComponents, optimizeCss } from "carbon-preprocess-svelte";
 
 export default {
   plugins: [
-    optimizeComponents(), // before svelte(): it hands Svelte the rewritten source
+    optimizeComponents(), // hands svelte() the rewritten source
     svelte(),
     optimizeCss({ propAware: true }),
   ],
@@ -471,7 +472,8 @@ export default {
 ```ts
 optimizeComponents({
   /**
-   * Globs (relative to the Vite root) of every file that renders Carbon
+   * Globs (relative to the project root: Vite `root`, webpack/Rspack
+   * `context`, or the working directory under Rollup) of every file that renders Carbon
    * components. They're analyzed before the build; a module outside them
    * that imports a Carbon component fails the build. Components a script,
    * Markdown, MDX or Astro file imports keep every prop value.
@@ -506,11 +508,11 @@ Where it runs:
 | :--- | :--- | :--- |
 | Vite, SvelteKit, Astro (`vite.plugins`) | first, automatically | `vite build` and `vite build --watch`; never `vite dev` |
 | Rollup, Rolldown | list it before the Svelte plugin | wherever you add it, so add it to production builds only (`content` resolves from the working directory) |
-| webpack, Rspack | first, automatically; see [`OptimizeComponentsPlugin`](#optimizecomponentsplugin) | `mode: "production"` only |
+| webpack, Rspack | first, automatically; see [`OptimizeComponentsPlugin`](#optimizecomponentsplugin) | `mode: "production"` (webpack's default) only |
 
 It skips dev servers because it analyzes the whole app up front, dev rebuilds of single modules would leave rewritten components stale, and its safety check needs the complete build.
 
-- **Fails the build instead of shipping wrong code** if a module outside `content` imports a Carbon component, or a wrapper whose props were read from its call sites.
+- **Fails the build instead of shipping wrong code** if a module outside `content` imports a Carbon component (a virtual module, or a dependency in `node_modules`, included), or a wrapper whose props were read from its call sites. Add those files to `content`.
 - **SvelteKit and Astro:** the server and client builds are rewritten alike, so prerendered pages hydrate as before.
 - **Watch mode:** a rebuild reanalyzes `content` only when a file in it changed.
 - **Source maps** point devtools and stack traces at the original source.
