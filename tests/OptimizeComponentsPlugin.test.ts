@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import webpack from "webpack";
 import { OptimizeComponentsPlugin } from "../src/plugins/OptimizeComponentsPlugin";
+import { optimizerRegistry } from "../src/plugins/optimizer-registry";
 import { createFakeProject } from "./helpers/fake-project";
 
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
@@ -73,10 +74,13 @@ describe("OptimizeComponentsPlugin", () => {
   });
 
   test("a config without `mode` builds for production, like webpack", async () => {
+    const before = optimizerRegistry().size;
     const { stats, code, dispose } = await build(APP, undefined);
     try {
       expect(stats.hasErrors()).toBe(false);
       expect(code).not.toContain("<ButtonSkeleton");
+      // Closing the compiler forgets its optimizer.
+      expect(optimizerRegistry().size).toBe(before);
     } finally {
       dispose();
     }
