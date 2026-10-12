@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import {
   componentIndexCacheFile,
@@ -200,16 +206,33 @@ describe("loadComponentIndex", () => {
     }
   });
 
+  test("indexes again once Carbon is installed or upgraded", async () => {
+    const project = createFakeProject();
+    project.installBrokenCarbon();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      expect(await loadComponentIndex(project.root)).toBeUndefined();
+      rmSync(path.join(project.root, "node_modules"), { recursive: true });
+      project.linkCarbon();
+      expect(await loadComponentIndex(project.root)).toEqual(components);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+      project.dispose();
+    }
+  });
+
   test("is memoized per project root", async () => {
     const project = createFakeProject();
     project.linkCarbon();
 
     try {
-      const first = loadComponentIndex(project.root);
+      const first = await loadComponentIndex(project.root);
 
-      expect(loadComponentIndex(`${project.root}/`)).toBe(first);
-      expect(loadComponentIndex()).not.toBe(first);
-      expect(await first).toEqual(components);
+      expect(await loadComponentIndex(`${project.root}/`)).toBe(first);
+      expect(await loadComponentIndex()).not.toBe(first);
+      expect(first).toEqual(components);
     } finally {
       project.dispose();
     }
