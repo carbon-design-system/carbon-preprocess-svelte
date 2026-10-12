@@ -527,7 +527,7 @@ Where it runs:
 
 It skips dev servers because it analyzes the whole app up front, dev rebuilds of single modules would leave rewritten components stale, and its safety check needs the complete build.
 
-- **Fails the build instead of shipping wrong code** if a module outside `content` imports a Carbon component (a virtual module, or a dependency in `node_modules`, included), or a wrapper whose props were read from its call sites. Add those files to `content`.
+- **Fails the build instead of shipping wrong code** if a module outside `content` imports a Carbon component (a virtual module, or a dependency in `node_modules`, included), or a wrapper whose props were read from its call sites. Add those files to `content`. It also fails if a file imports Carbon in a way the analysis can't read, such as through a bundler alias (`import { Button } from "@carbon"`): import from `carbon-components-svelte` instead.
 - **SvelteKit and Astro:** the server and client builds are rewritten alike, so prerendered pages hydrate as before.
 - **Watch mode:** a rebuild reanalyzes `content` only when a file in it changed.
 - **Source maps** point devtools and stack traces at the original source.
