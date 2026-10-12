@@ -92,7 +92,7 @@ describe("try", () => {
     const { page } = await openTry();
     await page.getByLabel("Markdown").fill("> [!TIP]\n> Hi.");
     await page
-      .getByRole("checkbox", { name: 'alerts: "InlineNotification"' })
+      .getByRole("checkbox", { name: "Alerts as notifications" })
       .check({ force: true });
     await page.getByRole("tab", { name: "Svelte" }).last().click();
     await page.waitForTimeout(1500);
