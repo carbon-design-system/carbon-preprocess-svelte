@@ -6,7 +6,7 @@ import { type AssetReport, printReport, toAssetReport } from "./print-report";
 export type CssAsset = {
   id: string;
   source: Uint8Array | string;
-  /** Replaces the asset's contents; skipped on `dryRun`. */
+  /** Replaces the asset's contents; skipped on `dryRun` and when nothing was removed. */
   write(css: string): void;
 };
 
@@ -41,7 +41,7 @@ export function optimizeAssets({
   for (const { id, source, write } of assets) {
     const { css, removed } = optimizer.run(source);
 
-    if (!options.dryRun) write(css);
+    if (!options.dryRun && removed > 0) write(css);
 
     if (!silent && removed > 0) {
       logAssetDiff({

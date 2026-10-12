@@ -160,7 +160,7 @@ async function main() {
         id,
         source,
         write(css) {
-          if (css !== source) writeFileSync(file, css);
+          writeFileSync(file, css);
         },
       };
     }),
