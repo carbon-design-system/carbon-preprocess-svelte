@@ -1,3 +1,5 @@
+import { utimesSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PropAwareOptions } from "../src/analyzer/analyze-usage";
 import { analyzeUsage } from "../src/analyzer/analyze-usage";
 import {
@@ -12,6 +14,7 @@ import { createScope, evaluate } from "../src/analyzer/evaluate";
 import { addCallSite, newComponentUsage } from "../src/analyzer/usage";
 import { possible, UNKNOWN } from "../src/analyzer/values";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 
 const carbonRoot = resolveCarbonRoot();
 const carbon = readCarbonComponents(carbonRoot);
@@ -259,6 +262,33 @@ import Tile from "carbon-components-svelte/src/Tile/Tile.svelte";
 });
 
 describe("analyzeUsage", () => {
+  test("reads Carbon's scripts again when one changes", async () => {
+    const mock = createMockCarbonPackage({
+      "index.js": "",
+      "utils/classes.js": `export const a = "bx--alpha";`,
+    });
+    const util = join(mock.root, "src/utils/classes.js");
+    const isPruned = async (cls: string) =>
+      (
+        await analyzeUsage({
+          carbonRoot: mock.root,
+          carbon: new Map(),
+          bundled: [],
+          modules: [],
+        })
+      ).isPruned(cls);
+    try {
+      expect(await isPruned(".bx--alpha")).toBe(false);
+      expect(await isPruned(".bx--beta")).toBe(true);
+      writeFileSync(util, `export const b = "bx--beta";`);
+      const later = new Date(Date.now() + 10_000);
+      utimesSync(util, later, later);
+      expect(await isPruned(".bx--beta")).toBe(false);
+    } finally {
+      mock.dispose();
+    }
+  });
+
   test("one tertiary button prunes other kinds, sizes, skeleton and tooltip", async () => {
     const { isPruned, liveComponents } = await analyze(
       app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),

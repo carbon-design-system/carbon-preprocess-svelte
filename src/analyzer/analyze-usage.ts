@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { listJsAndSvelteFiles } from "../indexer/list-files";
+import { carbonSignature } from "../indexer/resolve-carbon-root";
 import { collectCarbonTokens } from "../plugins/scan-content";
 import type { CarbonComponents, ModuleUsage } from "./call-sites";
 import { type ComponentModel, loadComponentModel } from "./component-model";
@@ -62,11 +63,18 @@ type CarbonSources = {
 };
 
 const SET_CONTEXT = /setContext\(\s*["']([^"']+)["']/g;
-const carbonSourcesCache = new Map<string, CarbonSources>();
+const carbonSourcesCache = new Map<
+  string,
+  { signature: string; sources: CarbonSources }
+>();
 
-async function readCarbonSources(carbonSrc: string): Promise<CarbonSources> {
+/** Read once per Carbon, and again when it changes (see `carbonSignature`). */
+async function readCarbonSources(carbonRoot: string): Promise<CarbonSources> {
+  const carbonSrc = path.join(carbonRoot, "src");
+  const signature = await carbonSignature(carbonRoot);
   const cached = carbonSourcesCache.get(carbonSrc);
-  if (cached) return cached;
+  if (cached?.signature === signature) return cached.sources;
+
   const sources: CarbonSources = {
     scriptTokens: new Set(),
     componentContexts: new Set(),
@@ -83,7 +91,7 @@ async function readCarbonSources(carbonSrc: string): Promise<CarbonSources> {
       );
     }
   }
-  carbonSourcesCache.set(carbonSrc, sources);
+  carbonSourcesCache.set(carbonSrc, { signature, sources });
   return sources;
 }
 
@@ -187,7 +195,7 @@ export async function analyzeUsage(input: {
   options?: PropAwareOptions;
 }): Promise<UsageAnalysis> {
   const carbonSrc = path.join(input.carbonRoot, "src");
-  const sources = await readCarbonSources(carbonSrc);
+  const sources = await readCarbonSources(input.carbonRoot);
   const bundled = [...input.bundled];
   const options = input.options ?? {};
   // Each model once per analysis: `loadComponentModel` checks the file's

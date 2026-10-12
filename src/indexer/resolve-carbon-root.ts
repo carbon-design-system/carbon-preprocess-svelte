@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import Module, { createRequire } from "node:module";
 import path from "node:path";
 import { CarbonSvelte } from "../constants";
+import { listJsAndSvelteFiles } from "./list-files";
 
 const nodeRequire = createRequire(import.meta.url);
 
@@ -83,4 +84,47 @@ export function resolveCarbonRoot(from: string = process.cwd()): string {
   throw new Error(
     `Could not resolve an installed "${CarbonSvelte.Components}" package.`,
   );
+}
+
+/** A checkout linked in (`bun link`, `workspace:`) rather than installed: its source changes under a fixed version, so a cache would go stale. */
+export function isLinkedCheckout(carbonRoot: string): boolean {
+  try {
+    return !realpathSync(carbonRoot).split(path.sep).includes("node_modules");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Changes when the Carbon at `carbonRoot` does: its real path and version,
+ * and for a linked checkout, the modification times of its sources.
+ * Caches of what Carbon contains key on it.
+ */
+export async function carbonSignature(carbonRoot: string): Promise<string> {
+  let version: unknown;
+  try {
+    ({ version } = JSON.parse(
+      readFileSync(path.join(carbonRoot, "package.json"), "utf8"),
+    ) as { version?: unknown });
+  } catch {
+    // Unversioned: only its sources tell it apart.
+  }
+  let real: string;
+  try {
+    real = realpathSync(carbonRoot);
+  } catch {
+    return "";
+  }
+  let signature = `${real}@${String(version)}`;
+  const linked = !real.split(path.sep).includes("node_modules");
+  if (version !== undefined && !linked) return signature;
+  const src = path.join(carbonRoot, "src");
+  try {
+    for (const file of await listJsAndSvelteFiles(src)) {
+      signature += `:${statSync(path.join(src, file)).mtimeMs}`;
+    }
+  } catch {
+    // No `src`: indexing it fails, and says so.
+  }
+  return signature;
 }

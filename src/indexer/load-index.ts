@@ -1,11 +1,14 @@
-import { realpathSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { errorMessage } from "../utils";
 import type { ComponentIndex } from "./build-index";
-import { resolveCarbonRoot } from "./resolve-carbon-root";
+import {
+  carbonSignature,
+  isLinkedCheckout,
+  resolveCarbonRoot,
+} from "./resolve-carbon-root";
 
 const CACHE_DIRNAME = ".cache/carbon-preprocess-svelte";
 
@@ -92,15 +95,6 @@ export function componentIndexCacheFile(
   );
 }
 
-/** A checkout linked in (`bun link`, `workspace:`) rather than installed: its source changes under a fixed version, so a cache would go stale. */
-function isLinkedCheckout(carbonRoot: string): boolean {
-  try {
-    return !realpathSync(carbonRoot).split(path.sep).includes("node_modules");
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Builds (or reads the cached) component index for the
  * `carbon-components-svelte` installed in the project. Throws if it can't.
@@ -144,14 +138,22 @@ const memoized = new Map<string, Promise<ComponentIndex | undefined>>();
  * safe, while pruning against another Carbon version's index drops rules the
  * installed markup still uses (#213).
  *
- * Memoized per project root, so a build indexes at most once and a failure
- * warns once.
+ * Memoized per project root and `carbonSignature`, so a build indexes at
+ * most once and a failure warns once, until Carbon changes: a watch session
+ * can outlive an install, an upgrade or an edit to a linked checkout.
  */
-export function loadComponentIndex(
+export async function loadComponentIndex(
   projectRoot: string = process.cwd(),
 ): Promise<ComponentIndex | undefined> {
   const root = path.resolve(projectRoot);
-  let pending = memoized.get(root);
+  let carbon = "";
+  try {
+    carbon = await carbonSignature(resolveCarbonRoot(root));
+  } catch {
+    // Unresolvable: indexing fails, and warns.
+  }
+  const key = `${root}\0${carbon}`;
+  let pending = memoized.get(key);
 
   if (!pending) {
     pending = resolveComponentIndex({ projectRoot: root }).catch((error) => {
@@ -160,7 +162,7 @@ export function loadComponentIndex(
       );
       return undefined;
     });
-    memoized.set(root, pending);
+    memoized.set(key, pending);
   }
 
   return pending;
