@@ -325,6 +325,53 @@ describe("optimizeComponents", () => {
     expect(() => plugin.buildEnd.call(ctx)).toThrow(VIRTUAL_MODULES);
   });
 
+  test.each([
+    ["a re-export", `export { Button } from "carbon-components-svelte";`],
+    [
+      "a dynamic import",
+      `export const load = () => import("carbon-components-svelte/src/Button/Button.svelte");`,
+    ],
+    [
+      "a dynamic import of the barrel",
+      `export const load = () => import("carbon-components-svelte");`,
+    ],
+  ])("fails the build on %s of Carbon outside `content`", async (_, code) => {
+    const { project, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
+    );
+    try {
+      const ctx = context();
+      await plugin.buildStart.call(ctx);
+      plugin.transform(code, path.join(project.root, "lib", "Toolbar.ts"));
+      expect(() => plugin.buildEnd.call(ctx)).toThrow(MISSED_TOOLBAR);
+
+      // The same in a virtual module.
+      const virtual = context();
+      await plugin.buildStart.call(virtual);
+      plugin.transform(code, "\0virtual:toolbar");
+      expect(() => plugin.buildEnd.call(virtual)).toThrow(VIRTUAL_MODULE);
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("a type-only re-export of Carbon passes", async () => {
+    const { project, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
+    );
+    try {
+      const ctx = context();
+      await plugin.buildStart.call(ctx);
+      plugin.transform(
+        `export type { ButtonProps } from "carbon-components-svelte";`,
+        path.join(project.root, "lib", "types.ts"),
+      );
+      expect(() => plugin.buildEnd.call(ctx)).not.toThrow();
+    } finally {
+      project.dispose();
+    }
+  });
+
   test("a virtual module that only mentions carbon-components-svelte passes", async () => {
     const { plugin } = setUp(
       `<script>${IMPORT_BUTTON}</script>\n<Button>Save</Button>`,
