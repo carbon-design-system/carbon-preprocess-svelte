@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.51](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.51) - 2026-10-12
+
+**Fixes**
+
+- `optimizeCss`: leave a CSS asset with nothing to prune as it is
+- `optimizeCss`: drop only Carbon's Plex faces, quoted or not
+- `optimizeComponents`: catch namespace imports; don't treat data files as Carbon importers
+- `optimizeComponents`: keep the styles of re-exported and namespace-imported components (CLI)
+- webpack/Rspack: run the plugins when `mode` is unset
+- webpack/Rspack: forget a closed compiler's optimizer
+- analyzer: open `propAware.exclude` at every site of the component, including Carbon's own
+- analyzer: count an app component's own `<svelte:self>` sites
+- analyzer: treat objects handed on by a destructured `{#each}` or a slot as mutable
+- analyzer: don't decide `==` with an object, or confuse literal keys
+
+**Performance**
+
+- `optimizeComponents`: resolve each file's real path once per build (~92% faster module checks)
+- analyzer: walk a queued component once; explain unknowns lazily
+- analyzer: skip the context and dynamic-import scans when they can't match
+
 ## [0.11.50](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.50) - 2026-10-11
 
 **Features**
