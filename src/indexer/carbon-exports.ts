@@ -20,7 +20,7 @@ export function isIdentifierName(name: string): boolean {
   return IDENTIFIER_NAME.test(name);
 }
 
-/** Carbon needs at most two hops from the barrel to a definition. */
+/** Carbon needs at most two hops from the barrel to a definition; the rest guards against cycles. */
 const MAX_HOPS = 8;
 
 /** `export { a, b as c } from "./x"` statements in `file`, by exported name. */

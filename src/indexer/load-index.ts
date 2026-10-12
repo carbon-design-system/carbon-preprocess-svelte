@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
+import { errorMessage } from "../utils";
 import type { ComponentIndex } from "./build-index";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
 
@@ -155,7 +156,7 @@ export function loadComponentIndex(
   if (!pending) {
     pending = resolveComponentIndex({ projectRoot: root }).catch((error) => {
       console.warn(
-        `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${error instanceof Error ? error.message : error}); leaving Carbon CSS unpruned.`,
+        `${LOG_PREFIX} could not index the installed ${CarbonSvelte.Components} (${errorMessage(error)}); leaving Carbon CSS unpruned.`,
       );
       return undefined;
     });

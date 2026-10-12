@@ -13,8 +13,6 @@ import { listJsAndSvelteFiles } from "./list-files";
 import { mergeSubComponentClasses } from "./merge-sub-component-classes";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
 
-export { resolveCarbonRoot } from "./resolve-carbon-root";
-
 const SRC_PREFIX = `${CarbonSvelte.Components}/src/`;
 
 type ComponentEntry = { path: string; classes: string[] };

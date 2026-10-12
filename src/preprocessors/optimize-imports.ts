@@ -8,6 +8,7 @@ import {
   readCarbonExports,
 } from "../indexer/carbon-exports";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
+import { errorMessage } from "../utils";
 import { MappingsBuilder } from "./mappings-builder";
 
 const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;
@@ -166,7 +167,7 @@ function createCarbonExportsResolver(): (
       if (!warned) {
         warned = true;
         console.warn(
-          `${LOG_PREFIX} optimizeImports could not read the exports of the installed ${CarbonSvelte.Components} (${error instanceof Error ? error.message : error}); leaving its imports on the barrel.`,
+          `${LOG_PREFIX} optimizeImports could not read the exports of the installed ${CarbonSvelte.Components} (${errorMessage(error)}); leaving its imports on the barrel.`,
         );
       }
       exports = new Map();

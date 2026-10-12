@@ -1,5 +1,6 @@
 import { globSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { errorMessage } from "../utils";
 
 /** Literal `bx--`-prefixed tokens as they appear in source markup. */
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;
@@ -15,14 +16,6 @@ export function collectCarbonTokens(source: string, into: Set<string>): void {
   for (const token of source.match(CARBON_TOKEN) ?? []) {
     into.add(`.${token}`);
   }
-}
-
-/** Contents of each file in `files` (relative to `cwd`), skipping unreadable ones. */
-export function* readSources(
-  files: readonly string[],
-  cwd: string,
-): Generator<string> {
-  for (const { code } of readFiles(files, cwd)) yield code;
 }
 
 /** Each readable file in `files` (relative to `cwd`), by absolute path. */
@@ -66,15 +59,14 @@ export function scanContent(
   let files: string[];
   try {
     files = globSync([...content], { cwd });
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    return { classes: [], matchedFiles: 0, error };
+  } catch (error) {
+    return { classes: [], matchedFiles: 0, error: errorMessage(error) };
   }
 
   const classes = new Set<string>();
 
-  for (const source of readSources(files, cwd)) {
-    collectCarbonTokens(source, classes);
+  for (const { code } of readFiles(files, cwd)) {
+    collectCarbonTokens(code, classes);
   }
 
   return { classes: [...classes], matchedFiles: files.length };

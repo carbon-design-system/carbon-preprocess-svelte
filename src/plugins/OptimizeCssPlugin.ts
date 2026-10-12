@@ -1,7 +1,12 @@
 import type { PropAwareResult, UsageCollector } from "../analyzer";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
-import { isCarbonSvelteImport, isCssFile, isScannableModule } from "../utils";
+import {
+  errorMessage,
+  isCarbonSvelteImport,
+  isCssFile,
+  isScannableModule,
+} from "../utils";
 import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
@@ -95,7 +100,7 @@ export class OptimizeCssPlugin {
       (compilation) => {
         const ids = new Set<string>();
         const moduleClasses = new Set<string>();
-        /** `[resource, code]` of every module that may render Carbon. */
+        /** `[resource, code]` of every scannable module, for `propAware`. */
         const propAwareModules: Array<[string, string]> = [];
         const warn = (message: string) => {
           if (!silent) compilation.warnings.push(new WebpackError(message));
@@ -173,7 +178,7 @@ export class OptimizeCssPlugin {
                 collector = analyzer.createUsageCollector(compiler.context);
               } catch (error) {
                 warn(
-                  `${LOG_PREFIX} propAware is off for this build (${(error as Error).message}).`,
+                  `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,
                 );
               }
               for (const [resource, code] of propAwareModules) {

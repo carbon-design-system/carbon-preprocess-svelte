@@ -47,6 +47,11 @@ export function isScannableModule(id: string): boolean {
   return !RE_CARBON_COMPONENTS_SEGMENT.test(id);
 }
 
+/** A thrown value's message, for a warning. */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** Decodes a CSS asset source without copying the bytes. */
 export function toCssString(source: Uint8Array | string): string {
   if (typeof source === "string") return source;
