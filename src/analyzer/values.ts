@@ -69,10 +69,16 @@ export function join(a: Value, b: Value): Value {
 /** Joins `map(p)` over every possible value `p` of `value`. */
 export function flatMap(value: Value, map: (p: Primitive) => Value): Value {
   if (value === UNKNOWN) return UNKNOWN;
-  let result: Value = EMPTY;
+  if (value.size === 1) {
+    const [p] = value;
+    return map(p);
+  }
+  const result = new Set<Primitive>();
   for (const p of value) {
-    result = join(result, map(p));
-    if (result === UNKNOWN) return UNKNOWN;
+    const mapped = map(p);
+    if (mapped === UNKNOWN) return UNKNOWN;
+    for (const q of mapped) result.add(q);
+    if (result.size > MAX_VALUES) return UNKNOWN;
   }
   return result;
 }
