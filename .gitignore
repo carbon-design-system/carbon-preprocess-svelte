@@ -4,4 +4,5 @@ dist
 build
 public/build/
 .svelte-kit
-*.tgz.eval-specialize
+*.tgz
+.eval-specialize
