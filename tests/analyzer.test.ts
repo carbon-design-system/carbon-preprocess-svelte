@@ -281,6 +281,16 @@ describe("analyzeUsage", () => {
       { exclude: ["Button"] },
     );
     expect(excluded.isPruned(".bx--btn--danger")).toBe(false);
+
+    // Wherever it renders: Modal renders Button with props of its own.
+    const inModal = await analyze(
+      app(
+        `import { Modal } from "carbon-components-svelte";`,
+        `<Modal open primaryButtonText="OK" />`,
+      ),
+      { exclude: ["Button"] },
+    );
+    expect(inModal.isPruned(".bx--btn--danger")).toBe(false);
   });
 
   test("props flow into the components a component renders", async () => {
