@@ -9,7 +9,7 @@ import { optimizeAssets } from "./plugins/optimize-assets";
 import type { SafelistEntry } from "./plugins/safelist";
 import { collectCarbonTokens, readFiles } from "./plugins/scan-content";
 import { collectCarbonImports } from "./plugins/scan-imports";
-import { isCssFile } from "./utils";
+import { errorMessage, isCssFile } from "./utils";
 
 const REGEXP_SAFELIST_ENTRY = /^\/(.+)\/([a-z]*)$/;
 
@@ -179,8 +179,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(
-    `${LOG_PREFIX} ${error instanceof Error ? error.message : error}`,
-  );
+  console.error(`${LOG_PREFIX} ${errorMessage(error)}`);
   process.exitCode = 1;
 });

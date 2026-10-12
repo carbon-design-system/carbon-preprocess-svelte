@@ -30,7 +30,6 @@ export type CssOptimizerOptions = PruneOptions & {
   ids: Iterable<string>;
   /** Class selectors (`.bx--*`) to keep; pre-scanned so no I/O happens here. */
   contentClasses?: Iterable<string>;
-  /** Set by `propAware`. */
   propAware?: PropAwareUsage;
 };
 

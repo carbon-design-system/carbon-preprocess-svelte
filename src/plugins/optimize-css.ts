@@ -4,6 +4,7 @@ import { LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
 import {
+  errorMessage,
   isCarbonSvelteImport,
   isCssFile,
   isScannableModule,
@@ -81,7 +82,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         } catch (error) {
           if (!silent) {
             this.warn(
-              `${LOG_PREFIX} propAware is off for this build (${(error as Error).message}).`,
+              `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,
             );
           }
         }

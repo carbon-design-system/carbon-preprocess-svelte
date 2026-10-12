@@ -64,7 +64,6 @@ export function extractFromSvelte(props: {
   const moduleClasses = new Set<string>();
 
   const moduleStrings = scriptStrings(code, ast.module);
-  // The walk visits the module script, then the instance, before the markup.
   for (const text of [...moduleStrings, ...scriptStrings(code, ast.instance)]) {
     for (const cls of extractCarbonClassTokens(text)) selectors.add(cls);
   }
