@@ -216,11 +216,14 @@ describe("OptimizeCssPlugin", () => {
   test("processes CSS files when Carbon Svelte imports are found", async () => {
     const plugin = new OptimizeCssPlugin();
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
-    const cssContent = ".bx--btn { color: blue; }";
+    const cssContent =
+      ".bx--btn { color: blue; } .bx--accordion { color: red; }";
 
     const mockCompiler = createMockCompiler({
       assets: {
         "styles.css": { source: () => cssContent },
+        // Nothing to prune: the asset and its source map stay as they are.
+        "app.css": { source: () => "body { color: red; }" },
       },
       moduleResources: [carbonComponent],
     });
@@ -229,6 +232,7 @@ describe("OptimizeCssPlugin", () => {
     await mockCompiler.waitForProcessAssets();
     expect(mockCompiler.compilation.warnings).toEqual([]);
 
+    expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledTimes(1);
     expect(mockCompiler.compilation.updateAsset).toHaveBeenCalledWith(
       "styles.css",
       expect.any(Object),
@@ -286,7 +290,9 @@ describe("OptimizeCssPlugin", () => {
   test("handles Buffer input correctly", async () => {
     const plugin = new OptimizeCssPlugin();
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
-    const cssContent = Buffer.from(".bx--btn { color: blue; }");
+    const cssContent = Buffer.from(
+      ".bx--btn { color: blue; } .bx--accordion { color: red; }",
+    );
 
     const mockCompiler = createMockCompiler({
       assets: {
@@ -496,7 +502,8 @@ describe("OptimizeCssPlugin", () => {
   test("ignores a module whose originalSource() throws", async () => {
     const plugin = new OptimizeCssPlugin({ silent: true });
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
-    const cssContent = ".bx--btn { color: blue }";
+    const cssContent =
+      ".bx--btn { color: blue }\n.bx--accordion { color: red }";
 
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => cssContent } },
