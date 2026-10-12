@@ -68,10 +68,19 @@ const load = () => import("carbon-components-svelte/src/Modal/Modal.svelte");`,
     ).toBe(false);
     expect([...names].sort()).toEqual(["Button", "Modal", "Tag"]);
 
+    const required = new Set<string>();
+    collectCarbonImports(
+      'const Modal = require("carbon-components-svelte/src/Modal/Modal.svelte");',
+      required,
+    );
+    expect([...required]).toEqual(["Modal"]);
+
     for (const code of [
       'import * as Carbon from "carbon-components-svelte";',
       'export * from "carbon-components-svelte";',
       'const carbon = await import("carbon-components-svelte");',
+      'const { Button } = require("carbon-components-svelte");',
+      `const load = (name) => import(\`carbon-components-svelte/src/\${name}/\${name}.svelte\`);`,
     ]) {
       expect(collectCarbonImports(code, new Set())).toBe(true);
     }

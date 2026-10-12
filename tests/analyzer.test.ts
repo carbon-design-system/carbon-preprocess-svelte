@@ -209,6 +209,44 @@ import Tile from "carbon-components-svelte/src/Tile/Tile.svelte";
     }
   });
 
+  test("a dynamic import or `require` of a component opens it", () => {
+    const MODAL = "Modal/Modal.svelte";
+    const sites = (code: string, file = "/app/App.svelte") =>
+      collectSourceUsage(code, file, carbon).sites.map((site) => [
+        site.component,
+        site.open,
+      ]);
+    // In a script, in markup, and in a CommonJS module.
+    expect(
+      sites(
+        `<script>const M = import("carbon-components-svelte/src/Modal/Modal.svelte");</script>`,
+      ),
+    ).toEqual([[MODAL, true]]);
+    expect(
+      sites(
+        `{#await import("carbon-components-svelte/src/Modal/Modal.svelte") then M}<M.default />{/await}`,
+      ),
+    ).toEqual([[MODAL, true]]);
+    expect(
+      sites(
+        `const Modal = require("carbon-components-svelte/src/Modal/Modal.svelte");`,
+        "/app/lib.cjs",
+      ),
+    ).toEqual([[MODAL, true]]);
+
+    // A path computed from Carbon's name may be any component; another isn't.
+    const computed = (path: string) =>
+      collectSourceUsage(
+        `${IMPORT_BUTTON}\nconst load = (name) => import(\`${path}\`);`,
+        "/app/lib.js",
+        carbon,
+      ).openAll;
+    expect(
+      computed(`carbon-components-svelte/src/\${name}/\${name}.svelte`),
+    ).toBe(true);
+    expect(computed(`./locales/\${name}.js`)).toBe(false);
+  });
+
   test("a `.svelte` file that doesn't parse falls back to its imports", () => {
     const usage = collectSourceUsage(
       `<script>${IMPORT_BUTTON}</script>\n<Button kind={"ghost"}>{#if}</Button>`,

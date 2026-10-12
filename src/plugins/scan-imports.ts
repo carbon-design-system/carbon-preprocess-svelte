@@ -4,9 +4,12 @@ import { CarbonSvelte } from "../constants";
 const DIRECT_COMPONENT_PATH =
   /^carbon-components-svelte\/src\/.+\/([A-Za-z0-9_]+)\.svelte$/;
 
-/** `import("carbon-components-svelte")` or `import("…/Button.svelte")`. */
+/**
+ * `import()` or `require()` of the barrel, a component's path, or a path
+ * computed from Carbon's name (`` `carbon-components-svelte/src/${name}…` ``).
+ */
 const CARBON_DYNAMIC_IMPORT =
-  /\bimport\s*\(\s*(["'`])(carbon-components-svelte(?:\/[^"'`]*)?)\1\s*\)/g;
+  /\b(?:import|require)\s*\(\s*(["'`])(carbon-components-svelte(?:\/[^"'`]*)?)\1/g;
 
 /**
  * Adds the Carbon component names `source` (a whole `.svelte` file is
@@ -14,7 +17,8 @@ const CARBON_DYNAMIC_IMPORT =
  * direct paths `optimizeImports` produces. Type-only imports are skipped.
  *
  * Returns `true` when it may use components it doesn't name: a namespace
- * import, `export *`, or a dynamic import of the barrel.
+ * import, `export *`, or a dynamic import of the barrel or of a computed
+ * path.
  */
 export function collectCarbonImports(
   source: string,
@@ -50,7 +54,8 @@ export function collectCarbonImports(
     );
   }
   for (const match of source.matchAll(CARBON_DYNAMIC_IMPORT)) {
-    add(match[2], () => ["*"]);
+    if (match[2].includes("${")) all = true;
+    else add(match[2], () => ["*"]);
   }
   return all;
 }
