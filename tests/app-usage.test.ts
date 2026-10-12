@@ -362,6 +362,53 @@ describe("rewriting the app's own components", () => {
     expect(report.join("\n")).toMatch(APP_REWRITE_REPORT);
   });
 
+  // Each renders itself under a guard its own call sites decide; an
+  // `icon` no site passes gives the rewrite something to remove.
+  test.each([
+    [
+      "by `<svelte:self>`",
+      `<script>export let depth = 0;\nexport let icon = false;</script>`,
+      `{#if depth < 2}<svelte:self depth={depth + 1} />{/if}`,
+    ],
+    [
+      "with a string that grows",
+      `<script>export let prefix = "";\nexport let icon = false;</script>`,
+      `{#if prefix.length < 3}<svelte:self prefix={prefix + "-"} />{/if}`,
+    ],
+    [
+      "with a constant",
+      `<script>export let root = true;\nexport let icon = false;</script>`,
+      `{#if root}<svelte:self root={false} />{/if}`,
+    ],
+    [
+      "spreading its own props",
+      `<script>export let depth = 0;\nexport let icon = false;</script>`,
+      `{#if depth < 2}<svelte:self {...$$props} depth={depth + 1} />{/if}`,
+    ],
+    [
+      "by importing itself",
+      `<script>import Tree from "./Tree.svelte";\nexport let depth = 0;\nexport let icon = false;</script>`,
+      `{#if depth < 2}<Tree depth={depth + 1} />{/if}`,
+    ],
+  ])(
+    "one that renders itself %s keeps the guard that ends it",
+    async (_, script, recursion) => {
+      const { sources } = await appSources([
+        MAIN,
+        appRendering(`<Tree />`, `import Tree from "./Tree.svelte";`),
+        {
+          file: "/app/src/Tree.svelte",
+          code: `${script}\n{#if icon}<i>icon</i>{/if}\n${recursion}`,
+        },
+      ]);
+      const rewritten = sources.get("src/Tree.svelte");
+      expect(rewritten).not.toContain("<i>icon</i>");
+      expect(rewritten).toContain(
+        recursion.slice(0, recursion.indexOf("}") + 1),
+      );
+    },
+  );
+
   test("one rendered from somewhere unseen keeps every prop value", async () => {
     const { sources, apps } = await appSources([
       appRendering(`<svelte:component this={Card} tone="danger" />`),
