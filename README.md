@@ -30,9 +30,9 @@ Pick the tool for your bundler or pipeline; each works on its own.
 | Tool | Type | Works with | What it does |
 | :--- | :--- | :--- | :--- |
 | [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports to source paths, for faster dev and build times |
-| [`optimizeCss`](#optimizecss) | Build plugin | Vite, Rollup, Rolldown | Prunes unused Carbon styles, shrinking CSS bundles up to 90% |
-| [`optimizeComponents`](#optimizecomponents) | Build plugin | Vite, Rollup, Rolldown, Astro | Rewrites Carbon components for the props your app passes, removing code it never runs |
+| [`optimizeCss`](#optimizecss) | Build plugin | Vite, SvelteKit, Astro, Rollup, Rolldown | Prunes unused Carbon styles, shrinking CSS bundles up to 90% |
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss` for Webpack and Rspack |
+| [`optimizeComponents`](#optimizecomponents) | Build plugin | Vite, SvelteKit, Astro, Rollup, Rolldown | Rewrites Carbon components for the props your app passes, removing code it never runs |
 | [`OptimizeComponentsPlugin`](#optimizecomponentsplugin) | Build plugin | Webpack, Rspack | `optimizeComponents` for Webpack and Rspack |
 | [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, `Bun.build`, any post-build script | The CSS engine as a function, for any pipeline |
 | [CLI](#cli) | Command | esbuild, Bun, any pipeline without a plugin hook | Prunes built CSS files with one command |
@@ -451,7 +451,22 @@ The same options work on `OptimizeCssPlugin` and `optimizeCarbonCss` (which need
 
 Across 2,416 apps covering every Carbon component and prop value, it left 46% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](#optimizecomponents).
 
-#### `optimizeComponents`
+### `OptimizeCssPlugin`
+
+`optimizeCss` for Webpack and [Rspack](https://rspack.rs): same options, production mode only. One instance works on both, since Rspack implements webpack's plugin API.
+
+```js
+// webpack.config.mjs (or rspack.config.mjs)
+import { OptimizeCssPlugin } from "carbon-preprocess-svelte";
+
+export default {
+  plugins: [new OptimizeCssPlugin()],
+};
+```
+
+Full set-ups: [examples/webpack](examples/webpack), [examples/webpack@svelte-5](examples/webpack@svelte-5), [examples/rspack](examples/rspack).
+
+### `optimizeComponents`
 
 Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). Your own wrapper components are rewritten the same way when every place that renders them is in `content`. It's the JavaScript counterpart of prop-aware pruning, using the same analysis.
 
@@ -529,7 +544,7 @@ JavaScript removed in the examples:
 | Rollup, Rolldown, webpack (Svelte 4) | 26–28% |
 | webpack, Rspack (Svelte 5) | 9–12% (the Svelte 5 runtime is a larger share of a small app) |
 
-#### `OptimizeComponentsPlugin`
+### `OptimizeComponentsPlugin`
 
 `optimizeComponents` for webpack and Rspack, with the same options. It runs in production mode only, and its pre-loader runs before `svelte-loader` wherever the plugin is listed.
 
@@ -547,21 +562,6 @@ export default {
   ],
 };
 ```
-
-### `OptimizeCssPlugin`
-
-`optimizeCss` for Webpack and [Rspack](https://rspack.rs): same options, production mode only. One instance works on both, since Rspack implements webpack's plugin API.
-
-```js
-// webpack.config.mjs (or rspack.config.mjs)
-import { OptimizeCssPlugin } from "carbon-preprocess-svelte";
-
-export default {
-  plugins: [new OptimizeCssPlugin()],
-};
-```
-
-Full set-ups: [examples/webpack](examples/webpack), [examples/webpack@svelte-5](examples/webpack@svelte-5), [examples/rspack](examples/rspack).
 
 ### `optimizeCarbonCss`
 
