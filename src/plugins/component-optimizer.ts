@@ -89,10 +89,14 @@ function importsCarbon(file: string, code: string, virtual = false): boolean {
 }
 
 /** `file` relative to `root`, through symlinks when `file` exists. */
-function relativeTo(root: string, file: string): string {
-  const real = realpath(file);
-  return real
-    ? path.relative(realpath(root) ?? root, real)
+function relativeTo(
+  root: string,
+  file: string,
+  real: (file: string) => string | undefined = realpath,
+): string {
+  const resolved = real(file);
+  return resolved
+    ? path.relative(real(root) ?? root, resolved)
     : path.relative(root, file);
 }
 
@@ -190,6 +194,15 @@ export function createComponentOptimizer(
         result: SpecializedComponents | { warning: string };
       }
     | undefined;
+  /**
+   * Real paths, per build: every module is checked, and the bundler asks
+   * about the same files many times.
+   */
+  const realpaths = new Map<string, string | undefined>();
+  const real = (file: string): string | undefined => {
+    if (!realpaths.has(file)) realpaths.set(file, realpath(file));
+    return realpaths.get(file);
+  };
 
   return {
     /** Analyzes `content` under `root`; call before each build. */
@@ -199,6 +212,7 @@ export function createComponentOptimizer(
       resolve?: ImportResolver,
     ): Promise<{ warning?: string; info?: string; report?: string[] }> {
       sources = new Map();
+      realpaths.clear();
       analyzed.clear();
       missed.clear();
       virtual.clear();
@@ -217,7 +231,7 @@ export function createComponentOptimizer(
         }
         files.push({ file: absolute, code });
         hash.update(`${absolute}\0${code}\0`);
-        analyzed.add(realpath(absolute) ?? absolute);
+        analyzed.add(real(absolute) ?? absolute);
       }
 
       const resolvedImports = resolve
@@ -247,9 +261,7 @@ export function createComponentOptimizer(
       const { result } = last;
       if ("warning" in result) return { warning: result.warning };
       sources = result.sources;
-      closed = new Set(
-        [...result.closed].map((file) => realpath(file) ?? file),
-      );
+      closed = new Set([...result.closed].map((file) => real(file) ?? file));
       return {
         info: options?.silent
           ? undefined
@@ -270,7 +282,7 @@ export function createComponentOptimizer(
     rewritable(id: string): boolean {
       const file = stripQuery(id);
       if (!file.endsWith(".svelte")) return false;
-      return isCarbonSvelteImport(file) || analyzed.has(realpath(file) ?? file);
+      return isCarbonSvelteImport(file) || analyzed.has(real(file) ?? file);
     },
 
     /** The rewritten source of module `id`: a Carbon component, or an app component whose every call site is known. */
@@ -279,8 +291,8 @@ export function createComponentOptimizer(
       // Svelte's style sub-modules (`?svelte&type=style`) aren't the source.
       const [file, query = ""] = id.split("?");
       if (query.includes("svelte")) return undefined;
-      const real = realpath(file);
-      return real ? sources.get(real) : undefined;
+      const resolved = real(file);
+      return resolved ? sources.get(resolved) : undefined;
     },
 
     /** Records module `id` if it renders Carbon without having been analyzed. */
@@ -288,19 +300,18 @@ export function createComponentOptimizer(
       if (sources.size === 0) return;
       const file = stripQuery(id);
       if (isCarbonSvelteImport(file) || RE_EXT_STYLESHEET.test(file)) return;
-      const real = realpath(file);
-      if (analyzed.has(real ?? file)) return;
+      if (analyzed.has(real(file) ?? file)) return;
       const isVirtual = id.startsWith("\0") || !path.isAbsolute(file);
       if (!importsCarbon(file, code, isVirtual)) return;
       // Named as the app imports it, without Rollup's `\0` prefix.
       if (isVirtual) virtual.add(id.replace(ROLLUP_VIRTUAL_PREFIX, ""));
-      else missed.add(relativeTo(root, file));
+      else missed.add(relativeTo(root, file, real));
     },
 
     /** Whether module `id` is an app component whose props were read from its call sites. */
     isClosed(id: string): boolean {
       if (closed.size === 0 || id.includes("?")) return false;
-      return closed.has(realpath(id) ?? id);
+      return closed.has(real(id) ?? id);
     },
 
     /**
@@ -315,11 +326,11 @@ export function createComponentOptimizer(
       dynamic: boolean,
       root: string,
     ): void {
-      const name = relativeTo(root, id);
+      const name = relativeTo(root, id, real);
       const outside = importers.filter((importer) => {
         if (importer === undefined) return true;
         const file = stripQuery(importer);
-        return !analyzed.has(realpath(file) ?? file);
+        return !analyzed.has(real(file) ?? file);
       });
       if (dynamic) outside.push("a dynamic import");
       if (outside.length === 0) return;
@@ -329,7 +340,7 @@ export function createComponentOptimizer(
           importer === undefined
             ? "the bundler"
             : path.isAbsolute(stripQuery(importer))
-              ? relativeTo(root, stripQuery(importer))
+              ? relativeTo(root, stripQuery(importer), real)
               : importer,
         ),
       );
