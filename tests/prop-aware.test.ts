@@ -43,6 +43,57 @@ describe("propAware", () => {
     }
   });
 
+  test("the Vite plugin keeps a component imported in a way it can't read", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
+    const appFile = join(dir, "App.svelte");
+    const buttonFile = join(carbonRoot, "src", BUTTON);
+    try {
+      // `@carbon` is a bundler alias for `carbon-components-svelte`.
+      const code = app(
+        `import { Button } from "@carbon";`,
+        `<Button kind="tertiary">Hi</Button>`,
+      );
+      writeFileSync(appFile, code);
+      const plugin = optimizeCss({
+        silent: true,
+        propAware: true,
+      }) as unknown as {
+        buildStart(this: object): Promise<void>;
+        transform(code: string, id: string): void;
+        buildEnd(this: object): Promise<void>;
+        generateBundle(
+          this: object,
+          options: unknown,
+          bundle: Rollup.OutputBundle,
+        ): Promise<void>;
+      };
+      const ctx = {
+        warn: jest.fn(),
+        getModuleIds: () => [appFile, buttonFile][Symbol.iterator](),
+        getModuleInfo: (id: string) => ({
+          importers: id === buttonFile ? [appFile] : [],
+          dynamicImporters: [],
+        }),
+        resolve: async () => null,
+      };
+      await plugin.buildStart.call(ctx);
+      plugin.transform(code, appFile);
+      plugin.transform("", buttonFile);
+      await plugin.buildEnd.call(ctx);
+      const bundle = {
+        "styles.css": { type: "asset", source: BUTTON_CSS },
+      } as unknown as Rollup.OutputBundle;
+      await plugin.generateBundle.call(ctx, {}, bundle);
+
+      // Every variant stays, as without `propAware`.
+      expect((bundle["styles.css"] as Rollup.OutputAsset).source).toBe(
+        ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("the Vite plugin reads call sites from each `.svelte` module's source", async () => {
     const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
     const appFile = join(dir, "App.svelte");

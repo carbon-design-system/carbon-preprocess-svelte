@@ -5,7 +5,15 @@ import type { SpecializedComponents } from "../analyzer";
 import { importKey } from "../analyzer/import-key";
 import { CarbonSvelte, LOG_PREFIX, RE_EXT_STYLESHEET } from "../constants";
 import { installedMajor } from "../indexer/resolve-carbon-root";
-import { isCarbonSvelteImport, stripQuery } from "../utils";
+import {
+  CARBON_BARREL_KEY,
+  type CarbonImport,
+  carbonImportKey,
+  carbonModuleKey,
+  isCarbonSpecifier,
+  isCarbonSvelteImport,
+  stripQuery,
+} from "../utils";
 import { collectCarbonImports } from "./scan-imports";
 
 export type OptimizeComponentsOptions = {
@@ -183,6 +191,10 @@ export function createComponentOptimizer(
   let closed = new Set<string>();
   /** Those rendered from somewhere else, and by what. */
   const escaped = new Map<string, string[]>();
+  /** Analyzed files, by name, and the imports of Carbon in them it didn't read. */
+  const unread = new Map<string, Set<string>>();
+  /** See `SpecializedComponents.readImport`. */
+  let readImport: SpecializedComponents["readImport"] = () => true;
   /**
    * The last analysis and a hash of the `content` it read: watch rebuilds
    * and SvelteKit's second (server or client) build reuse it unless a
@@ -213,6 +225,8 @@ export function createComponentOptimizer(
     ): Promise<{ warning?: string; info?: string; report?: string[] }> {
       sources = new Map();
       realpaths.clear();
+      unread.clear();
+      readImport = () => true;
       analyzed.clear();
       missed.clear();
       virtual.clear();
@@ -261,6 +275,7 @@ export function createComponentOptimizer(
       const { result } = last;
       if ("warning" in result) return { warning: result.warning };
       sources = result.sources;
+      readImport = result.readImport;
       closed = new Set([...result.closed].map((file) => real(file) ?? file));
       return {
         info: options?.silent
@@ -346,6 +361,41 @@ export function createComponentOptimizer(
       );
     },
 
+    /**
+     * Records an edge of the bundler's module graph into Carbon unless the
+     * analysis read it. `check` reads module text; the graph also has
+     * imports no text names Carbon in, such as one through an alias
+     * (`import { Button } from "@carbon"`).
+     */
+    checkCarbonImport(edge: CarbonImport, root: string): void {
+      if (sources.size === 0) return;
+      const { id, importer, specifier } = edge;
+      const file = stripQuery(importer);
+      if (!carbonImportKey(id) || carbonModuleKey(file)) return;
+      if (importer.startsWith("\0") || !path.isAbsolute(file)) {
+        virtual.add(importer.replace(ROLLUP_VIRTUAL_PREFIX, ""));
+        return;
+      }
+      const resolved = real(file) ?? file;
+      if (!analyzed.has(resolved)) {
+        missed.add(relativeTo(root, file, real));
+        return;
+      }
+      const target = real(stripQuery(id)) ?? stripQuery(id);
+      const aliased = specifier !== undefined && !isCarbonSpecifier(specifier);
+      if (!aliased && readImport(resolved, target)) return;
+      const name = relativeTo(root, file, real);
+      const imports = unread.get(name) ?? new Set();
+      imports.add(
+        aliased
+          ? `\`${specifier}\``
+          : carbonImportKey(target) === CARBON_BARREL_KEY
+            ? `\`${CarbonSvelte.Components}\``
+            : `Carbon's ${path.basename(target, path.extname(target))}`,
+      );
+      unread.set(name, imports);
+    },
+
     /** The build error for the modules `check` recorded, if any. */
     error(): string | undefined {
       const errors: string[] = [];
@@ -357,6 +407,11 @@ export function createComponentOptimizer(
       if (missed.size > 0) {
         errors.push(
           `${name} rewrote Carbon components before seeing ${[...missed].join(", ")}, which ${missed.size === 1 ? "imports" : "import"} them. Add those files to \`content\` (now ${JSON.stringify(content)}); only a pattern that names \`node_modules\` reaches inside it.`,
+        );
+      }
+      for (const [file, imports] of unread) {
+        errors.push(
+          `${name} can't read how ${file} imports ${[...imports].join(", ")}, so it rewrote Carbon without that file's call sites. Import Carbon from \`carbon-components-svelte\` there, not through an alias, or remove ${name}.`,
         );
       }
       if (virtual.size > 0) {

@@ -97,7 +97,8 @@ export type OptimizeCssOptions = {
    * Each `.svelte` file that imports Carbon is analyzed from its source,
    * along with the app's constants and its own wrapper components. A prop
    * the analysis can't read (a reassigned variable, a spread, `bind:`)
-   * keeps every value, and a component used as a value keeps everything.
+   * keeps every value, and a component used as a value, or imported in a
+   * way the analysis can't read (a bundler alias), keeps everything.
    * If the analysis fails, CSS is pruned as without this option, with a
    * warning.
    *

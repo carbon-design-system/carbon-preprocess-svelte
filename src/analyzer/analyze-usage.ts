@@ -46,13 +46,6 @@ export type UsageAnalysis = {
   scopeFor(key: string): Scope | undefined;
 };
 
-const SRC_SEGMENT = /(?:^|[\\/])carbon-components-svelte[\\/]src[\\/](.+)$/;
-
-/** `…/carbon-components-svelte/src/Button/Button.svelte` -> `Button/Button.svelte`. */
-export function carbonModuleKey(id: string): string | undefined {
-  return SRC_SEGMENT.exec(id)?.[1].replace(/\\/g, "/");
-}
-
 type CarbonSources = {
   /** Classes and prefixes Carbon's `.js` modules name; never pruned. */
   scriptTokens: Set<string>;

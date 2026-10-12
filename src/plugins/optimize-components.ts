@@ -1,4 +1,5 @@
 import type { Plugin } from "vite";
+import { carbonImports } from "./carbon-imports";
 import {
   createComponentOptimizer,
   type OptimizeComponentsOptions,
@@ -58,7 +59,12 @@ export const optimizeComponents = (
     transform(code, id) {
       optimizer.check(id, code, root);
     },
-    buildEnd() {
+    async buildEnd() {
+      // Every import of Carbon, as the module graph has it: check the
+      // analysis read each one.
+      for (const edge of await carbonImports(this)) {
+        optimizer.checkCarbonImport(edge, root);
+      }
       // The app components whose props came from their call sites: check
       // nothing outside `content` imports them.
       for (const id of this.getModuleIds()) {

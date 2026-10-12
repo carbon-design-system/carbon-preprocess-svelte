@@ -7,10 +7,18 @@ import path from "node:path";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
 import type { PropAwareUsage } from "../plugins/create-optimized-css";
-import { errorMessage, isSvelteFile, stripQuery } from "../utils";
+import {
+  CARBON_BARREL_KEY,
+  type CarbonImport,
+  carbonImportKey,
+  carbonModuleKey,
+  errorMessage,
+  isCarbonSpecifier,
+  isSvelteFile,
+  stripQuery,
+} from "../utils";
 import {
   analyzeUsage,
-  carbonModuleKey,
   type PropAwareOptions,
   type UsageAnalysis,
 } from "./analyze-usage";
@@ -19,6 +27,7 @@ import {
   type CarbonComponents,
   type ModuleUsage,
   readCarbonComponents,
+  readCarbonImport,
 } from "./call-sites";
 import { type SourceMap, toSourceMap } from "./mapped-text";
 import { type SpecializeOptions, specializeComponent } from "./specialize";
@@ -99,11 +108,15 @@ export function createUsageCollector(projectRoot: string) {
     },
     /**
      * The analysis for this bundle, or a warning when it can't be done.
-     * `bundledIds` are the Carbon `.svelte` module paths in the bundle.
+     * `bundledIds` are the Carbon `.svelte` module paths in the bundle;
+     * `carbonImports`, the module graph's edges into Carbon. A component
+     * imported in a way the analysis didn't read (an alias) keeps every
+     * variant.
      */
     async analyze(
       bundledIds: Iterable<string>,
       options: PropAwareOptions,
+      carbonImports: Iterable<CarbonImport> = [],
     ): Promise<PropAwareResult | { warning: string }> {
       try {
         const bundled = new Set<string>();
@@ -111,12 +124,14 @@ export function createUsageCollector(projectRoot: string) {
           const key = carbonModuleKey(id);
           if (key) bundled.add(key);
         }
+        const appUsage = collectAppUsage(modules.values(), carbon);
+        const unread = unreadCarbonImports(appUsage, carbonImports);
         return await toResult(
           await analyzeUsage({
             carbonRoot,
             carbon,
             bundled,
-            modules: collectAppUsage(modules.values(), carbon).modules,
+            modules: unread ? [...appUsage.modules, unread] : appUsage.modules,
             options,
           }),
           carbon,
@@ -129,6 +144,47 @@ export function createUsageCollector(projectRoot: string) {
 }
 
 export type UsageCollector = ReturnType<typeof createUsageCollector>;
+
+const UNREAD_IMPORT = "imported in a way the analysis can't read (an alias?)";
+
+/**
+ * Open sites for the Carbon modules `edges` import that `appUsage` didn't
+ * read the import of (or that an alias imports), or `undefined` if it
+ * read them all. An unread import of the barrel opens every component.
+ */
+function unreadCarbonImports(
+  appUsage: AppUsage,
+  edges: Iterable<CarbonImport>,
+): ModuleUsage | undefined {
+  const unread: ModuleUsage = {
+    sites: [],
+    openAll: false,
+    providedContexts: new Set(),
+  };
+  for (const { id, importer, specifier } of edges) {
+    const key = carbonImportKey(id);
+    const file = stripQuery(importer);
+    if (!key || carbonModuleKey(file)) continue;
+    if (
+      (specifier === undefined || isCarbonSpecifier(specifier)) &&
+      readCarbonImport(appUsage.read.get(file), key)
+    ) {
+      continue;
+    }
+    if (key === CARBON_BARREL_KEY) unread.openAll = true;
+    else {
+      unread.sites.push({
+        component: key,
+        open: true,
+        props: new Map(),
+        slots: null,
+        location: { file, line: 1 },
+        reason: UNREAD_IMPORT,
+      });
+    }
+  }
+  return unread.openAll || unread.sites.length > 0 ? unread : undefined;
+}
 
 function toResult(
   analysis: UsageAnalysis,
@@ -302,6 +358,13 @@ export type SpecializedComponents = {
   apps: number;
   /** Lines for `optimizeComponents({ report: true })`. */
   report: () => string[];
+  /**
+   * Whether the analysis read analyzed file `importer`'s import of Carbon
+   * module `id` (both real paths). `false` means an import it can't see,
+   * such as one through an alias; `true` for a module it doesn't read
+   * imports of (a Carbon script, a stylesheet).
+   */
+  readImport: (importer: string, id: string) => boolean;
 };
 
 /**
@@ -392,10 +455,17 @@ export async function specializeFiles(input: {
   } catch (error) {
     return { warning: failure(error, SPECIALIZE_FAILURE) };
   }
+  const read = new Map(
+    [...appUsage.read].map(([file, usage]) => [realpath(file), usage]),
+  );
   return {
     sources,
     edits,
     closed: appUsage.closed,
+    readImport: (importer, id) => {
+      const key = carbonImportKey(id);
+      return !key || readCarbonImport(read.get(importer), key);
+    },
     apps: appRewrites.filter((rewrite) => rewrite.edits > 0).length,
     report: () =>
       formatSpecializeReport(result, rewrites, appRewrites, input.projectRoot),

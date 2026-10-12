@@ -112,6 +112,8 @@ function exportedNames(model: ComponentModel): Array<[string, string]> {
 export type AppUsage = {
   /** Every module's Carbon call sites, ready for `analyzeUsage`. */
   modules: ModuleUsage[];
+  /** Each analyzed file as first read, by path: see `readCarbonImport`. */
+  read: ReadonlyMap<string, ModuleUsage>;
   /**
    * App components whose props were read from their call sites alone:
    * sound only if nothing outside the analyzed files renders them, which
@@ -179,11 +181,13 @@ export function collectAppUsage(
     collectSourceUsage(code, file, carbon, apps),
   );
   const referenced = new Set<string>();
+  const read = new Map<string, ModuleUsage>();
   let openApps = false;
   for (const module of [
     ...statics,
     ...[...sources.keys()].map((key) => collect(key)),
   ]) {
+    if (module.file) read.set(module.file, module);
     openApps ||= module.openApps === true;
     for (const site of module.sites) {
       if (isAppComponent(site.component)) referenced.add(site.component);
@@ -233,6 +237,7 @@ export function collectAppUsage(
   );
   return {
     modules: [...statics, ...latest.values()].map(carbonOnly),
+    read,
     closed,
     scopeFor(file) {
       const usage = usages.get(file);
