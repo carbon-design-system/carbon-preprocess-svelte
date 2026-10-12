@@ -104,6 +104,7 @@ function runPass(
   modelOf: (key: string) => ComponentModel,
   roots: CallSite[],
   context: (provided: Set<string>) => ContextResolver,
+  excluded: ReadonlySet<string>,
 ): Pass {
   let provided = new Set<string>();
   for (;;) {
@@ -118,6 +119,10 @@ function runPass(
       if (!usage) {
         usage = newComponentUsage();
         usages.set(site.component, usage);
+      }
+      // Excluded wherever it renders, Carbon's own call sites included.
+      if (excluded.has(site.component) && !site.open) {
+        site = { ...site, open: true, reason: "excluded" };
       }
       if (addCallSite(usage, site, model.propNames.values())) {
         queue.push(site.component);
@@ -228,9 +233,7 @@ export async function analyzeUsage(input: {
     for (const key of module.providedContexts) appContexts.add(key);
     for (const site of module.sites) {
       const assumptions = assumed.get(site.component);
-      if (excluded.has(site.component)) {
-        roots.push({ ...site, open: true, reason: "excluded" });
-      } else if (assumptions && !site.open) {
+      if (assumptions && !site.open) {
         const props = new Map(site.props);
         for (const [prop, value] of assumptions) {
           if (props.get(prop) === UNKNOWN) props.set(prop, value);
@@ -258,6 +261,7 @@ export async function analyzeUsage(input: {
       !sources.componentContexts.has(key)
         ? UNKNOWN
         : UNDEFINED,
+    excluded,
   );
 
   const scriptPrefixes = [...sources.scriptTokens].filter((token) =>
