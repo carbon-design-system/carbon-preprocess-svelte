@@ -55,4 +55,31 @@ describe("collectCarbonImports", () => {
     );
     expect([...names]).toEqual(["Button"]);
   });
+
+  test("collects re-exports, and flags what may use any component", () => {
+    const names = new Set<string>();
+    expect(
+      collectCarbonImports(
+        `export { Button, type ButtonProps } from "carbon-components-svelte";
+export { default as Tag } from "carbon-components-svelte/src/Tag/Tag.svelte";
+const load = () => import("carbon-components-svelte/src/Modal/Modal.svelte");`,
+        names,
+      ),
+    ).toBe(false);
+    expect([...names].sort()).toEqual(["Button", "Modal", "Tag"]);
+
+    for (const code of [
+      'import * as Carbon from "carbon-components-svelte";',
+      'export * from "carbon-components-svelte";',
+      'const carbon = await import("carbon-components-svelte");',
+    ]) {
+      expect(collectCarbonImports(code, new Set())).toBe(true);
+    }
+    expect(
+      collectCarbonImports(
+        'import type * as Carbon from "carbon-components-svelte";\nimport "carbon-components-svelte/css/white.css";',
+        names,
+      ),
+    ).toBe(false);
+  });
 });
