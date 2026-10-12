@@ -591,10 +591,9 @@ export function collectSvelteUsage(
   options: SvelteUsageOptions = {},
 ): ModuleUsage {
   const { apps } = options;
-  if (
-    !code.includes(CarbonSvelte.Components) &&
-    !(apps && (code.includes(".svelte") || code.includes("import")))
-  ) {
+  // With the app's components, every file is walked: one can render
+  // another, or itself, in ways no text check can rule out.
+  if (!apps && !code.includes(CarbonSvelte.Components)) {
     return { sites: [], openAll: false, providedContexts: new Set() };
   }
 
