@@ -236,6 +236,26 @@ describe("specializeComponent", () => {
     }
   });
 
+  test("an item a destructured `{#each}` binds or a slot hands on may change", () => {
+    const destructured = specialize(
+      `<script>
+  const items = [{ open: false }];
+</script>
+{#each items as { open }}<input type="checkbox" bind:checked={open} />{/each}
+{#each items as item}{#if item.open}<p>open</p>{/if}{/each}`,
+    );
+    expect(destructured).toContain("{#if item.open}");
+
+    const slotted = specialize(
+      `<script>
+  const state = { open: false };
+</script>
+<slot {state} />
+{#if state.open}<p>open</p>{/if}`,
+    );
+    expect(slotted).toContain("{#if state.open}");
+  });
+
   test("an array that stays empty renders no `{#each}` body", () => {
     const code = specialize(
       `<script>export let items = [];</script>
