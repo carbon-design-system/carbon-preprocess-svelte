@@ -4,12 +4,14 @@ import { LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
 import {
+  type CarbonImport,
   errorMessage,
   isCarbonSvelteImport,
   isCssFile,
   isScannableModule,
   toCssString,
 } from "../utils";
+import { carbonImports } from "./carbon-imports";
 import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
@@ -58,6 +60,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   let collector: UsageCollector | undefined;
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
   let analyzer: typeof import("../analyzer") | undefined;
+  /** The module graph's edges into Carbon, read in `buildEnd`. */
+  let edges: CarbonImport[] = [];
 
   return {
     name: "vite:carbon:optimize-css",
@@ -87,6 +91,14 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
           }
         }
       }
+    },
+    async buildEnd() {
+      // The module graph is only complete, and `this.resolve` only works,
+      // in the build phase.
+      edges =
+        collector && typeof this.getModuleIds === "function"
+          ? await carbonImports(this)
+          : [];
     },
     transform(code, id) {
       if (isCarbonSvelteImport(id)) {
@@ -140,7 +152,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
 
       let usage: PropAwareResult | undefined;
       if (collector && propAware) {
-        const result = await collector.analyze(ids, propAware);
+        const result = await collector.analyze(ids, propAware, edges);
         if (!("warning" in result)) usage = result;
         else if (!silent) this.warn(result.warning);
       }

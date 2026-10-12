@@ -4,6 +4,7 @@ import webpack from "webpack";
 import { OptimizeComponentsPlugin } from "../src/plugins/OptimizeComponentsPlugin";
 import { optimizerRegistry } from "../src/plugins/optimizer-registry";
 import { createFakeProject } from "./helpers/fake-project";
+import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 const SVELTE_FILE = /\.svelte$/;
@@ -13,6 +14,8 @@ const SVELTE_LOADER = path.join(
 );
 const CARD_ESCAPED =
   /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]extra\.js also renders it\./;
+const UNREAD_MODAL =
+  /can't read how src[\\/]App\.svelte imports `@carbon\/src\/Modal\/Modal\.svelte`/;
 const MISSED_TOOLBAR =
   /OptimizeComponentsPlugin rewrote Carbon components before seeing lib[\\/]toolbar\.js/;
 
@@ -24,6 +27,7 @@ const MISSED_TOOLBAR =
 async function build(
   files: Record<string, string>,
   mode: "production" | "development" | undefined = "production",
+  resolve: webpack.Configuration["resolve"] = {},
 ) {
   const project = createFakeProject();
   project.linkCarbon();
@@ -37,6 +41,7 @@ async function build(
     entry: "./src/index.js",
     output: { path: path.join(project.root, "out") },
     module: { rules: [{ test: SVELTE_FILE, loader: SVELTE_LOADER }] },
+    resolve,
     optimization: { minimize: false },
     devtool: false,
     plugins: [new OptimizeComponentsPlugin({ silent: true })],
@@ -123,6 +128,25 @@ describe("OptimizeComponentsPlugin", () => {
       );
     } finally {
       escaped.dispose();
+    }
+  });
+
+  test("fails the build on an import of Carbon the analysis can't read", async () => {
+    const { stats, dispose } = await build(
+      {
+        ...APP,
+        "src/App.svelte": `<script>${IMPORT_BUTTON}\nimport Modal from "@carbon/src/Modal/Modal.svelte";</script>\n<Button kind="tertiary">Save</Button><Modal open />`,
+      },
+      "production",
+      { alias: { "@carbon": resolvePackageRoot("carbon-components-svelte") } },
+    );
+    try {
+      const errors = stats.toJson({ errors: true }).errors ?? [];
+      expect(errors.map((error) => error.message).join("\n")).toMatch(
+        UNREAD_MODAL,
+      );
+    } finally {
+      dispose();
     }
   });
 

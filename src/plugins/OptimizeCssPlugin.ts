@@ -2,6 +2,8 @@ import type { PropAwareResult, UsageCollector } from "../analyzer";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
 import {
+  type CarbonImport,
+  carbonImportKey,
   errorMessage,
   isCarbonSvelteImport,
   isCssFile,
@@ -31,6 +33,14 @@ type WebpackModule = {
 };
 
 type WebpackCompilation = {
+  /** Absent on the mock compilations unit tests pass. */
+  moduleGraph?: {
+    getIncomingConnections(module: WebpackModule): Iterable<{
+      originModule?: WebpackModule | null;
+      /** `request` is the specifier the import was written with. */
+      dependency?: { type?: string; request?: unknown } | null;
+    }>;
+  };
   hooks: {
     finishModules: {
       tap(
@@ -102,6 +112,8 @@ export class OptimizeCssPlugin {
         const moduleClasses = new Set<string>();
         /** `[resource, code]` of every scannable module, for `propAware`. */
         const propAwareModules: Array<[string, string]> = [];
+        /** The module graph's edges into Carbon, for `propAware`. */
+        const carbonImports: CarbonImport[] = [];
         const warn = (message: string) => {
           if (!silent) compilation.warnings.push(new WebpackError(message));
         };
@@ -112,6 +124,23 @@ export class OptimizeCssPlugin {
             for (const module of modules) {
               const resource = module.resource;
               if (typeof resource !== "string") continue;
+
+              if (propAware && carbonImportKey(resource)) {
+                for (const connection of compilation.moduleGraph?.getIncomingConnections(
+                  module,
+                ) ?? []) {
+                  const origin = connection.originModule?.resource;
+                  const request = connection.dependency?.request;
+                  if (typeof origin === "string") {
+                    carbonImports.push({
+                      id: resource,
+                      importer: origin,
+                      specifier:
+                        typeof request === "string" ? request : undefined,
+                    });
+                  }
+                }
+              }
 
               if (isCarbonSvelteImport(resource)) {
                 ids.add(resource);
@@ -184,7 +213,11 @@ export class OptimizeCssPlugin {
               for (const [resource, code] of propAwareModules) {
                 collector?.add(resource, code);
               }
-              const result = await collector?.analyze(ids, propAware);
+              const result = await collector?.analyze(
+                ids,
+                propAware,
+                carbonImports,
+              );
               if (result && "warning" in result) warn(result.warning);
               else usage = result;
             }

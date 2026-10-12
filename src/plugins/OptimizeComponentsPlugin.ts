@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { carbonImportKey } from "../utils";
 import {
   createComponentOptimizer,
   type ImportResolver,
@@ -27,7 +28,8 @@ type AsyncHook = {
 
 type WebpackConnection = {
   originModule?: WebpackModule | null;
-  dependency?: { type?: string } | null;
+  /** `request` is the specifier the import was written with. */
+  dependency?: { type?: string; request?: unknown } | null;
 };
 
 type WebpackCompilation = {
@@ -185,6 +187,28 @@ export class OptimizeComponentsPlugin {
           }
           if (typeof source === "string" || Buffer.isBuffer(source)) {
             optimizer.check(resource, source.toString(), compiler.context);
+          }
+          // Every import of Carbon, as the module graph has it: check the
+          // analysis read each one.
+          if (carbonImportKey(resource)) {
+            for (const connection of compilation.moduleGraph.getIncomingConnections(
+              module,
+            )) {
+              const origin = connection.originModule?.resource;
+              const request = connection.dependency?.request;
+              if (typeof origin === "string") {
+                optimizer.checkCarbonImport(
+                  {
+                    id: resource,
+                    importer: origin,
+                    specifier:
+                      typeof request === "string" ? request : undefined,
+                  },
+                  compiler.context,
+                );
+              }
+            }
+            continue;
           }
           if (optimizer.isClosed(resource)) {
             const importers: Array<string | undefined> = [];

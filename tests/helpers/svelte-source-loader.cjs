@@ -3,7 +3,7 @@
  * and imports the components it does, so webpack bundles what Svelte would
  * have compiled. A barrel import becomes the component's direct path.
  */
-const SVELTE_IMPORT = /from\s+["'](\.{1,2}\/[^"']+\.svelte)["']/g;
+const SVELTE_IMPORT = /from\s+["']([^"']+\.svelte)["']/g;
 const BARREL_IMPORT =
   /import\s*\{([^}]*)\}\s*from\s*["']carbon-components-svelte["']/g;
 

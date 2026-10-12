@@ -77,7 +77,36 @@ export type ModuleUsage = {
   openApps?: boolean;
   /** `carbon:` context keys the module passes to `setContext`. */
   providedContexts: Set<string>;
+  /** The file it was read from. */
+  file?: string;
+  /** What it imports from Carbon, as read. */
+  carbonImports?: CarbonImports;
 };
+
+/** What a module imports from Carbon, as the analysis read it. */
+export type CarbonImports = {
+  /** Keys of the components it imports, re-exports or loads by path. */
+  components: Set<string>;
+  /** It imports something from the barrel. */
+  barrel: boolean;
+};
+
+/**
+ * Whether the analysis read `usage`'s import of Carbon module `key`
+ * (`index.js` for the barrel). A bundler's module graph with an edge the
+ * analysis didn't read means an import it can't see, such as one through
+ * an alias (`import { Button } from "@carbon"`).
+ */
+export function readCarbonImport(
+  usage: ModuleUsage | undefined,
+  key: string,
+): boolean {
+  if (!usage) return false;
+  if (usage.openAll) return true;
+  const imports = usage.carbonImports;
+  if (!imports) return false;
+  return key === "index.js" ? imports.barrel : imports.components.has(key);
+}
 
 /** The app's own `.svelte` files the analysis reads, for resolving imports of them. */
 export type AppComponents = {
@@ -185,9 +214,15 @@ function readDynamicImports(
       if (CARBON_ARGUMENT.test(code)) bindings.openAll = true;
       continue;
     }
-    if (source === CarbonSvelte.Components) bindings.openAll = true;
+    if (source === CarbonSvelte.Components) {
+      bindings.openAll = true;
+      bindings.carbonImports.barrel = true;
+    }
     const direct = DIRECT_COMPONENT_PATH.exec(source)?.[1];
-    if (direct) bindings.dynamic.push(direct);
+    if (direct) {
+      bindings.dynamic.push(direct);
+      bindings.carbonImports.components.add(direct);
+    }
     const resolved = app && resolveAppImport(app.from, source, app.apps);
     if (resolved) bindings.openAppComponents.push(...resolved.keys);
   }
@@ -234,6 +269,7 @@ type ImportBindings = {
   openAppComponents: string[];
   /** See `ModuleUsage.openApps`. */
   openApps: boolean;
+  carbonImports: CarbonImports;
 };
 
 function newBindings(): ImportBindings {
@@ -246,6 +282,7 @@ function newBindings(): ImportBindings {
     openAll: false,
     openAppComponents: [],
     openApps: false,
+    carbonImports: { components: new Set(), barrel: false },
   };
 }
 
@@ -270,13 +307,18 @@ function readImports(
     const isBarrel = from === CarbonSvelte.Components;
     const directKey = DIRECT_COMPONENT_PATH.exec(from)?.[1];
     const appImport = app && resolveAppImport(app.from, from, app.apps);
+    if (isBarrel) bindings.carbonImports.barrel = true;
+    if (directKey) bindings.carbonImports.components.add(directKey);
 
     if (statement.kind === "export") {
       for (const specifier of statement.specifiers) {
         if (specifier.typeOnly) continue;
         if (isBarrel && specifier.kind !== "named") bindings.openAll = true;
         const key = isBarrel ? carbon.get(specifier.local) : directKey;
-        if (key) bindings.reExported.push(key);
+        if (key) {
+          bindings.reExported.push(key);
+          bindings.carbonImports.components.add(key);
+        }
       }
       if (appImport) bindings.openAppComponents.push(...appImport.keys);
       continue;
@@ -296,7 +338,10 @@ function readImports(
           bindings.namespaces.add(specifier.local);
         } else {
           const key = carbon.get(specifier.imported);
-          if (key) bindings.components.set(specifier.local, key);
+          if (key) {
+            bindings.components.set(specifier.local, key);
+            bindings.carbonImports.components.add(key);
+          }
         }
       } else if (directKey && specifier.kind === "default") {
         bindings.components.set(specifier.local, directKey);
@@ -347,6 +392,8 @@ export function collectScriptUsage(
     openAll: bindings.namespaces.size > 0 || bindings.openAll,
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
+    file,
+    carbonImports: bindings.carbonImports,
   };
 }
 
@@ -364,12 +411,14 @@ export function collectImportedUsage(
   reason: string,
   apps?: AppComponents,
 ): ModuleUsage {
+  const bindings = newBindings();
   const usage: ModuleUsage = {
     sites: [],
     openAll: false,
     providedContexts: providedContexts(code),
+    file,
+    carbonImports: bindings.carbonImports,
   };
-  const bindings = newBindings();
   readDynamicImports(code, bindings, apps && { from: file, apps });
   usage.openAll = bindings.openAll;
   for (const key of bindings.dynamic)
@@ -400,19 +449,23 @@ export function collectImportedUsage(
       const name = specifier.trim();
       if (name === "" || name.startsWith("type ")) continue;
       const key = carbon.get(name.split(IMPORT_AS)[0]);
-      if (key)
+      if (key) {
         usage.sites.push(
           openSite(key, file, locate(code, match.index).line, reason),
         );
+        bindings.carbonImports.components.add(key);
+      }
     }
   }
   for (const match of code.matchAll(BARREL_SPECIFIER)) {
+    bindings.carbonImports.barrel = true;
     if (!understood.has(match.index)) usage.openAll = true;
   }
   for (const match of code.matchAll(DIRECT_COMPONENT_SPECIFIER)) {
     usage.sites.push(
       openSite(match[1], file, locate(code, match.index).line, reason),
     );
+    bindings.carbonImports.components.add(match[1]);
   }
   return usage;
 }
@@ -636,7 +689,7 @@ export function collectSvelteUsage(
   // With the app's components, every file is walked: one can render
   // another, or itself, in ways no text check can rule out.
   if (!apps && !code.includes(CarbonSvelte.Components)) {
-    return { sites: [], openAll: false, providedContexts: new Set() };
+    return { sites: [], openAll: false, providedContexts: new Set(), file };
   }
 
   let ast: AST.Root;
@@ -683,6 +736,8 @@ export function collectSvelteUsage(
     openAll: bindings.openAll,
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
+    file,
+    carbonImports: bindings.carbonImports,
   };
   const rendered = new Set<string>();
   const line = (node: { start: number }) => locate(code, node.start).line;
