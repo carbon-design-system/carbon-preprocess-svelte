@@ -4,9 +4,9 @@ import { LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
 import type { UsageCollector, UsageResult } from "../specializer/analysis";
+import type { LibraryImport } from "../specializer/library";
 import { libraryImports } from "../specializer/module-graph";
 import {
-  type CarbonImport,
   errorMessage,
   isCarbonSvelteImport,
   isCssFile,
@@ -62,7 +62,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
   let analyzer: typeof import("../specializer/analysis") | undefined;
   /** The module graph's edges into Carbon, read in `buildEnd`. */
-  let edges: CarbonImport[] = [];
+  let edges: LibraryImport[] = [];
 
   return {
     name: "vite:carbon:optimize-css",

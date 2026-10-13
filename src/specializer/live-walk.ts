@@ -9,6 +9,7 @@ import {
   spreadProps,
   whyUnknownLater,
 } from "./evaluate";
+import type { ClassTokens } from "./library";
 import type { CallSite } from "./usage";
 import {
   isEmptyArray,
@@ -35,13 +36,6 @@ export type LiveResult = {
 
 /** A walk in progress: what it found, and how it reads class names. */
 type Walk = LiveResult & { tokens: ClassTokens | undefined };
-
-/** How a walk reads class names: see `LibrarySpec.classTokens`. */
-export type ClassTokens = {
-  /** Text that may name a class contains it (`"x--"`). */
-  marker: string;
-  text(text: string): string[];
-};
 
 function addTokens(text: string, result: Walk): void {
   const { tokens } = result;
@@ -76,8 +70,7 @@ export function walkLive(scope: Scope, tokens?: ClassTokens): LiveResult {
   for (const node of [ast.module, ast.instance, ast.fragment]) {
     if (node) visit(node, scope, result);
   }
-  const { classes, prefixes, childSites } = result;
-  return { classes, prefixes, childSites };
+  return result;
 }
 
 function visitAll(nodes: Iterable<Node>, scope: Scope, result: Walk) {

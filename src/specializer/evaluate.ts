@@ -13,6 +13,7 @@ import {
   type GuardedWrite,
   isTopLevel,
   memberKey,
+  propertyName,
 } from "./component-model";
 import { type ComponentUsage, newComponentUsage } from "./usage";
 import {
@@ -34,14 +35,14 @@ import {
   possible,
   readProperty,
   shape,
-  store,
+  storeOf,
   stringify,
   truthOf,
   typeOf,
   UNDEFINED,
   UNKNOWN,
   type Value,
-  valueId,
+  valueKey,
 } from "./values";
 
 /** What `getContext(key)` can return: `undefined` if nothing provides it. */
@@ -174,9 +175,12 @@ function keepIfContained(
     !model.escapes.get(`$$props.${passedAs}`)?.full &&
     !own?.full &&
     !(own?.paths ?? []).some((path) => mayReachObject(value, path));
-  return contained
-    ? value
-    : flatMap(value, (p) => possible(isStructured(p) ? OBJECT : p));
+  return contained ? value : withoutContents(value);
+}
+
+/** `value` with each object whose contents are known as just some object. */
+function withoutContents(value: Value): Value {
+  return flatMap(value, (p) => possible(isStructured(p) ? OBJECT : p));
 }
 
 /** Whether reading `path` from `value` can give an object (or something unknown). */
@@ -305,9 +309,7 @@ function resolve(name: string, scope: Scope): Value {
   // (Svelte doesn't subscribe to a missing store), and a `readable` one's
   // never changes.
   if (name.startsWith("$") && !name.startsWith("$$") && name.length > 1) {
-    const holder = lookup(name.slice(1), scope);
-    if (isOnlyUndefined(holder)) return UNDEFINED;
-    return flatMap(holder, (p) =>
+    return flatMap(lookup(name.slice(1), scope), (p) =>
       isNullish(p) ? UNDEFINED : isStore(p) ? p.value : UNKNOWN,
     );
   }
@@ -663,18 +665,12 @@ function evaluateCall(
       return key === undefined ? UNKNOWN : scope.context(key);
     }
     default: {
-      // `readable(value)` with no start function: a store that never
-      // changes. One holding an object could have it mutated through `$`.
+      // `readable(value)` with no start function: a store that never changes.
       if (
         scope.model.storeImports.get(callee.name) === "readable" &&
         args.length <= 1
       ) {
-        const value = first ? argument() : UNDEFINED;
-        return possible(
-          store(
-            value !== UNKNOWN && [...value].some(isObject) ? UNKNOWN : value,
-          ),
-        );
+        return storeOf(first ? argument() : UNDEFINED);
       }
       const fn = knownFunction(callee.name, scope);
       if (fn) return callValue(fn, args as Node[], scope, scope);
@@ -740,11 +736,11 @@ function callValue(
   callee: Scope,
 ): Value {
   if (args.some((arg) => arg.type === "SpreadElement")) return UNKNOWN;
-  const key = `call:${callee.model.key}:${(fn as { start?: number }).start}`;
+  const key = `call:${callee.model.key}:${fn.start}`;
   if (callee.pending.has(key) || callDepth >= MAX_CALL_DEPTH) return UNKNOWN;
   const values = args.map((arg) => evaluate(arg as Expression, caller));
   // The same call with the same values returns the same.
-  const memoKey = `${key}(${values.map(valueId).join(",")})`;
+  const memoKey = `${key}(${values.map(valueKey).join(",")})`;
   const memoized = caller.memo.get(memoKey);
   if (memoized !== undefined) return memoized;
   const result = runCall(fn, values, callee, key);
@@ -866,10 +862,7 @@ function bindParameter(
       if (!binding) return false;
       // The body may change an object it's handed (`o.push(1)`) before
       // reading it again: some object, contents unknown.
-      locals.set(
-        binding,
-        flatMap(value, (p) => possible(isStructured(p) ? OBJECT : p)),
-      );
+      locals.set(binding, withoutContents(value));
       return true;
     }
     case "AssignmentPattern": {
@@ -979,15 +972,7 @@ function objectShape(
     if (property.type !== "Property" || property.kind !== "init") {
       return possible(OBJECT);
     }
-    const key = property.computed
-      ? property.key.type === "Literal"
-        ? String(property.key.value)
-        : undefined
-      : property.key.type === "Identifier"
-        ? property.key.name
-        : property.key.type === "Literal"
-          ? String(property.key.value)
-          : undefined;
+    const key = propertyName(property);
     if (key === undefined || key === "__proto__") return possible(OBJECT);
     props.set(key, evaluate(property.value as Expression, scope));
   }

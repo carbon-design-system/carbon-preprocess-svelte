@@ -1,9 +1,15 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 import { readPackageExports } from "./exports";
-import type { ClassTokens } from "./live-walk";
-import { resolvePackageDir } from "./package";
+import { requirePackageDir } from "./package";
 import { isSvelteFile, stripQuery } from "./util";
+
+/** How the analysis reads a library's class names: see `LibrarySpec.classTokens`. */
+export type ClassTokens = {
+  /** Text that may name a class contains it (`"x--"`). */
+  marker: string;
+  text(text: string): string[];
+};
 
 /** A Svelte component library the specializer reads and rewrites. */
 export type LibrarySpec = {
@@ -51,17 +57,21 @@ function escapeRegExp(text: string): string {
   return text.replace(REGEXP_SPECIAL, "\\$&");
 }
 
-const patternsCache = new WeakMap<LibrarySpec, ReturnType<typeof patternsOf>>();
+/** `make(spec)`, made once per spec. */
+function perSpec<T>(make: (spec: LibrarySpec) => T): (spec: LibrarySpec) => T {
+  const cache = new WeakMap<LibrarySpec, T>();
+  return (spec) => {
+    let value = cache.get(spec);
+    if (value === undefined) {
+      value = make(spec);
+      cache.set(spec, value);
+    }
+    return value;
+  };
+}
 
 /** The regexes an app module's text is read with for `spec`'s library. */
-export function libraryPatterns(spec: LibrarySpec) {
-  let patterns = patternsCache.get(spec);
-  if (!patterns) {
-    patterns = patternsOf(spec);
-    patternsCache.set(spec, patterns);
-  }
-  return patterns;
-}
+export const libraryPatterns = perSpec(patternsOf);
 
 function patternsOf(spec: LibrarySpec) {
   const name = escapeRegExp(spec.name);
@@ -92,7 +102,7 @@ function patternsOf(spec: LibrarySpec) {
     /** Imports that are components, so passing one as a prop passes an object. */
     componentSource: new RegExp(
       spec.componentPackages.length > 0
-        ? `\\.svelte$|^(?:${spec.componentPackages.map(escape).join("|")})(\\/|$)`
+        ? `\\.svelte$|^(?:${spec.componentPackages.map(escapeRegExp).join("|")})(\\/|$)`
         : "\\.svelte$",
     ),
     /** An import or `require` of it in a file the lexer can't read. */
@@ -179,17 +189,8 @@ export class LibraryPaths {
   }
 }
 
-const pathsCache = new WeakMap<LibrarySpec, LibraryPaths>();
-
 /** `LibraryPaths` for `spec`, made once. */
-export function libraryPaths(spec: LibrarySpec): LibraryPaths {
-  let paths = pathsCache.get(spec);
-  if (!paths) {
-    paths = new LibraryPaths(spec);
-    pathsCache.set(spec, paths);
-  }
-  return paths;
-}
+export const libraryPaths = perSpec((spec) => new LibraryPaths(spec));
 
 /** A library as installed: its root and exported components. */
 export class Library extends LibraryPaths {
@@ -231,7 +232,7 @@ export function libraryAt(spec: LibrarySpec, root: string): Library {
   let cached = componentsCache.get(cacheKey);
   if (cached?.mtimeMs !== mtimeMs) {
     const components = new Map<string, string>();
-    const prefix = `${spec.name}/${spec.srcDir}/`;
+    const prefix = libraryPaths(spec).srcPrefix;
     for (const [name, target] of readPackageExports(root, spec)) {
       if (target.name === "default" && target.path.endsWith(".svelte")) {
         components.set(name, target.path.slice(prefix.length));
@@ -245,9 +246,5 @@ export function libraryAt(spec: LibrarySpec, root: string): Library {
 
 /** `spec`'s library as the project at `projectRoot` installs it. */
 export function loadLibrary(spec: LibrarySpec, projectRoot: string): Library {
-  const root = resolvePackageDir(spec.name, projectRoot);
-  if (!root) {
-    throw new Error(`Could not resolve an installed "${spec.name}" package.`);
-  }
-  return libraryAt(spec, root);
+  return libraryAt(spec, requirePackageDir(spec.name, projectRoot));
 }

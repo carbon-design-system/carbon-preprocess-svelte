@@ -2,12 +2,9 @@ import path from "node:path";
 import { type LexedImport, lexImportsExports } from "sveast/lexer";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
-import {
-  type CarbonExport,
-  isIdentifierName,
-  readCarbonExports,
-} from "../indexer/carbon-exports";
+import { readCarbonExports } from "../indexer/carbon-exports";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
+import { isIdentifierName, type PackageExport } from "../specializer/exports";
 import { MappingsBuilder } from "../specializer/mappings-builder";
 import { errorMessage } from "../utils";
 
@@ -20,7 +17,7 @@ const BARRELS = new Set<string>([
 ]);
 
 /** Carbon's barrel exports, read on first use so icon-only files don't need it installed. */
-export type CarbonExportsLoader = () => ReadonlyMap<string, CarbonExport>;
+export type CarbonExportsLoader = () => ReadonlyMap<string, PackageExport>;
 
 /** `import local from "path"` or `import { name as local } from "path"`. */
 function directImport(local: string, path: string, name: string): string {
@@ -147,9 +144,9 @@ export function transformScript(
 /** Barrel exports of the Carbon a directory resolves; cached per directory and install, warns once. */
 function createCarbonExportsResolver(): (
   dir: string,
-) => ReadonlyMap<string, CarbonExport> {
-  const byDir = new Map<string, ReadonlyMap<string, CarbonExport>>();
-  const byCarbonRoot = new Map<string, ReadonlyMap<string, CarbonExport>>();
+) => ReadonlyMap<string, PackageExport> {
+  const byDir = new Map<string, ReadonlyMap<string, PackageExport>>();
+  const byCarbonRoot = new Map<string, ReadonlyMap<string, PackageExport>>();
   let warned = false;
 
   return (dir) => {

@@ -51,7 +51,7 @@ export type FunctionNode = Extract<
 >;
 
 /** An exported function of one of the library's `.js` modules, and that module. */
-export type Helper = { model: ComponentModel; fn: FunctionNode };
+type Helper = { model: ComponentModel; fn: FunctionNode };
 
 /**
  * What the usage analysis needs to know about one library component, read
@@ -153,10 +153,12 @@ export type ComponentModel = {
  */
 export type Escape = { full: boolean; paths: string[][] };
 
+/** An enclosing `if` test, and whether what it guards is on its true side. */
+type Guard = { test: Expression; holds: boolean };
+
 /** A write `name = value` under `if` conditions in a `$:` statement. */
 export type GuardedWrite = {
-  /** Each enclosing `if` test, and whether the write is on its true side. */
-  guards: Array<{ test: Expression; holds: boolean }>;
+  guards: Guard[];
   value: Expression;
   line: number;
 };
@@ -236,10 +238,12 @@ function libraryResolver(src: string): ImportResolver {
   return (from, source, name) => {
     const component = resolveReExport(src, from, source, name);
     if (component) return { component };
-    const string = resolveStringExport(src, from, source, name);
-    if (string !== undefined) return { string };
     const module = scriptModule(src, from, source);
-    return module ? { helper: () => loadHelper(src, module, name) } : undefined;
+    if (!module) return undefined;
+    const string = stringExport(src, module, name);
+    return string !== undefined
+      ? { string }
+      : { helper: () => loadHelper(src, module, name) };
   };
 }
 
@@ -390,22 +394,15 @@ function resolveReExport(
 }
 
 /**
- * The string `import { name } from source` binds in module `from`, when
- * the `.js` module it names declares it as `export const name = "…"`, on
- * its own line, once. Re-exports aren't followed.
+ * The string `.js` module `module` exports as `name`, when it declares it
+ * as `export const name = "…"`, on its own line, once. Re-exports aren't
+ * followed.
  */
-function resolveStringExport(
+function stringExport(
   src: string,
-  from: string,
-  source: string,
+  module: string,
   name: string,
 ): string | undefined {
-  const joined = path.posix.join(path.posix.dirname(from), source);
-  const module = [joined, `${joined}.js`].find(
-    (candidate) =>
-      candidate.endsWith(".js") && existsSync(path.join(src, candidate)),
-  );
-  if (!module) return undefined;
   const code = readFileSync(path.join(src, module), "utf8");
   const declaration = new RegExp(
     `^export const ${name.replaceAll("$", "\\$")} = (["'])([^"'\\\\\\n]*)\\1;?[ \\t]*$`,
@@ -525,14 +522,15 @@ export function buildComponentModel(
   const reactive = reactiveStatements(ast);
   forEachNode(ast, (node) => {
     switch (node.type) {
-      case "AssignmentExpression":
+      case "AssignmentExpression": {
+        const guards = reactive.get(node);
         if (model.reactiveDeclarations.has(node)) {
           // `$: x = …` defines `x` rather than writing it.
           forEachNode(node.left as Node, (target) => {
             if (target.type === "Identifier") writes.delete(target);
           });
         } else if (
-          (reactive.get(node)?.length ?? 0) > 0 &&
+          guards?.length &&
           node.operator === "=" &&
           node.left.type === "Identifier" &&
           // `$store = …` sets a store other components may share.
@@ -542,16 +540,13 @@ export function buildComponentModel(
           const { name } = node.left;
           writes.delete(node.left);
           const list = model.guardedWrites.get(name) ?? [];
-          list.push({
-            guards: reactive.get(node) ?? [],
-            value: node.right,
-            line: line(node.start),
-          });
+          list.push({ guards, value: node.right, line: line(node.start) });
           model.guardedWrites.set(name, list);
         } else {
           markWritten(node.left, `is assigned at line ${line(node.start)}`);
         }
         break;
+      }
       case "UpdateExpression":
         markWritten(node.argument, `is updated at line ${line(node.start)}`);
         break;
@@ -595,7 +590,7 @@ const CONTEXT_CALL = /\b(?:get|set)Context\b|\bgetAllContexts\b/;
  */
 function readContextFlow(
   model: ComponentModel,
-  reactive: Map<Node, GuardedWrite["guards"]>,
+  reactive: Map<Node, Guard[]>,
 ): void {
   const { ast, code } = model;
   if (!CONTEXT_CALL.test(code)) return;
@@ -640,22 +635,13 @@ function contextObject(
   model: ComponentModel,
   node: Node | undefined,
   parents: Map<Node, Node | null>,
-  reactive: Map<Node, GuardedWrite["guards"]>,
+  reactive: Map<Node, Guard[]>,
 ): Map<string, MirroredStore | null> | null {
   let object = node;
   if (node?.type === "Identifier") {
-    const binding = model.scopes.bindingOf(node);
-    const declarator = binding?.declaration as Node | undefined;
-    if (
-      !binding ||
-      !isTopLevel(binding, model) ||
-      binding.kind !== "const" ||
-      binding.references.length !== 1 ||
-      declarator?.type !== "VariableDeclarator"
-    ) {
-      return null;
-    }
-    object = declarator.init as Node | undefined;
+    const constant = topLevelConstant(model, node);
+    if (constant?.binding.references.length !== 1) return null;
+    object = constant.declarator.init as Node | undefined;
   }
   if (object?.type !== "ObjectExpression") return null;
   const properties = new Map<string, MirroredStore | null>();
@@ -687,8 +673,20 @@ function contextObject(
   return properties;
 }
 
+/** The declaration of `id` when it names a top-level `const`. */
+function topLevelConstant(model: ComponentModel, id: Identifier) {
+  const binding = model.scopes.bindingOf(id);
+  const declarator = binding?.declaration as Node | undefined;
+  return binding &&
+    isTopLevel(binding, model) &&
+    binding.kind === "const" &&
+    declarator?.type === "VariableDeclarator"
+    ? { binding, declarator }
+    : undefined;
+}
+
 /** A property's key, unless it's computed from something other than a literal. */
-function propertyName(property: Extract<Node, { type: "Property" }>) {
+export function propertyName(property: Extract<Node, { type: "Property" }>) {
   if (!property.computed && property.key.type === "Identifier") {
     return property.key.name;
   }
@@ -707,15 +705,12 @@ function mirroredStore(
   id: Identifier,
   holder: Node,
   parents: Map<Node, Node | null>,
-  reactive: Map<Node, GuardedWrite["guards"]>,
+  reactive: Map<Node, Guard[]>,
 ): Omit<MirroredStore, "readOnly"> | null {
-  const binding = model.scopes.bindingOf(id);
-  const declarator = binding?.declaration as Node | undefined;
+  const constant = topLevelConstant(model, id);
+  if (!constant) return null;
+  const { binding, declarator } = constant;
   if (
-    !binding ||
-    !isTopLevel(binding, model) ||
-    binding.kind !== "const" ||
-    declarator?.type !== "VariableDeclarator" ||
     declarator.init?.type !== "CallExpression" ||
     declarator.init.callee.type !== "Identifier" ||
     model.storeImports.get(declarator.init.callee.name) !== "writable" ||
@@ -892,9 +887,9 @@ function onlySubscribed(model: ComponentModel, id: Identifier): boolean {
  * runs under. Any other statement or expression on the way (a loop, `&&`,
  * a function) leaves an expression out.
  */
-function reactiveStatements(ast: AST.Root): Map<Node, GuardedWrite["guards"]> {
-  const found = new Map<Node, GuardedWrite["guards"]>();
-  const visit = (node: Node, guards: GuardedWrite["guards"]): void => {
+function reactiveStatements(ast: AST.Root): Map<Node, Guard[]> {
+  const found = new Map<Node, Guard[]>();
+  const visit = (node: Node, guards: Guard[]): void => {
     switch (node.type) {
       case "BlockStatement":
         for (const statement of node.body) visit(statement as Node, guards);
@@ -1117,16 +1112,16 @@ function readTopLevelStatement(
     return;
   }
 
-  if (
+  const assignment =
     statement.type === "LabeledStatement" &&
     statement.label.name === "$" &&
     statement.body.type === "ExpressionStatement" &&
     statement.body.expression.type === "AssignmentExpression" &&
-    statement.body.expression.operator === "=" &&
-    statement.body.expression.left.type === "ObjectPattern"
-  ) {
+    statement.body.expression.operator === "="
+      ? statement.body.expression
+      : undefined;
+  if (assignment?.left.type === "ObjectPattern") {
     // `$: ({ a, b: c } = f())` defines each name as a read of `f()`.
-    const assignment = statement.body.expression;
     const names = extractIdentifiers(assignment.left as Pattern).map(
       ({ name }) => name,
     );
@@ -1147,20 +1142,8 @@ function readTopLevelStatement(
       undefined,
     );
     model.reactiveDeclarations.add(assignment);
-    return;
-  }
-
-  if (
-    statement.type === "LabeledStatement" &&
-    statement.label.name === "$" &&
-    statement.body.type === "ExpressionStatement" &&
-    statement.body.expression.type === "AssignmentExpression" &&
-    statement.body.expression.operator === "=" &&
-    statement.body.expression.left.type === "Identifier"
-  ) {
-    const assignment = statement.body.expression;
-    const name =
-      assignment.left.type === "Identifier" ? assignment.left.name : "";
+  } else if (assignment?.left.type === "Identifier") {
+    const { name } = assignment.left;
     // `$: $store = …` writes a store; a second definition, or one that
     // redefines a prop or variable, is just another assignment. Either way
     // the name becomes unknown.

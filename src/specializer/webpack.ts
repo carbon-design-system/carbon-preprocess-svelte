@@ -1,34 +1,29 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import type { Failure } from "./analysis";
 import { type LibrarySpec, libraryPaths } from "./library";
 import {
   createComponentOptimizer,
   type ImportResolver,
+  type PluginNames,
   type SpecializerOptions,
 } from "./optimizer";
 import { optimizerRegistry } from "./registry";
-import { isProduction } from "./webpack-mode";
+import { RE_EXT_SVELTE } from "./util";
+import {
+  importEdges,
+  isProduction,
+  moduleSource,
+  type WebpackConnection,
+  type WebpackModule,
+} from "./webpack-util";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
  * this plugin uses, so it works with either bundler without depending on
  * either package.
  */
-type WebpackModule = {
-  resource?: unknown;
-  /** On `NormalModule`: the loader output. */
-  originalSource?: () => { source(): string | Buffer } | null | undefined;
-};
-
 type AsyncHook = {
   tapPromise(name: string, callback: () => Promise<void>): void;
-};
-
-type WebpackConnection = {
-  originModule?: WebpackModule | null;
-  /** `request` is the specifier the import was written with. */
-  dependency?: { type?: string; request?: unknown } | null;
 };
 
 type WebpackCompilation = {
@@ -77,8 +72,6 @@ export type WebpackCompiler = {
   };
 };
 
-const SVELTE_FILE = /\.svelte$/;
-
 /** The compiler's resolver, for aliased imports; `undefined` if it has none. */
 function resolveWith(compiler: WebpackCompiler): ImportResolver | undefined {
   let resolver: ReturnType<
@@ -119,14 +112,8 @@ function resolveWith(compiler: WebpackCompiler): ImportResolver | undefined {
 export class SpecializerWebpackPlugin {
   private spec: LibrarySpec;
   private options: SpecializerOptions;
-  private names: {
-    /** Names the plugin in messages and webpack's hooks. */
-    plugin: string;
-    /** What a failed analysis turns off, for its warning. */
-    failure: Failure;
-    /** The built loader's path. */
-    loader: string;
-  };
+  /** `plugin` also names webpack's hooks; `loader` is the built loader's path. */
+  private names: PluginNames & { loader: string };
 
   public constructor(
     spec: LibrarySpec,
@@ -161,7 +148,7 @@ export class SpecializerWebpackPlugin {
     // `.svelte` file: which of the app's own get rewritten depends on the
     // analysis, and the loader passes the rest through.
     compiler.options.module.rules.push({
-      test: SVELTE_FILE,
+      test: RE_EXT_SVELTE,
       enforce: "pre",
       use: [{ loader: this.names.loader, options: { id } }],
     });
@@ -185,34 +172,18 @@ export class SpecializerWebpackPlugin {
         for (const module of modules) {
           const resource = module.resource;
           if (typeof resource !== "string") continue;
-          let source: string | Buffer | undefined;
-          try {
-            source = module.originalSource?.()?.source();
-          } catch {
-            // Some module types throw when asked for a source.
-          }
-          if (typeof source === "string" || Buffer.isBuffer(source)) {
-            optimizer.check(resource, source.toString(), compiler.context);
+          const code = moduleSource(module);
+          if (code !== undefined) {
+            optimizer.check(resource, code, compiler.context);
           }
           // Every import of the library, as the module graph has it: check
           // the analysis read each one.
           if (library.importKey(resource)) {
-            for (const connection of compilation.moduleGraph.getIncomingConnections(
-              module,
+            for (const edge of importEdges(
+              resource,
+              compilation.moduleGraph.getIncomingConnections(module),
             )) {
-              const origin = connection.originModule?.resource;
-              const request = connection.dependency?.request;
-              if (typeof origin === "string") {
-                optimizer.checkLibraryImport(
-                  {
-                    id: resource,
-                    importer: origin,
-                    specifier:
-                      typeof request === "string" ? request : undefined,
-                  },
-                  compiler.context,
-                );
-              }
+              optimizer.checkLibraryImport(edge, compiler.context);
             }
             continue;
           }

@@ -12,9 +12,9 @@ import {
   evaluate,
   type Scope,
 } from "./evaluate";
-import type { Library } from "./library";
+import type { ClassTokens, Library } from "./library";
 import { listJsAndSvelteFiles } from "./list-files";
-import { type ClassTokens, walkLive } from "./live-walk";
+import { type LiveResult, walkLive } from "./live-walk";
 import { packageSignature } from "./package";
 import {
   addCallSite,
@@ -23,12 +23,11 @@ import {
   newComponentUsage,
 } from "./usage";
 import {
-  isObject,
   join,
   possible,
   sameValue,
   shape,
-  store,
+  storeOf,
   UNDEFINED,
   UNKNOWN,
   type Value,
@@ -165,12 +164,12 @@ function contextValues(
     const scope = createScope(model, usage, resolver);
     for (const [contextKey, objects] of model.contextObjects) {
       const leaked = leaks.get(contextKey);
+      if (!objects.every((object) => object !== null)) {
+        unflowable.add(contextKey);
+        continue;
+      }
       let value = values.get(contextKey) ?? UNDEFINED;
       for (const object of objects) {
-        if (!object) {
-          unflowable.add(contextKey);
-          break;
-        }
         const props = new Map<string, Value>();
         for (const [property, mirrored] of object) {
           const flows =
@@ -190,11 +189,10 @@ function contextValues(
 /** What a `MirroredStore` holds: its initial value or any of its writes. */
 function storeValue(mirrored: MirroredStore, scope: Scope): Value {
   let value = mirrored.initial ? evaluate(mirrored.initial, scope) : UNDEFINED;
-  for (const write of mirrored.writes)
+  for (const write of mirrored.writes) {
     value = join(value, evaluate(write, scope));
-  // A store holding an object could have it changed through `$s`.
-  if (value !== UNKNOWN && [...value].some(isObject)) value = UNKNOWN;
-  return possible(store(value));
+  }
+  return storeOf(value);
 }
 
 function sameValues(a: ContextValues, b: ContextValues): boolean {
@@ -205,6 +203,14 @@ function sameValues(a: ContextValues, b: ContextValues): boolean {
   }
   return true;
 }
+
+/** What the rendered components provide, as one round of `runPass` reads it. */
+type ProvidedContexts = {
+  keys: Set<string>;
+  /** A rendered component passes `setContext` a key the analysis can't read. */
+  unknown: boolean;
+  values: ContextValues;
+};
 
 type Pass = {
   usages: Map<string, ComponentUsage>;
@@ -222,27 +228,24 @@ type Pass = {
 function runPass(
   modelOf: (key: string) => ComponentModel,
   roots: CallSite[],
-  context: (
-    provided: Set<string>,
-    providesUnknown: boolean,
-    values: ContextValues,
-  ) => ContextResolver,
+  context: (provided: ProvidedContexts) => ContextResolver,
   excluded: ReadonlySet<string>,
   /** Whether stores may flow through contexts (see `contextValues`). */
   flowContexts: boolean,
   /** How the library's class names are read, if at all. */
   classTokens: ClassTokens | undefined,
 ): Pass {
-  let provided = new Set<string>();
-  // A rendered component passes `setContext` a key the analysis can't read.
-  let providesUnknown = false;
-  let values: ContextValues = new Map();
+  let provided: ProvidedContexts = {
+    keys: new Set(),
+    unknown: false,
+    values: new Map(),
+  };
   for (let round = 0; ; round++) {
     const usages = new Map<string, ComponentUsage>();
-    const live = new Map<string, ReturnType<typeof walkLive>>();
+    const live = new Map<string, LiveResult>();
     // A component queued twice is walked once, with its usage as it is then.
     const queue = new Set<string>();
-    const resolver = context(provided, providesUnknown, values);
+    const resolver = context(provided);
 
     const enqueue = (site: CallSite) => {
       const model = modelOf(site.component);
@@ -273,21 +276,25 @@ function runPass(
 
     // `getContext` reads `undefined` unless a rendered component provides
     // it. Rendering more can provide more, so repeat until that settles.
-    const next = new Set(provided);
-    let nextUnknown: boolean = providesUnknown;
+    const next: ProvidedContexts = {
+      keys: new Set(provided.keys),
+      unknown: provided.unknown,
+      values:
+        flowContexts && round < MAX_CONTEXT_ROUNDS
+          ? contextValues(modelOf, usages, resolver)
+          : new Map(),
+    };
     for (const key of usages.keys()) {
       const model = modelOf(key);
-      for (const contextKey of model.providedContexts) next.add(contextKey);
-      nextUnknown ||= model.providesUnknownContext;
+      for (const contextKey of model.providedContexts) {
+        next.keys.add(contextKey);
+      }
+      next.unknown ||= model.providesUnknownContext;
     }
-    const nextValues =
-      flowContexts && round < MAX_CONTEXT_ROUNDS
-        ? contextValues(modelOf, usages, resolver)
-        : new Map<string, Value>();
     if (
-      next.size === provided.size &&
-      nextUnknown === providesUnknown &&
-      sameValues(values, nextValues)
+      next.keys.size === provided.keys.size &&
+      next.unknown === provided.unknown &&
+      sameValues(provided.values, next.values)
     ) {
       const classes = new Set<string>();
       const prefixes = new Set<string>();
@@ -298,8 +305,6 @@ function runPass(
       return { usages, resolver, classes, prefixes };
     }
     provided = next;
-    providesUnknown = nextUnknown;
-    values = nextValues;
   }
 }
 
@@ -392,14 +397,14 @@ export async function analyzeUsage(input: {
     }
   }
 
+  const unknownKeys = appProvidesUnknown || sources.unknownScriptContext;
   const precise = runPass(
     modelOf,
     roots,
-    (provided, providesUnknown, values) => (key) => {
+    (provided) => (key) => {
       if (
-        providesUnknown ||
-        appProvidesUnknown ||
-        sources.unknownScriptContext ||
+        provided.unknown ||
+        unknownKeys ||
         appContexts.has(key) ||
         sources.scriptContexts.has(key) ||
         // A key set some way this scan can't see (a constant, a helper).
@@ -407,8 +412,8 @@ export async function analyzeUsage(input: {
       ) {
         return UNKNOWN;
       }
-      if (!provided.has(key)) return UNDEFINED;
-      return values.get(key) ?? UNKNOWN;
+      if (!provided.keys.has(key)) return UNDEFINED;
+      return provided.values.get(key) ?? UNKNOWN;
     },
     excluded,
     !sources.scriptReadsContext && !appReadsContext,

@@ -58,6 +58,15 @@ export function resolvePackageDir(
   return undefined;
 }
 
+/** `resolvePackageDir`, throwing when `name` isn't installed. */
+export function requirePackageDir(name: string, from?: string): string {
+  const dir = resolvePackageDir(name, from);
+  if (!dir) {
+    throw new Error(`Could not resolve an installed "${name}" package.`);
+  }
+  return dir;
+}
+
 /** Major version of the installed package `name`, if it resolves. */
 export function installedMajor(
   name: string,
@@ -65,21 +74,31 @@ export function installedMajor(
 ): number | undefined {
   const dir = resolvePackageDir(name, from);
   if (!dir) return undefined;
+  const major = Number.parseInt(String(readVersion(dir)), 10);
+  return Number.isNaN(major) ? undefined : major;
+}
+
+/** The `version` in the `package.json` at `root`, if it reads. */
+function readVersion(root: string): unknown {
   try {
-    const { version } = JSON.parse(
-      readFileSync(path.join(dir, "package.json"), "utf8"),
-    ) as { version?: unknown };
-    const major = Number.parseInt(String(version), 10);
-    return Number.isNaN(major) ? undefined : major;
+    return (
+      JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as {
+        version?: unknown;
+      }
+    ).version;
   } catch {
     return undefined;
   }
 }
 
+/** Whether real path `real` is a linked checkout: see `isLinkedCheckout`. */
+const isLinked = (real: string) =>
+  !real.split(path.sep).includes("node_modules");
+
 /** A checkout linked in (`bun link`, `workspace:`) rather than installed: its source changes under a fixed version, so a cache would go stale. */
 export function isLinkedCheckout(root: string): boolean {
   try {
-    return !realpathSync(root).split(path.sep).includes("node_modules");
+    return isLinked(realpathSync(root));
   } catch {
     return false;
   }
@@ -94,14 +113,7 @@ export async function packageSignature(
   root: string,
   srcDir: string,
 ): Promise<string> {
-  let version: unknown;
-  try {
-    ({ version } = JSON.parse(
-      readFileSync(path.join(root, "package.json"), "utf8"),
-    ) as { version?: unknown });
-  } catch {
-    // Unversioned: only its sources tell it apart.
-  }
+  const version = readVersion(root);
   let real: string;
   try {
     real = realpathSync(root);
@@ -109,8 +121,8 @@ export async function packageSignature(
     return "";
   }
   let signature = `${real}@${String(version)}`;
-  const linked = !real.split(path.sep).includes("node_modules");
-  if (version !== undefined && !linked) return signature;
+  if (version !== undefined && !isLinked(real)) return signature;
+  // Linked or unversioned: only its sources tell it apart.
   const src = path.join(root, srcDir);
   try {
     for (const file of await listJsAndSvelteFiles(src)) {

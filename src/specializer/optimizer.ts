@@ -1,10 +1,19 @@
 import { createHash } from "node:crypto";
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import type { Failure, SpecializedComponents } from "./analysis";
+import type {
+  Failure,
+  RewrittenSource,
+  SpecializedComponents,
+} from "./analysis";
 import { importKey } from "./import-key";
 import { collectLibraryImports } from "./imports";
-import { type LibraryImport, type LibrarySpec, libraryPaths } from "./library";
+import {
+  type LibraryImport,
+  type LibraryPaths,
+  type LibrarySpec,
+  libraryPaths,
+} from "./library";
 import { installedMajor } from "./package";
 import { RE_EXT_STYLESHEET, stripQuery } from "./util";
 
@@ -59,6 +68,10 @@ const LEXABLE = /\.(svelte|[cm]?[jt]sx?)$/;
 const isInNodeModules = (file: string) =>
   file.split(PATH_SEPARATOR).includes("node_modules");
 
+/** Whether module `id`, `file` without its query, has no file on disk. */
+const isVirtual = (id: string, file: string) =>
+  id.startsWith("\0") || !path.isAbsolute(file);
+
 /** Files matching `patterns`, skipping `node_modules` unless a pattern names it. */
 function globContent(patterns: string[], cwd: string): string[] {
   const named = patterns.filter((pattern) => pattern.includes("node_modules"));
@@ -74,23 +87,25 @@ function globContent(patterns: string[], cwd: string): string[] {
 }
 
 /**
- * Whether module `code` imports one of `spec`'s components. Virtual
+ * Whether module `code` imports one of `library`'s components. Virtual
  * modules are JavaScript, so they're lexed too: one that only mentions
  * the package (data, a path, `package.json`) doesn't count. In a file
  * the lexer can't read (Markdown, MDX, Astro), any import of it counts.
  */
 function importsLibrary(
-  spec: LibrarySpec,
+  library: LibraryPaths,
   file: string,
   code: string,
-  virtual = false,
+  virtual: boolean,
 ): boolean {
-  if (!code.includes(spec.name)) return false;
+  if (!code.includes(library.name)) return false;
   if (!virtual && !LEXABLE.test(file)) {
-    return libraryPaths(spec).patterns.importText.test(code);
+    return library.patterns.importText.test(code);
   }
   const imported = new Set<string>();
-  return collectLibraryImports(spec, code, imported) || imported.size > 0;
+  return (
+    collectLibraryImports(library.spec, code, imported) || imported.size > 0
+  );
 }
 
 /** `file` relative to `root`, through symlinks when `file` exists. */
@@ -129,7 +144,7 @@ const ALIAS_SVELTE_IMPORT =
  * `files`, by `importKey`.
  */
 async function resolveAliases(
-  spec: LibrarySpec,
+  library: LibraryPaths,
   files: Array<{ file: string; code: string }>,
   resolve: ImportResolver,
 ): Promise<Map<string, string>> {
@@ -142,7 +157,7 @@ async function resolveAliases(
     if (!code.includes(".svelte")) continue;
     for (const match of code.matchAll(ALIAS_SVELTE_IMPORT)) {
       const source = match[1];
-      if (libraryPaths(spec).isComponentFile(source)) continue;
+      if (library.isComponentFile(source)) continue;
       pending.push(
         resolve(source, file).then(
           (id) => {
@@ -160,11 +175,13 @@ async function resolveAliases(
   return resolved;
 }
 
-/** A rewritten component, as a bundler's `load` returns it. */
-export type RewrittenSource =
-  SpecializedComponents["sources"] extends Map<string, infer Source>
-    ? Source
-    : never;
+/** How the plugins name themselves in messages. */
+export type PluginNames = {
+  /** Names the plugin in messages. */
+  plugin: string;
+  /** What a failed analysis turns off, for its warning. */
+  failure: Failure;
+};
 
 /**
  * What the Vite and webpack plugins share: analyze `content` before a
@@ -174,12 +191,7 @@ export type RewrittenSource =
 export function createComponentOptimizer(
   spec: LibrarySpec,
   options: SpecializerOptions | undefined,
-  names: {
-    /** Names the plugin in messages. */
-    plugin: string;
-    /** What a failed analysis turns off, for its warning. */
-    failure: Failure;
-  },
+  names: PluginNames,
 ) {
   const name = names.plugin;
   const { label } = spec;
@@ -255,7 +267,7 @@ export function createComponentOptimizer(
       }
 
       const resolvedImports = resolve
-        ? await resolveAliases(spec, files, resolve)
+        ? await resolveAliases(library, files, resolve)
         : undefined;
       for (const [key, file] of resolvedImports ?? []) {
         hash.update(`${key}\0${file}\0`);
@@ -326,10 +338,10 @@ export function createComponentOptimizer(
         return;
       }
       if (analyzed.has(real(file) ?? file)) return;
-      const isVirtual = id.startsWith("\0") || !path.isAbsolute(file);
-      if (!importsLibrary(spec, file, code, isVirtual)) return;
+      const unbacked = isVirtual(id, file);
+      if (!importsLibrary(library, file, code, unbacked)) return;
       // Named as the app imports it, without Rollup's `\0` prefix.
-      if (isVirtual) virtual.add(id.replace(ROLLUP_VIRTUAL_PREFIX, ""));
+      if (unbacked) virtual.add(id.replace(ROLLUP_VIRTUAL_PREFIX, ""));
       else missed.add(relativeTo(root, file, real));
     },
 
@@ -382,7 +394,7 @@ export function createComponentOptimizer(
       const { id, importer, specifier } = edge;
       const file = stripQuery(importer);
       if (!library.importKey(id) || library.moduleKey(file)) return;
-      if (importer.startsWith("\0") || !path.isAbsolute(file)) {
+      if (isVirtual(importer, file)) {
         virtual.add(importer.replace(ROLLUP_VIRTUAL_PREFIX, ""));
         return;
       }

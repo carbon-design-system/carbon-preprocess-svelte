@@ -1,8 +1,11 @@
 import type { Plugin } from "vite";
-import type { Failure } from "./analysis";
 import type { LibrarySpec } from "./library";
 import { libraryImports } from "./module-graph";
-import { createComponentOptimizer, type SpecializerOptions } from "./optimizer";
+import {
+  createComponentOptimizer,
+  type PluginNames,
+  type SpecializerOptions,
+} from "./optimizer";
 
 /**
  * Vite, Rollup and Rolldown plugin that rewrites each component of `spec`'s
@@ -17,14 +20,8 @@ import { createComponentOptimizer, type SpecializerOptions } from "./optimizer";
 export function specializerPlugin(
   spec: LibrarySpec,
   options: SpecializerOptions | undefined,
-  names: {
-    /** The plugin's name in the bundler. */
-    id: string;
-    /** Names the plugin in messages. */
-    plugin: string;
-    /** What a failed analysis turns off, for its warning. */
-    failure: Failure;
-  },
+  /** `id` is the plugin's name in the bundler. */
+  names: PluginNames & { id: string },
 ): Plugin {
   let root = process.cwd();
   const optimizer = createComponentOptimizer(spec, options, names);

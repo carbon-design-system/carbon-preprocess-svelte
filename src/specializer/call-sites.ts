@@ -52,7 +52,7 @@ export type ModuleUsage = {
   providedContexts: Set<string>;
   /**
    * It calls `setContext` with what may be a library key it doesn't
-   * spell out (see `providesUnknownContext`).
+   * spell out (see `contextUsage`).
    */
   providesUnknownContext?: boolean;
   /**
@@ -68,7 +68,7 @@ export type ModuleUsage = {
 };
 
 /** What a module imports from the library, as the analysis read it. */
-export type LibraryImports = {
+type LibraryImports = {
   /** Keys of the components it imports, re-exports or loads by path. */
   components: Set<string>;
   /** It imports something from the barrel. */
@@ -77,7 +77,7 @@ export type LibraryImports = {
 
 /**
  * Whether the analysis read `usage`'s import of library module `key`
- * (`index.js` for the barrel). A bundler's module graph with an edge the
+ * (`library.barrelKey` for the barrel). A bundler's module graph with an edge the
  * analysis didn't read means an import it can't see, such as one through
  * an alias (`import { Button } from "@lib"`).
  */
@@ -221,33 +221,33 @@ const SCRIPT_FILE = /\.[cm]?[jt]sx?$/;
 const IMPORT_AS = /\s+as\s+/;
 const SVELTE_SPECIFIER = /(["'])([^"'\n]+\.svelte)\1/g;
 
-function providedContexts(library: Library, code: string): Set<string> {
-  const keys = new Set<string>();
-  if (!code.includes(library.spec.contextKeyPrefix)) return keys;
-  for (const match of code.matchAll(library.patterns.contextKey))
-    keys.add(match[2]);
-  return keys;
-}
-
 /**
- * Whether a key the module passes `setContext` may be a library key that
- * `providedContexts` can't see: one held by the library's script modules, or
- * built from parts (`library.spec.contextKeyPrefix + name`).
+ * The library contexts module `code` may provide or read. A key it passes
+ * `setContext` may be one `providedContexts` can't see: held by the
+ * library's script modules, or built from parts (`prefix + name`).
  */
-function providesUnknownContext(library: Library, code: string): boolean {
-  if (!code.includes("setContext")) return false;
-  if (library.patterns.scriptSpecifier.test(code)) return true;
-  const mentions = code.split(library.spec.contextKeyPrefix).length - 1;
-  return mentions > [...code.matchAll(library.patterns.contextKey)].length;
-}
-
-function readsLibraryContext(library: Library, code: string): boolean {
-  if (code.includes("getAllContexts")) return true;
-  return (
-    code.includes("getContext") &&
-    (code.includes(library.spec.contextKeyPrefix) ||
-      library.patterns.scriptSpecifier.test(code))
-  );
+function contextUsage(
+  library: Library,
+  code: string,
+): Pick<
+  ModuleUsage,
+  "providedContexts" | "providesUnknownContext" | "readsLibraryContext"
+> {
+  const prefix = library.spec.contextKeyPrefix;
+  const keys = code.includes(prefix)
+    ? [...code.matchAll(library.patterns.contextKey)].map((match) => match[2])
+    : [];
+  const importsScript = () => library.patterns.scriptSpecifier.test(code);
+  return {
+    providedContexts: new Set(keys),
+    providesUnknownContext:
+      code.includes("setContext") &&
+      (importsScript() || code.split(prefix).length - 1 > keys.length),
+    readsLibraryContext:
+      code.includes("getAllContexts") ||
+      (code.includes("getContext") &&
+        (code.includes(prefix) || importsScript())),
+  };
 }
 
 type ImportBindings = {
@@ -396,9 +396,7 @@ export function collectScriptUsage(
     ].map((key) => openSite(key, file, 1, reason)),
     openAll: bindings.namespaces.size > 0 || bindings.openAll,
     openApps: bindings.openApps,
-    providedContexts: providedContexts(library, code),
-    providesUnknownContext: providesUnknownContext(library, code),
-    readsLibraryContext: readsLibraryContext(library, code),
+    ...contextUsage(library, code),
     file,
     libraryImports: bindings.libraryImports,
   };
@@ -422,9 +420,7 @@ export function collectImportedUsage(
   const usage: ModuleUsage = {
     sites: [],
     openAll: false,
-    providedContexts: providedContexts(library, code),
-    providesUnknownContext: providesUnknownContext(library, code),
-    readsLibraryContext: readsLibraryContext(library, code),
+    ...contextUsage(library, code),
     file,
     libraryImports: bindings.libraryImports,
   };
@@ -436,8 +432,8 @@ export function collectImportedUsage(
     // Every `.svelte` path it names, imported or not, renders with any props.
     usage.openApps = bindings.openApps;
     for (const match of code.matchAll(SVELTE_SPECIFIER)) {
-      for (const key of resolveAppImport(library, file, match[2], apps)?.keys ??
-        []) {
+      const resolved = resolveAppImport(library, file, match[2], apps);
+      for (const key of resolved?.keys ?? []) {
         usage.sites.push(
           openSite(key, file, locate(code, match.index).line, reason),
         );
@@ -699,7 +695,7 @@ export function collectSvelteUsage(
   // With the app's components, every file is walked: one can render
   // another, or itself, in ways no text check can rule out.
   if (!apps && !code.includes(library.name)) {
-    return { sites: [], openAll: false, providedContexts: new Set(), file };
+    return { sites: [], openAll: false, ...contextUsage(library, code), file };
   }
 
   let ast: AST.Root;
@@ -745,9 +741,7 @@ export function collectSvelteUsage(
     ],
     openAll: bindings.openAll,
     openApps: bindings.openApps,
-    providedContexts: providedContexts(library, code),
-    providesUnknownContext: providesUnknownContext(library, code),
-    readsLibraryContext: readsLibraryContext(library, code),
+    ...contextUsage(library, code),
     file,
     libraryImports: bindings.libraryImports,
   };
