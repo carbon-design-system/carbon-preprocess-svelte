@@ -74,10 +74,17 @@ export type ComponentModel = {
   componentImports: Map<string, string>;
   /** Every other imported binding. */
   otherImports: Set<string>;
+  /**
+   * Imported bindings of a Carbon module's `export const NAME = "…"`, by
+   * local name: the strings a context key can be (see `contextKey`).
+   */
+  importedStrings: Map<string, string>;
   /** Bindings imported from `svelte/store`, by local name: `readable`. */
   storeImports: Map<string, string>;
-  /** Keys this component passes to `setContext` as string literals. */
+  /** Keys this component passes to `setContext` (see `contextKey`). */
   providedContexts: Set<string>;
+  /** It passes `setContext` a key the analysis can't read. */
+  providesUnknownContext: boolean;
   /**
    * How each name's value can reach code that might mutate it, which
    * decides whether an object or array literal it holds stays known (see
@@ -159,24 +166,33 @@ export function loadComponentModel(
   const model = buildComponentModel(
     readFileSync(file, "utf8"),
     key,
-    (from, source, name) => resolveReExport(carbonSrc, from, source, name),
+    (from, source, name) => {
+      const component = resolveReExport(carbonSrc, from, source, name);
+      if (component) return { component };
+      const string = resolveStringExport(carbonSrc, from, source, name);
+      return string === undefined ? undefined : { string };
+    },
   );
   cache.set(file, { mtimeMs, model });
   return model;
 }
 
 /**
- * The Carbon component that `import { name } from source` binds in module
- * `from`, following `.js` barrels like `ListBox/index.js`.
+ * What `import { name } from source` binds in module `from`: a Carbon
+ * component, or the string a Carbon module's `export const` holds.
  */
 type ImportResolver = (
   from: string,
   source: string,
   name: string,
-) => string | undefined;
+) => { component: string } | { string: string } | undefined;
 
 const MAX_BARREL_HOPS = 4;
 
+/**
+ * The Carbon component that `import { name } from source` binds in module
+ * `from`, following `.js` barrels like `ListBox/index.js`.
+ */
 function resolveReExport(
   carbonSrc: string,
   from: string,
@@ -212,6 +228,32 @@ function resolveReExport(
   return undefined;
 }
 
+/**
+ * The string `import { name } from source` binds in module `from`, when
+ * the `.js` module it names declares it as `export const name = "…"`, on
+ * its own line, once. Re-exports aren't followed.
+ */
+function resolveStringExport(
+  carbonSrc: string,
+  from: string,
+  source: string,
+  name: string,
+): string | undefined {
+  const joined = path.posix.join(path.posix.dirname(from), source);
+  const module = [joined, `${joined}.js`].find(
+    (candidate) =>
+      candidate.endsWith(".js") && existsSync(path.join(carbonSrc, candidate)),
+  );
+  if (!module) return undefined;
+  const code = readFileSync(path.join(carbonSrc, module), "utf8");
+  const declaration = new RegExp(
+    `^export const ${name.replaceAll("$", "\\$")} = (["'])([^"'\\\\\\n]*)\\1;?[ \\t]*$`,
+    "gm",
+  );
+  const matches = [...code.matchAll(declaration)];
+  return matches.length === 1 ? matches[0][2] : undefined;
+}
+
 export function buildComponentModel(
   code: string,
   key: string,
@@ -233,8 +275,10 @@ export function buildComponentModel(
     unknownReasons: new Map(),
     componentImports: new Map(),
     otherImports: new Set(),
+    importedStrings: new Map(),
     storeImports: new Map(),
     providedContexts: new Set(),
+    providesUnknownContext: false,
     escapes: findEscapes(ast),
   };
 
@@ -331,15 +375,13 @@ export function buildComponentModel(
         );
         break;
       case "CallExpression":
-        if (node.callee.type === "Identifier") {
-          const [first] = node.arguments;
-          if (
-            node.callee.name === "setContext" &&
-            first?.type === "Literal" &&
-            typeof first.value === "string"
-          ) {
-            model.providedContexts.add(first.value);
-          }
+        if (
+          node.callee.type === "Identifier" &&
+          node.callee.name === "setContext"
+        ) {
+          const key = contextKey(node.arguments[0] as Node | undefined, model);
+          if (key === undefined) model.providesUnknownContext = true;
+          else model.providedContexts.add(key);
         }
         break;
     }
@@ -477,12 +519,18 @@ function readTopLevelStatement(
               specifier.imported.type === "Identifier"
             ? specifier.imported.name
             : undefined;
-      const key =
+      const resolved =
         source.startsWith(".") && imported
           ? resolveImport(model.key, source, imported)
           : undefined;
-      if (key) model.componentImports.set(specifier.local.name, key);
-      else model.otherImports.add(specifier.local.name);
+      if (resolved && "component" in resolved) {
+        model.componentImports.set(specifier.local.name, resolved.component);
+      } else {
+        model.otherImports.add(specifier.local.name);
+        if (resolved) {
+          model.importedStrings.set(specifier.local.name, resolved.string);
+        }
+      }
       if (source === "svelte/store" && imported) {
         model.storeImports.set(specifier.local.name, imported);
       }
@@ -786,6 +834,25 @@ function topLevelBindings(scopes: Scopes): Binding[] {
     bindings.push(...scopes.module.declarations.values());
   }
   return bindings;
+}
+
+/**
+ * The key a `getContext` or `setContext` call passes as `node`: a string
+ * literal, or an imported `export const` string (`FORM_CONTEXT_KEY`).
+ * `undefined` for anything else.
+ */
+export function contextKey(
+  node: Node | undefined,
+  model: ComponentModel,
+): string | undefined {
+  if (node?.type === "Literal") {
+    return typeof node.value === "string" ? node.value : undefined;
+  }
+  if (node?.type !== "Identifier") return undefined;
+  const binding = model.scopes.bindingOf(node);
+  return binding && isTopLevel(binding, model)
+    ? model.importedStrings.get(node.name)
+    : undefined;
 }
 
 /**
