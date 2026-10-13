@@ -2,13 +2,10 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { version as OWN_VERSION } from "../../package.json";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
+import { isLinkedCheckout } from "../specializer/package";
 import { errorMessage } from "../utils";
 import type { ComponentIndex } from "./build-index";
-import {
-  carbonSignature,
-  isLinkedCheckout,
-  resolveCarbonRoot,
-} from "./resolve-carbon-root";
+import { carbonSignature, resolveCarbonRoot } from "./resolve-carbon-root";
 
 const CACHE_DIRNAME = ".cache/carbon-preprocess-svelte";
 

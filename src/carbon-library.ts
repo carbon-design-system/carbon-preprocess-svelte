@@ -1,6 +1,7 @@
-import { CarbonSvelte } from "./constants";
+import { CarbonSvelte, PACKAGE_NAME } from "./constants";
 import { extractCarbonClassTokens } from "./indexer/extract-runtime-classes";
 import { collectCarbonTokens } from "./plugins/scan-content";
+import type { Failure } from "./specializer/analysis";
 import type { LibrarySpec } from "./specializer/library";
 
 /** Carbon, as the specializer reads and rewrites it. */
@@ -11,7 +12,7 @@ export const CARBON: LibrarySpec = {
   componentPackages: [CarbonSvelte.Icons, CarbonSvelte.Pictograms],
   contextKeyPrefix: "carbon:",
   label: "Carbon",
-  tool: "carbon-preprocess-svelte",
+  tool: PACKAGE_NAME,
   classTokens: {
     marker: "bx--",
     text: (text) => extractCarbonClassTokens(text),
@@ -23,10 +24,10 @@ export const CARBON: LibrarySpec = {
 export const PROP_AWARE_FAILURE = {
   feature: "propAware",
   fallback: "Carbon CSS was pruned without it",
-};
+} satisfies Failure;
 
 /** What the usage analysis turns off when it fails, for `optimizeComponents`. */
 export const SPECIALIZE_FAILURE = {
   feature: "optimizeComponents",
   fallback: "Carbon components were bundled unchanged",
-};
+} satisfies Failure;

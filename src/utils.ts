@@ -25,51 +25,6 @@ export function isCarbonSvelteImport(id: string) {
   return isSvelteFile(id) && RE_CARBON_COMPONENTS_SEGMENT.test(id);
 }
 
-const SRC_SEGMENT = /(?:^|[\\/])carbon-components-svelte[\\/]src[\\/](.+)$/;
-const BACKSLASH = /\\/g;
-
-/** `…/carbon-components-svelte/src/Button/Button.svelte` -> `Button/Button.svelte`. */
-export function carbonModuleKey(id: string): string | undefined {
-  return SRC_SEGMENT.exec(id)?.[1].replace(BACKSLASH, "/");
-}
-
-/** The barrel, `src/index.js`, as `carbonModuleKey` names it. */
-export const CARBON_BARREL_KEY = "index.js";
-
-/**
- * `carbonModuleKey` of a Carbon component or the barrel: the modules whose
- * imports the analysis reads. `undefined` for any other module.
- */
-export function carbonImportKey(id: string): string | undefined {
-  const key = carbonModuleKey(stripQuery(id));
-  return key && (key === CARBON_BARREL_KEY || isSvelteFile(key))
-    ? key
-    : undefined;
-}
-
-/**
- * One import of a Carbon component or the barrel, an edge of the bundler's
- * module graph: `id` is the Carbon module, `specifier` what `importer`
- * wrote, when the bundler says.
- */
-export type CarbonImport = {
-  id: string;
-  importer: string;
-  specifier?: string;
-};
-
-/**
- * Whether `specifier` names Carbon as the analysis reads it. Any other
- * import that resolves into Carbon (a bundler alias like `@carbon`) is
- * one the analysis can't see.
- */
-export function isCarbonSpecifier(specifier: string): boolean {
-  return (
-    specifier === CarbonSvelte.Components ||
-    specifier.startsWith(`${CarbonSvelte.Components}/`)
-  );
-}
-
 /**
  * Whether a bundled module's code should be scanned for literal `bx--`
  * tokens. Skips virtual modules (`\0` prefix), stylesheets (see

@@ -15,10 +15,12 @@ import {
   type Library,
   type LibraryImport,
   type LibrarySpec,
+  libraryPaths,
   loadLibrary,
 } from "./library";
 import { type SourceMap, toSourceMap } from "./mapped-text";
 import { type SpecializeOptions, specializeComponent } from "./specialize";
+import type { CallSite } from "./usage";
 import { errorMessage, isSvelteFile, stripQuery } from "./util";
 import { formatValue, UNKNOWN } from "./values";
 
@@ -36,11 +38,11 @@ export type UsageResult = {
 export type Failure = { feature: string; fallback: string };
 
 function failure(
-  library: LibrarySpec,
+  spec: LibrarySpec,
   error: unknown,
   { feature, fallback }: Failure,
 ): string {
-  return `${library.tool}: ${feature} could not analyze this build (${errorMessage(error)}); ${fallback}.`;
+  return `${libraryPaths(spec).logPrefix} ${feature} could not analyze this build (${errorMessage(error)}); ${fallback}.`;
 }
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/;
@@ -51,7 +53,7 @@ const NODE_MODULES = /[\\/]node_modules[\\/]/;
  * `undefined` for a `.svelte` file's sub-module (`?svelte&type=style`).
  */
 function readModuleSource(
-  library: LibrarySpec,
+  spec: LibrarySpec,
   id: string,
   code: string,
 ): { file: string; code: string } | undefined {
@@ -59,7 +61,7 @@ function readModuleSource(
   if (!isSvelteFile(file)) {
     // A dependency can't import the app's own components, and its
     // computed `import()`s aren't the app's: read it for the library only.
-    if (NODE_MODULES.test(file) && !code.includes(library.name)) {
+    if (NODE_MODULES.test(file) && !code.includes(spec.name)) {
       return undefined;
     }
     return { file, code };
@@ -107,7 +109,7 @@ export function createUsageCollector(
     async analyze(
       bundledIds: Iterable<string>,
       options: UsageOptions,
-      imports: Iterable<LibraryImport> = [],
+      imports: Iterable<LibraryImport>,
     ): Promise<UsageResult | { warning: string }> {
       try {
         const bundled = new Set<string>();
@@ -137,6 +139,21 @@ export type UsageCollector = ReturnType<typeof createUsageCollector>;
 
 const UNREAD_IMPORT = "imported in a way the analysis can't read (an alias?)";
 
+function openSite(component: string, reason: string, file?: string): CallSite {
+  return {
+    component,
+    open: true,
+    props: new Map(),
+    slots: null,
+    ...(file !== undefined && { location: { file, line: 1 } }),
+    reason,
+  };
+}
+
+function emptyModule(): ModuleUsage {
+  return { sites: [], openAll: false, providedContexts: new Set() };
+}
+
 /**
  * Open sites for the library modules `edges` import that `appUsage` didn't
  * read the import of (or that an alias imports), or `undefined` if it
@@ -147,11 +164,7 @@ function unreadImports(
   appUsage: AppUsage,
   edges: Iterable<LibraryImport>,
 ): ModuleUsage | undefined {
-  const unread: ModuleUsage = {
-    sites: [],
-    openAll: false,
-    providedContexts: new Set(),
-  };
+  const unread = emptyModule();
   for (const { id, importer, specifier } of edges) {
     const key = library.importKey(id);
     const file = stripQuery(importer);
@@ -163,16 +176,7 @@ function unreadImports(
       continue;
     }
     if (key === library.barrelKey) unread.openAll = true;
-    else {
-      unread.sites.push({
-        component: key,
-        open: true,
-        props: new Map(),
-        slots: null,
-        location: { file, line: 1 },
-        reason: UNREAD_IMPORT,
-      });
-    }
+    else unread.sites.push(openSite(key, UNREAD_IMPORT, file));
   }
   return unread.openAll || unread.sites.length > 0 ? unread : undefined;
 }
@@ -199,55 +203,55 @@ export async function analyzeFiles(input: {
   files: Iterable<{ file: string; code: string }>;
   components: Iterable<string>;
   options: UsageOptions;
-  /** Names the feature in the warning when analysis fails. */
   failure: Failure;
   /** `collectAppUsage(files)`, if the caller already has it. */
   appUsage?: AppUsage;
 }): Promise<UsageResult | { warning: string }> {
   try {
     const library = loadLibrary(input.library, input.projectRoot);
-    const modules = [
-      ...(input.appUsage ?? collectAppUsage(input.files, library)).modules,
-    ];
-
-    const rendered = new Set(
-      modules.flatMap((module) => module.sites.map((site) => site.component)),
-    );
-    const bundled = new Set<string>();
-    const unseen: ModuleUsage = {
-      sites: [],
-      openAll: false,
-      providedContexts: new Set(),
-    };
+    const bundled: string[] = [];
     for (const component of input.components) {
       const key =
         library.moduleKey(component) ?? library.components.get(component);
-      if (!key) continue;
-      bundled.add(key);
-      if (!rendered.has(key)) {
-        unseen.sites.push({
-          component: key,
-          open: true,
-          props: new Map(),
-          slots: null,
-          reason: "not found in `content`",
-        });
-      }
+      if (key) bundled.push(key);
     }
-    modules.push(unseen);
-
-    return toResult(
-      await analyzeUsage({
-        library,
-        bundled,
-        modules,
-        options: input.options,
-      }),
+    return await analyzeBundle(
       library,
+      (input.appUsage ?? collectAppUsage(input.files, library)).modules,
+      bundled,
+      input.options,
     );
   } catch (error) {
     return { warning: failure(input.library, error, input.failure) };
   }
+}
+
+/** `analyzeUsage` with module keys `bundled` as the bundle. */
+async function analyzeBundle(
+  library: Library,
+  modules: readonly ModuleUsage[],
+  bundled: Iterable<string>,
+  options: UsageOptions,
+): Promise<UsageResult> {
+  const rendered = new Set(
+    modules.flatMap((module) => module.sites.map((site) => site.component)),
+  );
+  const keys = new Set(bundled);
+  const unseen = emptyModule();
+  for (const key of keys) {
+    if (!rendered.has(key)) {
+      unseen.sites.push(openSite(key, "not found in `content`"));
+    }
+  }
+  return toResult(
+    await analyzeUsage({
+      library,
+      bundled: keys,
+      modules: [...modules, unseen],
+      options,
+    }),
+    library,
+  );
 }
 
 /** Report lines: per component, the prop values the app passes and why some stay open. */
@@ -333,9 +337,12 @@ function realpath(file: string): string {
   }
 }
 
+/** A rewritten component, as a bundler's `load` returns it. */
+export type RewrittenSource = { code: string; map: SourceMap };
+
 /** Library components rewritten for an app, by real path of their source. */
 export type SpecializedComponents = {
-  sources: Map<string, { code: string; map: SourceMap }>;
+  sources: Map<string, RewrittenSource>;
   edits: number;
   /**
    * The app's own components whose props came from their call sites in
@@ -367,32 +374,27 @@ export async function specializeFiles(input: {
   options?: SpecializeOptions;
   /** Aliased `.svelte` imports the bundler resolved, by `importKey`. */
   resolvedImports?: ReadonlyMap<string, string>;
-  /** Names the feature in the warning when analysis fails, and the report. */
+  /** Also names the report. */
   failure: Failure;
 }): Promise<SpecializedComponents | { warning: string }> {
   let appUsage: AppUsage;
   let library: Library;
+  let result: UsageResult;
   try {
     library = loadLibrary(input.library, input.projectRoot);
     appUsage = collectAppUsage(input.files, library, input.resolvedImports);
+    // Every component the app renders, and nothing else, is bundled.
+    result = await analyzeBundle(
+      library,
+      appUsage.modules,
+      appUsage.modules.flatMap((module) =>
+        module.sites.map((site) => site.component),
+      ),
+      {},
+    );
   } catch (error) {
     return { warning: failure(input.library, error, input.failure) };
   }
-  const components = new Set(
-    appUsage.modules.flatMap((module) =>
-      module.sites.map((site) => site.component),
-    ),
-  );
-  const result = await analyzeFiles({
-    library: input.library,
-    projectRoot: input.projectRoot,
-    files: input.files,
-    components: [...components].map((key) => `${library.srcPrefix}${key}`),
-    options: {},
-    failure: input.failure,
-    appUsage,
-  });
-  if ("warning" in result) return result;
 
   const src = realpathSync(library.src);
   const sources: SpecializedComponents["sources"] = new Map();

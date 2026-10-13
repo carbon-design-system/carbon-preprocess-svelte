@@ -2,10 +2,15 @@ import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
 import type { UsageCollector, UsageResult } from "../specializer/analysis";
-import { isProduction } from "../specializer/webpack-mode";
+import { type LibraryImport, libraryPaths } from "../specializer/library";
 import {
-  type CarbonImport,
-  carbonImportKey,
+  importEdges,
+  isProduction,
+  moduleSource,
+  type WebpackConnection,
+  type WebpackModule,
+} from "../specializer/webpack-util";
+import {
   errorMessage,
   isCarbonSvelteImport,
   isCssFile,
@@ -27,20 +32,10 @@ type WebpackAssetSource = {
   source(): string | Buffer;
 };
 
-type WebpackModule = {
-  resource?: unknown;
-  /** On `NormalModule`: the loader output. */
-  originalSource?: () => WebpackAssetSource | null | undefined;
-};
-
 type WebpackCompilation = {
   /** Absent on the mock compilations unit tests pass. */
   moduleGraph?: {
-    getIncomingConnections(module: WebpackModule): Iterable<{
-      originModule?: WebpackModule | null;
-      /** `request` is the specifier the import was written with. */
-      dependency?: { type?: string; request?: unknown } | null;
-    }>;
+    getIncomingConnections(module: WebpackModule): Iterable<WebpackConnection>;
   };
   hooks: {
     finishModules: {
@@ -105,6 +100,7 @@ export class OptimizeCssPlugin {
     const options = this.options;
     const silent = options.silent === true;
     const propAware = propAwareOptions(options);
+    const carbon = libraryPaths(CARBON);
 
     compiler.hooks.thisCompilation.tap(
       OptimizeCssPlugin.name,
@@ -114,7 +110,7 @@ export class OptimizeCssPlugin {
         /** `[resource, code]` of every scannable module, for `propAware`. */
         const propAwareModules: Array<[string, string]> = [];
         /** The module graph's edges into Carbon, for `propAware`. */
-        const carbonImports: CarbonImport[] = [];
+        const carbonImports: LibraryImport[] = [];
         const warn = (message: string) => {
           if (!silent) compilation.warnings.push(new WebpackError(message));
         };
@@ -126,21 +122,14 @@ export class OptimizeCssPlugin {
               const resource = module.resource;
               if (typeof resource !== "string") continue;
 
-              if (propAware && carbonImportKey(resource)) {
-                for (const connection of compilation.moduleGraph?.getIncomingConnections(
-                  module,
-                ) ?? []) {
-                  const origin = connection.originModule?.resource;
-                  const request = connection.dependency?.request;
-                  if (typeof origin === "string") {
-                    carbonImports.push({
-                      id: resource,
-                      importer: origin,
-                      specifier:
-                        typeof request === "string" ? request : undefined,
-                    });
-                  }
-                }
+              if (propAware && carbon.importKey(resource)) {
+                carbonImports.push(
+                  ...importEdges(
+                    resource,
+                    compilation.moduleGraph?.getIncomingConnections(module) ??
+                      [],
+                  ),
+                );
               }
 
               if (isCarbonSvelteImport(resource)) {
@@ -152,14 +141,8 @@ export class OptimizeCssPlugin {
               const scan = options.scanModules !== false;
               if (!(scan || propAware)) continue;
 
-              let source: string | Buffer | undefined;
-              try {
-                source = module.originalSource?.()?.source();
-              } catch {
-                // Some module types throw when asked for a source.
-              }
-              if (typeof source === "string" || Buffer.isBuffer(source)) {
-                const code = source.toString();
+              const code = moduleSource(module);
+              if (code !== undefined) {
                 if (scan) collectCarbonTokens(code, moduleClasses);
                 if (propAware) propAwareModules.push([resource, code]);
               }

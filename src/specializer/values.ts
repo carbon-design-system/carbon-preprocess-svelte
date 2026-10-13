@@ -112,8 +112,8 @@ const interned = new Map<string, Shape>();
 const ids = new WeakMap<Shape, number>();
 let nextId = 0;
 
-/** A stable key for a value, for interning the shapes that hold it. */
-function valueKey(value: Value): string {
+/** A key that's equal for values that hold the same values. */
+export function valueKey(value: Value): string {
   if (value === UNKNOWN) return "?";
   return [...value]
     .map((p) => {
@@ -130,11 +130,6 @@ function valueKey(value: Value): string {
 /** Whether `a` and `b` hold the same values. */
 export function sameValue(a: Value, b: Value): boolean {
   return a === b || valueKey(a) === valueKey(b);
-}
-
-/** A key that's equal for values that hold the same values. */
-export function valueId(value: Value): string {
-  return valueKey(value);
 }
 
 /** The interned shape of an object (`props`) or array (`elements`) literal. */
@@ -163,6 +158,16 @@ export function shape(
 const stores = new Map<string, Store>();
 
 /** The interned store holding `value`; see `Store`. */
+/**
+ * A store holding `value`, as a value. One holding an object could have it
+ * changed through `$s`, so its contents are unknown.
+ */
+export function storeOf(value: Value): Value {
+  return possible(
+    store(value !== UNKNOWN && [...value].some(isObject) ? UNKNOWN : value),
+  );
+}
+
 export function store(value: Value): Store {
   const key = valueKey(value);
   let existing = stores.get(key);

@@ -1,17 +1,13 @@
-export {
-  RE_EXT_STYLESHEET,
-  RE_EXT_SVELTE,
-  RE_MODULE_QUERY,
-} from "./specializer/util";
-
 export const CarbonSvelte = {
   Components: "carbon-components-svelte",
   Icons: "carbon-icons-svelte",
   Pictograms: "carbon-pictograms-svelte",
 } as const;
 
+export const PACKAGE_NAME = "carbon-preprocess-svelte";
+
 /** Prefix for every warning and error the package logs, so users can grep for it. */
-export const LOG_PREFIX = "carbon-preprocess-svelte:";
+export const LOG_PREFIX = `${PACKAGE_NAME}:`;
 
 export const ALWAYS_ON_CLASSES = [".bx--body"];
 
