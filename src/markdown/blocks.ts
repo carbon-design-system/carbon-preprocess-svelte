@@ -9,7 +9,7 @@ import {
 import { type ScannedTag, scanElement, scanTag, skipExpression } from "./scan";
 
 export type AlertType = "note" | "tip" | "important" | "warning" | "caution";
-export type Align = "left" | "center" | "right" | null;
+type Align = "left" | "center" | "right" | null;
 
 /** Extra attributes a `transform` hook can set on the rendered element. */
 export type Attributes = Record<string, string>;
@@ -51,7 +51,7 @@ export type Block =
   /** Svelte markup (elements, components, `{#if}` lines), kept verbatim. */
   | { type: "svelte"; value: string };
 
-export interface ListItem {
+interface ListItem {
   /** `true`/`false` for a task list item (`- [x]`), otherwise undefined. */
   checked?: boolean;
   children: Block[];
@@ -103,7 +103,7 @@ const ALERTS: Record<string, AlertType> = {
   CAUTION: "caution",
 };
 
-export interface BlockContext {
+interface BlockContext {
   refs: Map<string, LinkReference>;
   /** Footnote definitions (`[^label]: …`), by lowercased label. */
   footnotes: Map<string, Block[]>;
@@ -301,7 +301,7 @@ function lineEnd(text: string, i: number): number {
 }
 
 /** Parse lines into blocks. Containers (quotes, list items) recurse. */
-export function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
+function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
   const blocks: Block[] = [];
   const source = lines.join("\n");
   const offsets: number[] = [];

@@ -370,7 +370,7 @@ function urlLiterals(
 }
 
 /** Parse a paragraph's (or heading's, or table cell's) inline content. */
-export function parseInline(src: string, options: InlineOptions): Inline[] {
+function parseInline(src: string, options: InlineOptions): Inline[] {
   const items: Inline[] = [];
   const brackets: Bracket[] = [];
   let text = "";
