@@ -1,6 +1,6 @@
 /**
  * Accuracy and payoff check for specializing Carbon components
- * (`src/analyzer/specialize.ts`), the core of `optimizeComponents`.
+ * (`src/specializer/specialize.ts`), the core of `optimizeComponents`.
  *
  * For each app in the prop-aware corpus (see `./prop-aware-cases.ts`):
  *
@@ -28,16 +28,18 @@
  * enough.
  *   bun --conditions=svelte scripts/eval-specialize.ts --apps "examples/*\/src/App.svelte"
  */
+
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import type { BunPlugin } from "bun";
-import { analyzeFiles } from "../src/analyzer";
-import { collectAppUsage } from "../src/analyzer/app-usage";
-import { readCarbonComponents } from "../src/analyzer/call-sites";
-import { specializeComponent } from "../src/analyzer/specialize";
-import { parse } from "../src/indexer/parser";
+import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import { analyzeFiles } from "../src/specializer/analysis";
+import { collectAppUsage } from "../src/specializer/app-usage";
+import { libraryAt } from "../src/specializer/library";
+import { parse } from "../src/specializer/parser";
+import { specializeComponent } from "../src/specializer/specialize";
 import { goldenApps } from "./golden-apps";
 import { buildCases, caseSource } from "./prop-aware-cases";
 import { wrapperCases } from "./wrapper-cases";
@@ -86,7 +88,8 @@ const GENERATE =
     ? { server: "server", client: "client" }
     : { server: "ssr", client: "dom" };
 const carbonSrc = path.join(carbonRoot, "src");
-const carbon = readCarbonComponents(carbonRoot);
+const library = libraryAt(CARBON, carbonRoot);
+const carbon = library.components;
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
@@ -300,9 +303,11 @@ for (const [n, testCase] of cases.entries()) {
   }
 
   // The app's own components, closed when every call site is in `files`.
-  const appUsage = collectAppUsage(files, carbon);
+  const appUsage = collectAppUsage(files, library);
   // biome-ignore lint/performance/noAwaitInLoops: one app at a time keeps output attributable
   const result = await analyzeFiles({
+    library: CARBON,
+    failure: PROP_AWARE_FAILURE,
     projectRoot: PROJECT,
     files,
     components: testCase.components,

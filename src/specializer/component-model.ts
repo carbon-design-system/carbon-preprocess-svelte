@@ -12,8 +12,8 @@ import {
   type Pattern,
   walk,
 } from "sveast/walk";
-import { parse } from "../indexer/parser";
 import { forEachNode, type Node } from "./ast";
+import { parse } from "./parser";
 
 /** Marks the names `pattern` declares as unknown, with why. */
 function markUnknown(
@@ -50,15 +50,15 @@ export type FunctionNode = Extract<
   }
 >;
 
-/** An exported function of one of Carbon's `.js` modules, and that module. */
+/** An exported function of one of the library's `.js` modules, and that module. */
 export type Helper = { model: ComponentModel; fn: FunctionNode };
 
 /**
- * What the usage analysis needs to know about one Carbon component, read
+ * What the usage analysis needs to know about one library component, read
  * once from its source.
  */
 export type ComponentModel = {
-  /** Path relative to Carbon's `src`, e.g. `Button/Button.svelte`. */
+  /** Path relative to the library's `srcDir`, e.g. `Button/Button.svelte`. */
   key: string;
   /** The source `ast` was parsed from. */
   code: string;
@@ -93,17 +93,17 @@ export type ComponentModel = {
    * value unless one of its conditions can't hold.
    */
   guardedWrites: Map<string, GuardedWrite[]>;
-  /** Local binding -> Carbon module key, for relative `.svelte` imports. */
+  /** Local binding -> library module key, for relative `.svelte` imports. */
   componentImports: Map<string, string>;
   /** Every other imported binding. */
   otherImports: Set<string>;
   /**
-   * Imported bindings of a Carbon module's `export const NAME = "…"`, by
+   * Imported bindings of a library module's `export const NAME = "…"`, by
    * local name: the strings a context key can be (see `contextKey`).
    */
   importedStrings: Map<string, string>;
   /**
-   * Imported bindings of a Carbon `.js` module's exported functions, by
+   * Imported bindings of a library `.js` module's exported functions, by
    * local name, read when first called.
    */
   importedHelpers: Map<string, () => Helper | undefined>;
@@ -213,51 +213,46 @@ function runeCall(
 const cache = new Map<string, { mtimeMs: number; model: ComponentModel }>();
 
 /**
- * Reads and models `key` under `carbonSrc`. Cached by absolute path and
- * modification time, so a linked Carbon checkout edited between
+ * Reads and models `key` under `src`. Cached by absolute path and
+ * modification time, so a linked library checkout edited between
  * `vite build --watch` rebuilds is read again.
  */
-export function loadComponentModel(
-  carbonSrc: string,
-  key: string,
-): ComponentModel {
-  const file = path.join(carbonSrc, key);
+export function loadComponentModel(src: string, key: string): ComponentModel {
+  const file = path.join(src, key);
   const { mtimeMs } = statSync(file);
   const cached = cache.get(file);
   if (cached?.mtimeMs === mtimeMs) return cached.model;
   const model = buildComponentModel(
     readFileSync(file, "utf8"),
     key,
-    carbonResolver(carbonSrc),
+    libraryResolver(src),
   );
   cache.set(file, { mtimeMs, model });
   return model;
 }
 
-/** Resolves a Carbon module's relative imports: see `ImportResolver`. */
-function carbonResolver(carbonSrc: string): ImportResolver {
+/** Resolves a library module's relative imports: see `ImportResolver`. */
+function libraryResolver(src: string): ImportResolver {
   return (from, source, name) => {
-    const component = resolveReExport(carbonSrc, from, source, name);
+    const component = resolveReExport(src, from, source, name);
     if (component) return { component };
-    const string = resolveStringExport(carbonSrc, from, source, name);
+    const string = resolveStringExport(src, from, source, name);
     if (string !== undefined) return { string };
-    const module = scriptModule(carbonSrc, from, source);
-    return module
-      ? { helper: () => loadHelper(carbonSrc, module, name) }
-      : undefined;
+    const module = scriptModule(src, from, source);
+    return module ? { helper: () => loadHelper(src, module, name) } : undefined;
   };
 }
 
 /** The `.js` module `source` names from module `from`, if it exists. */
 function scriptModule(
-  carbonSrc: string,
+  src: string,
   from: string,
   source: string,
 ): string | undefined {
   const joined = path.posix.join(path.posix.dirname(from), source);
   return [joined, `${joined}.js`].find(
     (candidate) =>
-      candidate.endsWith(".js") && existsSync(path.join(carbonSrc, candidate)),
+      candidate.endsWith(".js") && existsSync(path.join(src, candidate)),
   );
 }
 
@@ -267,15 +262,12 @@ const scriptCache = new Map<
 >();
 
 /**
- * Carbon's `.js` module `key`, modeled as a module script. Every name it
+ * The library's `.js` module `key`, modeled as a module script. Every name it
  * exports may be changed by an importer, so an object one holds is never
  * known (see `escapes`). `undefined` if it doesn't parse.
  */
-function loadScriptModel(
-  carbonSrc: string,
-  key: string,
-): ComponentModel | undefined {
-  const file = path.join(carbonSrc, key);
+function loadScriptModel(src: string, key: string): ComponentModel | undefined {
+  const file = path.join(src, key);
   const { mtimeMs } = statSync(file);
   const cached = scriptCache.get(file);
   if (cached?.mtimeMs === mtimeMs) return cached.model;
@@ -284,7 +276,7 @@ function loadScriptModel(
     model = buildComponentModel(
       `<script context="module">\n${readFileSync(file, "utf8")}\n</script>`,
       key,
-      carbonResolver(carbonSrc),
+      libraryResolver(src),
     );
     for (const statement of model.ast.module?.content.body ?? []) {
       if (statement.type !== "ExportNamedDeclaration") continue;
@@ -310,11 +302,11 @@ function loadScriptModel(
 
 /** The function `.js` module `key` exports as `name`, if it declares one. */
 function loadHelper(
-  carbonSrc: string,
+  src: string,
   key: string,
   name: string,
 ): Helper | undefined {
-  const model = loadScriptModel(carbonSrc, key);
+  const model = loadScriptModel(src, key);
   // A function the module reassigns may not be the one declared.
   if (!model || model.unknownNames.has(name)) return undefined;
   for (const statement of model.ast.module?.content.body ?? []) {
@@ -342,8 +334,9 @@ function loadHelper(
 }
 
 /**
- * What `import { name } from source` binds in module `from`: a Carbon
- * component, or the string a Carbon module's `export const` holds.
+ * What `import { name } from source` binds in module `from`: a library
+ * component, a string a library module's `export const` holds, or a
+ * library module's function.
  */
 type ImportResolver = (
   from: string,
@@ -358,11 +351,11 @@ type ImportResolver = (
 const MAX_BARREL_HOPS = 4;
 
 /**
- * The Carbon component that `import { name } from source` binds in module
+ * The library component that `import { name } from source` binds in module
  * `from`, following `.js` barrels like `ListBox/index.js`.
  */
 function resolveReExport(
-  carbonSrc: string,
+  src: string,
   from: string,
   source: string,
   name: string,
@@ -374,16 +367,16 @@ function resolveReExport(
     return name === "default" ? joined : undefined;
   const barrel = [joined, `${joined}.js`, `${joined}/index.js`].find(
     (candidate) =>
-      candidate.endsWith(".js") && existsSync(path.join(carbonSrc, candidate)),
+      candidate.endsWith(".js") && existsSync(path.join(src, candidate)),
   );
   if (!barrel) return undefined;
-  const code = readFileSync(path.join(carbonSrc, barrel), "utf8");
+  const code = readFileSync(path.join(src, barrel), "utf8");
   for (const statement of lexImportsExports(code)) {
     if (statement.kind !== "export" || !statement.source) continue;
     for (const specifier of statement.specifiers) {
       if (specifier.exported === name || specifier.kind === "all") {
         const resolved = resolveReExport(
-          carbonSrc,
+          src,
           barrel,
           statement.source.value,
           specifier.kind === "all" ? name : specifier.local,
@@ -402,7 +395,7 @@ function resolveReExport(
  * its own line, once. Re-exports aren't followed.
  */
 function resolveStringExport(
-  carbonSrc: string,
+  src: string,
   from: string,
   source: string,
   name: string,
@@ -410,10 +403,10 @@ function resolveStringExport(
   const joined = path.posix.join(path.posix.dirname(from), source);
   const module = [joined, `${joined}.js`].find(
     (candidate) =>
-      candidate.endsWith(".js") && existsSync(path.join(carbonSrc, candidate)),
+      candidate.endsWith(".js") && existsSync(path.join(src, candidate)),
   );
   if (!module) return undefined;
-  const code = readFileSync(path.join(carbonSrc, module), "utf8");
+  const code = readFileSync(path.join(src, module), "utf8");
   const declaration = new RegExp(
     `^export const ${name.replaceAll("$", "\\$")} = (["'])([^"'\\\\\\n]*)\\1;?[ \\t]*$`,
     "gm",

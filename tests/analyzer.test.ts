@@ -1,23 +1,24 @@
 import { utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PropAwareOptions } from "../src/analyzer/analyze-usage";
-import { analyzeUsage } from "../src/analyzer/analyze-usage";
+import { CARBON } from "../src/carbon-library";
+import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import type { UsageOptions } from "../src/specializer/analyze-usage";
+import { analyzeUsage } from "../src/specializer/analyze-usage";
 import {
   type collectImportedUsage,
   collectScriptUsage,
   collectSourceUsage,
   collectSvelteUsage,
-  readCarbonComponents,
-} from "../src/analyzer/call-sites";
-import { buildComponentModel } from "../src/analyzer/component-model";
-import { createScope, evaluate } from "../src/analyzer/evaluate";
-import { addCallSite, newComponentUsage } from "../src/analyzer/usage";
-import { possible, UNKNOWN } from "../src/analyzer/values";
-import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+} from "../src/specializer/call-sites";
+import { buildComponentModel } from "../src/specializer/component-model";
+import { createScope, evaluate } from "../src/specializer/evaluate";
+import { libraryAt } from "../src/specializer/library";
+import { addCallSite, newComponentUsage } from "../src/specializer/usage";
+import { possible, UNKNOWN } from "../src/specializer/values";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 
 const carbonRoot = resolveCarbonRoot();
-const carbon = readCarbonComponents(carbonRoot);
+const carbon = libraryAt(CARBON, carbonRoot);
 const BUTTON = "Button/Button.svelte";
 
 function app(script: string, markup: string): string {
@@ -26,11 +27,10 @@ function app(script: string, markup: string): string {
 
 const IMPORT_BUTTON = `import { Button } from "carbon-components-svelte";`;
 
-async function analyze(code: string, options?: PropAwareOptions) {
+async function analyze(code: string, options?: UsageOptions) {
   const usage = collectSvelteUsage(code, "/app/App.svelte", carbon);
   return analyzeUsage({
-    carbonRoot,
-    carbon,
+    library: carbon,
     bundled: usage.sites.map((site) => site.component),
     modules: [usage],
     options,
@@ -271,8 +271,7 @@ describe("analyzeUsage", () => {
     const isPruned = async (cls: string) =>
       (
         await analyzeUsage({
-          carbonRoot: mock.root,
-          carbon: new Map(),
+          library: libraryAt(CARBON, mock.root),
           bundled: [],
           modules: [],
         })
@@ -500,7 +499,7 @@ describe("analyzeUsage", () => {
         ...files,
       });
       try {
-        const mockCarbon = readCarbonComponents(mock.root);
+        const mockCarbon = libraryAt(CARBON, mock.root);
         const usage = collectSvelteUsage(
           app(
             // Only what renders: an import alone renders with any props.
@@ -511,8 +510,7 @@ describe("analyzeUsage", () => {
           mockCarbon,
         );
         const { isPruned } = await analyzeUsage({
-          carbonRoot: mock.root,
-          carbon: mockCarbon,
+          library: mockCarbon,
           bundled: usage.sites.map((site) => site.component),
           modules: [usage],
         });
@@ -620,7 +618,7 @@ ${extra}
         ...files,
       });
       try {
-        const mockCarbon = readCarbonComponents(mock.root);
+        const mockCarbon = libraryAt(CARBON, mock.root);
         const names = [...new Set(markup.match(/(?<=<)[A-Z]\w*/g))];
         const usage = collectSvelteUsage(
           app(
@@ -631,8 +629,7 @@ ${extra}
           mockCarbon,
         );
         const { isPruned } = await analyzeUsage({
-          carbonRoot: mock.root,
-          carbon: mockCarbon,
+          library: mockCarbon,
           bundled: usage.sites.map((site) => site.component),
           modules: [usage],
         });
@@ -768,15 +765,14 @@ function swap() {
 <div class:bx--sm={resolved === "sm"} class:bx--md={resolved === "md"} />`,
       });
       try {
-        const mockCarbon = readCarbonComponents(mock.root);
+        const mockCarbon = libraryAt(CARBON, mock.root);
         const usage = collectSvelteUsage(
           app(`import { Sized } from "carbon-components-svelte";`, markup),
           "/app/App.svelte",
           mockCarbon,
         );
         const { isPruned } = await analyzeUsage({
-          carbonRoot: mock.root,
-          carbon: mockCarbon,
+          library: mockCarbon,
           bundled: usage.sites.map((site) => site.component),
           modules: [usage],
         });

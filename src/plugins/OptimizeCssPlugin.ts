@@ -1,6 +1,8 @@
-import type { PropAwareResult, UsageCollector } from "../analyzer";
+import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
+import type { UsageCollector, UsageResult } from "../specializer/analysis";
+import { isProduction } from "../specializer/webpack-mode";
 import {
   type CarbonImport,
   carbonImportKey,
@@ -15,7 +17,6 @@ import { optimizeAssets } from "./optimize-assets";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
-import { isProduction } from "./webpack-mode";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
@@ -198,13 +199,17 @@ export class OptimizeCssPlugin {
             if (warning) warn(warning);
 
             const analyzer = propAware
-              ? await import("../analyzer")
+              ? await import("../specializer/analysis")
               : undefined;
-            let usage: PropAwareResult | undefined;
+            let usage: UsageResult | undefined;
             if (analyzer && propAware) {
               let collector: UsageCollector | undefined;
               try {
-                collector = analyzer.createUsageCollector(compiler.context);
+                collector = analyzer.createUsageCollector(
+                  CARBON,
+                  compiler.context,
+                  PROP_AWARE_FAILURE,
+                );
               } catch (error) {
                 warn(
                   `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,

@@ -1,4 +1,4 @@
-import type { PropAwareOptions } from "../analyzer/analyze-usage";
+import type { UsageOptions as PropAwareOptions } from "../specializer/analyze-usage";
 import type { SafelistEntry } from "./safelist";
 
 export type OptimizeCssOptions = {

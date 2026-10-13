@@ -1,3 +1,9 @@
+export {
+  RE_EXT_STYLESHEET,
+  RE_EXT_SVELTE,
+  RE_MODULE_QUERY,
+} from "./specializer/util";
+
 export const CarbonSvelte = {
   Components: "carbon-components-svelte",
   Icons: "carbon-icons-svelte",
@@ -20,20 +26,7 @@ export const CONTEXT_ANCESTORS = [
   ".bx--side-nav-expand-icon",
 ] as const;
 
-export const RE_EXT_SVELTE = /\.svelte$/;
-
 export const RE_EXT_CSS = /\.css$/;
-
-/**
- * `.css` and preprocessor files Vite compiles to CSS. Their `bx--` selectors
- * are what the optimizer prunes, not proof of use: a stylesheet that
- * `@import`s Carbon's theme would otherwise allowlist the whole theme.
- */
-export const RE_EXT_STYLESHEET =
-  /\.(css|scss|sass|less|styl|stylus|pcss|postcss)$/;
-
-/** Splits a bundler module id into its path and its `?query#hash` suffix. */
-export const RE_MODULE_QUERY = /[?#].*$/;
 
 /** Matches a Vite Svelte style sub-module query (`?svelte&type=style&...`). */
 export const RE_STYLE_QUERY = /[?&]type=style(&|$)/;

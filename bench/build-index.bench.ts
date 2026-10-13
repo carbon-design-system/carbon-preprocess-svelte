@@ -12,8 +12,8 @@ import {
   type ModuleGraphCache,
 } from "../src/indexer/extract-runtime-classes";
 import { extractFromSvelte } from "../src/indexer/extract-selectors";
-import { listJsAndSvelteFiles } from "../src/indexer/list-files";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import { listJsAndSvelteFiles } from "../src/specializer/list-files";
 import { isSvelteFile } from "../src/utils";
 
 const carbonRoot = resolveCarbonRoot();

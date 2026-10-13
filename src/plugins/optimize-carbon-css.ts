@@ -1,5 +1,6 @@
 import { globSync } from "node:fs";
 import path from "node:path";
+import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
 import { toCssString } from "../utils";
@@ -84,8 +85,10 @@ async function analyzePropAware(
     );
     return undefined;
   }
-  const { analyzeFiles } = await import("../analyzer");
+  const { analyzeFiles } = await import("../specializer/analysis");
   const result = await analyzeFiles({
+    library: CARBON,
+    failure: PROP_AWARE_FAILURE,
     projectRoot: cwd,
     files: [...readFiles(globSync(options.content, { cwd }), cwd)],
     components: ids,

@@ -24,6 +24,7 @@
  *
  *   bun --conditions=svelte scripts/eval-prop-aware.ts --apps "examples/*\/src/App.svelte"
  */
+
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -32,12 +33,13 @@ import { filterCss } from "caligula";
 import { requiredClasses } from "caligula/selector";
 import { compile } from "svelte/compiler";
 import { render } from "svelte/server";
-import { analyzeFiles } from "../src/analyzer";
-import { readCarbonComponents } from "../src/analyzer/call-sites";
-import { loadComponentModel } from "../src/analyzer/component-model";
+import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
 import { loadComponentIndex } from "../src/indexer/load-index";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { optimizeCssWithReport } from "../src/plugins/create-optimized-css";
+import { analyzeFiles } from "../src/specializer/analysis";
+import { loadComponentModel } from "../src/specializer/component-model";
+import { libraryAt } from "../src/specializer/library";
 import { buildCases, caseSource } from "./prop-aware-cases";
 
 // Components that schedule DOM work after an SSR render (`tick().then(…)`)
@@ -73,7 +75,7 @@ const ROOT = path.resolve(import.meta.dir, "..");
 const OUT = path.join(ROOT, ".context/eval-prop-aware");
 const carbonRoot = resolveCarbonRoot(ROOT);
 const carbonSrc = path.join(carbonRoot, "src");
-const carbon = readCarbonComponents(carbonRoot);
+const carbon = libraryAt(CARBON, carbonRoot).components;
 const css = readFileSync(path.join(carbonRoot, "css/white.css"), "utf8");
 const index = await loadComponentIndex(ROOT);
 if (!index) throw new Error("could not build the component index");
@@ -179,6 +181,8 @@ for (const testCase of cases) {
   );
 
   const result = await analyzeFiles({
+    library: CARBON,
+    failure: PROP_AWARE_FAILURE,
     projectRoot: ROOT,
     files: [{ file, code }],
     components: testCase.components,

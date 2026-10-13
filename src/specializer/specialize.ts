@@ -7,7 +7,6 @@ import {
   valueVisitorKeys,
   walk,
 } from "sveast/walk";
-import { parse } from "../indexer/parser";
 import type { Node } from "./ast";
 import { bindEach, evaluate, isPropsObject, type Scope } from "./evaluate";
 import {
@@ -18,6 +17,7 @@ import {
   sliceOf,
   splice,
 } from "./mapped-text";
+import { parse } from "./parser";
 import {
   isEmptyArray,
   isNeverNullish,
@@ -31,7 +31,7 @@ import {
 } from "./values";
 
 /**
- * Rewrites a Carbon component's source for the values its call sites pass:
+ * Rewrites a component's source for the values its call sites pass:
  * expressions with one known value become literals, operands and branches
  * that can't run are removed, and `{#if}` chains keep only their live
  * branches. Child

@@ -5,9 +5,12 @@
  */
 import { existsSync, globSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { CarbonComponents } from "../src/analyzer/call-sites";
-import { loadComponentModel } from "../src/analyzer/component-model";
 import { collectCarbonImports } from "../src/plugins/scan-imports";
+
+/** Carbon component export name -> module key (`Button` -> `Button/Button.svelte`). */
+type CarbonComponents = ReadonlyMap<string, string>;
+
+import { loadComponentModel } from "../src/specializer/component-model";
 
 export type Case = {
   id: string;

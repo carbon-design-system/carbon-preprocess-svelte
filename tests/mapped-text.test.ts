@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { analyzeFiles } from "../src/analyzer";
+import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
+import { analyzeFiles } from "../src/specializer/analysis";
 import {
   concat,
   type MappedText,
@@ -9,8 +10,8 @@ import {
   sliceOf,
   splice,
   toSourceMap,
-} from "../src/analyzer/mapped-text";
-import { specializeComponent } from "../src/analyzer/specialize";
+} from "../src/specializer/mapped-text";
+import { specializeComponent } from "../src/specializer/specialize";
 
 const BASE64 =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -108,6 +109,8 @@ test("a specialized Carbon component maps back to its source", async () => {
     const code = `<script>import { Button } from "carbon-components-svelte";</script>\n<Button kind="tertiary" size="small">Hi</Button>`;
     writeFileSync(file, code);
     const result = await analyzeFiles({
+      library: CARBON,
+      failure: PROP_AWARE_FAILURE,
       projectRoot: process.cwd(),
       files: [{ file, code }],
       components: ["Button"],

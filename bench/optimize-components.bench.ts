@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { group, task } from "ostia";
-import { createComponentOptimizer } from "../src/plugins/component-optimizer";
+import { CARBON, SPECIALIZE_FAILURE } from "../src/carbon-library";
+import { createComponentOptimizer } from "../src/specializer/optimizer";
 
 /**
  * What `optimizeComponents` and `OptimizeComponentsPlugin` add to a build
@@ -12,12 +13,13 @@ import { createComponentOptimizer } from "../src/plugins/component-optimizer";
 // The vite-matrix app and its wrapper, frozen like the analyzer's fixtures.
 const root = path.join(import.meta.dirname, "fixtures/wrapper");
 const options = { silent: true, content: ["*.svelte"] };
+const BENCH = { plugin: "bench", failure: SPECIALIZE_FAILURE };
 
 group("optimizeComponents: prepare (vite-matrix app)", () => {
   task("cold: a new build", async () => {
-    await createComponentOptimizer(options, "bench").prepare(root);
+    await createComponentOptimizer(CARBON, options, BENCH).prepare(root);
   });
-  const warm = createComponentOptimizer(options, "bench");
+  const warm = createComponentOptimizer(CARBON, options, BENCH);
   task("watch rebuild: `content` unchanged", async () => {
     await warm.prepare(root);
   });
@@ -45,7 +47,7 @@ const modules = [
     code: "<button />",
   })),
 ];
-const checker = createComponentOptimizer(options, "bench");
+const checker = createComponentOptimizer(CARBON, options, BENCH);
 await checker.prepare(root);
 
 group("optimizeComponents: check every transformed module", () => {

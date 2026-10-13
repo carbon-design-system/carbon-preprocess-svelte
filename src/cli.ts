@@ -1,7 +1,7 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import type { PropAwareResult } from "./analyzer";
+import { CARBON, PROP_AWARE_FAILURE } from "./carbon-library";
 import { LOG_PREFIX } from "./constants";
 import { loadComponentIndex } from "./indexer/load-index";
 import { createCssOptimizer } from "./plugins/create-optimized-css";
@@ -9,6 +9,7 @@ import { optimizeAssets } from "./plugins/optimize-assets";
 import type { SafelistEntry } from "./plugins/safelist";
 import { collectCarbonTokens, readFiles } from "./plugins/scan-content";
 import { collectCarbonImports } from "./plugins/scan-imports";
+import type { UsageResult } from "./specializer/analysis";
 import { errorMessage, isCssFile } from "./utils";
 
 const REGEXP_SAFELIST_ENTRY = /^\/(.+)\/([a-z]*)$/;
@@ -131,10 +132,14 @@ async function main() {
     silent: values.silent === true,
   };
 
-  const analyzer = propAware ? await import("./analyzer") : undefined;
-  let usage: PropAwareResult | undefined;
+  const analyzer = propAware
+    ? await import("./specializer/analysis")
+    : undefined;
+  let usage: UsageResult | undefined;
   if (analyzer) {
     const result = await analyzer.analyzeFiles({
+      library: CARBON,
+      failure: PROP_AWARE_FAILURE,
       projectRoot: cwd,
       files: sources,
       components,

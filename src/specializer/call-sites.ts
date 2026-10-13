@@ -1,10 +1,6 @@
-import { statSync } from "node:fs";
 import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
 import { type AST, children, type Expression, locate } from "sveast/walk";
-import { CarbonSvelte } from "../constants";
-import { readCarbonExports } from "../indexer/carbon-exports";
-import { parse } from "../indexer/parser";
 import { forEachNode, type Node } from "./ast";
 import { buildComponentModel, type ComponentModel } from "./component-model";
 import {
@@ -17,7 +13,9 @@ import {
   whyUnknownLater,
 } from "./evaluate";
 import { importKey } from "./import-key";
+import type { Library } from "./library";
 import { callSiteFromElement, type Explain } from "./live-walk";
+import { parse } from "./parser";
 import { type CallSite, type ComponentUsage, newComponentUsage } from "./usage";
 import {
   EMPTY_ARRAY,
@@ -30,44 +28,15 @@ import {
   type Value,
 } from "./values";
 
-/** Carbon component export name -> module key (`Button` -> `Button/Button.svelte`). */
-export type CarbonComponents = Map<string, string>;
-
-const SRC_PREFIX = `${CarbonSvelte.Components}/src/`;
-
-const componentsCache = new Map<
-  string,
-  { mtimeMs: number; components: CarbonComponents }
->();
-
-/**
- * Carbon's exported components. Cached by the modification time of its
- * `src/index.js`, so a linked Carbon checkout edited between
- * `vite build --watch` rebuilds is read again.
- */
-export function readCarbonComponents(carbonRoot: string): CarbonComponents {
-  const { mtimeMs } = statSync(path.join(carbonRoot, "src", "index.js"));
-  const cached = componentsCache.get(carbonRoot);
-  if (cached?.mtimeMs === mtimeMs) return new Map(cached.components);
-  const components: CarbonComponents = new Map();
-  for (const [name, target] of readCarbonExports(carbonRoot)) {
-    if (target.name === "default" && target.path.endsWith(".svelte")) {
-      components.set(name, target.path.slice(SRC_PREFIX.length));
-    }
-  }
-  componentsCache.set(carbonRoot, { mtimeMs, components });
-  return new Map(components);
-}
-
 /** What one app module contributes to the analysis. */
 export type ModuleUsage = {
   /**
-   * Its call sites: of Carbon components (keyed like `Button/Button.svelte`)
+   * Its call sites: of library components (keyed like `Button/Button.svelte`)
    * and, when `AppComponents` are given, of the app's own `.svelte` files
    * (keyed by absolute path).
    */
   sites: CallSite[];
-  /** Every bundled Carbon component may render with any props. */
+  /** Every bundled library component may render with any props. */
   openAll: boolean;
   /**
    * It imports `.svelte` files in a way the analysis can't follow (a
@@ -76,29 +45,30 @@ export type ModuleUsage = {
    */
   openApps?: boolean;
   /**
-   * `carbon:` context keys the module may pass to `setContext`: every
-   * `"carbon:…"` string it holds, so a key kept in a constant counts.
+   * Library context keys the module may pass to `setContext`: every
+   * string it holds that starts with `LibrarySpec.contextKeyPrefix`, so a
+   * key kept in a constant counts.
    */
   providedContexts: Set<string>;
   /**
-   * It calls `setContext` with what may be a `carbon:` key it doesn't
+   * It calls `setContext` with what may be a library key it doesn't
    * spell out (see `providesUnknownContext`).
    */
   providesUnknownContext?: boolean;
   /**
-   * It may read a Carbon context (`getContext` or `getAllContexts`, and a
-   * `carbon:` key or one of Carbon's script modules), and so write to the
+   * It may read a library context (`getContext` or `getAllContexts`, and
+   * a library key or one of its script modules), and so write to the
    * stores one hands on.
    */
-  readsCarbonContext?: boolean;
+  readsLibraryContext?: boolean;
   /** The file it was read from. */
   file?: string;
-  /** What it imports from Carbon, as read. */
-  carbonImports?: CarbonImports;
+  /** What it imports from the library, as read. */
+  libraryImports?: LibraryImports;
 };
 
-/** What a module imports from Carbon, as the analysis read it. */
-export type CarbonImports = {
+/** What a module imports from the library, as the analysis read it. */
+export type LibraryImports = {
   /** Keys of the components it imports, re-exports or loads by path. */
   components: Set<string>;
   /** It imports something from the barrel. */
@@ -106,20 +76,23 @@ export type CarbonImports = {
 };
 
 /**
- * Whether the analysis read `usage`'s import of Carbon module `key`
+ * Whether the analysis read `usage`'s import of library module `key`
  * (`index.js` for the barrel). A bundler's module graph with an edge the
  * analysis didn't read means an import it can't see, such as one through
- * an alias (`import { Button } from "@carbon"`).
+ * an alias (`import { Button } from "@lib"`).
  */
-export function readCarbonImport(
+export function readLibraryImport(
+  library: Library,
   usage: ModuleUsage | undefined,
   key: string,
 ): boolean {
   if (!usage) return false;
   if (usage.openAll) return true;
-  const imports = usage.carbonImports;
+  const imports = usage.libraryImports;
   if (!imports) return false;
-  return key === "index.js" ? imports.barrel : imports.components.has(key);
+  return key === library.barrelKey
+    ? imports.barrel
+    : imports.components.has(key);
 }
 
 /** The app's own `.svelte` files the analysis reads, for resolving imports of them. */
@@ -150,7 +123,7 @@ export function indexAppComponents(
   return { files: set, byName, resolved };
 }
 
-/** Whether `key` names an app component (an absolute path), not a Carbon one. */
+/** Whether `key` names an app component (an absolute path), not a library one. */
 export function isAppComponent(key: string): boolean {
   return path.isAbsolute(key);
 }
@@ -164,11 +137,12 @@ export function isAppComponent(key: string): boolean {
  * or `Card/index.svelte`, and those are possible but not certain.
  */
 function resolveAppImport(
+  library: Library,
   from: string,
   source: string,
   apps: AppComponents,
 ): { keys: string[]; exact: boolean } | undefined {
-  if (source.startsWith(SRC_PREFIX)) return undefined;
+  if (source.startsWith(library.srcPrefix)) return undefined;
   if (source.endsWith(".svelte")) {
     if (source.startsWith(".")) {
       const file = path.resolve(path.dirname(from), source);
@@ -200,18 +174,17 @@ function resolveAppImport(
 const DYNAMIC_IMPORT = /\b(?:import|require)\s*\(/g;
 /** The literal argument of an `import(`, read from where it ends. */
 const LITERAL_IMPORT = /\s*(["'`])([^"'`$]+)\1\s*\)/y;
-/** A computed argument that starts with Carbon's name (`` `carbon-components-svelte/src/${name}…` ``). */
-const CARBON_ARGUMENT = /\s*["'`]carbon-components-svelte\b/y;
 const IMPORT_META_GLOB = /\bimport\.meta\.glob\b/;
 
 /**
  * `import()`, `require()` and `import.meta.glob` in `code`, which the
- * lexer doesn't read. One of a Carbon component or an app component
- * renders it with any props; one of Carbon's barrel, or computed from
- * Carbon's name, may render any Carbon component; any other computed one
+ * lexer doesn't read. One of a library component or an app component
+ * renders it with any props; one of the library's barrel, or computed from
+ * its name, may render any library component; any other computed one
  * may render any app component.
  */
 function readDynamicImports(
+  library: Library,
   code: string,
   bindings: ImportBindings,
   app: AppImports,
@@ -224,80 +197,71 @@ function readDynamicImports(
     const source = LITERAL_IMPORT.exec(code)?.[2];
     if (source === undefined) {
       bindings.openApps = true;
-      CARBON_ARGUMENT.lastIndex = start;
-      if (CARBON_ARGUMENT.test(code)) bindings.openAll = true;
+      library.patterns.argument.lastIndex = start;
+      if (library.patterns.argument.test(code)) bindings.openAll = true;
       continue;
     }
-    if (source === CarbonSvelte.Components) {
+    if (source === library.name) {
       bindings.openAll = true;
-      bindings.carbonImports.barrel = true;
+      bindings.libraryImports.barrel = true;
     }
-    const direct = DIRECT_COMPONENT_PATH.exec(source)?.[1];
+    const direct = library.patterns.directComponentPath.exec(source)?.[1];
     if (direct) {
       bindings.dynamic.push(direct);
-      bindings.carbonImports.components.add(direct);
+      bindings.libraryImports.components.add(direct);
     }
-    const resolved = app && resolveAppImport(app.from, source, app.apps);
+    const resolved =
+      app && resolveAppImport(library, app.from, source, app.apps);
     if (resolved) bindings.openAppComponents.push(...resolved.keys);
   }
 }
 
-const DIRECT_COMPONENT_PATH = /^carbon-components-svelte\/src\/(.+\.svelte)$/;
-const CARBON_CONTEXT_KEY = /(["'`])(carbon:[^"'`\s]+)\1/g;
-/** An import of a Carbon module that isn't a component. */
-const CARBON_SCRIPT_SPECIFIER =
-  /["']carbon-components-svelte\/src\/(?![^"']*\.svelte["'])[^"']*["']/;
 /** JS and TS modules, which `lexImportsExports` reads. */
 const SCRIPT_FILE = /\.[cm]?[jt]sx?$/;
-const BARREL_IMPORT =
-  /\bimport\s+(type\s+)?\{([^}]*)\}\s*from\s*(["'])carbon-components-svelte\3/g;
-const BARREL_SPECIFIER = /["']carbon-components-svelte["']/g;
-const DIRECT_COMPONENT_SPECIFIER =
-  /["']carbon-components-svelte\/src\/([^"']+\.svelte)["']/g;
 const IMPORT_AS = /\s+as\s+/;
 const SVELTE_SPECIFIER = /(["'])([^"'\n]+\.svelte)\1/g;
-/** Imports that are components, so passing one as a prop passes an object. */
-const COMPONENT_SOURCE = /\.svelte$|^carbon-(icons|pictograms)-svelte(\/|$)/;
 
-function providedContexts(code: string): Set<string> {
+function providedContexts(library: Library, code: string): Set<string> {
   const keys = new Set<string>();
-  if (!code.includes("carbon:")) return keys;
-  for (const match of code.matchAll(CARBON_CONTEXT_KEY)) keys.add(match[2]);
+  if (!code.includes(library.spec.contextKeyPrefix)) return keys;
+  for (const match of code.matchAll(library.patterns.contextKey))
+    keys.add(match[2]);
   return keys;
 }
 
 /**
- * Whether a key the module passes `setContext` may be a `carbon:` key that
- * `providedContexts` can't see: one held by Carbon's script modules, or
- * built from parts (`"carbon:" + name`).
+ * Whether a key the module passes `setContext` may be a library key that
+ * `providedContexts` can't see: one held by the library's script modules, or
+ * built from parts (`library.spec.contextKeyPrefix + name`).
  */
-function providesUnknownContext(code: string): boolean {
+function providesUnknownContext(library: Library, code: string): boolean {
   if (!code.includes("setContext")) return false;
-  if (CARBON_SCRIPT_SPECIFIER.test(code)) return true;
-  const mentions = code.split("carbon:").length - 1;
-  return mentions > [...code.matchAll(CARBON_CONTEXT_KEY)].length;
+  if (library.patterns.scriptSpecifier.test(code)) return true;
+  const mentions = code.split(library.spec.contextKeyPrefix).length - 1;
+  return mentions > [...code.matchAll(library.patterns.contextKey)].length;
 }
 
-function readsCarbonContext(code: string): boolean {
+function readsLibraryContext(library: Library, code: string): boolean {
   if (code.includes("getAllContexts")) return true;
   return (
     code.includes("getContext") &&
-    (code.includes("carbon:") || CARBON_SCRIPT_SPECIFIER.test(code))
+    (code.includes(library.spec.contextKeyPrefix) ||
+      library.patterns.scriptSpecifier.test(code))
   );
 }
 
 type ImportBindings = {
-  /** Local binding -> Carbon component key, or app component file. */
+  /** Local binding -> library component key, or app component file. */
   components: Map<string, string>;
-  /** Local names of `import * as C from "carbon-components-svelte"`. */
+  /** Local names of `import * as C from "<library>"`. */
   namespaces: Set<string>;
-  /** Bindings known to hold a component (Carbon, icons, local `.svelte`). */
+  /** Bindings known to hold a component (the library's, icons, local `.svelte`). */
   objects: Set<string>;
-  /** Re-exported Carbon components: rendered somewhere we can't see. */
+  /** Re-exported library components: rendered somewhere we can't see. */
   reExported: string[];
-  /** Carbon components imported with `import()` or `require()`. */
+  /** Library components imported with `import()` or `require()`. */
   dynamic: string[];
-  /** Any Carbon component may render: `export *`, or a dynamic barrel import. */
+  /** Any library component may render: `export *`, or a dynamic barrel import. */
   openAll: boolean;
   /**
    * App components imported dynamically, re-exported, or through a path
@@ -306,7 +270,7 @@ type ImportBindings = {
   openAppComponents: string[];
   /** See `ModuleUsage.openApps`. */
   openApps: boolean;
-  carbonImports: CarbonImports;
+  libraryImports: LibraryImports;
 };
 
 function newBindings(): ImportBindings {
@@ -319,7 +283,7 @@ function newBindings(): ImportBindings {
     openAll: false,
     openAppComponents: [],
     openApps: false,
-    carbonImports: { components: new Set(), barrel: false },
+    libraryImports: { components: new Set(), barrel: false },
   };
 }
 
@@ -328,12 +292,12 @@ type AppImports = { from: string; apps: AppComponents } | undefined;
 
 function readImports(
   code: string,
-  carbon: CarbonComponents,
+  library: Library,
   bindings: ImportBindings,
   app: AppImports,
 ): void {
   if (
-    !code.includes(CarbonSvelte.Components) &&
+    !code.includes(library.name) &&
     !(app && (code.includes("import") || code.includes("export")))
   ) {
     return;
@@ -341,20 +305,23 @@ function readImports(
   for (const statement of lexImportsExports(code)) {
     const from = statement.source?.value;
     if (!from || statement.typeOnly) continue;
-    const isBarrel = from === CarbonSvelte.Components;
-    const directKey = DIRECT_COMPONENT_PATH.exec(from)?.[1];
-    const appImport = app && resolveAppImport(app.from, from, app.apps);
-    if (isBarrel) bindings.carbonImports.barrel = true;
-    if (directKey) bindings.carbonImports.components.add(directKey);
+    const isBarrel = from === library.name;
+    const directKey = library.patterns.directComponentPath.exec(from)?.[1];
+    const appImport =
+      app && resolveAppImport(library, app.from, from, app.apps);
+    if (isBarrel) bindings.libraryImports.barrel = true;
+    if (directKey) bindings.libraryImports.components.add(directKey);
 
     if (statement.kind === "export") {
       for (const specifier of statement.specifiers) {
         if (specifier.typeOnly) continue;
         if (isBarrel && specifier.kind !== "named") bindings.openAll = true;
-        const key = isBarrel ? carbon.get(specifier.local) : directKey;
+        const key = isBarrel
+          ? library.components.get(specifier.local)
+          : directKey;
         if (key) {
           bindings.reExported.push(key);
-          bindings.carbonImports.components.add(key);
+          bindings.libraryImports.components.add(key);
         }
       }
       if (appImport) bindings.openAppComponents.push(...appImport.keys);
@@ -363,7 +330,8 @@ function readImports(
 
     for (const specifier of statement.specifiers) {
       if (specifier.typeOnly) continue;
-      if (COMPONENT_SOURCE.test(from)) bindings.objects.add(specifier.local);
+      if (library.patterns.componentSource.test(from))
+        bindings.objects.add(specifier.local);
       if (appImport) {
         if (appImport.exact && specifier.kind === "default") {
           bindings.components.set(specifier.local, appImport.keys[0]);
@@ -374,10 +342,10 @@ function readImports(
         if (specifier.kind === "namespace") {
           bindings.namespaces.add(specifier.local);
         } else {
-          const key = carbon.get(specifier.imported);
+          const key = library.components.get(specifier.imported);
           if (key) {
             bindings.components.set(specifier.local, key);
-            bindings.carbonImports.components.add(key);
+            bindings.libraryImports.components.add(key);
           }
         }
       } else if (directKey && specifier.kind === "default") {
@@ -405,20 +373,20 @@ function openSite(
 
 /**
  * Call sites in a JS/TS module (or anything else that isn't a `.svelte`
- * file): it can only use Carbon components as values, so every one it
+ * file): it can only use library components as values, so every one it
  * imports or re-exports is open.
  */
 export function collectScriptUsage(
   code: string,
   file: string,
-  carbon: CarbonComponents,
+  library: Library,
   reason = "used from a script module",
   apps?: AppComponents,
 ): ModuleUsage {
   const bindings = newBindings();
   const app = apps && { from: file, apps };
-  readImports(code, carbon, bindings, app);
-  readDynamicImports(code, bindings, app);
+  readImports(code, library, bindings, app);
+  readDynamicImports(library, code, bindings, app);
   return {
     sites: [
       ...bindings.components.values(),
@@ -428,25 +396,25 @@ export function collectScriptUsage(
     ].map((key) => openSite(key, file, 1, reason)),
     openAll: bindings.namespaces.size > 0 || bindings.openAll,
     openApps: bindings.openApps,
-    providedContexts: providedContexts(code),
-    providesUnknownContext: providesUnknownContext(code),
-    readsCarbonContext: readsCarbonContext(code),
+    providedContexts: providedContexts(library, code),
+    providesUnknownContext: providesUnknownContext(library, code),
+    readsLibraryContext: readsLibraryContext(library, code),
     file,
-    carbonImports: bindings.carbonImports,
+    libraryImports: bindings.libraryImports,
   };
 }
 
 /**
  * Call sites in a file the analysis can't parse (Markdown, Astro, a
  * `.svelte` file another preprocessor rewrites), read from its text alone:
- * every Carbon component it imports with `import { … }` or by path is
+ * every library component it imports with `import { … }` or by path is
  * open, and any other mention of the package (a namespace import, a
  * re-export, a dynamic import) opens every component.
  */
 export function collectImportedUsage(
   code: string,
   file: string,
-  carbon: CarbonComponents,
+  library: Library,
   reason: string,
   apps?: AppComponents,
 ): ModuleUsage {
@@ -454,13 +422,13 @@ export function collectImportedUsage(
   const usage: ModuleUsage = {
     sites: [],
     openAll: false,
-    providedContexts: providedContexts(code),
-    providesUnknownContext: providesUnknownContext(code),
-    readsCarbonContext: readsCarbonContext(code),
+    providedContexts: providedContexts(library, code),
+    providesUnknownContext: providesUnknownContext(library, code),
+    readsLibraryContext: readsLibraryContext(library, code),
     file,
-    carbonImports: bindings.carbonImports,
+    libraryImports: bindings.libraryImports,
   };
-  readDynamicImports(code, bindings, apps && { from: file, apps });
+  readDynamicImports(library, code, bindings, apps && { from: file, apps });
   usage.openAll = bindings.openAll;
   for (const key of bindings.dynamic)
     usage.sites.push(openSite(key, file, 1, reason));
@@ -468,7 +436,8 @@ export function collectImportedUsage(
     // Every `.svelte` path it names, imported or not, renders with any props.
     usage.openApps = bindings.openApps;
     for (const match of code.matchAll(SVELTE_SPECIFIER)) {
-      for (const key of resolveAppImport(file, match[2], apps)?.keys ?? []) {
+      for (const key of resolveAppImport(library, file, match[2], apps)?.keys ??
+        []) {
         usage.sites.push(
           openSite(key, file, locate(code, match.index).line, reason),
         );
@@ -478,35 +447,35 @@ export function collectImportedUsage(
       usage.sites.push(openSite(key, file, 1, reason));
     }
   }
-  if (!code.includes(CarbonSvelte.Components)) return usage;
+  if (!code.includes(library.name)) return usage;
 
   const understood = new Set<number>();
-  for (const match of code.matchAll(BARREL_IMPORT)) {
-    understood.add(
-      match.index + match[0].length - CarbonSvelte.Components.length - 2,
-    );
+  for (const match of code.matchAll(library.patterns.barrelImport)) {
+    understood.add(match.index + match[0].length - library.name.length - 2);
     if (match[1]) continue; // `import type { … }`
     for (const specifier of match[2].split(",")) {
       const name = specifier.trim();
       if (name === "" || name.startsWith("type ")) continue;
-      const key = carbon.get(name.split(IMPORT_AS)[0]);
+      const key = library.components.get(name.split(IMPORT_AS)[0]);
       if (key) {
         usage.sites.push(
           openSite(key, file, locate(code, match.index).line, reason),
         );
-        bindings.carbonImports.components.add(key);
+        bindings.libraryImports.components.add(key);
       }
     }
   }
-  for (const match of code.matchAll(BARREL_SPECIFIER)) {
-    bindings.carbonImports.barrel = true;
+  for (const match of code.matchAll(library.patterns.barrelSpecifier)) {
+    bindings.libraryImports.barrel = true;
     if (!understood.has(match.index)) usage.openAll = true;
   }
-  for (const match of code.matchAll(DIRECT_COMPONENT_SPECIFIER)) {
+  for (const match of code.matchAll(
+    library.patterns.directComponentSpecifier,
+  )) {
     usage.sites.push(
       openSite(match[1], file, locate(code, match.index).line, reason),
     );
-    bindings.carbonImports.components.add(match[1]);
+    bindings.libraryImports.components.add(match[1]);
   }
   return usage;
 }
@@ -518,19 +487,19 @@ export function collectImportedUsage(
 export function collectSourceUsage(
   code: string,
   file: string,
-  carbon: CarbonComponents,
+  library: Library,
   apps?: AppComponents,
 ): ModuleUsage {
   if (file.endsWith(".svelte")) {
-    return collectSvelteUsage(code, file, carbon, { apps });
+    return collectSvelteUsage(code, file, library, { apps });
   }
   if (SCRIPT_FILE.test(file)) {
-    return collectScriptUsage(code, file, carbon, undefined, apps);
+    return collectScriptUsage(code, file, library, undefined, apps);
   }
   return collectImportedUsage(
     code,
     file,
-    carbon,
+    library,
     "not a Svelte or script file",
     apps,
   );
@@ -712,24 +681,24 @@ function staticValue(expression: Expression, objects: Set<string>): Value {
 }
 
 /**
- * Call sites of Carbon components in an app `.svelte` file, read from its
+ * Call sites of library components in an app `.svelte` file, read from its
  * source as written (barrel or direct-path imports).
  *
  * Sound by construction: a component referenced as a value, spread into, or
  * imported but never rendered as a tag (markup another preprocessor
- * generates) is open; a file that doesn't parse makes every Carbon
+ * generates) is open; a file that doesn't parse makes every library
  * component it imports open.
  */
 export function collectSvelteUsage(
   code: string,
   file: string,
-  carbon: CarbonComponents,
+  library: Library,
   options: SvelteUsageOptions = {},
 ): ModuleUsage {
   const { apps } = options;
   // With the app's components, every file is walked: one can render
   // another, or itself, in ways no text check can rule out.
-  if (!apps && !code.includes(CarbonSvelte.Components)) {
+  if (!apps && !code.includes(library.name)) {
     return { sites: [], openAll: false, providedContexts: new Set(), file };
   }
 
@@ -741,7 +710,7 @@ export function collectSvelteUsage(
     return collectImportedUsage(
       code,
       file,
-      carbon,
+      library,
       "could not be parsed",
       apps,
     );
@@ -753,14 +722,14 @@ export function collectSvelteUsage(
     if (script) {
       readImports(
         code.slice(script.content.start, script.content.end),
-        carbon,
+        library,
         bindings,
         app,
       );
     }
   }
   // The markup too: `{#await import("…")}`.
-  readDynamicImports(code, bindings, app);
+  readDynamicImports(library, code, bindings, app);
 
   const usage: ModuleUsage = {
     sites: [
@@ -776,11 +745,11 @@ export function collectSvelteUsage(
     ],
     openAll: bindings.openAll,
     openApps: bindings.openApps,
-    providedContexts: providedContexts(code),
-    providesUnknownContext: providesUnknownContext(code),
-    readsCarbonContext: readsCarbonContext(code),
+    providedContexts: providedContexts(library, code),
+    providesUnknownContext: providesUnknownContext(library, code),
+    readsLibraryContext: readsLibraryContext(library, code),
     file,
-    carbonImports: bindings.carbonImports,
+    libraryImports: bindings.libraryImports,
   };
   const rendered = new Set<string>();
   const line = (node: { start: number }) => locate(code, node.start).line;
@@ -849,7 +818,7 @@ export function collectSvelteUsage(
         const [namespace, member] = node.name.split(".");
         const key = member
           ? bindings.namespaces.has(namespace)
-            ? carbon.get(member)
+            ? library.components.get(member)
             : undefined
           : bindings.components.get(node.name);
         if (key) {
@@ -895,7 +864,7 @@ export function collectSvelteUsage(
             parent.object === node &&
             !parent.computed &&
             parent.property.type === "Identifier"
-              ? carbon.get(parent.property.name)
+              ? library.components.get(parent.property.name)
               : undefined;
           if (member) {
             usage.sites.push(

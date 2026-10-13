@@ -1,5 +1,4 @@
 import { type AST, children, type Expression, locate } from "sveast/walk";
-import { extractCarbonClassTokens } from "../indexer/extract-runtime-classes";
 import type { Node } from "./ast";
 import { UnsupportedComponentError } from "./component-model";
 import {
@@ -26,23 +25,34 @@ import {
 
 /** What one component renders under its usage. */
 export type LiveResult = {
-  /** `.bx--*` classes it can apply. */
+  /** Classes it can apply (see `ClassTokens`). */
   classes: Set<string>;
-  /** `.bx--*-` prefixes of classes built from values it can't bound. */
+  /** Prefixes of classes built from values it can't bound. */
   prefixes: Set<string>;
-  /** Carbon components it can render, with the props it passes them. */
+  /** Library components it can render, with the props it passes them. */
   childSites: CallSite[];
 };
 
-function addTokens(text: string, result: LiveResult): void {
-  if (!text.includes("bx--")) return;
-  for (const token of extractCarbonClassTokens(text)) {
+/** A walk in progress: what it found, and how it reads class names. */
+type Walk = LiveResult & { tokens: ClassTokens | undefined };
+
+/** How a walk reads class names: see `LibrarySpec.classTokens`. */
+export type ClassTokens = {
+  /** Text that may name a class contains it (`"x--"`). */
+  marker: string;
+  text(text: string): string[];
+};
+
+function addTokens(text: string, result: Walk): void {
+  const { tokens } = result;
+  if (!tokens || !text.includes(tokens.marker)) return;
+  for (const token of tokens.text(text)) {
     if (token.endsWith("-")) result.prefixes.add(token);
     else result.classes.add(token);
   }
 }
 
-function addStrings(value: Value, result: LiveResult): void {
+function addStrings(value: Value, result: Walk): void {
   if (value === UNKNOWN) return;
   for (const p of value) if (typeof p === "string") addTokens(p, result);
 }
@@ -54,21 +64,23 @@ function addStrings(value: Value, result: LiveResult): void {
  * and falsy `class:` directives. Everything else is assumed live,
  * including every function body.
  */
-export function walkLive(scope: Scope): LiveResult {
-  const result: LiveResult = {
+export function walkLive(scope: Scope, tokens?: ClassTokens): LiveResult {
+  const result: Walk = {
     classes: new Set(),
     prefixes: new Set(),
     childSites: [],
+    tokens,
   };
   const { ast } = scope.model;
   // Scripts first, then markup; `<style>` holds no rendered classes.
   for (const node of [ast.module, ast.instance, ast.fragment]) {
     if (node) visit(node, scope, result);
   }
-  return result;
+  const { classes, prefixes, childSites } = result;
+  return { classes, prefixes, childSites };
 }
 
-function visitAll(nodes: Iterable<Node>, scope: Scope, result: LiveResult) {
+function visitAll(nodes: Iterable<Node>, scope: Scope, result: Walk) {
   for (const node of nodes) visit(node, scope, result);
 }
 
@@ -77,13 +89,13 @@ function visitBranches(
   consequent: Node | null | undefined,
   alternate: Node | null | undefined,
   scope: Scope,
-  result: LiveResult,
+  result: Walk,
 ): void {
   if (truth !== "falsy" && consequent) visit(consequent, scope, result);
   if (truth !== "truthy" && alternate) visit(alternate, scope, result);
 }
 
-function visit(node: Node, scope: Scope, result: LiveResult): void {
+function visit(node: Node, scope: Scope, result: Walk): void {
   switch (node.type) {
     // Import bindings aren't uses.
     case "ImportDeclaration":
@@ -94,7 +106,11 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
       return;
 
     case "TemplateLiteral": {
-      if (node.quasis.some((quasi) => quasi.value.raw.includes("bx--"))) {
+      const marker = result.tokens?.marker;
+      if (
+        marker !== undefined &&
+        node.quasis.some((quasi) => quasi.value.raw.includes(marker))
+      ) {
         const value = evaluate(node, scope);
         if (value !== UNKNOWN) {
           addStrings(value, result);
@@ -106,13 +122,13 @@ function visit(node: Node, scope: Scope, result: LiveResult): void {
     }
 
     // A template the walk can't evaluate keeps its literal parts: the
-    // `bx--btn--` in `bx--btn--${kind}` becomes a prefix.
+    // `x--btn--` in `x--btn--${kind}` becomes a prefix.
     case "TemplateElement":
       addTokens(node.value.raw, result);
       return;
 
     case "Text":
-      // Attribute text (`class="bx--a"`, `labelClass="bx--b"`); element
+      // Attribute text (`class="x--a"`, `labelClass="x--b"`); element
       // text never names a class, and skipping it here costs nothing.
       addTokens(node.data, result);
       return;
