@@ -9,11 +9,12 @@ import {
   type ComponentModel,
   contextKey,
   FUNCTION_DECLARATION,
+  type FunctionNode,
   type GuardedWrite,
   isTopLevel,
   memberKey,
 } from "./component-model";
-import type { ComponentUsage } from "./usage";
+import { type ComponentUsage, newComponentUsage } from "./usage";
 import {
   BOOLEAN,
   binary,
@@ -40,6 +41,7 @@ import {
   UNDEFINED,
   UNKNOWN,
   type Value,
+  valueId,
 } from "./values";
 
 /** What `getContext(key)` can return: `undefined` if nothing provides it. */
@@ -675,20 +677,23 @@ function evaluateCall(
         );
       }
       const fn = knownFunction(callee.name, scope);
-      return fn ? returnValue(fn, scope) : UNKNOWN;
+      if (fn) return callValue(fn, args as Node[], scope, scope);
+      const helper = scope.model.importedHelpers.get(callee.name)?.();
+      if (!helper) return UNKNOWN;
+      return callValue(
+        helper.fn,
+        args as Node[],
+        scope,
+        createScope(helper.model, newComponentUsage(), () => UNKNOWN),
+      );
     }
   }
 }
 
-type FunctionNode = Extract<
-  Node,
-  { type: "ArrowFunctionExpression" | "FunctionExpression" }
->;
-
 /**
  * The function the component's own name `name` holds, when the analysis
- * can read its body: a prop's default no call site overrides, or a
- * top-level `const f = (…) => …`.
+ * can read its body: a prop's default no call site overrides, a
+ * top-level `const f = (…) => …`, or a `function` declaration.
  */
 function knownFunction(name: string, scope: Scope): FunctionNode | undefined {
   const { model, usage } = scope;
@@ -699,12 +704,15 @@ function knownFunction(name: string, scope: Scope): FunctionNode | undefined {
     node = model.props.get(name) as Node | null | undefined;
   } else {
     const declaration = model.declarations.get(name);
-    if (declaration === FUNCTION_DECLARATION) return undefined;
-    node = declaration as Node | null | undefined;
+    node =
+      declaration === FUNCTION_DECLARATION
+        ? model.functions.get(name)
+        : (declaration as Node | null | undefined);
   }
   if (
     (node?.type === "ArrowFunctionExpression" ||
-      node?.type === "FunctionExpression") &&
+      node?.type === "FunctionExpression" ||
+      node?.type === "FunctionDeclaration") &&
     !node.async &&
     !node.generator
   ) {
@@ -713,34 +721,188 @@ function knownFunction(name: string, scope: Scope): FunctionNode | undefined {
   return undefined;
 }
 
-/**
- * What calling `fn` returns, when its body is an expression or a lone
- * `return`: its parameters are unknown (they're nested bindings), and
- * every other name it reads is the component's own (it's declared at the
- * top level).
- */
-function returnValue(fn: FunctionNode, scope: Scope): Value {
-  let returned: Node | null;
-  if (fn.body.type === "BlockStatement") {
-    const statements = fn.body.body as Node[];
-    if (statements.length === 0) return UNDEFINED;
-    const [only] = statements;
-    if (statements.length > 1 || only.type !== "ReturnStatement") {
-      return UNKNOWN;
-    }
-    returned = only.argument as Node | null;
-  } else {
-    returned = fn.body as Node;
-  }
-  if (!returned) return UNDEFINED;
+/** Calls nested past this depth are unknown, so a long chain ends. */
+const MAX_CALL_DEPTH = 8;
+let callDepth = 0;
 
-  const key = `call:${(fn as { start?: number }).start}`;
-  if (scope.pending.has(key)) return UNKNOWN;
-  scope.pending.add(key);
+/**
+ * What calling `fn` with `args` (evaluated in `caller`) returns, run in
+ * `callee` (the scope of the module that declares `fn`): each parameter
+ * bound to its argument, then the body read statement by statement.
+ * Only `const` declarations, `return`, and `if` around a lone `return`
+ * are followed; anything else is unknown. An `if` whose test can go
+ * either way adds its `return` and carries on.
+ */
+function callValue(
+  fn: FunctionNode,
+  args: readonly Node[],
+  caller: Scope,
+  callee: Scope,
+): Value {
+  if (args.some((arg) => arg.type === "SpreadElement")) return UNKNOWN;
+  const key = `call:${callee.model.key}:${(fn as { start?: number }).start}`;
+  if (callee.pending.has(key) || callDepth >= MAX_CALL_DEPTH) return UNKNOWN;
+  const values = args.map((arg) => evaluate(arg as Expression, caller));
+  // The same call with the same values returns the same.
+  const memoKey = `${key}(${values.map(valueId).join(",")})`;
+  const memoized = caller.memo.get(memoKey);
+  if (memoized !== undefined) return memoized;
+  const result = runCall(fn, values, callee, key);
+  caller.memo.set(memoKey, result);
+  return result;
+}
+
+function runCall(
+  fn: FunctionNode,
+  values: Value[],
+  callee: Scope,
+  key: string,
+): Value {
+  const outer = callee.locals;
+  const locals = new Map(outer);
+  callee.locals = locals;
+  callee.pending.add(key);
+  callDepth++;
   try {
-    return evaluate(returned as Expression, scope);
+    for (const [index, param] of fn.params.entries()) {
+      if (
+        !bindParameter(
+          param as Node,
+          values[index] ?? UNDEFINED,
+          locals,
+          callee,
+        )
+      ) {
+        return UNKNOWN;
+      }
+    }
+    if (fn.body.type !== "BlockStatement") {
+      return evaluate(fn.body as Expression, callee);
+    }
+    let result: Value = possible();
+    for (const statement of fn.body.body as Node[]) {
+      switch (statement.type) {
+        case "ReturnStatement":
+          return join(result, returned(statement, callee));
+        case "VariableDeclaration": {
+          if (statement.kind !== "const") return UNKNOWN;
+          for (const declarator of statement.declarations) {
+            if (
+              !declarator.init ||
+              !bindParameter(
+                declarator.id as Node,
+                evaluate(declarator.init, callee),
+                locals,
+                callee,
+              )
+            ) {
+              return UNKNOWN;
+            }
+          }
+          break;
+        }
+        case "IfStatement": {
+          const consequent = loneReturn(statement.consequent as Node);
+          const alternate = statement.alternate
+            ? loneReturn(statement.alternate as Node)
+            : null;
+          if (!consequent || alternate === undefined) return UNKNOWN;
+          const truth = truthOf(evaluate(statement.test, callee));
+          if (truth !== "falsy") {
+            result = join(result, returned(consequent, callee));
+            if (truth === "truthy") return result;
+          }
+          // A `truthy` test already returned.
+          if (alternate) return join(result, returned(alternate, callee));
+          break;
+        }
+        default:
+          return UNKNOWN;
+      }
+    }
+    return join(result, UNDEFINED);
   } finally {
-    scope.pending.delete(key);
+    callDepth--;
+    callee.pending.delete(key);
+    callee.locals = outer;
+  }
+}
+
+/** The `return` `node` is, or a block holds alone; `undefined` otherwise. */
+function loneReturn(
+  node: Node,
+): Extract<Node, { type: "ReturnStatement" }> | undefined {
+  if (node.type === "ReturnStatement") return node;
+  if (node.type === "BlockStatement" && node.body.length === 1) {
+    const [only] = node.body as Node[];
+    if (only.type === "ReturnStatement") return only;
+  }
+  return undefined;
+}
+
+function returned(
+  statement: Extract<Node, { type: "ReturnStatement" }>,
+  scope: Scope,
+): Value {
+  return statement.argument
+    ? evaluate(statement.argument as Expression, scope)
+    : UNDEFINED;
+}
+
+/**
+ * Binds the names `pattern` declares in `locals` to their part of
+ * `value`: an identifier, a default (`a = 1`), or an object pattern of
+ * named properties. `false` for any other pattern.
+ */
+function bindParameter(
+  pattern: Node,
+  value: Value,
+  locals: Map<Binding, Value>,
+  scope: Scope,
+): boolean {
+  switch (pattern.type) {
+    case "Identifier": {
+      const binding = scope.model.scopes.bindingOf(pattern);
+      if (!binding) return false;
+      // The body may change an object it's handed (`o.push(1)`) before
+      // reading it again: some object, contents unknown.
+      locals.set(
+        binding,
+        flatMap(value, (p) => possible(isStructured(p) ? OBJECT : p)),
+      );
+      return true;
+    }
+    case "AssignmentPattern": {
+      // The default applies when the value is `undefined`.
+      let bound = value;
+      if (value !== UNKNOWN && value.has(undefined)) {
+        const defined = new Set(value);
+        defined.delete(undefined);
+        bound = join(defined, evaluate(pattern.right, scope));
+      }
+      return bindParameter(pattern.left as Node, bound, locals, scope);
+    }
+    case "ObjectPattern":
+      for (const property of pattern.properties as Node[]) {
+        if (
+          property.type !== "Property" ||
+          property.computed ||
+          property.key.type !== "Identifier"
+        ) {
+          return false;
+        }
+        const name = property.key.name;
+        // Destructuring `null` or `undefined` throws: no value to bind.
+        const part = flatMap(value, (p) =>
+          isNullish(p) ? possible() : readProperty(p, name),
+        );
+        if (!bindParameter(property.value as Node, part, locals, scope)) {
+          return false;
+        }
+      }
+      return true;
+    default:
+      return false;
   }
 }
 

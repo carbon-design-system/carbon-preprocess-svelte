@@ -736,6 +736,77 @@ ${extra}
     });
   });
 
+  describe("calls to Carbon's script modules", () => {
+    const HELPERS = `const SCALE = ["sm", "md"];
+export const EXPORTED = ["sm", "md"];
+export function pick(size) {
+  if (!size) return undefined;
+  return size;
+}
+export function fromScale(i) {
+  return SCALE[i];
+}
+export function fromExported(i) {
+  return EXPORTED[i];
+}
+export function swapped() {
+  return "sm";
+}
+function swap() {
+  swapped = () => "md";
+}
+`;
+    async function keptSizes(call: string, markup: string) {
+      const mock = createMockCarbonPackage({
+        "index.js": `export { default as Sized } from "./Sized/Sized.svelte";`,
+        "utils/helpers.js": HELPERS,
+        "Sized/Sized.svelte": `<script>
+  import { pick, fromScale, fromExported, swapped } from "../utils/helpers.js";
+  export let size = undefined;
+  $: resolved = ${call};
+</script>
+<div class:bx--sm={resolved === "sm"} class:bx--md={resolved === "md"} />`,
+      });
+      try {
+        const mockCarbon = readCarbonComponents(mock.root);
+        const usage = collectSvelteUsage(
+          app(`import { Sized } from "carbon-components-svelte";`, markup),
+          "/app/App.svelte",
+          mockCarbon,
+        );
+        const { isPruned } = await analyzeUsage({
+          carbonRoot: mock.root,
+          carbon: mockCarbon,
+          bundled: usage.sites.map((site) => site.component),
+          modules: [usage],
+        });
+        return ["sm", "md"].filter((size) => !isPruned(`.bx--${size}`));
+      } finally {
+        mock.dispose();
+      }
+    }
+
+    test.each([
+      ["an argument that returns early", "pick(size)", "<Sized />", []],
+      ["an argument it returns", "pick(size)", `<Sized size="sm" />`, ["sm"]],
+      ["a constant only the module sees", "fromScale(1)", "<Sized />", ["md"]],
+      [
+        "a constant an importer could change",
+        "fromExported(1)",
+        "<Sized />",
+        ["sm", "md"],
+      ],
+      [
+        "a function the module reassigns",
+        "swapped()",
+        "<Sized />",
+        ["sm", "md"],
+      ],
+    ])("%s", async (_, call, markup, expected) => {
+      expect(await keptSizes(call, markup)).toEqual(expected);
+    });
+  });
+
   test("models runes: `$props`, `$bindable`, `$state` and `$derived`", () => {
     const model = buildComponentModel(
       `<script>

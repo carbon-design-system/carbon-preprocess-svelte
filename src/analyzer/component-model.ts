@@ -39,6 +39,20 @@ function markNameUnknown(
 /** A top-level `function` declaration: some object, never re-bound. */
 export const FUNCTION_DECLARATION = "function";
 
+/** A function the analysis may call: its parameters and body. */
+export type FunctionNode = Extract<
+  Node,
+  {
+    type:
+      | "FunctionDeclaration"
+      | "FunctionExpression"
+      | "ArrowFunctionExpression";
+  }
+>;
+
+/** An exported function of one of Carbon's `.js` modules, and that module. */
+export type Helper = { model: ComponentModel; fn: FunctionNode };
+
 /**
  * What the usage analysis needs to know about one Carbon component, read
  * once from its source.
@@ -60,6 +74,8 @@ export type ComponentModel = {
   propNames: Map<string, string>;
   /** Top-level `let`/`const`, functions, and `$: x = …` declarations. */
   declarations: Map<string, Expression | null | typeof FUNCTION_DECLARATION>;
+  /** Top-level `function` declarations, by name. */
+  functions: Map<string, FunctionNode>;
   /** The `$: x = …` assignments that define a declaration above. */
   reactiveDeclarations: WeakSet<Node>;
   /**
@@ -86,6 +102,11 @@ export type ComponentModel = {
    * local name: the strings a context key can be (see `contextKey`).
    */
   importedStrings: Map<string, string>;
+  /**
+   * Imported bindings of a Carbon `.js` module's exported functions, by
+   * local name, read when first called.
+   */
+  importedHelpers: Map<string, () => Helper | undefined>;
   /** Bindings imported from `svelte/store`, by local name: `readable`. */
   storeImports: Map<string, string>;
   /** Keys this component passes to `setContext` (see `contextKey`). */
@@ -207,15 +228,117 @@ export function loadComponentModel(
   const model = buildComponentModel(
     readFileSync(file, "utf8"),
     key,
-    (from, source, name) => {
-      const component = resolveReExport(carbonSrc, from, source, name);
-      if (component) return { component };
-      const string = resolveStringExport(carbonSrc, from, source, name);
-      return string === undefined ? undefined : { string };
-    },
+    carbonResolver(carbonSrc),
   );
   cache.set(file, { mtimeMs, model });
   return model;
+}
+
+/** Resolves a Carbon module's relative imports: see `ImportResolver`. */
+function carbonResolver(carbonSrc: string): ImportResolver {
+  return (from, source, name) => {
+    const component = resolveReExport(carbonSrc, from, source, name);
+    if (component) return { component };
+    const string = resolveStringExport(carbonSrc, from, source, name);
+    if (string !== undefined) return { string };
+    const module = scriptModule(carbonSrc, from, source);
+    return module
+      ? { helper: () => loadHelper(carbonSrc, module, name) }
+      : undefined;
+  };
+}
+
+/** The `.js` module `source` names from module `from`, if it exists. */
+function scriptModule(
+  carbonSrc: string,
+  from: string,
+  source: string,
+): string | undefined {
+  const joined = path.posix.join(path.posix.dirname(from), source);
+  return [joined, `${joined}.js`].find(
+    (candidate) =>
+      candidate.endsWith(".js") && existsSync(path.join(carbonSrc, candidate)),
+  );
+}
+
+const scriptCache = new Map<
+  string,
+  { mtimeMs: number; model: ComponentModel | undefined }
+>();
+
+/**
+ * Carbon's `.js` module `key`, modeled as a module script. Every name it
+ * exports may be changed by an importer, so an object one holds is never
+ * known (see `escapes`). `undefined` if it doesn't parse.
+ */
+function loadScriptModel(
+  carbonSrc: string,
+  key: string,
+): ComponentModel | undefined {
+  const file = path.join(carbonSrc, key);
+  const { mtimeMs } = statSync(file);
+  const cached = scriptCache.get(file);
+  if (cached?.mtimeMs === mtimeMs) return cached.model;
+  let model: ComponentModel | undefined;
+  try {
+    model = buildComponentModel(
+      `<script context="module">\n${readFileSync(file, "utf8")}\n</script>`,
+      key,
+      carbonResolver(carbonSrc),
+    );
+    for (const statement of model.ast.module?.content.body ?? []) {
+      if (statement.type !== "ExportNamedDeclaration") continue;
+      const names = statement.declaration
+        ? statement.declaration.type === "VariableDeclaration"
+          ? statement.declaration.declarations.flatMap((declarator) =>
+              extractIdentifiers(declarator.id as Pattern),
+            )
+          : []
+        : statement.specifiers.flatMap((specifier) =>
+            specifier.local.type === "Identifier" ? [specifier.local] : [],
+          );
+      for (const { name } of names) {
+        model.escapes.set(name, { full: true, paths: [] });
+      }
+    }
+  } catch {
+    model = undefined;
+  }
+  scriptCache.set(file, { mtimeMs, model });
+  return model;
+}
+
+/** The function `.js` module `key` exports as `name`, if it declares one. */
+function loadHelper(
+  carbonSrc: string,
+  key: string,
+  name: string,
+): Helper | undefined {
+  const model = loadScriptModel(carbonSrc, key);
+  // A function the module reassigns may not be the one declared.
+  if (!model || model.unknownNames.has(name)) return undefined;
+  for (const statement of model.ast.module?.content.body ?? []) {
+    if (statement.type !== "ExportNamedDeclaration") continue;
+    const { declaration } = statement;
+    if (declaration?.type === "FunctionDeclaration") {
+      if (declaration.id?.name === name) {
+        return { model, fn: declaration as FunctionNode };
+      }
+    } else if (declaration?.type === "VariableDeclaration") {
+      for (const declarator of declaration.declarations) {
+        if (
+          declaration.kind === "const" &&
+          declarator.id.type === "Identifier" &&
+          declarator.id.name === name &&
+          (declarator.init?.type === "ArrowFunctionExpression" ||
+            declarator.init?.type === "FunctionExpression")
+        ) {
+          return { model, fn: declarator.init as FunctionNode };
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -226,7 +349,11 @@ type ImportResolver = (
   from: string,
   source: string,
   name: string,
-) => { component: string } | { string: string } | undefined;
+) =>
+  | { component: string }
+  | { string: string }
+  | { helper: () => Helper | undefined }
+  | undefined;
 
 const MAX_BARREL_HOPS = 4;
 
@@ -311,6 +438,7 @@ export function buildComponentModel(
     props: new Map(),
     propNames: new Map(),
     declarations: new Map(),
+    functions: new Map(),
     reactiveDeclarations: new WeakSet(),
     unknownNames: new Set(),
     unknownReasons: new Map(),
@@ -318,6 +446,7 @@ export function buildComponentModel(
     componentImports: new Map(),
     otherImports: new Set(),
     importedStrings: new Map(),
+    importedHelpers: new Map(),
     storeImports: new Map(),
     providedContexts: new Set(),
     providesUnknownContext: false,
@@ -406,7 +535,9 @@ export function buildComponentModel(
       case "AssignmentExpression":
         if (model.reactiveDeclarations.has(node)) {
           // `$: x = …` defines `x` rather than writing it.
-          writes.delete(node.left as Identifier);
+          forEachNode(node.left as Node, (target) => {
+            if (target.type === "Identifier") writes.delete(target);
+          });
         } else if (
           (reactive.get(node)?.length ?? 0) > 0 &&
           node.operator === "=" &&
@@ -928,8 +1059,10 @@ function readTopLevelStatement(
         model.componentImports.set(specifier.local.name, resolved.component);
       } else {
         model.otherImports.add(specifier.local.name);
-        if (resolved) {
+        if (resolved && "string" in resolved) {
           model.importedStrings.set(specifier.local.name, resolved.string);
+        } else if (resolved) {
+          model.importedHelpers.set(specifier.local.name, resolved.helper);
         }
       }
       if (source === "svelte/store" && imported) {
@@ -987,6 +1120,40 @@ function readTopLevelStatement(
 
   if (declaration.type === "FunctionDeclaration" && declaration.id) {
     model.declarations.set(declaration.id.name, FUNCTION_DECLARATION);
+    model.functions.set(declaration.id.name, declaration as FunctionNode);
+    return;
+  }
+
+  if (
+    statement.type === "LabeledStatement" &&
+    statement.label.name === "$" &&
+    statement.body.type === "ExpressionStatement" &&
+    statement.body.expression.type === "AssignmentExpression" &&
+    statement.body.expression.operator === "=" &&
+    statement.body.expression.left.type === "ObjectPattern"
+  ) {
+    // `$: ({ a, b: c } = f())` defines each name as a read of `f()`.
+    const assignment = statement.body.expression;
+    const names = extractIdentifiers(assignment.left as Pattern).map(
+      ({ name }) => name,
+    );
+    if (
+      names.some(
+        (name) =>
+          name.startsWith("$") ||
+          model.declarations.has(name) ||
+          model.props.has(name),
+      )
+    ) {
+      return;
+    }
+    declareDestructured(
+      model,
+      assignment.left as Node,
+      assignment.right,
+      undefined,
+    );
+    model.reactiveDeclarations.add(assignment);
     return;
   }
 
