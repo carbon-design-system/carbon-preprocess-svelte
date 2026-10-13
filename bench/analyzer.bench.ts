@@ -15,6 +15,7 @@ import { buildComponentModel } from "../src/specializer/component-model";
 import { libraryAt } from "../src/specializer/library";
 import { toSourceMap } from "../src/specializer/mapped-text";
 import { specializeComponent } from "../src/specializer/specialize";
+import { UNKNOWN } from "../src/specializer/values";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
 import { components } from "../tests/helpers/component-index";
 
@@ -194,6 +195,69 @@ ${i > 0 ? `<Inner tone="danger">{label}</Inner>` : ""}`,
 group(`collectAppUsage over ${bundleModules.length} modules`, () => {
   task("collectAppUsage", () => {
     collectAppUsage(bundleModules, carbon);
+  });
+});
+
+// App components whose props flow through `$:` writes under `if` and
+// calls with arguments: a chain of 20 wrappers, each picking its Button
+// `kind` in a guarded `$:` write and its Tag `type` from a local function
+// with a destructured, defaulted parameter.
+const guardedModules = [
+  ...Array.from({ length: 20 }, (_, i) => ({
+    file: path.join(bundleDir, `Guarded${i}.svelte`),
+    code: `<script>
+  import { Button, Tag } from "carbon-components-svelte";
+  ${i > 0 ? `import Inner from "./Guarded${i - 1}.svelte";` : ""}
+  export let tone = "primary";
+  export let urgent = false;
+  let kind = "ghost";
+  $: if (urgent) kind = "danger";
+  function tagType(t, { strong = false } = {}) {
+    if (t === "danger") return strong ? "red" : "magenta";
+    return "blue";
+  }
+</script>
+<Tag type={tagType(tone, { strong: urgent })}>Card ${i}</Tag>
+<Button {kind}><slot /></Button>
+${i > 0 ? `<Inner tone="danger" urgent>Card ${i}</Inner>` : ""}`,
+  })),
+  {
+    file: path.join(bundleDir, "main.js"),
+    code: `import App from "./Guarded19.svelte";\nnew App({ target: document.body });`,
+  },
+];
+
+const analyzeGuarded = () =>
+  analyzeFiles({
+    library: CARBON,
+    failure: PROP_AWARE_FAILURE,
+    projectRoot: root,
+    files: guardedModules,
+    components: ["Button", "Tag"],
+    options: {},
+  });
+// Measures nothing new if these reads fall back to unknown.
+const guarded = await analyzeGuarded();
+if (
+  "warning" in guarded ||
+  guarded.analysis.usages.get("Button/Button.svelte")?.props.get("kind") ===
+    UNKNOWN ||
+  guarded.analysis.usages.get("Tag/Tag.svelte")?.props.get("type") === UNKNOWN
+) {
+  throw new Error("guarded writes or calls went unread");
+}
+
+group("app components: guarded `$:` writes and calls (20 wrappers)", () => {
+  task("analyzeFiles", async () => {
+    await analyzeGuarded();
+  });
+  task("specializeFiles", async () => {
+    await specializeFiles({
+      library: CARBON,
+      failure: SPECIALIZE_FAILURE,
+      projectRoot: root,
+      files: guardedModules,
+    });
   });
 });
 
