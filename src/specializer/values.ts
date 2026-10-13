@@ -157,7 +157,6 @@ export function shape(
 
 const stores = new Map<string, Store>();
 
-/** The interned store holding `value`; see `Store`. */
 /**
  * A store holding `value`, as a value. One holding an object could have it
  * changed through `$s`, so its contents are unknown.
@@ -168,7 +167,8 @@ export function storeOf(value: Value): Value {
   );
 }
 
-export function store(value: Value): Store {
+/** The interned store holding `value`; see `Store`. */
+function store(value: Value): Store {
   const key = valueKey(value);
   let existing = stores.get(key);
   if (!existing) {

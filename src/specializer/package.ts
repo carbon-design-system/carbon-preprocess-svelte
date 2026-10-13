@@ -35,7 +35,7 @@ function resolveWithPnp(name: string, from: string): string | undefined {
  * Walks `require.resolve.paths` instead of resolving `<name>/package.json`,
  * which an `exports` map may block (`ERR_PACKAGE_PATH_NOT_EXPORTED`).
  */
-export function resolvePackageDir(
+function resolvePackageDir(
   name: string,
   from: string = process.cwd(),
 ): string | undefined {
