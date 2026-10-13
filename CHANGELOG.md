@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.53](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.53) - 2026-10-13
+
+**Features**
+
+- analyzer: read calls with their arguments, including Carbon helper functions
+- analyzer: read stores a context hands on
+- analyzer: read writes that only run under a `$:` condition
+- analyzer: read context keys Carbon imports as constants
+
+**Performance**
+
+- specializer: cut repeat walks, stat calls, and CSS parses
+
 ## [0.11.52](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.52) - 2026-10-12
 
 **Fixes**
