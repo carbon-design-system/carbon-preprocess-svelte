@@ -85,6 +85,12 @@ export type ModuleUsage = {
    * spell out (see `providesUnknownContext`).
    */
   providesUnknownContext?: boolean;
+  /**
+   * It may read a Carbon context (`getContext` or `getAllContexts`, and a
+   * `carbon:` key or one of Carbon's script modules), and so write to the
+   * stores one hands on.
+   */
+  readsCarbonContext?: boolean;
   /** The file it was read from. */
   file?: string;
   /** What it imports from Carbon, as read. */
@@ -272,6 +278,14 @@ function providesUnknownContext(code: string): boolean {
   return mentions > [...code.matchAll(CARBON_CONTEXT_KEY)].length;
 }
 
+function readsCarbonContext(code: string): boolean {
+  if (code.includes("getAllContexts")) return true;
+  return (
+    code.includes("getContext") &&
+    (code.includes("carbon:") || CARBON_SCRIPT_SPECIFIER.test(code))
+  );
+}
+
 type ImportBindings = {
   /** Local binding -> Carbon component key, or app component file. */
   components: Map<string, string>;
@@ -416,6 +430,7 @@ export function collectScriptUsage(
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
     providesUnknownContext: providesUnknownContext(code),
+    readsCarbonContext: readsCarbonContext(code),
     file,
     carbonImports: bindings.carbonImports,
   };
@@ -441,6 +456,7 @@ export function collectImportedUsage(
     openAll: false,
     providedContexts: providedContexts(code),
     providesUnknownContext: providesUnknownContext(code),
+    readsCarbonContext: readsCarbonContext(code),
     file,
     carbonImports: bindings.carbonImports,
   };
@@ -762,6 +778,7 @@ export function collectSvelteUsage(
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
     providesUnknownContext: providesUnknownContext(code),
+    readsCarbonContext: readsCarbonContext(code),
     file,
     carbonImports: bindings.carbonImports,
   };

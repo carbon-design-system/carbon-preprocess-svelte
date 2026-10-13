@@ -565,6 +565,177 @@ describe("analyzeUsage", () => {
     });
   });
 
+  test("a Toolbar takes its size from its DataTable's", async () => {
+    const IMPORT = `import { DataTable, Toolbar, ToolbarContent } from "carbon-components-svelte";`;
+    const table = (size: string) =>
+      app(
+        IMPORT,
+        `<DataTable size="${size}" headers={[]} rows={[]}><Toolbar><ToolbarContent /></Toolbar></DataTable>`,
+      );
+    const medium = await analyze(table("medium"));
+    expect(medium.isPruned(".bx--table-toolbar--xs")).toBe(true);
+    expect(medium.isPruned(".bx--table-toolbar--sm")).toBe(true);
+    const compact = await analyze(table("compact"));
+    expect(compact.isPruned(".bx--table-toolbar--xs")).toBe(false);
+    expect(compact.isPruned(".bx--table-toolbar--sm")).toBe(true);
+  });
+
+  describe("stores a context hands on", () => {
+    const PROVIDER = `<script>
+  import { setContext } from "svelte";
+  import { readonly, writable } from "svelte/store";
+  export let size = "md";
+  const store = writable(size);
+  $: $store = size;
+  const shared = writable(size);
+  $: shared.set(size);
+  setContext("carbon:Mock", { store, shared: readonly(shared) });
+</script>
+<slot />`;
+    const consumer = (property: string, extra = "") => `<script>
+  import { getContext } from "svelte";
+  const ctx = getContext("carbon:Mock");
+  const store = ctx?.${property};
+${extra}
+</script>
+<div class:bx--md={$store === "md"} class:bx--lg={$store === "lg"} />`;
+    /** Reads the context like `consumer`, but renders no class of its own. */
+    const reader = (property: string, extra: string) =>
+      `${consumer(property, extra).split("<div")[0]}<slot />`;
+
+    async function lgPruned(
+      files: Record<string, string>,
+      markup: string,
+      script = "",
+    ) {
+      const mock = createMockCarbonPackage({
+        "index.js": [
+          `export { default as Provider } from "./Provider/Provider.svelte";`,
+          `export { default as Consumer } from "./Consumer/Consumer.svelte";`,
+          `export { default as Other } from "./Other/Other.svelte";`,
+        ].join("\n"),
+        "Provider/Provider.svelte": PROVIDER,
+        "Consumer/Consumer.svelte": consumer("store"),
+        "Other/Other.svelte": "<slot />",
+        ...files,
+      });
+      try {
+        const mockCarbon = readCarbonComponents(mock.root);
+        const names = [...new Set(markup.match(/(?<=<)[A-Z]\w*/g))];
+        const usage = collectSvelteUsage(
+          app(
+            `${script}\nimport { ${names.join(", ")} } from "carbon-components-svelte";`,
+            markup,
+          ),
+          "/app/App.svelte",
+          mockCarbon,
+        );
+        const { isPruned } = await analyzeUsage({
+          carbonRoot: mock.root,
+          carbon: mockCarbon,
+          bundled: usage.sites.map((site) => site.component),
+          modules: [usage],
+        });
+        expect(
+          isPruned(markup.includes('size="lg"') ? ".bx--lg" : ".bx--md"),
+        ).toBe(false);
+        return isPruned(".bx--lg");
+      } finally {
+        mock.dispose();
+      }
+    }
+
+    const MD = `<Provider size="md"><Consumer /></Provider>`;
+
+    test("reads a store the provider only sets from `$:`", async () => {
+      expect(await lgPruned({}, MD)).toBe(true);
+      expect(
+        await lgPruned({}, `<Provider size="lg"><Consumer /></Provider>`),
+      ).toBe(false);
+      // Each provider's store, joined.
+      expect(
+        await lgPruned(
+          {},
+          `<Provider size="md"><Consumer /></Provider><Provider size="lg" />`,
+        ),
+      ).toBe(false);
+    });
+
+    test.each([
+      ["sets it in a handler", "  function f() { $store = 'lg'; }"],
+      ["passes it on", "  const other = { store };"],
+      ["subscribes by hand", "  store.subscribe(() => {});"],
+    ])("a provider that %s keeps it unknown", async (_, extra) => {
+      const files = {
+        "Provider/Provider.svelte": PROVIDER.replace(
+          "\n  setContext(",
+          `\n${extra}\n  setContext(`,
+        ),
+      };
+      expect(await lgPruned(files, MD)).toBe(false);
+    });
+
+    test.each([
+      ["sets it", `  $: if (ctx) $store = "lg";`],
+      ["hands on the context", "  const all = { ctx };"],
+      [
+        "reads every context",
+        "  import { getAllContexts } from 'svelte';\n  getAllContexts();",
+      ],
+    ])("a rendered reader that %s keeps it unknown", async (_, extra) => {
+      const files = { "Other/Other.svelte": reader("store", extra) };
+      expect(
+        await lgPruned(
+          files,
+          `<Provider size="md"><Consumer /><Other /></Provider>`,
+        ),
+      ).toBe(false);
+      // Not rendered, it can't.
+      expect(await lgPruned(files, MD)).toBe(true);
+    });
+
+    test("a store handed on in two contexts keeps it unknown", async () => {
+      const files = {
+        "Provider/Provider.svelte": PROVIDER.replace(
+          "\n</script>",
+          `\n  setContext("carbon:Twice", { store });\n</script>`,
+        ),
+      };
+      expect(await lgPruned(files, MD)).toBe(false);
+    });
+
+    test("no reader can set a store handed on as `readonly(s)`", async () => {
+      const files = {
+        "Consumer/Consumer.svelte": consumer("shared"),
+        "Other/Other.svelte": reader("shared", "  const all = { store };"),
+      };
+      expect(
+        await lgPruned(
+          files,
+          `<Provider size="md"><Consumer /><Other /></Provider>`,
+        ),
+      ).toBe(true);
+    });
+
+    test("an app that reads a Carbon context keeps it unknown", async () => {
+      expect(
+        await lgPruned(
+          {},
+          MD,
+          // Its key comes from Carbon, so the app holds no `"carbon:"` string.
+          `import { getContext } from "svelte";\nimport { KEY } from "carbon-components-svelte/src/keys.js";\nconst ctx = getContext(KEY);`,
+        ),
+      ).toBe(false);
+    });
+
+    test("a Carbon script module that reads a context keeps it unknown", async () => {
+      const files = {
+        "read.js": `import { getContext } from "svelte";\nexport const read = () => getContext("carbon:Mock");\n`,
+      };
+      expect(await lgPruned(files, MD)).toBe(false);
+    });
+  });
+
   test("models runes: `$props`, `$bindable`, `$state` and `$derived`", () => {
     const model = buildComponentModel(
       `<script>

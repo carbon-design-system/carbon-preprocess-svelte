@@ -11,11 +11,11 @@ exports[`golden app sizes admin-dashboard 1`] = `
     "js_kb": 248.63,
   },
   "full": {
-    "css_kb": 100.5,
-    "js_kb": 183.24,
+    "css_kb": 96.77,
+    "js_kb": 183.11,
   },
   "prop-aware": {
-    "css_kb": 100.5,
+    "css_kb": 96.77,
     "js_kb": 248.63,
   },
 }
@@ -33,7 +33,7 @@ exports[`golden app sizes signup-wizard 1`] = `
   },
   "full": {
     "css_kb": 64.12,
-    "js_kb": 152.35,
+    "js_kb": 152.19,
   },
   "prop-aware": {
     "css_kb": 64.12,

@@ -529,37 +529,37 @@ describe("names a nested scope binds", () => {
   });
 });
 
-describe("writes under `if` in `$:` statements", () => {
-  /** What `name` can hold in `script`, rendered with `props`. */
-  function possibleValues(
-    script: string,
-    props: Record<string, unknown> = {},
-    name = "a",
-  ) {
-    const model = buildComponentModel(
-      `<script>\n${script}\n</script>\n{a}`,
-      "X/X.svelte",
-    );
-    const usage = newComponentUsage();
-    addCallSite(
-      usage,
-      {
-        component: model.key,
-        open: false,
-        props: new Map(
-          Object.entries(props).map(([k, v]) => [k, possible(v as boolean)]),
-        ),
-        slots: new Set(),
-      },
-      model.props.keys(),
-    );
-    const value = evaluate(
-      { type: "Identifier", name } as Expression,
-      createScope(model, usage, () => possible(undefined)),
-    );
-    return value === UNKNOWN ? "unknown" : [...value].sort();
-  }
+/** What `name` can hold in `script`, rendered with `props`. */
+function possibleValues(
+  script: string,
+  props: Record<string, unknown> = {},
+  name = "a",
+) {
+  const model = buildComponentModel(
+    `<script>\n${script}\n</script>\n{a}`,
+    "X/X.svelte",
+  );
+  const usage = newComponentUsage();
+  addCallSite(
+    usage,
+    {
+      component: model.key,
+      open: false,
+      props: new Map(
+        Object.entries(props).map(([k, v]) => [k, possible(v as boolean)]),
+      ),
+      slots: new Set(),
+    },
+    model.props.keys(),
+  );
+  const value = evaluate(
+    { type: "Identifier", name } as Expression,
+    createScope(model, usage, () => possible(undefined)),
+  );
+  return value === UNKNOWN ? "unknown" : [...value].sort();
+}
 
+describe("writes under `if` in `$:` statements", () => {
   const GATED = `export let a = false;\nexport let gate = false;`;
 
   test.each([
@@ -642,5 +642,56 @@ describe("writes under `if` in `$:` statements", () => {
     );
     expect(code).not.toContain("<Expand />");
     expect(code).not.toContain("expandable = true");
+  });
+});
+
+describe("reading objects, keys and stores", () => {
+  test.each([
+    [
+      "a lookup with each of several known keys",
+      `export let k = "a";\nconst M = { a: "x", b: "y" };\n$: v = M[k];`,
+      { k: "b" },
+      ["y"],
+    ],
+    [
+      "a lookup with a key that may be `undefined`",
+      `export let k = "a";\nconst M = { a: "x" };\n$: v = k ? M[k] : "z";`,
+      // Passing `undefined` falls back to the default: `k` is "a" or
+      // `undefined`, and `M[undefined]` reads `M.undefined`.
+      { k: undefined },
+      ["x", "z", undefined],
+    ],
+    [
+      "a lookup with an unknown key",
+      `let k = "a";\nfunction f() { k = "b"; }\nconst M = { a: "x" };\n$: v = M[k];`,
+      {},
+      "unknown",
+    ],
+    [
+      "an object read by an unknown key, read by a known one",
+      `let k = "a";\nfunction f() { k = "b"; }\nconst M = { a: "x" };\n$: other = M[k];\n$: v = M.a;`,
+      {},
+      ["x"],
+    ],
+    [
+      "a property of something that may be `undefined`",
+      `let on = false;\nfunction f() { on = true; }\nconst o = on ? { a: "x" } : undefined;\n$: v = o?.a;`,
+      {},
+      ["x", undefined],
+    ],
+    [
+      "a store that may be missing",
+      `import { readable } from "svelte/store";\nlet on = false;\nfunction f() { on = true; }\nconst s = on ? readable("x") : undefined;\n$: v = $s;`,
+      {},
+      ["x", undefined],
+    ],
+    [
+      "a store reached through an object",
+      `import { readable } from "svelte/store";\nconst o = { s: readable("x") };\nconst s = o.s;\n$: v = $s;`,
+      {},
+      ["x"],
+    ],
+  ])("%s", (_, script, props, expected) => {
+    expect(possibleValues(script, props, "v")).toEqual(expected);
   });
 });

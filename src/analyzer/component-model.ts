@@ -93,6 +93,20 @@ export type ComponentModel = {
   /** It passes `setContext` a key the analysis can't read. */
   providesUnknownContext: boolean;
   /**
+   * What each `setContext` call passes, by key: an object literal's
+   * properties, each a `MirroredStore` or something else (`null`). `null`
+   * for a value that isn't such a literal.
+   */
+  contextObjects: Map<string, Array<Map<string, MirroredStore | null> | null>>;
+  /**
+   * The properties of each context it reads that it may write to or hand
+   * on (`"*"` for all of them): any use but subscribing to a store it
+   * reads into a `const`.
+   */
+  contextLeaks: Map<string, Set<string>>;
+  /** It calls `getContext` with a key it can't read, or `getAllContexts`. */
+  readsUnknownContext: boolean;
+  /**
    * How each name's value can reach code that might mutate it, which
    * decides whether an object or array literal it holds stays known (see
    * `Shape`). `$$props.x` adds `"$$props.x"` (the prop passed as `x`) and
@@ -124,6 +138,18 @@ export type GuardedWrite = {
   guards: Array<{ test: Expression; holds: boolean }>;
   value: Expression;
   line: number;
+};
+
+/**
+ * A `const s = writable(initial)` the component sets only from `$:`
+ * statements (`$: $s = a`, `$: s.set(a)`) and hands on only as a property
+ * of a context object: it holds `initial` or one of `writes`. `readOnly`
+ * when handed on as `readonly(s)`, which no reader can set.
+ */
+export type MirroredStore = {
+  initial: Expression | null;
+  writes: Expression[];
+  readOnly: boolean;
 };
 
 /** Thrown for a component the analysis can't model. */
@@ -295,6 +321,9 @@ export function buildComponentModel(
     storeImports: new Map(),
     providedContexts: new Set(),
     providesUnknownContext: false,
+    contextObjects: new Map(),
+    contextLeaks: new Map(),
+    readsUnknownContext: false,
     escapes: findEscapes(ast),
   };
 
@@ -371,7 +400,7 @@ export function buildComponentModel(
       written.add(name);
     });
   const line = (offset: number) => locate(code, offset).line;
-  const guarded = guardedAssignments(ast);
+  const reactive = reactiveStatements(ast);
   forEachNode(ast, (node) => {
     switch (node.type) {
       case "AssignmentExpression":
@@ -379,7 +408,7 @@ export function buildComponentModel(
           // `$: x = …` defines `x` rather than writing it.
           writes.delete(node.left as Identifier);
         } else if (
-          guarded.has(node) &&
+          (reactive.get(node)?.length ?? 0) > 0 &&
           node.operator === "=" &&
           node.left.type === "Identifier" &&
           // `$store = …` sets a store other components may share.
@@ -390,7 +419,7 @@ export function buildComponentModel(
           writes.delete(node.left);
           const list = model.guardedWrites.get(name) ?? [];
           list.push({
-            guards: guarded.get(node) ?? [],
+            guards: reactive.get(node) ?? [],
             value: node.right,
             line: line(node.start),
           });
@@ -430,16 +459,316 @@ export function buildComponentModel(
     model.restPropsName = undefined;
   }
 
+  readContextFlow(model, reactive);
   return model;
 }
 
+const CONTEXT_CALL = /\b(?:get|set)Context\b|\bgetAllContexts\b/;
+
 /**
- * The assignments in the instance script's `$:` statements that run only
- * under `if` conditions (`$: if (a) x = true`), with those conditions.
- * Any other statement or expression on the way (a loop, `&&`, a
- * function) leaves an assignment out.
+ * Fills `contextObjects`, `contextLeaks` and `readsUnknownContext`: what
+ * flows through the contexts the component sets and reads.
  */
-function guardedAssignments(ast: AST.Root): Map<Node, GuardedWrite["guards"]> {
+function readContextFlow(
+  model: ComponentModel,
+  reactive: Map<Node, GuardedWrite["guards"]>,
+): void {
+  const { ast, code } = model;
+  if (!CONTEXT_CALL.test(code)) return;
+  const parents = new Map<Node, Node | null>();
+  walk(ast, {
+    enter(node, parent) {
+      parents.set(node as Node, (parent as Node | null) ?? null);
+    },
+  });
+  const leak = (key: string, property: string) => {
+    const leaked = model.contextLeaks.get(key) ?? new Set<string>();
+    leaked.add(property);
+    model.contextLeaks.set(key, leaked);
+  };
+  forEachNode(ast, (node) => {
+    if (node.type !== "CallExpression" || node.callee.type !== "Identifier") {
+      return;
+    }
+    const [first, second] = node.arguments as Node[];
+    if (node.callee.name === "getAllContexts") {
+      model.readsUnknownContext = true;
+    } else if (node.callee.name === "getContext") {
+      const key = contextKey(first, model);
+      if (key === undefined) model.readsUnknownContext = true;
+      else readContextUse(model, node, key, parents, leak);
+    } else if (node.callee.name === "setContext") {
+      const key = contextKey(first, model);
+      if (key === undefined) return;
+      const objects = model.contextObjects.get(key) ?? [];
+      objects.push(contextObject(model, second, parents, reactive));
+      model.contextObjects.set(key, objects);
+    }
+  });
+}
+
+/**
+ * The properties of the object literal `node` passes to `setContext`
+ * (inline, or a `const` nothing else uses), each a `MirroredStore` or
+ * `null`. `null` for anything else.
+ */
+function contextObject(
+  model: ComponentModel,
+  node: Node | undefined,
+  parents: Map<Node, Node | null>,
+  reactive: Map<Node, GuardedWrite["guards"]>,
+): Map<string, MirroredStore | null> | null {
+  let object = node;
+  if (node?.type === "Identifier") {
+    const binding = model.scopes.bindingOf(node);
+    const declarator = binding?.declaration as Node | undefined;
+    if (
+      !binding ||
+      !isTopLevel(binding, model) ||
+      binding.kind !== "const" ||
+      binding.references.length !== 1 ||
+      declarator?.type !== "VariableDeclarator"
+    ) {
+      return null;
+    }
+    object = declarator.init as Node | undefined;
+  }
+  if (object?.type !== "ObjectExpression") return null;
+  const properties = new Map<string, MirroredStore | null>();
+  for (const property of object.properties as Node[]) {
+    if (property.type !== "Property" || property.kind !== "init") return null;
+    const name = propertyName(property);
+    if (name === undefined) return null;
+    const { value } = property;
+    // `readonly(s)` from `svelte/store`
+    const wrapped =
+      value.type === "CallExpression" &&
+      value.callee.type === "Identifier" &&
+      model.storeImports.get(value.callee.name) === "readonly" &&
+      value.arguments.length === 1 &&
+      value.arguments[0].type === "Identifier"
+        ? value.arguments[0]
+        : undefined;
+    const store =
+      value.type === "Identifier"
+        ? mirroredStore(model, value, property, parents, reactive)
+        : wrapped
+          ? mirroredStore(model, wrapped, value as Node, parents, reactive)
+          : null;
+    properties.set(
+      name,
+      store && { ...store, readOnly: wrapped !== undefined },
+    );
+  }
+  return properties;
+}
+
+/** A property's key, unless it's computed from something other than a literal. */
+function propertyName(property: Extract<Node, { type: "Property" }>) {
+  if (!property.computed && property.key.type === "Identifier") {
+    return property.key.name;
+  }
+  return property.key.type === "Literal"
+    ? String(property.key.value)
+    : undefined;
+}
+
+/**
+ * The store `id` names, when it's a `MirroredStore` handed on in `holder`
+ * (a property, or `readonly(id)`): every other use of the name subscribes
+ * to it, or sets it as a whole statement of a `$:` statement.
+ */
+function mirroredStore(
+  model: ComponentModel,
+  id: Identifier,
+  holder: Node,
+  parents: Map<Node, Node | null>,
+  reactive: Map<Node, GuardedWrite["guards"]>,
+): Omit<MirroredStore, "readOnly"> | null {
+  const binding = model.scopes.bindingOf(id);
+  const declarator = binding?.declaration as Node | undefined;
+  if (
+    !binding ||
+    !isTopLevel(binding, model) ||
+    binding.kind !== "const" ||
+    declarator?.type !== "VariableDeclarator" ||
+    declarator.init?.type !== "CallExpression" ||
+    declarator.init.callee.type !== "Identifier" ||
+    model.storeImports.get(declarator.init.callee.name) !== "writable" ||
+    declarator.init.arguments.length > 1 ||
+    declarator.init.arguments[0]?.type === "SpreadElement"
+  ) {
+    return null;
+  }
+  const writes: Expression[] = [];
+  for (const reference of binding.references) {
+    const parent = reference.parent as Node;
+    if (parent === holder) {
+      // Handed on here, and nowhere else.
+    } else if (reference.store && !reference.writes && !reference.mutates) {
+      // `$s`: reads it.
+    } else if (
+      reference.store &&
+      parent.type === "AssignmentExpression" &&
+      parent.operator === "=" &&
+      parent.left === reference.node &&
+      reactive.has(parent)
+    ) {
+      writes.push(parent.right);
+    } else if (
+      !reference.store &&
+      parent.type === "MemberExpression" &&
+      parent.object === reference.node &&
+      !parent.computed &&
+      parent.property.type === "Identifier" &&
+      parent.property.name === "set"
+    ) {
+      const call = parents.get(parent);
+      const [value] = call?.type === "CallExpression" ? call.arguments : [];
+      if (
+        call?.type !== "CallExpression" ||
+        call.callee !== parent ||
+        call.arguments.length !== 1 ||
+        value.type === "SpreadElement" ||
+        !reactive.has(call)
+      ) {
+        return null;
+      }
+      writes.push(value);
+    } else {
+      return null;
+    }
+  }
+  const [initial] = declarator.init.arguments as Expression[];
+  return { initial: initial ?? null, writes };
+}
+
+/**
+ * Records in `contextLeaks` what the component may write to or hand on
+ * from the context `call` reads: nothing for a property read into a
+ * `const` it only subscribes to (`const s = ctx?.s ?? readable(x)`, or
+ * `const { s } = getContext(k)`), the property for any other read, and
+ * every property (`"*"`) when the context itself goes anywhere else.
+ */
+function readContextUse(
+  model: ComponentModel,
+  call: Node,
+  key: string,
+  parents: Map<Node, Node | null>,
+  leak: (key: string, property: string) => void,
+): void {
+  let value: Node = call;
+  let parent = parents.get(call);
+  // `getContext(k) ?? {}`
+  if (parent?.type === "LogicalExpression" && parent.left === value) {
+    value = parent;
+    parent = parents.get(parent);
+  }
+  const declarator = topLevelConst(model, parent, value);
+  if (!declarator) {
+    leak(key, "*");
+    return;
+  }
+  if (declarator.id.type === "ObjectPattern") {
+    for (const property of declarator.id.properties as Node[]) {
+      const name =
+        property.type === "Property" ? propertyName(property) : undefined;
+      if (property.type !== "Property" || name === undefined) {
+        leak(key, "*");
+        return;
+      }
+      const target =
+        property.value.type === "AssignmentPattern"
+          ? property.value.left
+          : property.value;
+      if (target.type !== "Identifier" || !onlySubscribed(model, target)) {
+        leak(key, name);
+      }
+    }
+    return;
+  }
+  if (declarator.id.type !== "Identifier") {
+    leak(key, "*");
+    return;
+  }
+  const binding = model.scopes.bindingOf(declarator.id);
+  for (const reference of binding?.references ?? []) {
+    const parent = reference.parent as Node;
+    if (reference.writes || reference.mutates) {
+      leak(key, "*");
+      return;
+    }
+    if (
+      parent.type === "MemberExpression" &&
+      parent.object === reference.node &&
+      !parent.computed &&
+      parent.property.type === "Identifier"
+    ) {
+      const name = parent.property.name;
+      let read: Node = parent;
+      let up = parents.get(read);
+      if (up?.type === "ChainExpression") {
+        read = up;
+        up = parents.get(up);
+      }
+      // `ctx?.s ?? readable(false)`
+      if (up?.type === "LogicalExpression" && up.left === read) {
+        read = up;
+        up = parents.get(up);
+      }
+      const alias = topLevelConst(model, up, read);
+      if (alias?.id.type !== "Identifier" || !onlySubscribed(model, alias.id)) {
+        leak(key, name);
+      }
+    } else if (
+      !(parent.type === "IfStatement" && parent.test === reference.node) &&
+      !(
+        parent.type === "ConditionalExpression" &&
+        parent.test === reference.node
+      ) &&
+      !(parent.type === "UnaryExpression" && parent.operator === "!")
+    ) {
+      leak(key, "*");
+      return;
+    }
+  }
+}
+
+/** `parent`, when it's a top-level `const` declarator initialized to `init`. */
+function topLevelConst(
+  model: ComponentModel,
+  parent: Node | null | undefined,
+  init: Node,
+): Extract<Node, { type: "VariableDeclarator" }> | undefined {
+  if (parent?.type !== "VariableDeclarator" || parent.init !== init) {
+    return undefined;
+  }
+  const declaration = model.ast.instance?.content.body.find(
+    (statement) =>
+      statement.type === "VariableDeclaration" &&
+      statement.kind === "const" &&
+      statement.declarations.includes(parent as never),
+  );
+  return declaration ? parent : undefined;
+}
+
+/** Whether every use of the name `id` declares is a `$id` store read. */
+function onlySubscribed(model: ComponentModel, id: Identifier): boolean {
+  const binding = model.scopes.bindingOf(id);
+  return (
+    binding?.references.every(
+      (reference) => reference.store && !reference.writes && !reference.mutates,
+    ) ?? false
+  );
+}
+
+/**
+ * The expressions the instance script's `$:` statements run as statements
+ * (`$: $s = a`, `$: if (a) x = true`), each with the `if` conditions it
+ * runs under. Any other statement or expression on the way (a loop, `&&`,
+ * a function) leaves an expression out.
+ */
+function reactiveStatements(ast: AST.Root): Map<Node, GuardedWrite["guards"]> {
   const found = new Map<Node, GuardedWrite["guards"]>();
   const visit = (node: Node, guards: GuardedWrite["guards"]): void => {
     switch (node.type) {
@@ -459,12 +788,7 @@ function guardedAssignments(ast: AST.Root): Map<Node, GuardedWrite["guards"]> {
         }
         return;
       case "ExpressionStatement":
-        if (
-          guards.length > 0 &&
-          node.expression.type === "AssignmentExpression"
-        ) {
-          found.set(node.expression as Node, guards);
-        }
+        found.set(node.expression as Node, guards);
         return;
     }
   };
