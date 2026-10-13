@@ -1,16 +1,17 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Expression } from "sveast/walk";
 import { analyzeFiles } from "../src/analyzer";
 import { buildComponentModel } from "../src/analyzer/component-model";
-import { createScope } from "../src/analyzer/evaluate";
+import { createScope, evaluate } from "../src/analyzer/evaluate";
 import {
   dropUnusedDeclarations,
   type SpecializeOptions,
   specializeComponent,
 } from "../src/analyzer/specialize";
 import { addCallSite, newComponentUsage } from "../src/analyzer/usage";
-import { OBJECT, possible, type Value } from "../src/analyzer/values";
+import { OBJECT, possible, UNKNOWN, type Value } from "../src/analyzer/values";
 import { parse } from "../src/indexer/parser";
 
 /** Specializes `code` as a component whose one call site passes `props` (as values). */
@@ -525,5 +526,121 @@ describe("names a nested scope binds", () => {
     for (const tag of ["i", "b", "u", "s"]) {
       expect(code).toContain(`<${tag}>{size}</${tag}>`);
     }
+  });
+});
+
+describe("writes under `if` in `$:` statements", () => {
+  /** What `name` can hold in `script`, rendered with `props`. */
+  function possibleValues(
+    script: string,
+    props: Record<string, unknown> = {},
+    name = "a",
+  ) {
+    const model = buildComponentModel(
+      `<script>\n${script}\n</script>\n{a}`,
+      "X/X.svelte",
+    );
+    const usage = newComponentUsage();
+    addCallSite(
+      usage,
+      {
+        component: model.key,
+        open: false,
+        props: new Map(
+          Object.entries(props).map(([k, v]) => [k, possible(v as boolean)]),
+        ),
+        slots: new Set(),
+      },
+      model.props.keys(),
+    );
+    const value = evaluate(
+      { type: "Identifier", name } as Expression,
+      createScope(model, usage, () => possible(undefined)),
+    );
+    return value === UNKNOWN ? "unknown" : [...value].sort();
+  }
+
+  const GATED = `export let a = false;\nexport let gate = false;`;
+
+  test.each([
+    [
+      "a write whose condition can't hold",
+      `$: if (gate) a = true;`,
+      {},
+      [false],
+    ],
+    [
+      "a write whose condition can hold",
+      `$: if (gate) a = true;`,
+      { gate: true },
+      [false, true],
+    ],
+    [
+      "the `else` side",
+      `$: if (gate) {} else { a = "x"; }`,
+      { gate: true },
+      [false],
+    ],
+    [
+      "the `else` side, live",
+      `$: if (gate) {} else { a = "x"; }`,
+      {},
+      [false, "x"],
+    ],
+    [
+      "nested conditions",
+      `$: if (gate) { if (!gate) a = true; }`,
+      { gate: true },
+      [false],
+    ],
+    [
+      "a condition on the name itself",
+      `$: if (!a) a = true;`,
+      {},
+      [false, true],
+    ],
+    [
+      "a write of something unknown",
+      `$: if (!gate) a = Math.random();`,
+      {},
+      "unknown",
+    ],
+    ["a write of an object", `$: if (!gate) a = {};`, {}, "unknown"],
+    ["a write under `&&`", `$: !gate && (a = true);`, {}, "unknown"],
+    [
+      "a write in a loop",
+      `$: if (!gate) for (const x of [1]) a = x;`,
+      {},
+      "unknown",
+    ],
+    [
+      "another write in a handler",
+      `$: if (gate) a = true;\nfunction f() { a = 1; }`,
+      {},
+      "unknown",
+    ],
+    ["`+=`", `$: if (!gate) a += 1;`, {}, "unknown"],
+  ])("%s", (_, script, props, expected) => {
+    expect(possibleValues(`${GATED}\n${script}`, props)).toEqual(expected);
+  });
+
+  test("a store's value stays unknown: other components may share it", () => {
+    const script = `import { readable } from "svelte/store";\nconst s = readable(false);\n$: if (gate) $s = true;`;
+    expect(possibleValues(`${GATED}\n${script}`, {}, "$s")).toBe("unknown");
+  });
+
+  test("a write whose condition can't hold is removed with its branch", () => {
+    const code = specialize(
+      `<script>
+  export let expandable = false;
+  export let batchExpansion = false;
+  $: if (batchExpansion) {
+    expandable = true;
+  }
+</script>
+{#if expandable}<Expand />{/if}`,
+    );
+    expect(code).not.toContain("<Expand />");
+    expect(code).not.toContain("expandable = true");
   });
 });

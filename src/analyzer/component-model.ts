@@ -70,6 +70,13 @@ export type ComponentModel = {
   unknownNames: Set<string>;
   /** Why each of `unknownNames` is unknown, for the report. */
   unknownReasons: Map<string, string>;
+  /**
+   * Top-level names whose only writes are `name = …` inside `$:`
+   * statements, under `if` conditions: each write with the conditions it
+   * runs under. A name keeps its declared value and adds each write's
+   * value unless one of its conditions can't hold.
+   */
+  guardedWrites: Map<string, GuardedWrite[]>;
   /** Local binding -> Carbon module key, for relative `.svelte` imports. */
   componentImports: Map<string, string>;
   /** Every other imported binding. */
@@ -110,6 +117,14 @@ export type ComponentModel = {
  * it's an object.
  */
 export type Escape = { full: boolean; paths: string[][] };
+
+/** A write `name = value` under `if` conditions in a `$:` statement. */
+export type GuardedWrite = {
+  /** Each enclosing `if` test, and whether the write is on its true side. */
+  guards: Array<{ test: Expression; holds: boolean }>;
+  value: Expression;
+  line: number;
+};
 
 /** Thrown for a component the analysis can't model. */
 export class UnsupportedComponentError extends Error {}
@@ -273,6 +288,7 @@ export function buildComponentModel(
     reactiveDeclarations: new WeakSet(),
     unknownNames: new Set(),
     unknownReasons: new Map(),
+    guardedWrites: new Map(),
     componentImports: new Map(),
     otherImports: new Set(),
     importedStrings: new Map(),
@@ -355,12 +371,30 @@ export function buildComponentModel(
       written.add(name);
     });
   const line = (offset: number) => locate(code, offset).line;
+  const guarded = guardedAssignments(ast);
   forEachNode(ast, (node) => {
     switch (node.type) {
       case "AssignmentExpression":
         if (model.reactiveDeclarations.has(node)) {
           // `$: x = …` defines `x` rather than writing it.
           writes.delete(node.left as Identifier);
+        } else if (
+          guarded.has(node) &&
+          node.operator === "=" &&
+          node.left.type === "Identifier" &&
+          // `$store = …` sets a store other components may share.
+          !node.left.name.startsWith("$") &&
+          writes.get(node.left) === node.left.name
+        ) {
+          const { name } = node.left;
+          writes.delete(node.left);
+          const list = model.guardedWrites.get(name) ?? [];
+          list.push({
+            guards: guarded.get(node) ?? [],
+            value: node.right,
+            line: line(node.start),
+          });
+          model.guardedWrites.set(name, list);
         } else {
           markWritten(node.left, `is assigned at line ${line(node.start)}`);
         }
@@ -397,6 +431,49 @@ export function buildComponentModel(
   }
 
   return model;
+}
+
+/**
+ * The assignments in the instance script's `$:` statements that run only
+ * under `if` conditions (`$: if (a) x = true`), with those conditions.
+ * Any other statement or expression on the way (a loop, `&&`, a
+ * function) leaves an assignment out.
+ */
+function guardedAssignments(ast: AST.Root): Map<Node, GuardedWrite["guards"]> {
+  const found = new Map<Node, GuardedWrite["guards"]>();
+  const visit = (node: Node, guards: GuardedWrite["guards"]): void => {
+    switch (node.type) {
+      case "BlockStatement":
+        for (const statement of node.body) visit(statement as Node, guards);
+        return;
+      case "IfStatement":
+        visit(node.consequent as Node, [
+          ...guards,
+          { test: node.test, holds: true },
+        ]);
+        if (node.alternate) {
+          visit(node.alternate as Node, [
+            ...guards,
+            { test: node.test, holds: false },
+          ]);
+        }
+        return;
+      case "ExpressionStatement":
+        if (
+          guards.length > 0 &&
+          node.expression.type === "AssignmentExpression"
+        ) {
+          found.set(node.expression as Node, guards);
+        }
+        return;
+    }
+  };
+  for (const statement of (ast.instance?.content.body ?? []) as Node[]) {
+    if (statement.type === "LabeledStatement" && statement.label.name === "$") {
+      visit(statement.body as Node, []);
+    }
+  }
+  return found;
 }
 
 /**
