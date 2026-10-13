@@ -29,6 +29,7 @@ import {
   join,
   MAX_SHAPE_SIZE,
   OBJECT,
+  type Primitive,
   possible,
   readProperty,
   shape,
@@ -184,11 +185,31 @@ function mayReachObject(value: Value, path: readonly string[]): boolean {
       segment === "[]"
         ? itemsOf(current)
         : segment === "*"
-          ? UNKNOWN
-          : flatMap(current, (p) => readProperty(p, segment));
+          ? flatMap(current, ownValues)
+          : // Nothing is reachable from `null` or `undefined`.
+            flatMap(current, (p) =>
+              isNullish(p) ? UNDEFINED : readProperty(p, segment),
+            );
     if (current === UNKNOWN) return true;
   }
-  return current === UNKNOWN || [...current].some(isObject);
+  // A store's value already counts every write anyone can make to it.
+  return (
+    current === UNKNOWN || [...current].some((p) => isObject(p) && !isStore(p))
+  );
+}
+
+/**
+ * What reading any key of `p` can give (`obj[key]`): a known object's or
+ * array's own values, `undefined` past them, or anything.
+ */
+function ownValues(p: Primitive): Value {
+  if (isNullish(p)) return UNDEFINED;
+  if (!isShape(p)) return UNKNOWN;
+  let value = UNDEFINED;
+  for (const own of p.kind === "object" ? p.props.values() : p.elements) {
+    value = join(value, own);
+  }
+  return value;
 }
 
 /**
@@ -278,12 +299,15 @@ function resolve(name: string, scope: Scope): Value {
   const imported = scope.imported.get(name);
   if (imported && model.otherImports.has(name)) return imported;
 
-  // `$store` reads a store's value: `undefined` if the store itself is,
-  // and a `readable` one's never changes.
+  // `$store` reads a store's value: `undefined` if the store itself is
+  // (Svelte doesn't subscribe to a missing store), and a `readable` one's
+  // never changes.
   if (name.startsWith("$") && !name.startsWith("$$") && name.length > 1) {
     const holder = lookup(name.slice(1), scope);
     if (isOnlyUndefined(holder)) return UNDEFINED;
-    return flatMap(holder, (p) => (isStore(p) ? p.value : UNKNOWN));
+    return flatMap(holder, (p) =>
+      isNullish(p) ? UNDEFINED : isStore(p) ? p.value : UNKNOWN,
+    );
   }
 
   return UNKNOWN;
@@ -751,24 +775,35 @@ function evaluateMember(
   const target = evaluate(object, scope);
   // `undefined?.x` is `undefined`.
   if (optional && isOnlyUndefined(target)) return UNDEFINED;
-  const key = computed
-    ? singleKey(evaluate(property as Expression, scope))
+  const keys = computed
+    ? propertyKeys(evaluate(property as Expression, scope))
     : property.type === "Identifier"
-      ? property.name
+      ? [property.name]
       : undefined;
-  if (key === undefined) return UNKNOWN;
+  if (keys === undefined) return UNKNOWN;
   // A known object's own properties and elements, a string's `length`;
   // anything else (`null.x` throws, a getter may run) is beyond this model.
-  return flatMap(target, (p) =>
-    optional && isNullish(p) ? UNDEFINED : readProperty(p, key),
-  );
+  return flatMap(target, (p) => {
+    if (optional && isNullish(p)) return UNDEFINED;
+    let value: Value = possible();
+    for (const key of keys) value = join(value, readProperty(p, key));
+    return value;
+  });
 }
 
-/** The one string or number key `value` holds, as a property name. */
-function singleKey(value: Value): string | undefined {
-  if (value === UNKNOWN || value.size !== 1) return undefined;
-  const [p] = value;
-  return typeof p === "string" || typeof p === "number" ? String(p) : undefined;
+/**
+ * The property names `value`'s keys read, each converted as JavaScript
+ * does (`obj[undefined]` reads `"undefined"`); `undefined` unless there
+ * are some and every one is a primitive.
+ */
+function propertyKeys(value: Value): string[] | undefined {
+  if (value === UNKNOWN) return undefined;
+  const keys: string[] = [];
+  for (const p of value) {
+    if (isObject(p)) return undefined;
+    keys.push(String(p));
+  }
+  return keys.length > 0 ? keys : undefined;
 }
 
 /** An object literal's shape, or some object if it has spreads, getters or computed keys. */

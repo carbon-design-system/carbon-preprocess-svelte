@@ -29,8 +29,9 @@ export type Shape =
   | { readonly kind: "array"; readonly elements: readonly Value[] };
 
 /**
- * A Svelte store whose value never changes: `readable(v)` from
- * `svelte/store` with no start function. Only made by `store`.
+ * A Svelte store and what it can hold: `readable(v)` from `svelte/store`
+ * with no start function, which never changes, or a store a context hands
+ * on (see `MirroredStore`). Only made by `store`.
  */
 export type Store = { readonly kind: "store"; readonly value: Value };
 
@@ -124,6 +125,11 @@ function valueKey(value: Value): string {
     })
     .sort()
     .join("|");
+}
+
+/** Whether `a` and `b` hold the same values. */
+export function sameValue(a: Value, b: Value): boolean {
+  return a === b || valueKey(a) === valueKey(b);
 }
 
 /** The interned shape of an object (`props`) or array (`elements`) literal. */

@@ -4,8 +4,17 @@ import { listJsAndSvelteFiles } from "../indexer/list-files";
 import { carbonSignature } from "../indexer/resolve-carbon-root";
 import { collectCarbonTokens } from "../plugins/scan-content";
 import type { CarbonComponents, ModuleUsage } from "./call-sites";
-import { type ComponentModel, loadComponentModel } from "./component-model";
-import { type ContextResolver, createScope, type Scope } from "./evaluate";
+import {
+  type ComponentModel,
+  loadComponentModel,
+  type MirroredStore,
+} from "./component-model";
+import {
+  type ContextResolver,
+  createScope,
+  evaluate,
+  type Scope,
+} from "./evaluate";
 import { walkLive } from "./live-walk";
 import {
   addCallSite,
@@ -13,7 +22,17 @@ import {
   type ComponentUsage,
   newComponentUsage,
 } from "./usage";
-import { possible, UNDEFINED, UNKNOWN, type Value } from "./values";
+import {
+  isObject,
+  join,
+  possible,
+  sameValue,
+  shape,
+  store,
+  UNDEFINED,
+  UNKNOWN,
+  type Value,
+} from "./values";
 
 export type PropAwareOptions = {
   /** Components that keep every variant's styles, as without `propAware`. */
@@ -55,9 +74,12 @@ type CarbonSources = {
   scriptContexts: Set<string>;
   /** A `.js` module passes `setContext` a key that isn't a literal. */
   unknownScriptContext: boolean;
+  /** A `.js` module reads a context, so what it does with one is unseen. */
+  scriptReadsContext: boolean;
 };
 
 const SET_CONTEXT = /setContext\(\s*["']([^"']+)["']/g;
+const GET_CONTEXT = /\bget(?:All)?Contexts?\(/;
 /** A `setContext` call whose key isn't a lone string literal. */
 const SET_OTHER_CONTEXT = /setContext\(\s*(?!["'][^"']*["']\s*[,)])/;
 const carbonSourcesCache = new Map<
@@ -77,12 +99,16 @@ async function readCarbonSources(carbonRoot: string): Promise<CarbonSources> {
     componentContexts: new Set(),
     scriptContexts: new Set(),
     unknownScriptContext: false,
+    scriptReadsContext: false,
   };
   for (const file of await listJsAndSvelteFiles(carbonSrc)) {
     if (file.startsWith("icons/")) continue;
     const code = readFileSync(path.join(carbonSrc, file), "utf8");
     const isScript = file.endsWith(".js");
-    if (isScript) collectCarbonTokens(code, sources.scriptTokens);
+    if (isScript) {
+      collectCarbonTokens(code, sources.scriptTokens);
+      if (GET_CONTEXT.test(code)) sources.scriptReadsContext = true;
+    }
     for (const match of code.matchAll(SET_CONTEXT)) {
       (isScript ? sources.scriptContexts : sources.componentContexts).add(
         match[1],
@@ -102,6 +128,85 @@ async function readCarbonSources(carbonRoot: string): Promise<CarbonSources> {
   return sources;
 }
 
+/**
+ * What `getContext(key)` reads when a rendered component provides `key`:
+ * `undefined` (no provider above), or one of the providers' context
+ * objects, with the stores they hand on that no reader can set.
+ */
+type ContextValues = Map<string, Value>;
+
+/** Rounds after which context values stop flowing, so the fixpoint ends. */
+const MAX_CONTEXT_ROUNDS = 16;
+
+/**
+ * The context values the components in `usages` provide, as `resolver`
+ * evaluates them: a key's objects carry a `MirroredStore` property only
+ * when it's read-only or no rendered component leaks that property.
+ */
+function contextValues(
+  modelOf: (key: string) => ComponentModel,
+  usages: Map<string, ComponentUsage>,
+  resolver: ContextResolver,
+): ContextValues {
+  const values: ContextValues = new Map();
+  const leaks = new Map<string, Set<string>>();
+  for (const key of usages.keys()) {
+    const model = modelOf(key);
+    if (model.readsUnknownContext) return values;
+    for (const [contextKey, leaked] of model.contextLeaks) {
+      const all = leaks.get(contextKey) ?? new Set<string>();
+      for (const property of leaked) all.add(property);
+      leaks.set(contextKey, all);
+    }
+  }
+  const unflowable = new Set<string>();
+  for (const [key, usage] of usages) {
+    const model = modelOf(key);
+    if (model.contextObjects.size === 0) continue;
+    const scope = createScope(model, usage, resolver);
+    for (const [contextKey, objects] of model.contextObjects) {
+      const leaked = leaks.get(contextKey);
+      let value = values.get(contextKey) ?? UNDEFINED;
+      for (const object of objects) {
+        if (!object) {
+          unflowable.add(contextKey);
+          break;
+        }
+        const props = new Map<string, Value>();
+        for (const [property, mirrored] of object) {
+          const flows =
+            mirrored &&
+            (mirrored.readOnly || !(leaked?.has("*") || leaked?.has(property)));
+          props.set(property, flows ? storeValue(mirrored, scope) : UNKNOWN);
+        }
+        value = join(value, possible(shape({ kind: "object", props })));
+      }
+      values.set(contextKey, value);
+    }
+  }
+  for (const key of unflowable) values.delete(key);
+  return values;
+}
+
+/** What a `MirroredStore` holds: its initial value or any of its writes. */
+function storeValue(mirrored: MirroredStore, scope: Scope): Value {
+  let value = mirrored.initial ? evaluate(mirrored.initial, scope) : UNDEFINED;
+  for (const write of mirrored.writes)
+    value = join(value, evaluate(write, scope));
+  // A store holding an object could have it changed through `$s`.
+  if (value !== UNKNOWN && [...value].some(isObject)) value = UNKNOWN;
+  return possible(store(value));
+}
+
+function sameValues(a: ContextValues, b: ContextValues): boolean {
+  if (a.size !== b.size) return false;
+  for (const [key, value] of a) {
+    const other = b.get(key);
+    if (!other || !sameValue(value, other)) return false;
+  }
+  return true;
+}
+
 type Pass = {
   usages: Map<string, ComponentUsage>;
   /** The context resolver of the final iteration. */
@@ -118,18 +223,25 @@ type Pass = {
 function runPass(
   modelOf: (key: string) => ComponentModel,
   roots: CallSite[],
-  context: (provided: Set<string>, providesUnknown: boolean) => ContextResolver,
+  context: (
+    provided: Set<string>,
+    providesUnknown: boolean,
+    values: ContextValues,
+  ) => ContextResolver,
   excluded: ReadonlySet<string>,
+  /** Whether stores may flow through contexts (see `contextValues`). */
+  flowContexts: boolean,
 ): Pass {
   let provided = new Set<string>();
   // A rendered component passes `setContext` a key the analysis can't read.
   let providesUnknown = false;
-  for (;;) {
+  let values: ContextValues = new Map();
+  for (let round = 0; ; round++) {
     const usages = new Map<string, ComponentUsage>();
     const live = new Map<string, ReturnType<typeof walkLive>>();
     // A component queued twice is walked once, with its usage as it is then.
     const queue = new Set<string>();
-    const resolver = context(provided, providesUnknown);
+    const resolver = context(provided, providesUnknown, values);
 
     const enqueue = (site: CallSite) => {
       const model = modelOf(site.component);
@@ -167,7 +279,15 @@ function runPass(
       for (const contextKey of model.providedContexts) next.add(contextKey);
       nextUnknown ||= model.providesUnknownContext;
     }
-    if (next.size === provided.size && nextUnknown === providesUnknown) {
+    const nextValues =
+      flowContexts && round < MAX_CONTEXT_ROUNDS
+        ? contextValues(modelOf, usages, resolver)
+        : new Map<string, Value>();
+    if (
+      next.size === provided.size &&
+      nextUnknown === providesUnknown &&
+      sameValues(values, nextValues)
+    ) {
       const classes = new Set<string>();
       const prefixes = new Set<string>();
       for (const result of live.values()) {
@@ -178,6 +298,7 @@ function runPass(
     }
     provided = next;
     providesUnknown = nextUnknown;
+    values = nextValues;
   }
 }
 
@@ -245,11 +366,13 @@ export async function analyzeUsage(input: {
   const roots: CallSite[] = [];
   const appContexts = new Set<string>();
   let appProvidesUnknown = false;
+  let appReadsContext = false;
   let openAll = false;
   for (const module of input.modules) {
     openAll ||= module.openAll;
     for (const key of module.providedContexts) appContexts.add(key);
     appProvidesUnknown ||= module.providesUnknownContext === true;
+    appReadsContext ||= module.readsCarbonContext === true;
     for (const site of module.sites) {
       const assumptions = assumed.get(site.component);
       if (assumptions && !site.open) {
@@ -272,18 +395,23 @@ export async function analyzeUsage(input: {
   const precise = runPass(
     modelOf,
     roots,
-    (provided, providesUnknown) => (key) =>
-      providesUnknown ||
-      appProvidesUnknown ||
-      sources.unknownScriptContext ||
-      provided.has(key) ||
-      appContexts.has(key) ||
-      sources.scriptContexts.has(key) ||
-      // A key set some way this scan can't see (a constant, a helper).
-      !sources.componentContexts.has(key)
-        ? UNKNOWN
-        : UNDEFINED,
+    (provided, providesUnknown, values) => (key) => {
+      if (
+        providesUnknown ||
+        appProvidesUnknown ||
+        sources.unknownScriptContext ||
+        appContexts.has(key) ||
+        sources.scriptContexts.has(key) ||
+        // A key set some way this scan can't see (a constant, a helper).
+        !sources.componentContexts.has(key)
+      ) {
+        return UNKNOWN;
+      }
+      if (!provided.has(key)) return UNDEFINED;
+      return values.get(key) ?? UNKNOWN;
+    },
     excluded,
+    !sources.scriptReadsContext && !appReadsContext,
   );
 
   const scriptPrefixes = [...sources.scriptTokens].filter((token) =>
