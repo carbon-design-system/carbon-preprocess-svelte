@@ -132,6 +132,11 @@ export function sameValue(a: Value, b: Value): boolean {
   return a === b || valueKey(a) === valueKey(b);
 }
 
+/** A key that's equal for values that hold the same values. */
+export function valueId(value: Value): string {
+  return valueKey(value);
+}
+
 /** The interned shape of an object (`props`) or array (`elements`) literal. */
 export function shape(
   contents:

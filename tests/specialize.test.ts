@@ -695,3 +695,94 @@ describe("reading objects, keys and stores", () => {
     expect(possibleValues(script, props, "v")).toEqual(expected);
   });
 });
+
+describe("calling functions", () => {
+  test.each([
+    [
+      "an early `return` the argument decides",
+      `export let size = undefined;\nfunction f(x) { if (!x) return "a"; return "b"; }\n$: v = f(size);`,
+      {},
+      ["a"],
+    ],
+    [
+      "the rest of the body when it doesn't",
+      `export let size = undefined;\nfunction f(x) { if (!x) return "a"; return "b"; }\n$: v = f(size);`,
+      { size: "z" },
+      ["b"],
+    ],
+    [
+      "both sides of a test that can go either way",
+      `let on = false;\nfunction g() { on = true; }\nfunction f() { if (on) return "a"; return "b"; }\n$: v = f();`,
+      {},
+      ["a", "b"],
+    ],
+    [
+      "`if`/`else` that both return",
+      `export let x = 1;\nfunction f(n) { if (n > 0) { return "pos"; } else { return "neg"; } }\n$: v = f(x);`,
+      {},
+      ["pos"],
+    ],
+    [
+      "a `const` in the body",
+      `export let x = "a";\nconst f = (s) => { const t = s + "!"; return t; };\n$: v = f(x);`,
+      {},
+      ["a!"],
+    ],
+    [
+      "a destructured parameter with a default",
+      `function f({ a, b = false }) { return b; }\n$: v = f({ a: 1 });`,
+      {},
+      [false],
+    ],
+    [
+      "falling off the end",
+      `export let x = false;\nfunction f(n) { if (n) return "a"; }\n$: v = f(x);`,
+      {},
+      [undefined],
+    ],
+    [
+      "a reactive destructuring of the result",
+      `export let invalid = false;\nfunction f({ invalid }) { return { show: invalid, other: 1 }; }\n$: ({ show: v } = f({ invalid }));`,
+      {},
+      [false],
+    ],
+    [
+      "a statement it doesn't follow",
+      `function f(n) { for (const i of [1]) {} return 1; }\n$: v = f(1);`,
+      {},
+      "unknown",
+    ],
+    [
+      "an object the body changes",
+      `function f(o) { const n = o.push(1); return o.length; }\n$: v = f([]);`,
+      {},
+      "unknown",
+    ],
+    [
+      "recursion",
+      `function f(n) { return f(n); }\n$: v = f(1);`,
+      {},
+      "unknown",
+    ],
+    [
+      "a rest parameter",
+      `function f(...all) { return 1; }\n$: v = f(1);`,
+      {},
+      "unknown",
+    ],
+    [
+      "`arguments`",
+      `function f() { return arguments[0]; }\n$: v = f(1);`,
+      {},
+      "unknown",
+    ],
+    [
+      "a function the component reassigns",
+      `let f = function (n) { return 1; };\nfunction g() { f = () => 2; }\n$: v = f(1);`,
+      {},
+      "unknown",
+    ],
+  ])("%s", (_, script, props, expected) => {
+    expect(possibleValues(script, props, "v")).toEqual(expected);
+  });
+});

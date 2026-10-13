@@ -562,7 +562,8 @@ describe("spreads and calls the analysis can read", () => {
           `<Button kind={echo("ghost")} />`,
         ),
       ),
-    ).toEqual(["primary", "danger", "ghost"]);
+      // The parameter holds the argument, not the component's `kind`.
+    ).toEqual(["ghost"]);
   });
 
   test("a nested binding with the name leaves the component's own known", async () => {
