@@ -2,7 +2,7 @@
 export const RE_EXT_SVELTE = /\.svelte$/;
 
 /** Splits a bundler module id into its path and its `?query#hash` suffix. */
-export const RE_MODULE_QUERY = /[?#].*$/;
+const RE_MODULE_QUERY = /[?#].*$/;
 
 /** `.css` and the preprocessor files a bundler compiles to CSS. */
 export const RE_EXT_STYLESHEET =
