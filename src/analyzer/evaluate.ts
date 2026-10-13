@@ -9,6 +9,7 @@ import {
   type ComponentModel,
   contextKey,
   FUNCTION_DECLARATION,
+  type GuardedWrite,
   isTopLevel,
   memberKey,
 } from "./component-model";
@@ -113,12 +114,42 @@ function lookup(name: string, scope: Scope): Value {
   scope.pending.add(name);
   let value: Value;
   try {
-    value = keepIfContained(resolve(name, scope), name, model);
+    value = keepIfContained(
+      withGuardedWrites(resolve(name, scope), name, scope),
+      name,
+      model,
+    );
   } finally {
     scope.pending.delete(name);
   }
   scope.memo.set(name, value);
   return value;
+}
+
+/**
+ * `value` joined with what `name`'s guarded writes can assign: each write
+ * whose conditions can all hold. Unknown if a write assigns something
+ * unknown or an object.
+ */
+function withGuardedWrites(value: Value, name: string, scope: Scope): Value {
+  const writes = scope.model.guardedWrites.get(name);
+  if (!writes || value === UNKNOWN) return value;
+  for (const write of liveWrites(writes, scope)) {
+    const written = evaluate(write.value, scope);
+    if (written === UNKNOWN || [...written].some(isObject)) return UNKNOWN;
+    value = join(value, written);
+  }
+  return value;
+}
+
+/** The writes in `writes` whose `if` conditions can all hold. */
+function liveWrites(writes: GuardedWrite[], scope: Scope): GuardedWrite[] {
+  return writes.filter(({ guards }) =>
+    guards.every(({ test, holds }) => {
+      const truth = truthOf(evaluate(test, scope));
+      return truth === "either" || (truth === "truthy") === holds;
+    }),
+  );
 }
 
 /**
@@ -439,6 +470,11 @@ function whyNameUnknown(name: string, scope: Scope, depth: number): string {
   const component = model.key.split(PATH_SEPARATOR).pop() ?? model.key;
   const reason = model.unknownReasons.get(name);
   if (reason) return `\`${name}\` ${reason}`;
+  const writes = model.guardedWrites.get(name);
+  const write = writes && liveWrites(writes, scope)[0];
+  if (write && lookup(name, scope) === UNKNOWN) {
+    return `\`${name}\` is assigned at line ${write.line}`;
+  }
   if (model.props.has(name)) {
     if (usage.open) {
       return `\`${name}\` is a prop of ${component}, which is rendered with any props${usage.openReason ? ` (${usage.openReason})` : ""}`;
