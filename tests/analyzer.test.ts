@@ -428,6 +428,143 @@ describe("analyzeUsage", () => {
     expect(isPruned(".bx--list-box__field")).toBe(false);
   });
 
+  test("reads context keys Carbon imports as constants", async () => {
+    // TextInput reads `getContext(FORM_CONTEXT_KEY)`; FluidForm sets it.
+    const FLUID = ".bx--text-input--fluid";
+    const plain = await analyze(
+      app(
+        `import { TextInput } from "carbon-components-svelte";`,
+        `<TextInput labelText="A" />`,
+      ),
+    );
+    expect(plain.isPruned(FLUID)).toBe(true);
+    const fluid = await analyze(
+      app(
+        `import { FluidForm, TextInput } from "carbon-components-svelte";`,
+        `<FluidForm><TextInput labelText="A" /></FluidForm>`,
+      ),
+    );
+    expect(fluid.isPruned(FLUID)).toBe(false);
+  });
+
+  test.each([
+    [
+      "a constant",
+      `const KEY = "carbon:Form";\nsetContext(KEY, { isFluid: true });`,
+    ],
+    [
+      "a key built from parts",
+      `setContext("carbon:" + "Form", { isFluid: true });`,
+    ],
+    [
+      "Carbon's own key",
+      `import { FORM_CONTEXT_KEY } from "carbon-components-svelte/src/constants/context-keys.js";\nsetContext(FORM_CONTEXT_KEY, { isFluid: true });`,
+    ],
+  ])(
+    "an app that sets a Carbon context through %s keeps what it enables",
+    async (_, script) => {
+      const { isPruned } = await analyze(
+        app(
+          `import { setContext } from "svelte";\nimport { TextInput } from "carbon-components-svelte";\n${script}`,
+          `<TextInput labelText="A" />`,
+        ),
+      );
+      expect(isPruned(".bx--text-input--fluid")).toBe(false);
+    },
+  );
+
+  describe("a context key the analysis can't read keeps every context", () => {
+    const CONSUMER = `<script>
+  import { getContext } from "svelte";
+  import { KEY } from "../keys.js";
+  const ctx = getContext(KEY);
+</script>
+<div class:bx--plain={!ctx} class:bx--provided={!!ctx} />`;
+    const provider = (script: string) =>
+      `<script>\n  import { setContext } from "svelte";\n${script}\n</script>\n<slot />`;
+
+    async function isProvidedPruned(
+      files: Record<string, string>,
+      markup: string,
+    ) {
+      const mock = createMockCarbonPackage({
+        "index.js": [
+          `export { default as Consumer } from "./Consumer/Consumer.svelte";`,
+          `export { default as Provider } from "./Provider/Provider.svelte";`,
+          `export { provide } from "./provide.js";`,
+        ].join("\n"),
+        "keys.js": `export const KEY = "carbon:Mock";\n`,
+        "Consumer/Consumer.svelte": CONSUMER,
+        "Provider/Provider.svelte": provider(""),
+        "provide.js": `export function provide() {}\n`,
+        ...files,
+      });
+      try {
+        const mockCarbon = readCarbonComponents(mock.root);
+        const usage = collectSvelteUsage(
+          app(
+            // Only what renders: an import alone renders with any props.
+            `import { ${markup.includes("Provider") ? "Consumer, Provider" : "Consumer"} } from "carbon-components-svelte";`,
+            markup,
+          ),
+          "/app/App.svelte",
+          mockCarbon,
+        );
+        const { isPruned } = await analyzeUsage({
+          carbonRoot: mock.root,
+          carbon: mockCarbon,
+          bundled: usage.sites.map((site) => site.component),
+          modules: [usage],
+        });
+        expect(isPruned(".bx--plain")).toBe(false);
+        return isPruned(".bx--provided");
+      } finally {
+        mock.dispose();
+      }
+    }
+
+    test("reads a key imported as a constant", async () => {
+      const files = {
+        "Provider/Provider.svelte": provider(
+          `  import { KEY } from "../keys.js";\n  setContext(KEY, {});`,
+        ),
+      };
+      expect(await isProvidedPruned(files, `<Consumer />`)).toBe(true);
+      expect(
+        await isProvidedPruned(files, `<Provider><Consumer /></Provider>`),
+      ).toBe(false);
+    });
+
+    test("a rendered component that sets a key it computes", async () => {
+      const files = {
+        "Provider/Provider.svelte": provider(
+          `  const key = ["carbon", "Mock"].join(":");\n  setContext(key, {});`,
+        ),
+        // Sets the key readably, so the scan knows Carbon provides it.
+        "Other/Other.svelte": provider(`  setContext("carbon:Mock", {});`),
+      };
+      expect(await isProvidedPruned(files, `<Consumer />`)).toBe(true);
+      expect(await isProvidedPruned(files, `<Provider /><Consumer />`)).toBe(
+        false,
+      );
+    });
+
+    test("a script module that sets a key it doesn't spell out", async () => {
+      const files = {
+        "Other/Other.svelte": provider(`  setContext("carbon:Mock", {});`),
+        "provide.js": `import { setContext } from "svelte";\nimport { KEY } from "./keys.js";\nexport function provide() {\n  setContext(KEY, {});\n}\n`,
+      };
+      expect(await isProvidedPruned(files, `<Consumer />`)).toBe(false);
+    });
+
+    test("a constant that isn't a lone string stays unknown", async () => {
+      const files = {
+        "keys.js": `const PREFIX = "carbon:";\nexport const KEY = PREFIX + "Mock";\n`,
+      };
+      expect(await isProvidedPruned(files, `<Consumer />`)).toBe(false);
+    });
+  });
+
   test("models runes: `$props`, `$bindable`, `$state` and `$derived`", () => {
     const model = buildComponentModel(
       `<script>

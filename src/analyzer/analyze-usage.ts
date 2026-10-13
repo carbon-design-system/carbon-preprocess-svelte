@@ -49,13 +49,17 @@ export type UsageAnalysis = {
 type CarbonSources = {
   /** Classes and prefixes Carbon's `.js` modules name; never pruned. */
   scriptTokens: Set<string>;
-  /** `setContext` keys `.svelte` components pass as literals. */
+  /** `setContext` keys `.svelte` components pass (see `contextKey`). */
   componentContexts: Set<string>;
   /** `setContext` keys `.js` modules pass as literals. */
   scriptContexts: Set<string>;
+  /** A `.js` module passes `setContext` a key that isn't a literal. */
+  unknownScriptContext: boolean;
 };
 
 const SET_CONTEXT = /setContext\(\s*["']([^"']+)["']/g;
+/** A `setContext` call whose key isn't a lone string literal. */
+const SET_OTHER_CONTEXT = /setContext\(\s*(?!["'][^"']*["']\s*[,)])/;
 const carbonSourcesCache = new Map<
   string,
   { signature: string; sources: CarbonSources }
@@ -72,6 +76,7 @@ async function readCarbonSources(carbonRoot: string): Promise<CarbonSources> {
     scriptTokens: new Set(),
     componentContexts: new Set(),
     scriptContexts: new Set(),
+    unknownScriptContext: false,
   };
   for (const file of await listJsAndSvelteFiles(carbonSrc)) {
     if (file.startsWith("icons/")) continue;
@@ -82,6 +87,15 @@ async function readCarbonSources(carbonRoot: string): Promise<CarbonSources> {
       (isScript ? sources.scriptContexts : sources.componentContexts).add(
         match[1],
       );
+    }
+    if (!SET_OTHER_CONTEXT.test(code)) continue;
+    // A component's own model reads keys imported as constants; any it
+    // can't read make it provide every key (`providesUnknownContext`).
+    if (isScript) sources.unknownScriptContext = true;
+    else {
+      for (const key of loadComponentModel(carbonSrc, file).providedContexts) {
+        sources.componentContexts.add(key);
+      }
     }
   }
   carbonSourcesCache.set(carbonSrc, { signature, sources });
@@ -104,16 +118,18 @@ type Pass = {
 function runPass(
   modelOf: (key: string) => ComponentModel,
   roots: CallSite[],
-  context: (provided: Set<string>) => ContextResolver,
+  context: (provided: Set<string>, providesUnknown: boolean) => ContextResolver,
   excluded: ReadonlySet<string>,
 ): Pass {
   let provided = new Set<string>();
+  // A rendered component passes `setContext` a key the analysis can't read.
+  let providesUnknown = false;
   for (;;) {
     const usages = new Map<string, ComponentUsage>();
     const live = new Map<string, ReturnType<typeof walkLive>>();
     // A component queued twice is walked once, with its usage as it is then.
     const queue = new Set<string>();
-    const resolver = context(provided);
+    const resolver = context(provided, providesUnknown);
 
     const enqueue = (site: CallSite) => {
       const model = modelOf(site.component);
@@ -145,12 +161,13 @@ function runPass(
     // `getContext` reads `undefined` unless a rendered component provides
     // it. Rendering more can provide more, so repeat until that settles.
     const next = new Set(provided);
+    let nextUnknown: boolean = providesUnknown;
     for (const key of usages.keys()) {
-      for (const contextKey of modelOf(key).providedContexts) {
-        next.add(contextKey);
-      }
+      const model = modelOf(key);
+      for (const contextKey of model.providedContexts) next.add(contextKey);
+      nextUnknown ||= model.providesUnknownContext;
     }
-    if (next.size === provided.size) {
+    if (next.size === provided.size && nextUnknown === providesUnknown) {
       const classes = new Set<string>();
       const prefixes = new Set<string>();
       for (const result of live.values()) {
@@ -160,6 +177,7 @@ function runPass(
       return { usages, resolver, classes, prefixes };
     }
     provided = next;
+    providesUnknown = nextUnknown;
   }
 }
 
@@ -226,10 +244,12 @@ export async function analyzeUsage(input: {
 
   const roots: CallSite[] = [];
   const appContexts = new Set<string>();
+  let appProvidesUnknown = false;
   let openAll = false;
   for (const module of input.modules) {
     openAll ||= module.openAll;
     for (const key of module.providedContexts) appContexts.add(key);
+    appProvidesUnknown ||= module.providesUnknownContext === true;
     for (const site of module.sites) {
       const assumptions = assumed.get(site.component);
       if (assumptions && !site.open) {
@@ -252,7 +272,10 @@ export async function analyzeUsage(input: {
   const precise = runPass(
     modelOf,
     roots,
-    (provided) => (key) =>
+    (provided, providesUnknown) => (key) =>
+      providesUnknown ||
+      appProvidesUnknown ||
+      sources.unknownScriptContext ||
       provided.has(key) ||
       appContexts.has(key) ||
       sources.scriptContexts.has(key) ||

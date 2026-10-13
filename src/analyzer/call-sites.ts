@@ -75,8 +75,16 @@ export type ModuleUsage = {
    * render with any props.
    */
   openApps?: boolean;
-  /** `carbon:` context keys the module passes to `setContext`. */
+  /**
+   * `carbon:` context keys the module may pass to `setContext`: every
+   * `"carbon:…"` string it holds, so a key kept in a constant counts.
+   */
   providedContexts: Set<string>;
+  /**
+   * It calls `setContext` with what may be a `carbon:` key it doesn't
+   * spell out (see `providesUnknownContext`).
+   */
+  providesUnknownContext?: boolean;
   /** The file it was read from. */
   file?: string;
   /** What it imports from Carbon, as read. */
@@ -229,7 +237,10 @@ function readDynamicImports(
 }
 
 const DIRECT_COMPONENT_PATH = /^carbon-components-svelte\/src\/(.+\.svelte)$/;
-const PROVIDED_CONTEXT = /setContext\(\s*["'](carbon:[^"']+)["']/g;
+const CARBON_CONTEXT_KEY = /(["'`])(carbon:[^"'`\s]+)\1/g;
+/** An import of a Carbon module that isn't a component. */
+const CARBON_SCRIPT_SPECIFIER =
+  /["']carbon-components-svelte\/src\/(?![^"']*\.svelte["'])[^"']*["']/;
 /** JS and TS modules, which `lexImportsExports` reads. */
 const SCRIPT_FILE = /\.[cm]?[jt]sx?$/;
 const BARREL_IMPORT =
@@ -244,9 +255,21 @@ const COMPONENT_SOURCE = /\.svelte$|^carbon-(icons|pictograms)-svelte(\/|$)/;
 
 function providedContexts(code: string): Set<string> {
   const keys = new Set<string>();
-  if (!code.includes("setContext")) return keys;
-  for (const match of code.matchAll(PROVIDED_CONTEXT)) keys.add(match[1]);
+  if (!code.includes("carbon:")) return keys;
+  for (const match of code.matchAll(CARBON_CONTEXT_KEY)) keys.add(match[2]);
   return keys;
+}
+
+/**
+ * Whether a key the module passes `setContext` may be a `carbon:` key that
+ * `providedContexts` can't see: one held by Carbon's script modules, or
+ * built from parts (`"carbon:" + name`).
+ */
+function providesUnknownContext(code: string): boolean {
+  if (!code.includes("setContext")) return false;
+  if (CARBON_SCRIPT_SPECIFIER.test(code)) return true;
+  const mentions = code.split("carbon:").length - 1;
+  return mentions > [...code.matchAll(CARBON_CONTEXT_KEY)].length;
 }
 
 type ImportBindings = {
@@ -392,6 +415,7 @@ export function collectScriptUsage(
     openAll: bindings.namespaces.size > 0 || bindings.openAll,
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
+    providesUnknownContext: providesUnknownContext(code),
     file,
     carbonImports: bindings.carbonImports,
   };
@@ -416,6 +440,7 @@ export function collectImportedUsage(
     sites: [],
     openAll: false,
     providedContexts: providedContexts(code),
+    providesUnknownContext: providesUnknownContext(code),
     file,
     carbonImports: bindings.carbonImports,
   };
@@ -736,6 +761,7 @@ export function collectSvelteUsage(
     openAll: bindings.openAll,
     openApps: bindings.openApps,
     providedContexts: providedContexts(code),
+    providesUnknownContext: providesUnknownContext(code),
     file,
     carbonImports: bindings.carbonImports,
   };

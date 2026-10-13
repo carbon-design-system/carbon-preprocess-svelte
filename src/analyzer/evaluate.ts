@@ -7,6 +7,7 @@ import {
 import type { Node } from "./ast";
 import {
   type ComponentModel,
+  contextKey,
   FUNCTION_DECLARATION,
   isTopLevel,
   memberKey,
@@ -595,10 +596,10 @@ function evaluateCall(
     }
     case "String":
       return stringify(argument());
-    case "getContext":
-      return first?.type === "Literal" && typeof first.value === "string"
-        ? scope.context(first.value)
-        : UNKNOWN;
+    case "getContext": {
+      const key = contextKey(first as Node | undefined, scope.model);
+      return key === undefined ? UNKNOWN : scope.context(key);
+    }
     default: {
       // `readable(value)` with no start function: a store that never
       // changes. One holding an object could have it mutated through `$`.
