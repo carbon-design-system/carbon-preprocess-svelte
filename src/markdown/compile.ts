@@ -277,7 +277,7 @@ const PROPS_RUNE = /\$props\s*\(/;
 const OUTSIDE_PROSE = /^\s*(?:<[A-Z]|\{)/;
 
 /** GitHub's heading slug (`github-slugger`), for ids that match on GitHub. */
-export function githubSlug(text: string): string {
+function githubSlug(text: string): string {
   return text.toLowerCase().replace(SLUG_STRIP, "").replace(SPACE, "-");
 }
 

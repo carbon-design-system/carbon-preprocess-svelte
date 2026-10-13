@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { requirePackageDir } from "severan/internal";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
-import { resolvePackageDir } from "../indexer/resolve-carbon-root";
 import { carbonCodeIcon } from "../markdown/code-icons";
 import {
   compileMarkdown,
@@ -9,6 +9,15 @@ import {
   type MarkdownOptions,
 } from "../markdown/compile";
 import { type ImageSize, imageSize } from "../markdown/image-size";
+
+/** Directory of the installed package `name`, or `undefined` when it isn't. */
+function resolvePackageDir(name: string): string | undefined {
+  try {
+    return requirePackageDir(name);
+  } catch {
+    return undefined;
+  }
+}
 
 const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;
 // `https:`, `data:`, `//cdn…`, or a Svelte expression: not a local file.

@@ -2,6 +2,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     "src/index.ts",
+    "src/code.ts",
     "src/cli.ts",
     "src/optimize-components-loader.ts",
     "scripts/*.ts",
@@ -14,6 +15,7 @@
     "bench/**/*.ts",
     "tests/**/*.{ts,cjs}"
   ],
-  "ignoreDependencies": ["sveast"],
-  "svelte": false
+  "svelte": false,
+  "ignore": ["playground/**"],
+  "ignoreDependencies": ["sveast", "prettier", "prettier-plugin-svelte"]
 }
