@@ -1,60 +1,46 @@
 /**
- * Entry point the CSS plugins load lazily for `propAware`, so
- * builds without it never evaluate the analyzer.
+ * The usage analysis and the rewrites it drives, for a library. The build
+ * plugins load it lazily, so builds without them never evaluate it.
  */
 import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { CarbonSvelte, LOG_PREFIX } from "../constants";
-import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
-import type { PropAwareUsage } from "../plugins/create-optimized-css";
-import {
-  CARBON_BARREL_KEY,
-  type CarbonImport,
-  carbonImportKey,
-  carbonModuleKey,
-  errorMessage,
-  isCarbonSpecifier,
-  isSvelteFile,
-  stripQuery,
-} from "../utils";
 import {
   analyzeUsage,
-  type PropAwareOptions,
   type UsageAnalysis,
+  type UsageOptions,
 } from "./analyze-usage";
 import { type AppUsage, collectAppUsage } from "./app-usage";
+import { type ModuleUsage, readLibraryImport } from "./call-sites";
 import {
-  type CarbonComponents,
-  type ModuleUsage,
-  readCarbonComponents,
-  readCarbonImport,
-} from "./call-sites";
+  type Library,
+  type LibraryImport,
+  type LibrarySpec,
+  loadLibrary,
+} from "./library";
 import { type SourceMap, toSourceMap } from "./mapped-text";
 import { type SpecializeOptions, specializeComponent } from "./specialize";
+import { errorMessage, isSvelteFile, stripQuery } from "./util";
 import { formatValue, UNKNOWN } from "./values";
 
-export type PropAwareResult = PropAwareUsage & {
+/** What the usage analysis found, for an app's build. */
+export type UsageResult = {
   analysis: UsageAnalysis;
-  carbon: CarbonComponents;
+  library: Library;
+  /** Export names of the library's components that can render (`Button`). */
+  liveComponents: Set<string>;
+  /** Whether no rendered component can apply class `cls`. */
+  isPruned(cls: string): boolean;
 };
 
-/** Which feature a failed analysis turns off, for its warning. */
-type Failure = { feature: string; fallback: string };
-
-const PROP_AWARE_FAILURE: Failure = {
-  feature: "propAware",
-  fallback: "Carbon CSS was pruned without it",
-};
-const SPECIALIZE_FAILURE: Failure = {
-  feature: "optimizeComponents",
-  fallback: "Carbon components were bundled unchanged",
-};
+/** Which feature a failed analysis turns off, and what happens instead, for its warning. */
+export type Failure = { feature: string; fallback: string };
 
 function failure(
+  library: LibrarySpec,
   error: unknown,
-  { feature, fallback } = PROP_AWARE_FAILURE,
+  { feature, fallback }: Failure,
 ): string {
-  return `${LOG_PREFIX} ${feature} could not analyze this build (${errorMessage(error)}); ${fallback}.`;
+  return `${library.tool}: ${feature} could not analyze this build (${errorMessage(error)}); ${fallback}.`;
 }
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/;
@@ -65,14 +51,15 @@ const NODE_MODULES = /[\\/]node_modules[\\/]/;
  * `undefined` for a `.svelte` file's sub-module (`?svelte&type=style`).
  */
 function readModuleSource(
+  library: LibrarySpec,
   id: string,
   code: string,
 ): { file: string; code: string } | undefined {
   const file = stripQuery(id);
   if (!isSvelteFile(file)) {
     // A dependency can't import the app's own components, and its
-    // computed `import()`s aren't the app's: read it for Carbon only.
-    if (NODE_MODULES.test(file) && !code.includes(CarbonSvelte.Components)) {
+    // computed `import()`s aren't the app's: read it for the library only.
+    if (NODE_MODULES.test(file) && !code.includes(library.name)) {
       return undefined;
     }
     return { file, code };
@@ -88,17 +75,21 @@ function readModuleSource(
 
 /**
  * Collects call sites module by module during a build, then analyzes them
- * against the Carbon modules the bundle holds.
+ * against the library modules the bundle holds. `failed` names what a
+ * failed analysis turns off.
  */
-export function createUsageCollector(projectRoot: string) {
-  const carbonRoot = resolveCarbonRoot(projectRoot);
-  const carbon = readCarbonComponents(carbonRoot);
+export function createUsageCollector(
+  spec: LibrarySpec,
+  projectRoot: string,
+  failed: Failure,
+) {
+  const library = loadLibrary(spec, projectRoot);
   const modules = new Map<string, { file: string; code: string }>();
 
   return {
     /** Records module `id`; `code` is what the bundler hands the plugin. */
     add(id: string, code: string): void {
-      const source = readModuleSource(id, code);
+      const source = readModuleSource(spec, id, code);
       if (source) modules.set(id, source);
       else modules.delete(id);
     },
@@ -108,36 +99,35 @@ export function createUsageCollector(projectRoot: string) {
     },
     /**
      * The analysis for this bundle, or a warning when it can't be done.
-     * `bundledIds` are the Carbon `.svelte` module paths in the bundle;
-     * `carbonImports`, the module graph's edges into Carbon. A component
-     * imported in a way the analysis didn't read (an alias) keeps every
-     * variant.
+     * `bundledIds` are the library's `.svelte` module paths in the
+     * bundle; `imports`, the module graph's edges into the library. A
+     * component imported in a way the analysis didn't read (an alias)
+     * keeps every variant.
      */
     async analyze(
       bundledIds: Iterable<string>,
-      options: PropAwareOptions,
-      carbonImports: Iterable<CarbonImport> = [],
-    ): Promise<PropAwareResult | { warning: string }> {
+      options: UsageOptions,
+      imports: Iterable<LibraryImport> = [],
+    ): Promise<UsageResult | { warning: string }> {
       try {
         const bundled = new Set<string>();
         for (const id of bundledIds) {
-          const key = carbonModuleKey(id);
+          const key = library.moduleKey(id);
           if (key) bundled.add(key);
         }
-        const appUsage = collectAppUsage(modules.values(), carbon);
-        const unread = unreadCarbonImports(appUsage, carbonImports);
-        return await toResult(
+        const appUsage = collectAppUsage(modules.values(), library);
+        const unread = unreadImports(library, appUsage, imports);
+        return toResult(
           await analyzeUsage({
-            carbonRoot,
-            carbon,
+            library,
             bundled,
             modules: unread ? [...appUsage.modules, unread] : appUsage.modules,
             options,
           }),
-          carbon,
+          library,
         );
       } catch (error) {
-        return { warning: failure(error) };
+        return { warning: failure(spec, error, failed) };
       }
     },
   };
@@ -148,13 +138,14 @@ export type UsageCollector = ReturnType<typeof createUsageCollector>;
 const UNREAD_IMPORT = "imported in a way the analysis can't read (an alias?)";
 
 /**
- * Open sites for the Carbon modules `edges` import that `appUsage` didn't
+ * Open sites for the library modules `edges` import that `appUsage` didn't
  * read the import of (or that an alias imports), or `undefined` if it
  * read them all. An unread import of the barrel opens every component.
  */
-function unreadCarbonImports(
+function unreadImports(
+  library: Library,
   appUsage: AppUsage,
-  edges: Iterable<CarbonImport>,
+  edges: Iterable<LibraryImport>,
 ): ModuleUsage | undefined {
   const unread: ModuleUsage = {
     sites: [],
@@ -162,16 +153,16 @@ function unreadCarbonImports(
     providedContexts: new Set(),
   };
   for (const { id, importer, specifier } of edges) {
-    const key = carbonImportKey(id);
+    const key = library.importKey(id);
     const file = stripQuery(importer);
-    if (!key || carbonModuleKey(file)) continue;
+    if (!key || library.moduleKey(file)) continue;
     if (
-      (specifier === undefined || isCarbonSpecifier(specifier)) &&
-      readCarbonImport(appUsage.read.get(file), key)
+      (specifier === undefined || library.isSpecifier(specifier)) &&
+      readLibraryImport(library, appUsage.read.get(file), key)
     ) {
       continue;
     }
-    if (key === CARBON_BARREL_KEY) unread.openAll = true;
+    if (key === library.barrelKey) unread.openAll = true;
     else {
       unread.sites.push({
         component: key,
@@ -186,13 +177,10 @@ function unreadCarbonImports(
   return unread.openAll || unread.sites.length > 0 ? unread : undefined;
 }
 
-function toResult(
-  analysis: UsageAnalysis,
-  carbon: CarbonComponents,
-): PropAwareResult {
+function toResult(analysis: UsageAnalysis, library: Library): UsageResult {
   return {
     analysis,
-    carbon,
+    library,
     liveComponents: new Set(
       [...analysis.liveComponents].map((key) => path.posix.parse(key).name),
     ),
@@ -201,25 +189,25 @@ function toResult(
 }
 
 /**
- * For `optimizeCarbonCss` and the CLI: analyze `files` (the `content`
- * globs), with `components` (names or paths) as the bundle. A listed
- * component no file renders keeps every variant.
+ * Analyzes `files` (every file that renders the library), with
+ * `components` (names or paths) as the bundle. A listed component no file
+ * renders keeps every variant.
  */
 export async function analyzeFiles(input: {
+  library: LibrarySpec;
   projectRoot: string;
   files: Iterable<{ file: string; code: string }>;
   components: Iterable<string>;
-  options: PropAwareOptions;
+  options: UsageOptions;
   /** Names the feature in the warning when analysis fails. */
-  failure?: Failure;
+  failure: Failure;
   /** `collectAppUsage(files)`, if the caller already has it. */
   appUsage?: AppUsage;
-}): Promise<PropAwareResult | { warning: string }> {
+}): Promise<UsageResult | { warning: string }> {
   try {
-    const carbonRoot = resolveCarbonRoot(input.projectRoot);
-    const carbon = readCarbonComponents(carbonRoot);
+    const library = loadLibrary(input.library, input.projectRoot);
     const modules = [
-      ...(input.appUsage ?? collectAppUsage(input.files, carbon)).modules,
+      ...(input.appUsage ?? collectAppUsage(input.files, library)).modules,
     ];
 
     const rendered = new Set(
@@ -232,7 +220,8 @@ export async function analyzeFiles(input: {
       providedContexts: new Set(),
     };
     for (const component of input.components) {
-      const key = carbonModuleKey(component) ?? carbon.get(component);
+      const key =
+        library.moduleKey(component) ?? library.components.get(component);
       if (!key) continue;
       bundled.add(key);
       if (!rendered.has(key)) {
@@ -249,22 +238,21 @@ export async function analyzeFiles(input: {
 
     return toResult(
       await analyzeUsage({
-        carbonRoot,
-        carbon,
+        library,
         bundled,
         modules,
         options: input.options,
       }),
-      carbon,
+      library,
     );
   } catch (error) {
-    return { warning: failure(error, input.failure) };
+    return { warning: failure(input.library, error, input.failure) };
   }
 }
 
 /** Report lines: per component, the prop values the app passes and why some stay open. */
 export function formatPropAwareReport(
-  result: PropAwareResult,
+  result: UsageResult,
   prunedClasses: ReadonlySet<string>,
   root: string,
 ): string[] {
@@ -275,15 +263,15 @@ export function formatPropAwareReport(
   ];
 }
 
-/** A Carbon component's export name, from its module key. */
-function nameOf(result: PropAwareResult, key: string): string {
-  for (const [name, component] of result.carbon) {
+/** A library component's export name, from its module key. */
+function nameOf(result: UsageResult, key: string): string {
+  for (const [name, component] of result.library.components) {
     if (component === key) return name;
   }
   return path.posix.parse(key).name;
 }
 
-function formatCallSites(result: PropAwareResult, root: string): string[] {
+function formatCallSites(result: UsageResult, root: string): string[] {
   const lines: string[] = [];
   const relative = (file: string) =>
     path.isAbsolute(file) ? path.relative(root, file) : file;
@@ -345,7 +333,7 @@ function realpath(file: string): string {
   }
 }
 
-/** Carbon components rewritten for an app, by real path of their source. */
+/** Library components rewritten for an app, by real path of their source. */
 export type SpecializedComponents = {
   sources: Map<string, { code: string; map: SourceMap }>;
   edits: number;
@@ -356,34 +344,39 @@ export type SpecializedComponents = {
   closed: Set<string>;
   /** How many of the app's own components `sources` holds. */
   apps: number;
-  /** Lines for `optimizeComponents({ report: true })`. */
+  /** Lines for a report of what it rewrote. */
   report: () => string[];
   /**
-   * Whether the analysis read analyzed file `importer`'s import of Carbon
+   * Whether the analysis read analyzed file `importer`'s import of library
    * module `id` (both real paths). `false` means an import it can't see,
    * such as one through an alias; `true` for a module it doesn't read
-   * imports of (a Carbon script, a stylesheet).
+   * imports of (a script module, a stylesheet).
    */
   readImport: (importer: string, id: string) => boolean;
 };
 
 /**
- * Analyzes `files` (every file that renders Carbon) and rewrites each
- * Carbon component they render for the props they pass it.
+ * Analyzes `files` (every file that renders the library) and rewrites each
+ * library component they render for the props they pass it, and each of
+ * the app's own components whose every call site they hold.
  */
 export async function specializeFiles(input: {
+  library: LibrarySpec;
   projectRoot: string;
   files: Array<{ file: string; code: string }>;
   options?: SpecializeOptions;
   /** Aliased `.svelte` imports the bundler resolved, by `importKey`. */
   resolvedImports?: ReadonlyMap<string, string>;
+  /** Names the feature in the warning when analysis fails, and the report. */
+  failure: Failure;
 }): Promise<SpecializedComponents | { warning: string }> {
   let appUsage: AppUsage;
+  let library: Library;
   try {
-    const carbon = readCarbonComponents(resolveCarbonRoot(input.projectRoot));
-    appUsage = collectAppUsage(input.files, carbon, input.resolvedImports);
+    library = loadLibrary(input.library, input.projectRoot);
+    appUsage = collectAppUsage(input.files, library, input.resolvedImports);
   } catch (error) {
-    return { warning: failure(error, SPECIALIZE_FAILURE) };
+    return { warning: failure(input.library, error, input.failure) };
   }
   const components = new Set(
     appUsage.modules.flatMap((module) =>
@@ -391,20 +384,17 @@ export async function specializeFiles(input: {
     ),
   );
   const result = await analyzeFiles({
+    library: input.library,
     projectRoot: input.projectRoot,
     files: input.files,
-    components: [...components].map(
-      (key) => `${CarbonSvelte.Components}/src/${key}`,
-    ),
+    components: [...components].map((key) => `${library.srcPrefix}${key}`),
     options: {},
-    failure: SPECIALIZE_FAILURE,
+    failure: input.failure,
     appUsage,
   });
   if ("warning" in result) return result;
 
-  const carbonSrc = realpathSync(
-    path.join(resolveCarbonRoot(input.projectRoot), "src"),
-  );
+  const src = realpathSync(library.src);
   const sources: SpecializedComponents["sources"] = new Map();
   let edits = 0;
   const rewrites: ComponentRewrite[] = [];
@@ -424,7 +414,7 @@ export async function specializeFiles(input: {
             .unrendered()
             .map((source) => path.posix.join(path.posix.dirname(key), source)),
       });
-      const file = path.join(carbonSrc, key);
+      const file = path.join(src, key);
       sources.set(file, {
         code: specialized.code,
         map: toSourceMap(
@@ -453,7 +443,7 @@ export async function specializeFiles(input: {
       });
     }
   } catch (error) {
-    return { warning: failure(error, SPECIALIZE_FAILURE) };
+    return { warning: failure(input.library, error, input.failure) };
   }
   const read = new Map(
     [...appUsage.read].map(([file, usage]) => [realpath(file), usage]),
@@ -463,16 +453,22 @@ export async function specializeFiles(input: {
     edits,
     closed: appUsage.closed,
     readImport: (importer, id) => {
-      const key = carbonImportKey(id);
-      return !key || readCarbonImport(read.get(importer), key);
+      const key = library.importKey(id);
+      return !key || readLibraryImport(library, read.get(importer), key);
     },
     apps: appRewrites.filter((rewrite) => rewrite.edits > 0).length,
     report: () =>
-      formatSpecializeReport(result, rewrites, appRewrites, input.projectRoot),
+      formatSpecializeReport(
+        result,
+        rewrites,
+        appRewrites,
+        input.projectRoot,
+        input.failure.feature,
+      ),
   };
 }
 
-/** One Carbon component `specializeFiles` rewrote, for the report. */
+/** One library component `specializeFiles` rewrote, for the report. */
 type ComponentRewrite = {
   key: string;
   edits: number;
@@ -482,12 +478,14 @@ type ComponentRewrite = {
 };
 
 function formatSpecializeReport(
-  result: PropAwareResult,
+  result: UsageResult,
   rewrites: ComponentRewrite[],
   appRewrites: Array<{ file: string; edits: number }>,
   root: string,
+  feature: string,
 ): string[] {
   const name = (key: string) => nameOf(result, key);
+  const { spec } = result.library;
   const changed = rewrites
     .filter((rewrite) => rewrite.edits > 0)
     .sort((a, b) => b.edits - a.edits || a.key.localeCompare(b.key));
@@ -502,8 +500,8 @@ function formatSpecializeReport(
 
   const lines = [
     "",
-    "carbon-preprocess-svelte optimizeComponents report",
-    `  Rewrote ${changed.length} of ${rewrites.length} Carbon components (${edits} edits, ${dropped} declarations dropped):`,
+    `${spec.tool} ${feature} report`,
+    `  Rewrote ${changed.length} of ${rewrites.length} ${spec.label} components (${edits} edits, ${dropped} declarations dropped):`,
   ];
   for (const rewrite of changed) {
     const stops =

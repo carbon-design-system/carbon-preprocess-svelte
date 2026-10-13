@@ -2,7 +2,6 @@ import type { Expression } from "sveast/walk";
 import type { Node } from "./ast";
 import {
   appScope,
-  type CarbonComponents,
   collectSourceUsage,
   collectSvelteUsage,
   indexAppComponents,
@@ -12,6 +11,7 @@ import {
 } from "./call-sites";
 import { buildComponentModel, type ComponentModel } from "./component-model";
 import { createScope, evaluate, type Scope } from "./evaluate";
+import type { Library } from "./library";
 import {
   addCallSite,
   type CallSite,
@@ -110,9 +110,9 @@ function exportedNames(model: ComponentModel): Array<[string, string]> {
 }
 
 export type AppUsage = {
-  /** Every module's Carbon call sites, ready for `analyzeUsage`. */
+  /** Every module's library call sites, ready for `analyzeUsage`. */
   modules: ModuleUsage[];
-  /** Each analyzed file as first read, by path: see `readCarbonImport`. */
+  /** Each analyzed file as first read, by path: see `readLibraryImport`. */
   read: ReadonlyMap<string, ModuleUsage>;
   /**
    * App components whose props were read from their call sites alone:
@@ -130,9 +130,9 @@ export type AppUsage = {
 
 /**
  * Follows props through the app's own components. A wrapper like
- * `<Card tone="danger">` that passes `kind={tone}` to a Carbon `Button` is
+ * `<Card tone="danger">` that passes `kind={tone}` to a library `Button` is
  * evaluated with the props its own call sites pass, until no wrapper's
- * usage grows; then each one's Carbon call sites are known as precisely as
+ * usage grows; then each one's library call sites are known as precisely as
  * its callers make them.
  *
  * An app component renders with any props when the analyzed files never
@@ -141,7 +141,7 @@ export type AppUsage = {
  */
 export function collectAppUsage(
   files: Iterable<{ file: string; code: string }>,
-  carbon: CarbonComponents,
+  library: Library,
   /** Aliased `.svelte` imports the bundler resolved; see `AppComponents`. */
   resolved?: ReadonlyMap<string, string>,
 ): AppUsage {
@@ -168,7 +168,7 @@ export function collectAppUsage(
   };
   const constants = moduleConstants(others);
   const collect = (key: string, usage?: ComponentUsage) =>
-    collectSvelteUsage(sources.get(key) ?? "", key, carbon, {
+    collectSvelteUsage(sources.get(key) ?? "", key, library, {
       apps,
       usage,
       model: modelOf(key) ?? undefined,
@@ -178,7 +178,7 @@ export function collectAppUsage(
   // Which app components some analyzed file refers to at all; the rest are
   // rendered by something the analysis can't see.
   const statics = others.map(({ file, code }) =>
-    collectSourceUsage(code, file, carbon, apps),
+    collectSourceUsage(code, file, library, apps),
   );
   const referenced = new Set<string>();
   const read = new Map<string, ModuleUsage>();
@@ -228,7 +228,7 @@ export function collectAppUsage(
     }
   }
 
-  const carbonOnly = (module: ModuleUsage): ModuleUsage => ({
+  const libraryOnly = (module: ModuleUsage): ModuleUsage => ({
     ...module,
     sites: module.sites.filter((site) => !isAppComponent(site.component)),
   });
@@ -236,7 +236,7 @@ export function collectAppUsage(
     [...usages].filter(([, usage]) => !usage.open).map(([key]) => key),
   );
   return {
-    modules: [...statics, ...latest.values()].map(carbonOnly),
+    modules: [...statics, ...latest.values()].map(libraryOnly),
     read,
     closed,
     scopeFor(file) {

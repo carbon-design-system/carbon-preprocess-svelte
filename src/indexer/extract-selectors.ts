@@ -1,11 +1,11 @@
 import { lexStrings } from "sveast/lexer";
 import { type AST, walk } from "sveast/walk";
+import { parse } from "../specializer/parser";
 import {
   componentImports,
   extractCarbonClassTokens,
   extractRuntimeClassesFromSource,
 } from "./extract-runtime-classes";
-import { parse } from "./parser";
 
 const WHITESPACE_REGEX = /\s+/;
 const GLOBAL_SELECTOR_REGEX = /^:global\((.*)\)$/;

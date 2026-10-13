@@ -1,11 +1,9 @@
 import type { Plugin } from "vite";
-import { carbonImports } from "./carbon-imports";
-import {
-  createComponentOptimizer,
-  type OptimizeComponentsOptions,
-} from "./component-optimizer";
+import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
+import type { SpecializerOptions } from "../specializer/optimizer";
+import { specializerPlugin } from "../specializer/vite";
 
-export type { OptimizeComponentsOptions };
+export type OptimizeComponentsOptions = SpecializerOptions;
 
 /**
  * Vite, Rollup and Rolldown plugin that rewrites each Carbon component
@@ -21,68 +19,9 @@ export type { OptimizeComponentsOptions };
  */
 export const optimizeComponents = (
   options?: OptimizeComponentsOptions,
-): Plugin => {
-  let root = process.cwd();
-  const optimizer = createComponentOptimizer(options, "optimizeComponents");
-
-  return {
-    name: "vite:carbon:optimize-components",
-    // Builds only (`vite build`, `--watch` included), never the dev server:
-    // the analysis runs up front for the whole app, dev serving and HMR
-    // would leave rewritten components stale when an app prop changes,
-    // and the check in `buildEnd` needs the complete module graph. Rollup
-    // and Rolldown ignore `apply`, so there it's up to the config.
-    apply: "build",
-    // Before the Svelte plugin: `load` hands Svelte the rewritten Carbon
-    // source to compile (the first `load` that returns wins), and
-    // `transform` reads app modules before a preprocessor changes them.
-    // Neither Svelte plugin loads plain `.svelte` files today, so this is
-    // a safeguard; Vite sorts `pre` plugins first, Rollup and Rolldown go
-    // by array order.
-    enforce: "pre",
-    configResolved(config) {
-      root = config.root;
-    },
-    async buildStart() {
-      const { warning, info, report } = await optimizer.prepare(
-        root,
-        async (source, importer) =>
-          (await this.resolve(source, importer, { skipSelf: true }))?.id,
-      );
-      if (warning) this.warn(warning);
-      if (info) this.info?.(info);
-      for (const line of report ?? []) console.log(line);
-    },
-    load(id) {
-      return optimizer.load(id);
-    },
-    transform(code, id) {
-      optimizer.check(id, code, root);
-    },
-    async buildEnd() {
-      // Every import of Carbon, as the module graph has it: check the
-      // analysis read each one.
-      for (const edge of await carbonImports(this)) {
-        optimizer.checkCarbonImport(edge, root);
-      }
-      // The app components whose props came from their call sites: check
-      // nothing outside `content` imports them.
-      for (const id of this.getModuleIds()) {
-        if (!optimizer.isClosed(id)) continue;
-        const info = this.getModuleInfo(id);
-        if (!info) continue;
-        // An entry is mounted by something outside the module graph.
-        const importers: Array<string | undefined> = [...info.importers];
-        if (info.isEntry) importers.push(undefined);
-        optimizer.checkImporters(
-          id,
-          importers,
-          info.dynamicImporters.length > 0,
-          root,
-        );
-      }
-      const error = optimizer.error();
-      if (error) this.error(error);
-    },
-  };
-};
+): Plugin =>
+  specializerPlugin(CARBON, options, {
+    id: "vite:carbon:optimize-components",
+    plugin: "optimizeComponents",
+    failure: SPECIALIZE_FAILURE,
+  });

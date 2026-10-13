@@ -7,9 +7,11 @@
  *
  *   bun scripts/golden-report.ts [--only admin-dashboard] [--full]
  */
+
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { specializeFiles } from "../src/analyzer";
+import { CARBON, SPECIALIZE_FAILURE } from "../src/carbon-library";
+import { specializeFiles } from "../src/specializer/analysis";
 import { goldenApps } from "./golden-apps";
 
 const { values: args } = parseArgs({
@@ -45,6 +47,8 @@ const record = (kind: string, example: string) => {
 for (const app of goldenApps(ROOT, args.only)) {
   // biome-ignore lint/performance/noAwaitInLoops: one app at a time keeps output readable
   const result = await specializeFiles({
+    library: CARBON,
+    failure: SPECIALIZE_FAILURE,
     projectRoot: ROOT,
     files: app.files,
     options: { unwrap: true },

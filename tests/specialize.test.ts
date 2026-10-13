@@ -2,17 +2,23 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Expression } from "sveast/walk";
-import { analyzeFiles } from "../src/analyzer";
-import { buildComponentModel } from "../src/analyzer/component-model";
-import { createScope, evaluate } from "../src/analyzer/evaluate";
+import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
+import { analyzeFiles } from "../src/specializer/analysis";
+import { buildComponentModel } from "../src/specializer/component-model";
+import { createScope, evaluate } from "../src/specializer/evaluate";
+import { parse } from "../src/specializer/parser";
 import {
   dropUnusedDeclarations,
   type SpecializeOptions,
   specializeComponent,
-} from "../src/analyzer/specialize";
-import { addCallSite, newComponentUsage } from "../src/analyzer/usage";
-import { OBJECT, possible, UNKNOWN, type Value } from "../src/analyzer/values";
-import { parse } from "../src/indexer/parser";
+} from "../src/specializer/specialize";
+import { addCallSite, newComponentUsage } from "../src/specializer/usage";
+import {
+  OBJECT,
+  possible,
+  UNKNOWN,
+  type Value,
+} from "../src/specializer/values";
 
 /** Specializes `code` as a component whose one call site passes `props` (as values). */
 function specializeWith(code: string, props: Map<string, Value>) {
@@ -383,6 +389,8 @@ test("Carbon BigNumber without `total` drops the denominator", async () => {
     const code = `<script>import { BigNumber } from "carbon-components-svelte";</script>\n<BigNumber value={42} />`;
     writeFileSync(file, code);
     const result = await analyzeFiles({
+      library: CARBON,
+      failure: PROP_AWARE_FAILURE,
       projectRoot: process.cwd(),
       files: [{ file, code }],
       components: ["BigNumber"],
@@ -408,6 +416,8 @@ describe("Carbon Button for kind=tertiary", () => {
       const code = `<script>import { Button } from "carbon-components-svelte";</script>\n<Button kind="tertiary">Hi</Button>`;
       writeFileSync(file, code);
       const result = await analyzeFiles({
+        library: CARBON,
+        failure: PROP_AWARE_FAILURE,
         projectRoot: process.cwd(),
         files: [{ file, code }],
         components: ["Button"],

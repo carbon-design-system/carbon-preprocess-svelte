@@ -1,4 +1,4 @@
-import { MappingsBuilder } from "../preprocessors/mappings-builder";
+import { MappingsBuilder } from "./mappings-builder";
 
 /**
  * Text built from slices of a source and inserted strings that remembers

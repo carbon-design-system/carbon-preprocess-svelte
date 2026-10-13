@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import webpack from "webpack";
 import { OptimizeComponentsPlugin } from "../src/plugins/OptimizeComponentsPlugin";
-import { optimizerRegistry } from "../src/plugins/optimizer-registry";
+import { optimizerRegistry } from "../src/specializer/registry";
 import { createFakeProject } from "./helpers/fake-project";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 

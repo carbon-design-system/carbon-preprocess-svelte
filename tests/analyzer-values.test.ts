@@ -13,7 +13,7 @@ import {
   truthOf,
   typeOf,
   UNKNOWN,
-} from "../src/analyzer/values";
+} from "../src/specializer/values";
 
 describe("analyzer values", () => {
   test("join widens to UNKNOWN past 32 values or with UNKNOWN", () => {

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { CarbonSvelte } from "../constants";
+import { listJsAndSvelteFiles } from "../specializer/list-files";
 import { isSvelteFile } from "../utils";
 import { readCarbonExports } from "./carbon-exports";
 import { extractCssOrphans, resolveCarbonCssPath } from "./extract-css-context";
@@ -9,7 +10,6 @@ import {
   type ModuleGraphCache,
 } from "./extract-runtime-classes";
 import { extractFromSvelte } from "./extract-selectors";
-import { listJsAndSvelteFiles } from "./list-files";
 import { mergeSubComponentClasses } from "./merge-sub-component-classes";
 import { resolveCarbonRoot } from "./resolve-carbon-root";
 

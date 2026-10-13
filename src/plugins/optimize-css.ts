@@ -1,8 +1,10 @@
 import type { Plugin, Rollup } from "vite";
-import type { PropAwareResult, UsageCollector } from "../analyzer";
+import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
+import type { UsageCollector, UsageResult } from "../specializer/analysis";
+import { libraryImports } from "../specializer/module-graph";
 import {
   type CarbonImport,
   errorMessage,
@@ -11,7 +13,6 @@ import {
   isScannableModule,
   toCssString,
 } from "../utils";
-import { carbonImports } from "./carbon-imports";
 import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
@@ -59,7 +60,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   /** Call sites per module for `propAware`. */
   let collector: UsageCollector | undefined;
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
-  let analyzer: typeof import("../analyzer") | undefined;
+  let analyzer: typeof import("../specializer/analysis") | undefined;
   /** The module graph's edges into Carbon, read in `buildEnd`. */
   let edges: CarbonImport[] = [];
 
@@ -80,9 +81,13 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       contentClasses = undefined;
       components = await loadComponentIndex(root);
       if (propAware && !collector) {
-        analyzer = await import("../analyzer");
+        analyzer = await import("../specializer/analysis");
         try {
-          collector = analyzer.createUsageCollector(root);
+          collector = analyzer.createUsageCollector(
+            CARBON,
+            root,
+            PROP_AWARE_FAILURE,
+          );
         } catch (error) {
           if (!silent) {
             this.warn(
@@ -97,7 +102,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       // in the build phase.
       edges =
         collector && typeof this.getModuleIds === "function"
-          ? await carbonImports(this)
+          ? await libraryImports(CARBON, this)
           : [];
     },
     transform(code, id) {
@@ -150,7 +155,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
         contentClasses = scan.classes;
       }
 
-      let usage: PropAwareResult | undefined;
+      let usage: UsageResult | undefined;
       if (collector && propAware) {
         const result = await collector.analyze(ids, propAware, edges);
         if (!("warning" in result)) usage = result;

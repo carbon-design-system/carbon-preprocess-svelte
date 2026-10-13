@@ -1,9 +1,14 @@
-import { analyzeFiles, specializeFiles } from "../src/analyzer";
-import { collectAppUsage } from "../src/analyzer/app-usage";
-import { readCarbonComponents } from "../src/analyzer/call-sites";
+import {
+  CARBON,
+  PROP_AWARE_FAILURE,
+  SPECIALIZE_FAILURE,
+} from "../src/carbon-library";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import { analyzeFiles, specializeFiles } from "../src/specializer/analysis";
+import { collectAppUsage } from "../src/specializer/app-usage";
+import { libraryAt } from "../src/specializer/library";
 
-const carbon = readCarbonComponents(resolveCarbonRoot());
+const carbon = libraryAt(CARBON, resolveCarbonRoot());
 const KIND_REASSIGNED =
   /kind +dynamic: Card\.svelte:5 `kind` is assigned at line 3/;
 const KIND_IMPORTED = /kind +dynamic: App\.svelte:\d+ `kind` is imported/;
@@ -37,6 +42,8 @@ async function buttonKinds(
   components = ["Button"],
 ) {
   const result = await analyzeFiles({
+    library: CARBON,
+    failure: PROP_AWARE_FAILURE,
     projectRoot: process.cwd(),
     files,
     components,
@@ -253,6 +260,8 @@ const pick = (next) => (kind = next);
 <Button {kind} on:click={() => pick("danger")} />`,
     };
     const result = await specializeFiles({
+      library: CARBON,
+      failure: SPECIALIZE_FAILURE,
       projectRoot: process.cwd(),
       files: [MAIN, appRendering(`<Card />`), card],
     });
@@ -262,6 +271,8 @@ const pick = (next) => (kind = next);
 
   test("inside `{#each}`, the reason reads the item as the walk did", async () => {
     const result = await specializeFiles({
+      library: CARBON,
+      failure: SPECIALIZE_FAILURE,
       projectRoot: process.cwd(),
       files: [
         MAIN,
@@ -370,6 +381,8 @@ describe("rewriting the app's own components", () => {
   /** What `specializeFiles` serves for each app file, by file name. */
   async function appSources(files: Array<{ file: string; code: string }>) {
     const result = await specializeFiles({
+      library: CARBON,
+      failure: SPECIALIZE_FAILURE,
       projectRoot: process.cwd(),
       files,
     });

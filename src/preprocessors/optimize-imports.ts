@@ -8,8 +8,8 @@ import {
   readCarbonExports,
 } from "../indexer/carbon-exports";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
+import { MappingsBuilder } from "../specializer/mappings-builder";
 import { errorMessage } from "../utils";
-import { MappingsBuilder } from "./mappings-builder";
 
 const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;
 

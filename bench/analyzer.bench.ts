@@ -1,15 +1,20 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { group, task } from "ostia";
-import { analyzeFiles, specializeFiles } from "../src/analyzer";
-import { collectAppUsage } from "../src/analyzer/app-usage";
-import { readCarbonComponents } from "../src/analyzer/call-sites";
-import { buildComponentModel } from "../src/analyzer/component-model";
-import { toSourceMap } from "../src/analyzer/mapped-text";
-import { specializeComponent } from "../src/analyzer/specialize";
+import {
+  CARBON,
+  PROP_AWARE_FAILURE,
+  SPECIALIZE_FAILURE,
+} from "../src/carbon-library";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { optimizeCssWithReport } from "../src/plugins/create-optimized-css";
 import { collectCarbonImports } from "../src/plugins/scan-imports";
+import { analyzeFiles, specializeFiles } from "../src/specializer/analysis";
+import { collectAppUsage } from "../src/specializer/app-usage";
+import { buildComponentModel } from "../src/specializer/component-model";
+import { libraryAt } from "../src/specializer/library";
+import { toSourceMap } from "../src/specializer/mapped-text";
+import { specializeComponent } from "../src/specializer/specialize";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
 import { components } from "../tests/helpers/component-index";
 
@@ -57,6 +62,8 @@ const apps = Object.entries(APPS).map(([name, code]): [string, App] => {
 
 const analyze = (app: App) =>
   analyzeFiles({
+    library: CARBON,
+    failure: PROP_AWARE_FAILURE,
     projectRoot: root,
     files: [{ file: app.file, code: app.code }],
     components: app.components,
@@ -72,6 +79,8 @@ for (const [name, app] of apps) {
     });
     task("specializeFiles", async () => {
       await specializeFiles({
+        library: CARBON,
+        failure: SPECIALIZE_FAILURE,
         projectRoot: root,
         files: [{ file: app.file, code: app.code }],
       });
@@ -126,6 +135,8 @@ const matrixFiles = ["App.svelte", "ActionButton.svelte"].map((name) => ({
 group("prop-aware: large app with its wrapper (2 files)", () => {
   task("analyzeFiles", async () => {
     await analyzeFiles({
+      library: CARBON,
+      failure: PROP_AWARE_FAILURE,
       projectRoot: root,
       files: matrixFiles,
       components: large.components,
@@ -133,7 +144,12 @@ group("prop-aware: large app with its wrapper (2 files)", () => {
     });
   });
   task("specializeFiles", async () => {
-    await specializeFiles({ projectRoot: root, files: matrixFiles });
+    await specializeFiles({
+      library: CARBON,
+      failure: SPECIALIZE_FAILURE,
+      projectRoot: root,
+      files: matrixFiles,
+    });
   });
 });
 
@@ -141,7 +157,7 @@ group("prop-aware: large app with its wrapper (2 files)", () => {
 // plugin reads every build now that it sees every module. 40 `.svelte`
 // files that wrap Carbon and each other, 400 scripts (a tenth of them
 // importing Carbon), and a 300 kB vendor module.
-const carbon = readCarbonComponents(resolveCarbonRoot(root));
+const carbon = libraryAt(CARBON, resolveCarbonRoot(root));
 const bundleDir = path.join(root, "bench-app/src");
 const bundleModules = [
   ...Array.from({ length: 40 }, (_, i) => ({

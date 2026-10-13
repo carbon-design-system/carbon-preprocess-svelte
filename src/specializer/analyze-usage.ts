@@ -1,9 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { listJsAndSvelteFiles } from "../indexer/list-files";
-import { carbonSignature } from "../indexer/resolve-carbon-root";
-import { collectCarbonTokens } from "../plugins/scan-content";
-import type { CarbonComponents, ModuleUsage } from "./call-sites";
+import type { ModuleUsage } from "./call-sites";
 import {
   type ComponentModel,
   loadComponentModel,
@@ -15,7 +12,10 @@ import {
   evaluate,
   type Scope,
 } from "./evaluate";
-import { walkLive } from "./live-walk";
+import type { Library } from "./library";
+import { listJsAndSvelteFiles } from "./list-files";
+import { type ClassTokens, walkLive } from "./live-walk";
+import { packageSignature } from "./package";
 import {
   addCallSite,
   type CallSite,
@@ -34,8 +34,8 @@ import {
   type Value,
 } from "./values";
 
-export type PropAwareOptions = {
-  /** Components that keep every variant's styles, as without `propAware`. */
+export type UsageOptions = {
+  /** Components that keep every variant, as if rendered with any props. */
   exclude?: string[];
   /**
    * Values for props the analysis can't read (`kind={row.kind}`), by
@@ -49,12 +49,12 @@ export type PropAwareOptions = {
 };
 
 export type UsageAnalysis = {
-  /** Carbon module keys that can render. */
+  /** Library module keys that can render. */
   liveComponents: Set<string>;
-  /** Merged call sites per Carbon module key. */
+  /** Merged call sites per library module key. */
   usages: Map<string, ComponentUsage>;
   /**
-   * Whether no rendered component can apply `cls`: `.bx--btn--danger` when
+   * Whether no rendered component can apply `cls`: `.x--btn--danger` when
    * no button is danger, and every class of a component that can't render.
    */
   isPruned(cls: string): boolean;
@@ -65,8 +65,8 @@ export type UsageAnalysis = {
   scopeFor(key: string): Scope | undefined;
 };
 
-type CarbonSources = {
-  /** Classes and prefixes Carbon's `.js` modules name; never pruned. */
+type LibrarySources = {
+  /** Classes and prefixes the library's script modules name; never pruned. */
   scriptTokens: Set<string>;
   /** `setContext` keys `.svelte` components pass (see `contextKey`). */
   componentContexts: Set<string>;
@@ -82,31 +82,30 @@ const SET_CONTEXT = /setContext\(\s*["']([^"']+)["']/g;
 const GET_CONTEXT = /\bget(?:All)?Contexts?\(/;
 /** A `setContext` call whose key isn't a lone string literal. */
 const SET_OTHER_CONTEXT = /setContext\(\s*(?!["'][^"']*["']\s*[,)])/;
-const carbonSourcesCache = new Map<
+const librarySourcesCache = new Map<
   string,
-  { signature: string; sources: CarbonSources }
+  { signature: string; sources: LibrarySources }
 >();
 
-/** Read once per Carbon, and again when it changes (see `carbonSignature`). */
-async function readCarbonSources(carbonRoot: string): Promise<CarbonSources> {
-  const carbonSrc = path.join(carbonRoot, "src");
-  const signature = await carbonSignature(carbonRoot);
-  const cached = carbonSourcesCache.get(carbonSrc);
+/** Read once per library, and again when it changes (see `packageSignature`). */
+async function readLibrarySources(library: Library): Promise<LibrarySources> {
+  const { src } = library;
+  const signature = await packageSignature(library.root, library.spec.srcDir);
+  const cached = librarySourcesCache.get(src);
   if (cached?.signature === signature) return cached.sources;
 
-  const sources: CarbonSources = {
+  const sources: LibrarySources = {
     scriptTokens: new Set(),
     componentContexts: new Set(),
     scriptContexts: new Set(),
     unknownScriptContext: false,
     scriptReadsContext: false,
   };
-  for (const file of await listJsAndSvelteFiles(carbonSrc)) {
-    if (file.startsWith("icons/")) continue;
-    const code = readFileSync(path.join(carbonSrc, file), "utf8");
+  for (const file of await listJsAndSvelteFiles(src)) {
+    const code = readFileSync(path.join(src, file), "utf8");
     const isScript = file.endsWith(".js");
     if (isScript) {
-      collectCarbonTokens(code, sources.scriptTokens);
+      library.spec.classTokens?.script(code, sources.scriptTokens);
       if (GET_CONTEXT.test(code)) sources.scriptReadsContext = true;
     }
     for (const match of code.matchAll(SET_CONTEXT)) {
@@ -119,12 +118,12 @@ async function readCarbonSources(carbonRoot: string): Promise<CarbonSources> {
     // can't read make it provide every key (`providesUnknownContext`).
     if (isScript) sources.unknownScriptContext = true;
     else {
-      for (const key of loadComponentModel(carbonSrc, file).providedContexts) {
+      for (const key of loadComponentModel(src, file).providedContexts) {
         sources.componentContexts.add(key);
       }
     }
   }
-  carbonSourcesCache.set(carbonSrc, { signature, sources });
+  librarySourcesCache.set(src, { signature, sources });
   return sources;
 }
 
@@ -231,6 +230,8 @@ function runPass(
   excluded: ReadonlySet<string>,
   /** Whether stores may flow through contexts (see `contextValues`). */
   flowContexts: boolean,
+  /** How the library's class names are read, if at all. */
+  classTokens: ClassTokens | undefined,
 ): Pass {
   let provided = new Set<string>();
   // A rendered component passes `setContext` a key the analysis can't read.
@@ -250,7 +251,7 @@ function runPass(
         usage = newComponentUsage();
         usages.set(site.component, usage);
       }
-      // Excluded wherever it renders, Carbon's own call sites included.
+      // Excluded wherever it renders, the library's own call sites included.
       if (excluded.has(site.component) && !site.open) {
         site = { ...site, open: true, reason: "excluded" };
       }
@@ -265,7 +266,7 @@ function runPass(
       const model = modelOf(key);
       const usage = usages.get(key);
       if (!usage) continue;
-      const result = walkLive(createScope(model, usage, resolver));
+      const result = walkLive(createScope(model, usage, resolver), classTokens);
       live.set(key, result);
       for (const site of result.childSites) enqueue(site);
     }
@@ -308,9 +309,9 @@ function startsWithAny(cls: string, prefixes: Iterable<string>): boolean {
 }
 
 /**
- * Which Carbon classes the app can never render, given how it calls each
+ * Which library classes the app can never render, given how it calls each
  * component: every class the components it renders can't apply under the
- * app's props, unless one of Carbon's `.js` modules names it. The walk
+ * app's props, unless one of the library's `.js` modules names it. The walk
  * collects every class literal and template prefix in what renders, so a
  * class it doesn't see can't be applied: one only a dead branch applies,
  * or one of a component that never renders at all.
@@ -319,15 +320,14 @@ function startsWithAny(cls: string, prefixes: Iterable<string>): boolean {
  * without props.
  */
 export async function analyzeUsage(input: {
-  carbonRoot: string;
-  carbon: CarbonComponents;
-  /** Carbon module keys in the bundle. */
+  library: Library;
+  /** Library module keys in the bundle. */
   bundled: Iterable<string>;
   modules: Iterable<ModuleUsage>;
-  options?: PropAwareOptions;
+  options?: UsageOptions;
 }): Promise<UsageAnalysis> {
-  const carbonSrc = path.join(input.carbonRoot, "src");
-  const sources = await readCarbonSources(input.carbonRoot);
+  const { library } = input;
+  const sources = await readLibrarySources(library);
   const bundled = [...input.bundled];
   const options = input.options ?? {};
   // Each model once per analysis: `loadComponentModel` checks the file's
@@ -336,7 +336,7 @@ export async function analyzeUsage(input: {
   const modelOf = (key: string): ComponentModel => {
     let model = models.get(key);
     if (!model) {
-      model = loadComponentModel(carbonSrc, key);
+      model = loadComponentModel(library.src, key);
       models.set(key, model);
     }
     return model;
@@ -344,13 +344,13 @@ export async function analyzeUsage(input: {
 
   const excluded = new Set(
     (options.exclude ?? []).flatMap((name) => {
-      const key = input.carbon.get(name);
+      const key = library.components.get(name);
       return key ? [key] : [];
     }),
   );
   const assumed = new Map<string, Map<string, Value>>();
   for (const [name, props] of Object.entries(options.assume ?? {})) {
-    const key = input.carbon.get(name);
+    const key = library.components.get(name);
     if (!key) continue;
     assumed.set(
       key,
@@ -372,7 +372,7 @@ export async function analyzeUsage(input: {
     openAll ||= module.openAll;
     for (const key of module.providedContexts) appContexts.add(key);
     appProvidesUnknown ||= module.providesUnknownContext === true;
-    appReadsContext ||= module.readsCarbonContext === true;
+    appReadsContext ||= module.readsLibraryContext === true;
     for (const site of module.sites) {
       const assumptions = assumed.get(site.component);
       if (assumptions && !site.open) {
@@ -412,6 +412,7 @@ export async function analyzeUsage(input: {
     },
     excluded,
     !sources.scriptReadsContext && !appReadsContext,
+    library.spec.classTokens,
   );
 
   const scriptPrefixes = [...sources.scriptTokens].filter((token) =>
@@ -423,7 +424,7 @@ export async function analyzeUsage(input: {
     if (verdict === undefined) {
       // Not only the classes a bundled component could apply under other
       // props: the index also lists, for a component, classes its CSS is
-      // written against (`.bx--date-picker` for every input DatePicker can
+      // written against (`.x--date-picker` for every input DatePicker can
       // wrap), and those can't render unless their own component is live.
       verdict =
         !precise.classes.has(cls) &&

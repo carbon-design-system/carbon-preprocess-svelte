@@ -1,15 +1,12 @@
+import { CarbonSvelte, RE_EXT_CSS, RE_STYLE_QUERY } from "./constants";
 import {
-  CarbonSvelte,
-  RE_EXT_CSS,
+  errorMessage,
+  isSvelteFile,
   RE_EXT_STYLESHEET,
-  RE_EXT_SVELTE,
-  RE_MODULE_QUERY,
-  RE_STYLE_QUERY,
-} from "./constants";
+  stripQuery,
+} from "./specializer/util";
 
-export function isSvelteFile(id: string): id is `${string}.svelte` {
-  return RE_EXT_SVELTE.test(id);
-}
+export { errorMessage, isSvelteFile, stripQuery };
 
 export function isCssFile(id: string): id is `${string}.css` {
   return RE_EXT_CSS.test(id);
@@ -73,11 +70,6 @@ export function isCarbonSpecifier(specifier: string): boolean {
   );
 }
 
-/** `App.svelte?svelte&type=style&lang.css` -> `App.svelte`. */
-export function stripQuery(id: string): string {
-  return id.replace(RE_MODULE_QUERY, "");
-}
-
 /**
  * Whether a bundled module's code should be scanned for literal `bx--`
  * tokens. Skips virtual modules (`\0` prefix), stylesheets (see
@@ -90,11 +82,6 @@ export function isScannableModule(id: string): boolean {
     return false;
   }
   return !RE_CARBON_COMPONENTS_SEGMENT.test(id);
-}
-
-/** A thrown value's message, for a warning. */
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /** Decodes a CSS asset source without copying the bytes. */

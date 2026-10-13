@@ -1,8 +1,8 @@
 import { join, possible, UNKNOWN, type Value } from "./values";
 
-/** One place a Carbon component is rendered. */
+/** One place a library component is rendered. */
 export type CallSite = {
-  /** Carbon module key, relative to its `src`: `Button/Button.svelte`. */
+  /** Library module key, relative to its `srcDir`: `Button/Button.svelte`. */
   component: string;
   /**
    * Every prop and slot is unknown: the site spreads props, or the
