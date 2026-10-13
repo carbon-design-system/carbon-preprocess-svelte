@@ -19,6 +19,9 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Find unused files, exports, and dependencies
+        run: bun run knip
+
       - name: Run unit tests
         run: bun run test
 

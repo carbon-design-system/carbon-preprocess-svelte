@@ -151,7 +151,7 @@ export type ComponentModel = {
  * item}`). What a path reads may go anywhere, which only matters when
  * it's an object.
  */
-export type Escape = { full: boolean; paths: string[][] };
+type Escape = { full: boolean; paths: string[][] };
 
 /** An enclosing `if` test, and whether what it guards is on its true side. */
 type Guard = { test: Expression; holds: boolean };

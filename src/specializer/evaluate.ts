@@ -419,7 +419,7 @@ function snippet(node: Node | Expression, scope: Scope): string {
  * Why `node` evaluates to unknown under `scope`, for the report: the
  * first part of it the analysis can't read. `undefined` when it's known.
  */
-export function whyUnknown(
+function whyUnknown(
   node: Node | Expression,
   scope: Scope,
   depth = 0,
