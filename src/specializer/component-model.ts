@@ -262,8 +262,19 @@ function scriptModule(
 
 const scriptCache = new Map<
   string,
-  { mtimeMs: number; model: ComponentModel | undefined }
+  { mtimeMs: number; checked: number; model: ComponentModel | undefined }
 >();
+
+/**
+ * Counts analyses: a `.js` module's mtime is checked once per analysis,
+ * not on every call into one of its helpers.
+ */
+let analysisCount = 0;
+
+/** Starts an analysis: `.js` modules a helper call reads are checked again. */
+export function recheckScriptModels(): void {
+  analysisCount++;
+}
 
 /**
  * The library's `.js` module `key`, modeled as a module script. Every name it
@@ -272,9 +283,13 @@ const scriptCache = new Map<
  */
 function loadScriptModel(src: string, key: string): ComponentModel | undefined {
   const file = path.join(src, key);
-  const { mtimeMs } = statSync(file);
   const cached = scriptCache.get(file);
-  if (cached?.mtimeMs === mtimeMs) return cached.model;
+  if (cached?.checked === analysisCount) return cached.model;
+  const { mtimeMs } = statSync(file);
+  if (cached?.mtimeMs === mtimeMs) {
+    cached.checked = analysisCount;
+    return cached.model;
+  }
   let model: ComponentModel | undefined;
   try {
     model = buildComponentModel(
@@ -300,7 +315,7 @@ function loadScriptModel(src: string, key: string): ComponentModel | undefined {
   } catch {
     model = undefined;
   }
-  scriptCache.set(file, { mtimeMs, model });
+  scriptCache.set(file, { mtimeMs, checked: analysisCount, model });
   return model;
 }
 
@@ -419,7 +434,7 @@ export function buildComponentModel(
   /** `code` already parsed, to skip parsing it again. */
   parsed?: AST.Root,
 ): ComponentModel {
-  const ast = parsed ?? parse(code, { comments: false });
+  const ast = parsed ?? parse(code, { comments: false, css: false });
   const model: ComponentModel = {
     key,
     code,

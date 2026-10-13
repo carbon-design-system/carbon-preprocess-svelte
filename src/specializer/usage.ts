@@ -95,14 +95,17 @@ export function addCallSite(
     if (reason) usage.unknownBecause.set(name, reason);
   }
 
-  /** Keys earlier sites passed: a key first seen here was absent there. */
-  const seen = new Set(usage.props.keys());
   for (const [name, value] of site.props) {
-    if (usage.siteCount > 0 && !seen.has(name) && !usage.omitted.has(name)) {
+    const before = usage.props.get(name);
+    // A key earlier sites didn't pass was absent there.
+    if (
+      usage.siteCount > 0 &&
+      before === undefined &&
+      !usage.omitted.has(name)
+    ) {
       usage.omitted.add(name);
       changed = true;
     }
-    const before = usage.props.get(name);
     const after = before === undefined ? value : join(before, value);
     if (!sameValue(before, after)) {
       usage.props.set(name, after);
@@ -110,12 +113,14 @@ export function addCallSite(
     }
   }
   // Declared props and every key some site passes: absent here.
-  for (const name of [...propNames, ...seen]) {
+  const markAbsent = (name: string) => {
     if (!(site.props.has(name) || usage.omitted.has(name))) {
       usage.omitted.add(name);
       changed = true;
     }
-  }
+  };
+  for (const name of propNames) markAbsent(name);
+  for (const name of usage.props.keys()) markAbsent(name);
 
   if (site.slots === null) {
     if (!usage.slotsUnknown) changed = true;
