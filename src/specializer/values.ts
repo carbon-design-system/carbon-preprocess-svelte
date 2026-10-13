@@ -51,8 +51,18 @@ export type Value = ReadonlySet<Primitive> | typeof UNKNOWN;
 /** Past this many possible values, a set widens to `UNKNOWN`. */
 const MAX_VALUES = 32;
 
+/**
+ * One set per primitive the analysis makes most often, shared: values are
+ * never mutated.
+ */
+const SINGLETONS = new Map<Primitive, Value>(
+  ([true, false, null, undefined, "", OBJECT, EMPTY_ARRAY] as Primitive[]).map(
+    (p) => [p, new Set([p])],
+  ),
+);
+
 export function possible(...values: Primitive[]): Value {
-  return new Set(values);
+  return (values.length === 1 && SINGLETONS.get(values[0])) || new Set(values);
 }
 
 export const UNDEFINED: Value = possible(undefined);

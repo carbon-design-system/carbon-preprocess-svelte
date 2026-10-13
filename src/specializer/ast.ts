@@ -1,4 +1,4 @@
-import { type AST, children } from "sveast/walk";
+import { type AST, forEachChild } from "sveast/walk";
 
 export type Node = AST.SvelteNode;
 
@@ -8,6 +8,9 @@ export function forEachNode(
   visit: (node: Node) => void,
 ): void {
   if (!node) return;
-  visit(node);
-  for (const child of children(node)) forEachNode(child, visit);
+  const visitNode = (child: Node) => {
+    visit(child);
+    forEachChild(child, visitNode);
+  };
+  visitNode(node);
 }

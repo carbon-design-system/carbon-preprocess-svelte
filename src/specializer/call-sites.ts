@@ -1,6 +1,6 @@
 import path from "node:path";
 import { lexImportsExports } from "sveast/lexer";
-import { type AST, children, type Expression, locate } from "sveast/walk";
+import { type AST, type Expression, forEachChild, locate } from "sveast/walk";
 import { forEachNode, type Node } from "./ast";
 import { buildComponentModel, type ComponentModel } from "./component-model";
 import {
@@ -701,7 +701,7 @@ export function collectSvelteUsage(
   let ast: AST.Root;
   try {
     // The model, if given, holds the same parse.
-    ast = options.model?.ast ?? parse(code, { comments: false });
+    ast = options.model?.ast ?? parse(code, { comments: false, css: false });
   } catch {
     return collectImportedUsage(
       code,
@@ -871,7 +871,7 @@ export function collectSvelteUsage(
         return;
       }
     }
-    for (const child of children(node)) visit(child, node);
+    forEachChild(node, (child) => visit(child, node));
   };
 
   for (const node of [ast.module, ast.instance, ast.fragment]) {

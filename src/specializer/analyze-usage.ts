@@ -5,6 +5,7 @@ import {
   type ComponentModel,
   loadComponentModel,
   type MirroredStore,
+  recheckScriptModels,
 } from "./component-model";
 import {
   type ContextResolver,
@@ -332,6 +333,7 @@ export async function analyzeUsage(input: {
   options?: UsageOptions;
 }): Promise<UsageAnalysis> {
   const { library } = input;
+  recheckScriptModels();
   const sources = await readLibrarySources(library);
   const bundled = [...input.bundled];
   const options = input.options ?? {};

@@ -731,6 +731,8 @@ export function specializeComponent(
     folded,
     options?.dropUnused !== false,
     applied > 0,
+    // Nothing printed: the component's own parse is the output's.
+    folded.text === code ? ast : undefined,
   );
   let unrendered: string[] | undefined;
   return {
@@ -747,7 +749,7 @@ export function specializeComponent(
 
 /** Sources of `.svelte` imports whose bindings `code` no longer uses. */
 function unrenderedImports(code: string): string[] {
-  const ast = parse(code, { comments: false });
+  const ast = parse(code, { comments: false, css: false });
   const imports = new Map<string, string[]>();
   for (const script of [ast.module, ast.instance]) {
     for (const statement of (script?.content.body ?? []) as Node[]) {
@@ -828,29 +830,34 @@ const MAX_CLEANUP_PASSES = 8;
 
 /**
  * How often each name is read anywhere in the component, not counting the
- * `owned` identifier nodes (the names being declared).
+ * `owned` identifier nodes (the names being declared). With `propReads`,
+ * the same walk also counts into it every read but `export { a }` (which
+ * keeps `a` declared but doesn't read it), `owned` nodes included.
  */
 function countReads(
   ast: AST.Root | Node,
   owned: ReadonlySet<Node>,
-  /** Count `export { a }` as a read of `a` (it keeps `a` declared). */
-  exportsRead = true,
+  propReads?: Map<string, number>,
 ): Map<string, number> {
   const reads = new Map<string, number>();
-  const count = (name: string) => reads.set(name, (reads.get(name) ?? 0) + 1);
+  const count = (counts: Map<string, number>, name: string) => {
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+    // `$store` reads `store`.
+    if (name.startsWith("$") && !name.startsWith("$$")) {
+      const store = name.slice(1);
+      counts.set(store, (counts.get(store) ?? 0) + 1);
+    }
+  };
   walk(ast as Node, {
     enter(node, parent, key) {
       if (
         node.type === "Identifier" &&
-        !owned.has(node) &&
         !isDeclaredName(parent, key) &&
-        (exportsRead || parent?.type !== "ExportSpecifier") &&
         isReference(node, parent)
       ) {
-        count(node.name);
-        // `$store` reads `store`.
-        if (node.name.startsWith("$") && !node.name.startsWith("$$")) {
-          count(node.name.slice(1));
+        if (!owned.has(node)) count(reads, node.name);
+        if (propReads && parent?.type !== "ExportSpecifier") {
+          count(propReads, node.name);
         }
       }
       // `class:x` and `{x}` shorthands, `bind:x`, `let:x`: names without
@@ -861,7 +868,8 @@ function countReads(
         node.type === "LetDirective" ||
         node.type === "StyleDirective"
       ) {
-        count(node.name);
+        reads.set(node.name, (reads.get(node.name) ?? 0) + 1);
+        propReads?.set(node.name, (propReads.get(node.name) ?? 0) + 1);
       }
     },
   });
@@ -1049,16 +1057,18 @@ function cleanUp(
   input: MappedText,
   drop: boolean,
   silence: boolean,
+  /** `input.text` already parsed. */
+  parsed?: AST.Root,
 ): { mapped: MappedText; dropped: number } {
   if (!drop && !silence) return { mapped: input, dropped: 0 };
-  const ast = parse(input.text, { comments: false });
+  const ast = parsed ?? parse(input.text, { comments: false, css: false });
   const statements = (ast.instance?.content.body ?? []) as Node[];
   const candidates = drop ? removableDeclarations(statements) : [];
   const owned = new Set(candidates.flatMap((candidate) => [...candidate.own]));
   // A declaration's own reads (`$: x = x + 1`) count: only `owned` nodes
   // (the declared names) are left out.
-  const reads = countReads(ast, owned);
-  const propReads = silence ? countReads(ast, new Set(), false) : undefined;
+  const propReads = silence ? new Map<string, number>() : undefined;
+  const reads = countReads(ast, owned, propReads);
 
   const removed: Candidate[] = [];
   let remaining = candidates;
@@ -1067,12 +1077,15 @@ function cleanUp(
     if (unused.length === 0) break;
     for (const candidate of unused) {
       removed.push(candidate);
-      subtractReads(reads, countReads(candidate.statement, owned));
-      if (propReads) {
-        subtractReads(
-          propReads,
-          countReads(candidate.statement, new Set(), false),
-        );
+      const removedPropReads = propReads
+        ? new Map<string, number>()
+        : undefined;
+      subtractReads(
+        reads,
+        countReads(candidate.statement, owned, removedPropReads),
+      );
+      if (propReads && removedPropReads) {
+        subtractReads(propReads, removedPropReads);
       }
     }
     remaining = remaining.filter((candidate) => !unused.includes(candidate));
