@@ -888,4 +888,21 @@ function swap() {
     expect(value("rest")).toBe(UNKNOWN);
     expect(value("late")).toBe(UNKNOWN);
   });
+
+  test("reads `$state(…)` as a store's call where a store shadows the rune", () => {
+    const model = buildComponentModel(
+      `<script>
+  import { writable } from "svelte/store";
+  const state = writable((value) => value);
+  let kind = $state("a");
+</script>
+{kind}`,
+      "X/X.svelte",
+    );
+    const usage = newComponentUsage();
+    const scope = createScope(model, usage, () => UNKNOWN);
+    expect(evaluate({ type: "Identifier", name: "kind" } as never, scope)).toBe(
+      UNKNOWN,
+    );
+  });
 });
