@@ -467,24 +467,25 @@ export function buildComponentModel(
     }
   }
 
-  // `let a; export { a as b }` declares prop `b`.
+  // `let a; export { a as b }` declares prop `b`; after `export let a`,
+  // it renames prop `a` to `b` (Svelte 3–5 read only `b`).
   for (const statement of ast.instance?.content.body ?? []) {
     if (statement.type !== "ExportNamedDeclaration" || statement.declaration) {
       continue;
     }
     if (statement.source) continue;
     for (const specifier of statement.specifiers) {
-      if (
-        specifier.local.type !== "Identifier" ||
-        !letDeclarations.has(specifier.local.name)
-      ) {
-        continue;
-      }
+      if (specifier.local.type !== "Identifier") continue;
       const local = specifier.local.name;
       const exported =
         specifier.exported.type === "Identifier"
           ? specifier.exported.name
           : String(specifier.exported.value);
+      if (model.props.has(local)) {
+        model.propNames.set(local, exported);
+        continue;
+      }
+      if (!letDeclarations.has(local)) continue;
       const init = model.declarations.get(local);
       model.declarations.delete(local);
       model.props.set(
