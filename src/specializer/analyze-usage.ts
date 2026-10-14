@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ModuleUsage } from "./call-sites";
 import {
@@ -102,8 +102,12 @@ async function readLibrarySources(library: Library): Promise<LibrarySources> {
     unknownScriptContext: false,
     scriptReadsContext: false,
   };
-  for (const file of await listJsAndSvelteFiles(src)) {
-    const code = readFileSync(path.join(src, file), "utf8");
+  const files = await listJsAndSvelteFiles(src);
+  const codes = await Promise.all(
+    files.map((file) => readFile(path.join(src, file), "utf8")),
+  );
+  for (const [i, file] of files.entries()) {
+    const code = codes[i];
     const isScript = file.endsWith(".js");
     if (isScript) {
       library.spec.classTokens?.script(code, sources.scriptTokens);
