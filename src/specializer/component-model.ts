@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { lexImportsExports } from "sveast/lexer";
 import { analyzeScopes, type Binding, type Scopes } from "sveast/scope";
 import {
   type AST,
@@ -14,6 +13,11 @@ import {
   walk,
 } from "sveast/walk";
 import { forEachNode, type Node } from "./ast";
+import {
+  createExportResolver,
+  type Export,
+  type ExportResolver,
+} from "./exports";
 import { parse } from "./parser";
 
 /** Marks the names `pattern` declares as unknown, with why. */
@@ -106,10 +110,11 @@ export type ComponentModel = {
   /** Imported bindings of other packages, by local name: their specifier. */
   packageImports: Map<string, string>;
   /**
-   * `import * as L from "./…"`, by local name: the library module key of
-   * the component it exports as a member (`Button` in `L.Button`), if any.
+   * Imported bindings of library objects with components as members, by
+   * local name: `import * as L from "./…"`, a namespace re-export, or a
+   * component with members (`Object.assign(Root, { Item })`).
    */
-  namespaceImports: Map<string, (member: string) => string | undefined>;
+  memberImports: Map<string, Export>;
   /**
    * Imported bindings of a library module's `export const NAME = "…"`, by
    * local name: the strings a context key can be (see `contextKey`).
@@ -234,11 +239,28 @@ export function loadComponentModel(src: string, key: string): ComponentModel {
   return model;
 }
 
+const exportResolvers = new Map<
+  string,
+  { checked: number; resolver: ExportResolver }
+>();
+
+/** What the library's modules under `src` export: read once per analysis. */
+function exportsUnder(src: string): ExportResolver {
+  let cached = exportResolvers.get(src);
+  if (cached?.checked !== analysisCount) {
+    cached = { checked: analysisCount, resolver: createExportResolver(src) };
+    exportResolvers.set(src, cached);
+  }
+  return cached.resolver;
+}
+
 /** Resolves a library module's relative imports: see `ImportResolver`. */
 function libraryResolver(src: string): ImportResolver {
   return (from, source, name) => {
-    const component = resolveReExport(src, from, source, name);
-    if (component) return { component };
+    const exported = exportsUnder(src).importOf(from, source, name);
+    if (exported.kind === "component") return { component: exported.key };
+    if (exported.kind === "members") return { members: exported };
+    if (name === "*") return undefined;
     const module = scriptModule(src, from, source);
     if (!module) return undefined;
     const string = stringExport(src, module, name);
@@ -354,9 +376,10 @@ function loadHelper(
 }
 
 /**
- * What `import { name } from source` binds in module `from`: a library
- * component, a string a library module's `export const` holds, or a
- * library module's function.
+ * What `import { name } from source` binds in module `from` (`"*"` for a
+ * namespace): a library component, an object with components as
+ * members, a string a library module's `export const` holds, or a library
+ * module's function.
  */
 type ImportResolver = (
   from: string,
@@ -364,50 +387,10 @@ type ImportResolver = (
   name: string,
 ) =>
   | { component: string }
+  | { members: Export }
   | { string: string }
   | { helper: () => Helper | undefined }
   | undefined;
-
-const MAX_BARREL_HOPS = 4;
-
-/**
- * The library component that `import { name } from source` binds in module
- * `from`, following `.js` barrels like `ListBox/index.js`.
- */
-function resolveReExport(
-  src: string,
-  from: string,
-  source: string,
-  name: string,
-  hops = 0,
-): string | undefined {
-  if (hops > MAX_BARREL_HOPS) return undefined;
-  const joined = path.posix.join(path.posix.dirname(from), source);
-  if (joined.endsWith(".svelte"))
-    return name === "default" ? joined : undefined;
-  const barrel = [joined, `${joined}.js`, `${joined}/index.js`].find(
-    (candidate) =>
-      candidate.endsWith(".js") && existsSync(path.join(src, candidate)),
-  );
-  if (!barrel) return undefined;
-  const code = readFileSync(path.join(src, barrel), "utf8");
-  for (const statement of lexImportsExports(code)) {
-    if (statement.kind !== "export" || !statement.source) continue;
-    for (const specifier of statement.specifiers) {
-      if (specifier.exported === name || specifier.kind === "all") {
-        const resolved = resolveReExport(
-          src,
-          barrel,
-          statement.source.value,
-          specifier.kind === "all" ? name : specifier.local,
-          hops + 1,
-        );
-        if (resolved) return resolved;
-      }
-    }
-  }
-  return undefined;
-}
 
 /**
  * The string `.js` module `module` exports as `name`, when it declares it
@@ -456,7 +439,7 @@ export function buildComponentModel(
     componentImports: new Map(),
     otherImports: new Set(),
     packageImports: new Map(),
-    namespaceImports: new Map(),
+    memberImports: new Map(),
     importedStrings: new Map(),
     importedHelpers: new Map(),
     storeImports: new Map(),
@@ -1055,23 +1038,15 @@ function readTopLevelStatement(
     const source = String(statement.source.value);
     const relative = source.startsWith(".");
     for (const specifier of statement.specifiers) {
-      if (!relative) {
-        model.packageImports.set(specifier.local.name, source);
-      } else if (specifier.type === "ImportNamespaceSpecifier") {
-        model.namespaceImports.set(specifier.local.name, (member) => {
-          const resolved = resolveImport(model.key, source, member);
-          return resolved && "component" in resolved
-            ? resolved.component
-            : undefined;
-        });
-      }
+      if (!relative) model.packageImports.set(specifier.local.name, source);
       const imported =
         specifier.type === "ImportDefaultSpecifier"
           ? "default"
-          : specifier.type === "ImportSpecifier" &&
-              specifier.imported.type === "Identifier"
-            ? specifier.imported.name
-            : undefined;
+          : specifier.type === "ImportNamespaceSpecifier"
+            ? "*"
+            : specifier.imported.type === "Identifier"
+              ? specifier.imported.name
+              : undefined;
       const resolved =
         relative && imported
           ? resolveImport(model.key, source, imported)
@@ -1080,7 +1055,9 @@ function readTopLevelStatement(
         model.componentImports.set(specifier.local.name, resolved.component);
       } else {
         model.otherImports.add(specifier.local.name);
-        if (resolved && "string" in resolved) {
+        if (resolved && "members" in resolved) {
+          model.memberImports.set(specifier.local.name, resolved.members);
+        } else if (resolved && "string" in resolved) {
           model.importedStrings.set(specifier.local.name, resolved.string);
         } else if (resolved) {
           model.importedHelpers.set(specifier.local.name, resolved.helper);

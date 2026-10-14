@@ -12,7 +12,7 @@ import {
   spreadProps,
   whyUnknownLater,
 } from "./evaluate";
-import { type Export, UNKNOWN_EXPORT, VALUE } from "./exports";
+import { type Export, memberOf, UNKNOWN_EXPORT } from "./exports";
 import { importKey } from "./import-key";
 import type { Library } from "./library";
 import {
@@ -296,25 +296,6 @@ function newBindings(): ImportBindings {
   };
 }
 
-/**
- * What `exported.a.b` is, for `path` `["a", "b"]`: rendering an object
- * with members renders its own component, if it has one.
- */
-function memberOf(exported: Export, path: readonly string[]): Export {
-  let current = exported;
-  for (const name of path) {
-    if (current.kind !== "members") {
-      // A member of a component or a value: whatever it holds.
-      return current.kind === "value" ? VALUE : UNKNOWN_EXPORT;
-    }
-    current = current.member(name);
-  }
-  if (current.kind === "members") {
-    return current.self ? { kind: "component", key: current.self } : VALUE;
-  }
-  return current;
-}
-
 /** Where to resolve the app's own `.svelte` imports from, if anywhere. */
 type AppImports = { from: string; apps: AppComponents } | undefined;
 
@@ -553,7 +534,6 @@ function appEvaluator(
   explain: Explain;
   /** Binds an `{#each}`'s item while its body is read; returns the unbinding. */
   bindEach: (node: Extract<Node, { type: "EachBlock" }>) => () => void;
-  /** What `bind:this={expression}` binds is used for: see `instanceMembers`. */
   instance: (expression: Expression) => Set<string> | null;
 } {
   let scope: ReturnType<typeof createScope> | undefined;

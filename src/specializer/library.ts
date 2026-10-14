@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   createExportResolver,
   type Export,
+  type ExportResolver,
   readPackageExports,
 } from "./exports";
 import { installedMajor, requirePackageDir } from "./package";
@@ -218,12 +219,12 @@ export class Library extends LibraryPaths {
     return path.join(this.root, this.spec.srcDir);
   }
 
-  private resolveExport?: (module: string, name: string) => Export;
+  private exports?: ExportResolver;
 
   /** What its barrel exports as `name`: see `Export`. */
   exportOf(name: string): Export {
-    this.resolveExport ??= createExportResolver(this.src);
-    return this.resolveExport(this.spec.barrel, name);
+    this.exports ??= createExportResolver(this.src);
+    return this.exports.exportOf(this.spec.barrel, name);
   }
 
   private svelte?: { major: number | undefined };

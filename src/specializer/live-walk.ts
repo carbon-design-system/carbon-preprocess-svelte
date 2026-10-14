@@ -10,6 +10,7 @@ import {
   spreadProps,
   whyUnknownLater,
 } from "./evaluate";
+import { memberOf } from "./exports";
 import type { ClassTokens, LibraryPaths } from "./library";
 import type { CallSite } from "./usage";
 import {
@@ -137,10 +138,10 @@ function visit(node: Node, scope: Scope, result: Walk): void {
       // can render with any props.
       const key = scope.model.componentImports.get(node.name);
       if (key) result.childSites.push(openSite(key));
-      // A namespace used other than as `L.Member`: any of its components.
-      if (scope.model.namespaceImports.has(node.name)) {
+      // An object of components used other than as `L.Member`: any of them.
+      if (scope.model.memberImports.has(node.name)) {
         throw new UnsupportedComponentError(
-          `${scope.model.key} uses \`${node.name}\`, a namespace import, as a value`,
+          `${scope.model.key} uses \`${node.name}\`, an object of components, as a value`,
         );
       }
       return;
@@ -148,25 +149,18 @@ function visit(node: Node, scope: Scope, result: Walk): void {
 
     case "MemberExpression": {
       const { object, property } = node;
-      const member =
-        object.type === "Identifier" &&
-        !node.computed &&
-        property.type === "Identifier"
-          ? scope.model.namespaceImports.get(object.name)?.(property.name)
-          : undefined;
-      if (member) {
-        result.childSites.push(openSite(member));
-        return;
+      if (object.type !== "Identifier") break;
+      const members = scope.model.memberImports.get(object.name);
+      if (!members || node.computed || property.type !== "Identifier") break;
+      const member = memberOf(members, [property.name]);
+      if (member.kind === "component") {
+        result.childSites.push(openSite(member.key));
+      } else if (member.kind !== "value") {
+        throw new UnsupportedComponentError(
+          `${scope.model.key} uses \`${object.name}.${property.name}\`, which couldn't be resolved, as a value`,
+        );
       }
-      if (
-        object.type === "Identifier" &&
-        !node.computed &&
-        scope.model.namespaceImports.has(object.name)
-      ) {
-        // A member that isn't a component: a helper, a constant.
-        return;
-      }
-      break;
+      return;
     }
 
     case "LogicalExpression": {
@@ -279,15 +273,17 @@ function componentKey(
   library: LibraryPaths,
 ): string | undefined {
   const { model } = scope;
-  const dot = name.indexOf(".");
-  const root = dot === -1 ? name : name.slice(0, dot);
-  const key =
-    dot === -1
-      ? model.componentImports.get(name)
-      : model.namespaceImports.get(root)?.(name.slice(dot + 1));
-  if (key) return key;
-  if (!(model.otherImports.has(root) || model.namespaceImports.has(root))) {
-    return undefined;
+  const [root, ...path] = name.split(".");
+  const members = model.memberImports.get(root);
+  if (members) {
+    const rendered = memberOf(members, path);
+    if (rendered.kind === "component") return rendered.key;
+    if (rendered.kind === "value") return undefined;
+  } else {
+    const key =
+      path.length === 0 ? model.componentImports.get(name) : undefined;
+    if (key) return key;
+    if (!model.otherImports.has(root)) return undefined;
   }
   const source = model.packageImports.get(root);
   if (source !== undefined && !library.isSpecifier(source)) return undefined;

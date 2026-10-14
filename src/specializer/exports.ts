@@ -134,8 +134,37 @@ export type Export =
   /** Anything, a component or something that holds one included. */
   | { kind: "unknown" };
 
-export const VALUE: Export = { kind: "value" };
+const VALUE: Export = { kind: "value" };
 export const UNKNOWN_EXPORT: Export = { kind: "unknown" };
+
+export type ExportResolver = {
+  /** What module `module` (a key in `src`) exports as `name`. */
+  exportOf(module: string, name: string): Export;
+  /**
+   * What `import { name } from "source"` in module `from` binds (`"*"`
+   * for a namespace, `"default"` for a default import).
+   */
+  importOf(from: string, source: string, name: string): Export;
+};
+
+/**
+ * What `exported.a.b` is, for `path` `["a", "b"]`: rendering an object
+ * with members renders its own component, if it has one.
+ */
+export function memberOf(exported: Export, path: readonly string[]): Export {
+  let current = exported;
+  for (const name of path) {
+    if (current.kind !== "members") {
+      // A member of a component or a value: whatever it holds.
+      return current.kind === "value" ? VALUE : UNKNOWN_EXPORT;
+    }
+    current = current.member(name);
+  }
+  if (current.kind === "members") {
+    return current.self ? { kind: "component", key: current.self } : VALUE;
+  }
+  return current;
+}
 
 type ModuleInfo = {
   /** `export { local as name } from "source"`, by name. */
@@ -162,9 +191,7 @@ type ModuleInfo = {
  * defined some other way holds no component only if its module can't
  * reach a `.svelte` file through its imports.
  */
-export function createExportResolver(
-  src: string,
-): (module: string, name: string) => Export {
+export function createExportResolver(src: string): ExportResolver {
   const infos = new Map<string, ModuleInfo | null>();
   const resolved = new Map<string, Export | null>();
   const reaching = new Map<string, boolean>();
@@ -249,7 +276,6 @@ export function createExportResolver(
     };
   }
 
-  /** What an import of `imported` from `source` in module `from` binds. */
   function imported(from: string, source: string, name: string): Export {
     // Another package's: none of this library's components.
     if (!source.startsWith(".")) return VALUE;
@@ -309,6 +335,13 @@ export function createExportResolver(
     name: string,
   ): Export | null {
     if (!module.code.includes("export")) return null;
+    // A module that reaches no component exports none: whether it exports
+    // `name` at all is read from its text, without parsing it.
+    if (!reachesComponents(key)) {
+      return new RegExp(`\\b${escapeRegExp(name)}\\b`).test(module.code)
+        ? VALUE
+        : null;
+    }
     const body = module.body();
     if (!body) return UNKNOWN_EXPORT;
     /** Names being classified, so a cycle doesn't recurse forever. */
@@ -487,7 +520,16 @@ export function createExportResolver(
     return null;
   }
 
-  return (module, name) => resolve(module, name) ?? VALUE;
+  return {
+    exportOf: (module, name) => resolve(module, name) ?? VALUE,
+    importOf: imported,
+  };
+}
+
+const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
+
+function escapeRegExp(text: string): string {
+  return text.replace(REGEXP_SPECIAL, "\\$&");
 }
 
 /** Whether two exports render the same: both values, or one component. */
