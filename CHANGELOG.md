@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.54](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.54) - 2026-10-13
+
+**Fixes**
+
+- specializer: pass snippets and `children` to library components
+- specializer: keep props a parent can set via `bind:this` or a custom element
+- specializer: read namespace members; walk other packages' components
+- specializer: read runes from their bindings, not their names
+
+**Performance**
+
+- specializer: read the library's sources in parallel (~8 ms → ~4.6 ms for Carbon)
+- upgrade sveast to 0.9.5 (~20% faster `analyzeScopes`; ~22.5 MB vs ~27.5 MB retained models)
+
 ## [0.11.53](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.53) - 2026-10-13
 
 **Features**
