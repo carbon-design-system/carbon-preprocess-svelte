@@ -204,3 +204,86 @@ describe("props set outside call sites", () => {
     expect(after).toBe(before);
   });
 });
+
+// A library component may render another package's components and import
+// its own modules as a namespace.
+
+const IMPORTS_LIBRARY = {
+  "Inner.svelte": `<script>
+  export let kind = "a";
+</script>
+{#if kind === "b"}<b>B</b>{:else}<i>A</i>{/if}`,
+  "Tag.svelte": `<script>
+  import * as L from "./index.js";
+</script>
+<L.Inner kind="b" />`,
+  "Value.svelte": `<script>
+  import * as L from "./index.js";
+</script>
+<svelte:component this={L.Inner} kind="b" />`,
+  "Bare.svelte": `<script>
+  import * as L from "./index.js";
+  const all = L;
+</script>
+<svelte:component this={all.Inner} kind="b" />`,
+  "Wraps.svelte": `<script>
+  import Frame from "frame-kit";
+  import * as Kit from "frame-kit";
+  import Inner from "./Inner.svelte";
+  export let kind = "a";
+</script>
+<Frame title={kind}>
+  <Inner {kind} />
+  {#if kind === "z"}<p>z</p>{/if}
+</Frame>
+<Kit.Frame><Inner kind="b" /></Kit.Frame>`,
+};
+
+const PACKAGES = {
+  "frame-kit": {
+    "index.js": 'export { default, default as Frame } from "./Frame.svelte";',
+    "Frame.svelte": `<script>
+  export let title = "";
+</script>
+<div class="frame" {title}><slot /></div>`,
+  },
+};
+
+const imports = (markup: string): LibraryApp => ({
+  lib: IMPORTS_LIBRARY,
+  app: appRendering(markup),
+  packages: PACKAGES,
+});
+
+describe("imports a library component renders through", () => {
+  const RENDER: Record<string, LibraryApp> = {
+    "a namespace member as a tag": imports("<Tag />"),
+    "a namespace member and an import": imports("<Tag /><Inner />"),
+    "a namespace member as a value": imports("<Value /><Inner />"),
+    "another package's component": imports("<Wraps />"),
+  };
+  const cases = Object.keys(RENDER).flatMap((name): [string, boolean][] => [
+    [name, false],
+    [name, true],
+  ]);
+  test.each(cases)("%s (unwrap: %p)", async (name, unwrap) => {
+    const { before, after } = await renderSpecialized(RENDER[name], { unwrap });
+    expect(after).toBe(before);
+  });
+
+  test("a namespace member's props are read", async () => {
+    const sources = await specializedLibrary(imports("<Tag />"));
+    expect(sources["Inner.svelte"]).not.toContain("<i>A</i>");
+  });
+
+  test("another package's component leaves the rest rewritten", async () => {
+    const sources = await specializedLibrary(imports("<Wraps />"));
+    expect(sources["Wraps.svelte"]).not.toContain("<p>z</p>");
+  });
+
+  test("a namespace used as a value turns the analysis off", async () => {
+    await expect(
+      specializedLibrary(imports("<Bare /><Inner />")),
+    ).rejects.toThrow("Bare.svelte uses `L`, a namespace import, as a value");
+  });
+});

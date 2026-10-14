@@ -10,7 +10,7 @@ import {
   spreadProps,
   whyUnknownLater,
 } from "./evaluate";
-import type { ClassTokens } from "./library";
+import type { ClassTokens, LibraryPaths } from "./library";
 import type { CallSite } from "./usage";
 import {
   isEmptyArray,
@@ -36,8 +36,11 @@ export type LiveResult = {
   childSites: CallSite[];
 };
 
-/** A walk in progress: what it found, and how it reads class names. */
-type Walk = LiveResult & { tokens: ClassTokens | undefined };
+/** A walk in progress: what it found, and the library it reads. */
+type Walk = LiveResult & {
+  tokens: ClassTokens | undefined;
+  library: LibraryPaths;
+};
 
 function addTokens(text: string, result: Walk): void {
   const { tokens } = result;
@@ -60,12 +63,13 @@ function addStrings(value: Value, result: Walk): void {
  * and falsy `class:` directives. Everything else is assumed live,
  * including every function body.
  */
-export function walkLive(scope: Scope, tokens?: ClassTokens): LiveResult {
+export function walkLive(scope: Scope, library: LibraryPaths): LiveResult {
   const result: Walk = {
     classes: new Set(),
     prefixes: new Set(),
     childSites: [],
-    tokens,
+    tokens: library.spec.classTokens,
+    library,
   };
   const { ast } = scope.model;
   // Scripts first, then markup; `<style>` holds no rendered classes.
@@ -132,15 +136,37 @@ function visit(node: Node, scope: Scope, result: Walk): void {
       // A component referenced as a value (`this={Comp}`, `const C = …`)
       // can render with any props.
       const key = scope.model.componentImports.get(node.name);
-      if (key) {
-        result.childSites.push({
-          component: key,
-          open: true,
-          props: new Map(),
-          slots: null,
-        });
+      if (key) result.childSites.push(openSite(key));
+      // A namespace used other than as `L.Member`: any of its components.
+      if (scope.model.namespaceImports.has(node.name)) {
+        throw new UnsupportedComponentError(
+          `${scope.model.key} uses \`${node.name}\`, a namespace import, as a value`,
+        );
       }
       return;
+    }
+
+    case "MemberExpression": {
+      const { object, property } = node;
+      const member =
+        object.type === "Identifier" &&
+        !node.computed &&
+        property.type === "Identifier"
+          ? scope.model.namespaceImports.get(object.name)?.(property.name)
+          : undefined;
+      if (member) {
+        result.childSites.push(openSite(member));
+        return;
+      }
+      if (
+        object.type === "Identifier" &&
+        !node.computed &&
+        scope.model.namespaceImports.has(object.name)
+      ) {
+        // A member that isn't a component: a helper, a constant.
+        return;
+      }
+      break;
     }
 
     case "LogicalExpression": {
@@ -197,14 +223,7 @@ function visit(node: Node, scope: Scope, result: Walk): void {
     }
 
     case "Component": {
-      const key = scope.model.componentImports.get(node.name);
-      // A tag bound to an import the model couldn't trace to a `.svelte`
-      // file: whatever it renders is invisible to the walk.
-      if (!key && scope.model.otherImports.has(node.name)) {
-        throw new UnsupportedComponentError(
-          `${scope.model.key} renders <${node.name}>, which couldn't be resolved`,
-        );
-      }
+      const key = componentKey(node.name, scope, result.library);
       if (key) {
         result.childSites.push(
           locateReason(
@@ -239,6 +258,42 @@ function visit(node: Node, scope: Scope, result: Walk): void {
   }
 
   visitAll(children(node), scope, result);
+}
+
+function openSite(component: string): CallSite {
+  return { component, open: true, props: new Map(), slots: null };
+}
+
+/**
+ * The library module `<name>` renders (`<Button>`, `<L.Button>`), or
+ * `undefined` for a tag that renders none: one the component declares (a
+ * snippet parameter, `{@const}`), or another package's component, whose
+ * content is walked as live. A package's component that imports the
+ * library is in the app's `content` (the build plugins check), so its own
+ * call sites are read there. Throws for a tag bound to a module of the
+ * library the walk can't trace: whatever it renders is invisible to it.
+ */
+function componentKey(
+  name: string,
+  scope: Scope,
+  library: LibraryPaths,
+): string | undefined {
+  const { model } = scope;
+  const dot = name.indexOf(".");
+  const root = dot === -1 ? name : name.slice(0, dot);
+  const key =
+    dot === -1
+      ? model.componentImports.get(name)
+      : model.namespaceImports.get(root)?.(name.slice(dot + 1));
+  if (key) return key;
+  if (!(model.otherImports.has(root) || model.namespaceImports.has(root))) {
+    return undefined;
+  }
+  const source = model.packageImports.get(root);
+  if (source !== undefined && !library.isSpecifier(source)) return undefined;
+  throw new UnsupportedComponentError(
+    `${model.key} renders <${name}>, which couldn't be resolved`,
+  );
 }
 
 /** `Button.svelte:12`: where `node` is in the component `scope` walks. */

@@ -28,6 +28,8 @@ export type LibraryApp = {
   lib: Record<string, string>;
   /** Files in the app's `src/`; `App.svelte` is rendered. */
   app: Record<string, string>;
+  /** Other installed packages' files, by package name; `index.js` is each one's entry. */
+  packages?: Record<string, Record<string, string>>;
 };
 
 const SVELTE_FILE = /\.svelte$/;
@@ -39,7 +41,7 @@ const TAG_NAME = /<([A-Z]\w*)/g;
 // runtime), as an installed one would.
 const CACHE = path.join(import.meta.dir, "../../node_modules/.cache");
 
-function writeProject({ lib, app }: LibraryApp) {
+function writeProject({ lib, app, packages = {} }: LibraryApp) {
   mkdirSync(CACHE, { recursive: true });
   const root = mkdtempSync(path.join(CACHE, "render-library-"));
   const pkg = path.join(root, "node_modules", MYLIB.name);
@@ -66,6 +68,21 @@ function writeProject({ lib, app }: LibraryApp) {
       exports: { ".": "./src/index.js" },
     }),
   );
+  for (const [name, files] of Object.entries(packages)) {
+    const dir = path.join(root, "node_modules", name);
+    for (const [file, code] of Object.entries(files)) {
+      write(path.join(dir, file), code);
+    }
+    write(
+      path.join(dir, "package.json"),
+      JSON.stringify({
+        name,
+        version: "1.0.0",
+        type: "module",
+        main: "index.js",
+      }),
+    );
+  }
   const files = Object.entries(app).map(([file, code]) => {
     write(path.join(root, "src", file), code);
     return { file: path.join(root, "src", file), code };
