@@ -238,7 +238,6 @@ function runPass(
   library: Library,
 ): Pass {
   const { svelteMajor } = library;
-  const { classTokens } = library.spec;
   let provided: ProvidedContexts = {
     keys: new Set(),
     unknown: false,
@@ -276,7 +275,7 @@ function runPass(
       if (!usage) continue;
       const result = walkLive(
         createScope(model, usage, resolver, { svelteMajor }),
-        classTokens,
+        library,
       );
       live.set(key, result);
       for (const site of result.childSites) enqueue(site);

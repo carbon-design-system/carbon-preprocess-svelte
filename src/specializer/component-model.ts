@@ -102,6 +102,13 @@ export type ComponentModel = {
   componentImports: Map<string, string>;
   /** Every other imported binding. */
   otherImports: Set<string>;
+  /** Imported bindings of other packages, by local name: their specifier. */
+  packageImports: Map<string, string>;
+  /**
+   * `import * as L from "./…"`, by local name: the library module key of
+   * the component it exports as a member (`Button` in `L.Button`), if any.
+   */
+  namespaceImports: Map<string, (member: string) => string | undefined>;
   /**
    * Imported bindings of a library module's `export const NAME = "…"`, by
    * local name: the strings a context key can be (see `contextKey`).
@@ -459,6 +466,8 @@ export function buildComponentModel(
     guardedWrites: new Map(),
     componentImports: new Map(),
     otherImports: new Set(),
+    packageImports: new Map(),
+    namespaceImports: new Map(),
     importedStrings: new Map(),
     importedHelpers: new Map(),
     storeImports: new Map(),
@@ -1055,7 +1064,18 @@ function readTopLevelStatement(
 ): void {
   if (statement.type === "ImportDeclaration") {
     const source = String(statement.source.value);
+    const relative = source.startsWith(".");
     for (const specifier of statement.specifiers) {
+      if (!relative) {
+        model.packageImports.set(specifier.local.name, source);
+      } else if (specifier.type === "ImportNamespaceSpecifier") {
+        model.namespaceImports.set(specifier.local.name, (member) => {
+          const resolved = resolveImport(model.key, source, member);
+          return resolved && "component" in resolved
+            ? resolved.component
+            : undefined;
+        });
+      }
       const imported =
         specifier.type === "ImportDefaultSpecifier"
           ? "default"
@@ -1064,7 +1084,7 @@ function readTopLevelStatement(
             ? specifier.imported.name
             : undefined;
       const resolved =
-        source.startsWith(".") && imported
+        relative && imported
           ? resolveImport(model.key, source, imported)
           : undefined;
       if (resolved && "component" in resolved) {

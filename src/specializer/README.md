@@ -33,3 +33,5 @@ const MY_LIBRARY: LibrarySpec = {
 ## What it relies on
 
 Unknown means open: anything the analysis can't read keeps every value, so a missed call site prunes nothing it shouldn't. That needs every module that imports the library to be visible: the plugins analyze `content` before the build and fail it when a module outside `content` imports the library, or imports it in a way the analysis can't read (an alias). A context key or store is followed only when every component that can set or read it is visible, and an app module that reads the library's contexts turns that off.
+
+Props come from call sites alone, so a component keeps every value when something else can set them: a custom element, or one bound with `bind:this` whose instance the parent uses for more than reading what it exports (`$set`, an accessor, handing it on). Another package's component that a library component renders is walked as if its content renders; if that package imports the library, the same `content` check covers it. A library module the analysis can't trace (a `.ts` re-export, a namespace import used as a value) turns the analysis off for the build.
