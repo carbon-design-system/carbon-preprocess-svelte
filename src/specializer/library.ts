@@ -1,6 +1,10 @@
 import { statSync } from "node:fs";
 import path from "node:path";
-import { readPackageExports } from "./exports";
+import {
+  createExportResolver,
+  type Export,
+  readPackageExports,
+} from "./exports";
 import { installedMajor, requirePackageDir } from "./package";
 import { isSvelteFile, stripQuery } from "./util";
 
@@ -212,6 +216,14 @@ export class Library extends LibraryPaths {
   /** The directory of its modules. */
   get src(): string {
     return path.join(this.root, this.spec.srcDir);
+  }
+
+  private resolveExport?: (module: string, name: string) => Export;
+
+  /** What its barrel exports as `name`: see `Export`. */
+  exportOf(name: string): Export {
+    this.resolveExport ??= createExportResolver(this.src);
+    return this.resolveExport(this.spec.barrel, name);
   }
 
   private svelte?: { major: number | undefined };

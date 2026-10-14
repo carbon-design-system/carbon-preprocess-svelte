@@ -12,6 +12,7 @@ import {
   spreadProps,
   whyUnknownLater,
 } from "./evaluate";
+import { type Export, UNKNOWN_EXPORT, VALUE } from "./exports";
 import { importKey } from "./import-key";
 import type { Library } from "./library";
 import {
@@ -257,8 +258,12 @@ function contextUsage(
 type ImportBindings = {
   /** Local binding -> library component key, or app component file. */
   components: Map<string, string>;
-  /** Local names of `import * as C from "<library>"`. */
-  namespaces: Set<string>;
+  /**
+   * Local names bound to something of the library's that isn't one
+   * component: `import * as C from "<library>"`, an object with
+   * components as members, or an export the analysis can't tell.
+   */
+  exports: Map<string, Export>;
   /** Bindings known to hold a component (the library's, icons, local `.svelte`). */
   objects: Set<string>;
   /** Re-exported library components: rendered somewhere we can't see. */
@@ -280,7 +285,7 @@ type ImportBindings = {
 function newBindings(): ImportBindings {
   return {
     components: new Map(),
-    namespaces: new Set(),
+    exports: new Map(),
     objects: new Set(),
     reExported: [],
     dynamic: [],
@@ -289,6 +294,25 @@ function newBindings(): ImportBindings {
     openApps: false,
     libraryImports: { components: new Set(), barrel: false },
   };
+}
+
+/**
+ * What `exported.a.b` is, for `path` `["a", "b"]`: rendering an object
+ * with members renders its own component, if it has one.
+ */
+function memberOf(exported: Export, path: readonly string[]): Export {
+  let current = exported;
+  for (const name of path) {
+    if (current.kind !== "members") {
+      // A member of a component or a value: whatever it holds.
+      return current.kind === "value" ? VALUE : UNKNOWN_EXPORT;
+    }
+    current = current.member(name);
+  }
+  if (current.kind === "members") {
+    return current.self ? { kind: "component", key: current.self } : VALUE;
+  }
+  return current;
 }
 
 /** Where to resolve the app's own `.svelte` imports from, if anywhere. */
@@ -320,9 +344,12 @@ function readImports(
       for (const specifier of statement.specifiers) {
         if (specifier.typeOnly) continue;
         if (isBarrel && specifier.kind !== "named") bindings.openAll = true;
-        const key = isBarrel
-          ? library.components.get(specifier.local)
-          : directKey;
+        const exported = isBarrel ? library.exportOf(specifier.local) : null;
+        if (exported && exported.kind !== "component") {
+          if (exported.kind !== "value") bindings.openAll = true;
+          continue;
+        }
+        const key = exported ? exported.key : directKey;
         if (key) {
           bindings.reExported.push(key);
           bindings.libraryImports.components.add(key);
@@ -343,14 +370,15 @@ function readImports(
           bindings.openAppComponents.push(...appImport.keys);
         }
       } else if (isBarrel) {
-        if (specifier.kind === "namespace") {
-          bindings.namespaces.add(specifier.local);
-        } else {
-          const key = library.components.get(specifier.imported);
-          if (key) {
-            bindings.components.set(specifier.local, key);
-            bindings.libraryImports.components.add(key);
-          }
+        const exported: Export =
+          specifier.kind === "namespace"
+            ? { kind: "members", member: (name) => library.exportOf(name) }
+            : library.exportOf(specifier.imported);
+        if (exported.kind === "component") {
+          bindings.components.set(specifier.local, exported.key);
+          bindings.libraryImports.components.add(exported.key);
+        } else if (exported.kind !== "value") {
+          bindings.exports.set(specifier.local, exported);
         }
       } else if (directKey && specifier.kind === "default") {
         bindings.components.set(specifier.local, directKey);
@@ -398,7 +426,7 @@ export function collectScriptUsage(
       ...bindings.dynamic,
       ...bindings.openAppComponents,
     ].map((key) => openSite(key, file, 1, reason)),
-    openAll: bindings.namespaces.size > 0 || bindings.openAll,
+    openAll: bindings.exports.size > 0 || bindings.openAll,
     openApps: bindings.openApps,
     ...contextUsage(library, code),
     file,
@@ -456,12 +484,14 @@ export function collectImportedUsage(
     for (const specifier of match[2].split(",")) {
       const name = specifier.trim();
       if (name === "" || name.startsWith("type ")) continue;
-      const key = library.components.get(name.split(IMPORT_AS)[0]);
-      if (key) {
+      const exported = library.exportOf(name.split(IMPORT_AS)[0]);
+      if (exported.kind === "component") {
         usage.sites.push(
-          openSite(key, file, locate(code, match.index).line, reason),
+          openSite(exported.key, file, locate(code, match.index).line, reason),
         );
-        bindings.libraryImports.components.add(key);
+        bindings.libraryImports.components.add(exported.key);
+      } else if (exported.kind !== "value") {
+        usage.openAll = true;
       }
     }
   }
@@ -760,7 +790,7 @@ export function collectSvelteUsage(
       if (
         inner.type === "Identifier" &&
         (bindings.components.has(inner.name) ||
-          bindings.namespaces.has(inner.name))
+          bindings.exports.has(inner.name))
       ) {
         rendered.add(inner.name);
       }
@@ -803,14 +833,19 @@ export function collectSvelteUsage(
       }
 
       case "Component": {
-        const [namespace, member] = node.name.split(".");
-        const key = member
-          ? bindings.namespaces.has(namespace)
-            ? library.components.get(member)
-            : undefined
-          : bindings.components.get(node.name);
+        const [root, ...path] = node.name.split(".");
+        const exported = bindings.exports.get(root);
+        let key: string | undefined;
+        if (exported) {
+          rendered.add(root);
+          const rendering = memberOf(exported, path);
+          if (rendering.kind === "unknown") usage.openAll = true;
+          else if (rendering.kind === "component") key = rendering.key;
+        } else if (path.length === 0) {
+          key = bindings.components.get(node.name);
+        }
         if (key) {
-          rendered.add(member ? namespace : node.name);
+          rendered.add(root);
           const site = callSiteFromElement(
             node,
             key,
@@ -845,20 +880,23 @@ export function collectSvelteUsage(
         if (key) {
           rendered.add(node.name);
           usage.sites.push(openSite(key, file, line(node), "used as a value"));
-        } else if (bindings.namespaces.has(node.name)) {
+        } else {
+          const exported = bindings.exports.get(node.name);
+          if (!exported) return;
           rendered.add(node.name);
+          // `C.Button` as a value: that component, with any props.
           const member =
             parent?.type === "MemberExpression" &&
             parent.object === node &&
             !parent.computed &&
             parent.property.type === "Identifier"
-              ? library.components.get(parent.property.name)
-              : undefined;
-          if (member) {
+              ? memberOf(exported, [parent.property.name])
+              : UNKNOWN_EXPORT;
+          if (member.kind === "component") {
             usage.sites.push(
-              openSite(member, file, line(node), "used as a value"),
+              openSite(member.key, file, line(node), "used as a value"),
             );
-          } else {
+          } else if (member.kind !== "value") {
             usage.openAll = true;
           }
         }
@@ -872,8 +910,8 @@ export function collectSvelteUsage(
     if (node) visit(node, null);
   }
 
-  for (const namespace of bindings.namespaces) {
-    if (!rendered.has(namespace)) usage.openAll = true;
+  for (const local of bindings.exports.keys()) {
+    if (!rendered.has(local)) usage.openAll = true;
   }
   for (const [local, key] of bindings.components) {
     if (!rendered.has(local)) {
