@@ -13,7 +13,7 @@ import {
   evaluate,
   type Scope,
 } from "./evaluate";
-import type { ClassTokens, Library } from "./library";
+import type { Library } from "./library";
 import { listJsAndSvelteFiles } from "./list-files";
 import { type LiveResult, walkLive } from "./live-walk";
 import { packageSignature } from "./package";
@@ -146,6 +146,7 @@ function contextValues(
   modelOf: (key: string) => ComponentModel,
   usages: Map<string, ComponentUsage>,
   resolver: ContextResolver,
+  svelteMajor: number | undefined,
 ): ContextValues {
   const values: ContextValues = new Map();
   const leaks = new Map<string, Set<string>>();
@@ -162,7 +163,7 @@ function contextValues(
   for (const [key, usage] of usages) {
     const model = modelOf(key);
     if (model.contextObjects.size === 0) continue;
-    const scope = createScope(model, usage, resolver);
+    const scope = createScope(model, usage, resolver, { svelteMajor });
     for (const [contextKey, objects] of model.contextObjects) {
       const leaked = leaks.get(contextKey);
       if (!objects.every((object) => object !== null)) {
@@ -233,9 +234,10 @@ function runPass(
   excluded: ReadonlySet<string>,
   /** Whether stores may flow through contexts (see `contextValues`). */
   flowContexts: boolean,
-  /** How the library's class names are read, if at all. */
-  classTokens: ClassTokens | undefined,
+  library: Library,
 ): Pass {
+  const { svelteMajor } = library;
+  const { classTokens } = library.spec;
   let provided: ProvidedContexts = {
     keys: new Set(),
     unknown: false,
@@ -259,7 +261,7 @@ function runPass(
       if (excluded.has(site.component) && !site.open) {
         site = { ...site, open: true, reason: "excluded" };
       }
-      if (addCallSite(usage, site, model.propNames.values())) {
+      if (addCallSite(usage, site, model.propNames.values(), svelteMajor)) {
         queue.add(site.component);
       }
     };
@@ -270,7 +272,10 @@ function runPass(
       const model = modelOf(key);
       const usage = usages.get(key);
       if (!usage) continue;
-      const result = walkLive(createScope(model, usage, resolver), classTokens);
+      const result = walkLive(
+        createScope(model, usage, resolver, { svelteMajor }),
+        classTokens,
+      );
       live.set(key, result);
       for (const site of result.childSites) enqueue(site);
     }
@@ -282,7 +287,7 @@ function runPass(
       unknown: provided.unknown,
       values:
         flowContexts && round < MAX_CONTEXT_ROUNDS
-          ? contextValues(modelOf, usages, resolver)
+          ? contextValues(modelOf, usages, resolver, svelteMajor)
           : new Map(),
     };
     for (const key of usages.keys()) {
@@ -419,7 +424,7 @@ export async function analyzeUsage(input: {
     },
     excluded,
     !sources.scriptReadsContext && !appReadsContext,
-    library.spec.classTokens,
+    library,
   );
 
   const scriptPrefixes = [...sources.scriptTokens].filter((token) =>
@@ -450,7 +455,9 @@ export async function analyzeUsage(input: {
     scopeFor(key) {
       const usage = precise.usages.get(key);
       return usage
-        ? createScope(modelOf(key), usage, precise.resolver)
+        ? createScope(modelOf(key), usage, precise.resolver, {
+            svelteMajor: library.svelteMajor,
+          })
         : undefined;
     },
   };

@@ -511,6 +511,7 @@ function appEvaluator(
   ast: AST.Root,
   file: string,
   objects: Set<string>,
+  library: Library,
   options: SvelteUsageOptions,
 ): {
   value: (expression: Expression) => Value;
@@ -528,7 +529,7 @@ function appEvaluator(
       usage = newComponentUsage();
       usage.open = true;
     }
-    scope = appScope(model, file, usage, options.constants);
+    scope = appScope(model, file, usage, options.constants, library);
   } catch {
     scope = undefined;
   }
@@ -560,13 +561,12 @@ export function appScope(
   file: string,
   usage: ComponentUsage,
   constants: ModuleConstants | undefined,
+  library: Library,
 ): Scope {
-  return createScope(
-    model,
-    usage,
-    () => UNKNOWN,
-    importedConstants(model, file, constants),
-  );
+  return createScope(model, usage, () => UNKNOWN, {
+    imported: importedConstants(model, file, constants),
+    svelteMajor: library.svelteMajor,
+  });
 }
 
 const MODULE_EXTENSIONS = [
@@ -628,27 +628,6 @@ export type SvelteUsageOptions = {
 export type ModuleConstants = (
   file: string,
 ) => ReadonlyMap<string, Value> | undefined;
-
-const BLANK = /^\s*$/;
-
-/**
- * Svelte 5 passes an element's content as props: its `{#snippet name()}`
- * blocks by name, and anything else as `children`.
- */
-function passSnippets(
-  node: AST.Component | AST.SvelteSelf,
-  site: CallSite,
-): void {
-  for (const child of node.fragment.nodes) {
-    if (child.type === "Comment") continue;
-    if (child.type === "Text" && BLANK.test(child.data)) continue;
-    if (child.type === "SnippetBlock") {
-      site.props.set(child.expression.name, possible(OBJECT));
-    } else {
-      site.props.set("children", possible(OBJECT));
-    }
-  }
-}
 
 /** A prop value the app writes literally; anything else is unknown. */
 function staticValue(expression: Expression, objects: Set<string>): Value {
@@ -747,7 +726,14 @@ export function collectSvelteUsage(
   };
   const rendered = new Set<string>();
   const line = (node: { start: number }) => locate(code, node.start).line;
-  const props = appEvaluator(code, ast, file, bindings.objects, options);
+  const props = appEvaluator(
+    code,
+    ast,
+    file,
+    bindings.objects,
+    library,
+    options,
+  );
   const explainAt =
     (node: { start: number }): Explain =>
     (expression) => {
@@ -824,7 +810,6 @@ export function collectSvelteUsage(
             props.spread,
             explainAt(node),
           );
-          if (isAppComponent(key)) passSnippets(node, site);
           site.location = { file, line: line(node) };
           usage.sites.push(site);
         }
@@ -840,7 +825,6 @@ export function collectSvelteUsage(
             props.spread,
             explainAt(node),
           );
-          passSnippets(node, site);
           site.location = { file, line: line(node) };
           usage.sites.push(site);
         }

@@ -1,4 +1,11 @@
-import { join, possible, UNKNOWN, type Value } from "./values";
+import {
+  join,
+  OBJECT,
+  possible,
+  UNDEFINED,
+  UNKNOWN,
+  type Value,
+} from "./values";
 
 /** One place a library component is rendered. */
 export type CallSite = {
@@ -11,8 +18,13 @@ export type CallSite = {
   open: boolean;
   /** Props this site passes. */
   props: Map<string, Value>;
-  /** Slots this site fills; `null` when that can't be told (snippets). */
+  /** Slots this site fills (a snippet fills its name's); `null` when that can't be told. */
   slots: Set<string> | null;
+  /**
+   * The site passes content outside any snippet or `slot="…"` element:
+   * Svelte 5 passes it as the `children` prop (see `addCallSite`).
+   */
+  children?: boolean;
   /** Where the site is. Only set for app files, for the report. */
   location?: { file: string; line: number };
   /** Why the site is `open`, for the report. */
@@ -73,15 +85,40 @@ function sameValue(a: Value | undefined, b: Value | undefined): boolean {
 }
 
 /**
- * Merges `site` into `usage`. Returns whether anything the analysis reads
- * changed, so the caller knows to walk the component again.
+ * The props `site` passes, its content included: Svelte 5 passes it as
+ * `children`, Svelte 3/4 as a slot only, and with no Svelte installed to
+ * tell, it may be either.
+ */
+function propsOf(
+  site: CallSite,
+  svelteMajor: number | undefined,
+): Map<string, Value> {
+  if (!site.children || (svelteMajor !== undefined && svelteMajor < 5)) {
+    return site.props;
+  }
+  const props = new Map(site.props);
+  props.set(
+    "children",
+    svelteMajor === undefined
+      ? join(site.props.get("children") ?? UNDEFINED, possible(OBJECT))
+      : possible(OBJECT),
+  );
+  return props;
+}
+
+/**
+ * Merges `site` into `usage`, for an app that compiles with Svelte
+ * `svelteMajor`. Returns whether anything the analysis reads changed, so
+ * the caller knows to walk the component again.
  */
 export function addCallSite(
   usage: ComponentUsage,
   site: CallSite,
   propNames: Iterable<string>,
+  svelteMajor: number | undefined,
 ): boolean {
   let changed = usage.siteCount === 0;
+  const props = propsOf(site, svelteMajor);
   if (site.location) usage.appSites.push(site);
 
   if (site.open && !usage.open) {
@@ -95,7 +132,7 @@ export function addCallSite(
     if (reason) usage.unknownBecause.set(name, reason);
   }
 
-  for (const [name, value] of site.props) {
+  for (const [name, value] of props) {
     const before = usage.props.get(name);
     // A key earlier sites didn't pass was absent there.
     if (
@@ -114,7 +151,7 @@ export function addCallSite(
   }
   // Declared props and every key some site passes: absent here.
   const markAbsent = (name: string) => {
-    if (!(site.props.has(name) || usage.omitted.has(name))) {
+    if (!(props.has(name) || usage.omitted.has(name))) {
       usage.omitted.add(name);
       changed = true;
     }

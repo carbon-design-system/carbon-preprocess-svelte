@@ -14,7 +14,7 @@ import { buildComponentModel } from "../src/specializer/component-model";
 import { createScope, evaluate } from "../src/specializer/evaluate";
 import { libraryAt } from "../src/specializer/library";
 import { addCallSite, newComponentUsage } from "../src/specializer/usage";
-import { possible, UNKNOWN } from "../src/specializer/values";
+import { OBJECT, possible, UNKNOWN } from "../src/specializer/values";
 import { createMockCarbonPackage } from "./helpers/mock-carbon-package";
 
 const carbonRoot = resolveCarbonRoot();
@@ -145,17 +145,61 @@ let { tone = "danger" } = $props();`,
     expect(namespaceAsValue.openAll).toBe(true);
   });
 
-  test("snippets make slots unknown; slot attributes name them", () => {
+  test("slot attributes and snippets name the slots they fill", () => {
     const { sites } = collectSvelteUsage(
       app(
         IMPORT_BUTTON,
-        `<Button><span slot="icon" /></Button><Button>{#snippet icon()}x{/snippet}</Button>`,
+        `<Button><span slot="icon" /></Button><Button>{#snippet icon()}x{/snippet}</Button><Button>{#snippet children()}x{/snippet}</Button><Button>x{#snippet icon()}x{/snippet}</Button><Button><span slot={name} /></Button>`,
       ),
       "/app/App.svelte",
       carbon,
     );
-    expect(sites[0].slots).toEqual(new Set(["icon"]));
-    expect(sites[1].slots).toBeNull();
+    expect(sites.map((site) => site.slots)).toEqual([
+      new Set(["icon"]),
+      new Set(["icon"]),
+      new Set(["default"]),
+      new Set(["default", "icon"]),
+      null,
+    ]);
+    // A snippet is a prop; other content is `children` (see `addCallSite`).
+    expect(sites.map((site) => [...site.props.keys()])).toEqual([
+      [],
+      ["icon"],
+      ["children"],
+      ["icon"],
+      [],
+    ]);
+    expect(sites.map((site) => site.children === true)).toEqual([
+      false,
+      false,
+      false,
+      true,
+      false,
+    ]);
+  });
+});
+
+describe("addCallSite", () => {
+  // `<X>content</X>`: Svelte 5 passes it as `children`, Svelte 3/4 don't.
+  test.each([
+    [5, possible(OBJECT)],
+    [4, undefined],
+    [undefined, possible(undefined, OBJECT)],
+  ])("passes content as `children` under Svelte %p", (major, expected) => {
+    const usage = newComponentUsage();
+    addCallSite(
+      usage,
+      {
+        component: "X/X.svelte",
+        open: false,
+        props: new Map(),
+        slots: new Set(["default"]),
+        children: true,
+      },
+      ["children"],
+      major,
+    );
+    expect(usage.props.get("children")).toEqual(expected);
   });
 });
 
@@ -826,6 +870,7 @@ function swap() {
         slots: new Set(),
       },
       model.propNames.values(),
+      undefined,
     );
     const scope = createScope(model, usage, () => UNKNOWN);
     const value = (name: string) =>

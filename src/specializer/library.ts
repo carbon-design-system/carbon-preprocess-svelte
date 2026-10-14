@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 import { readPackageExports } from "./exports";
-import { requirePackageDir } from "./package";
+import { installedMajor, requirePackageDir } from "./package";
 import { isSvelteFile, stripQuery } from "./util";
 
 /** How the analysis reads a library's class names: see `LibrarySpec.classTokens`. */
@@ -212,6 +212,18 @@ export class Library extends LibraryPaths {
   /** The directory of its modules. */
   get src(): string {
     return path.join(this.root, this.spec.srcDir);
+  }
+
+  private svelte?: { major: number | undefined };
+
+  /**
+   * Major version of the Svelte it compiles with, as resolved from its
+   * root; `undefined` when none resolves. Svelte 5 passes a component's
+   * content as its `children` prop.
+   */
+  get svelteMajor(): number | undefined {
+    this.svelte ??= { major: installedMajor("svelte", this.root) };
+    return this.svelte.major;
   }
 }
 
