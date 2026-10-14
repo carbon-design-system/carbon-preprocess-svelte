@@ -2,6 +2,7 @@ import {
   appRendering,
   type LibraryApp,
   renderSpecialized,
+  specializedLibrary,
 } from "./helpers/render-library";
 
 // Each app renders the same HTML with the library rewritten for it as
@@ -116,6 +117,90 @@ describe("specialized libraries render as the original", () => {
   ]);
   test.each(cases)("%s (unwrap: %p)", async (name, unwrap) => {
     const { before, after } = await renderSpecialized(SHAPES[name], { unwrap });
+    expect(after).toBe(before);
+  });
+});
+
+// Props a parent sets through the instance `bind:this` binds (`$set`,
+// accessors), or that a custom element's attributes set, aren't call
+// sites: such a component keeps every value. One whose instance is only
+// read for what it exports is still rewritten.
+
+const INSTANCE_LIBRARY = {
+  "Kind.svelte": `<svelte:options accessors />
+<script>
+  export let kind = "a";
+  export function open() {}
+</script>
+{#if kind === "b"}<b>B</b>{:else}<i>A</i>{/if}`,
+  "Element.svelte": `<svelte:options customElement="x-element" />
+<script>
+  export let kind = "a";
+</script>
+{#if kind === "b"}<b>B</b>{:else}<i>A</i>{/if}`,
+  "Outer.svelte": `<script>
+  import Kind from "./Kind.svelte";
+  let kind;
+  $: kind?.$set({ kind: "b" });
+</script>
+<Kind bind:this={kind} />`,
+};
+
+const instance = (markup: string, script = ""): LibraryApp => ({
+  lib: INSTANCE_LIBRARY,
+  app: appRendering(markup, script),
+});
+
+const KEEPS_EVERY_VALUE: Record<string, LibraryApp> = {
+  "an accessor written": instance(
+    '<Kind bind:this={k} /><button on:click={() => (k.kind = "b")}>b</button>',
+    "let k;",
+  ),
+  "`$set` called": instance(
+    '<Kind bind:this={k} /><button on:click={() => k.$set({ kind: "b" })}>b</button>',
+    "let k;",
+  ),
+  "the instance handed on": instance(
+    "<Kind bind:this={k} />",
+    "import { register } from './register.js';\nlet k;\n$: register(k);",
+  ),
+  "the instance bound to a property": instance(
+    "<Kind bind:this={refs.k} />",
+    "const refs = {};",
+  ),
+  "an accessor read": instance("<Kind bind:this={k} />{k?.kind}", "let k;"),
+  "`$set` called by a library component": instance("<Outer />"),
+  "a custom element": instance("<Element />"),
+};
+
+const STILL_REWRITTEN: Record<string, LibraryApp> = {
+  "an export called": instance(
+    "<Kind bind:this={k} /><button on:click={() => k.open()}>open</button>",
+    "let k;",
+  ),
+  "an export called after a test": instance(
+    "<Kind bind:this={k} /><button on:click={() => k && k.open()}>open</button>{#if k}bound{/if}",
+    "let k;",
+  ),
+  "an export called optionally": instance(
+    "<Kind bind:this={k} /><button on:click={() => k?.open()}>open</button>",
+    "let k;",
+  ),
+};
+
+describe("props set outside call sites", () => {
+  test.each(Object.keys(KEEPS_EVERY_VALUE))("%s keeps them", async (name) => {
+    const sources = await specializedLibrary(KEEPS_EVERY_VALUE[name]);
+    const component = name === "a custom element" ? "Element" : "Kind";
+    expect(sources[`${component}.svelte`]).toContain("<b>B</b>");
+  });
+
+  test.each(Object.keys(STILL_REWRITTEN))("%s still rewrites", async (name) => {
+    const sources = await specializedLibrary(STILL_REWRITTEN[name]);
+    expect(sources["Kind.svelte"]).not.toContain("<b>B</b>");
+    const { before, after } = await renderSpecialized(STILL_REWRITTEN[name], {
+      unwrap: false,
+    });
     expect(after).toBe(before);
   });
 });

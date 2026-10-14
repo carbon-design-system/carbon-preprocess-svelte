@@ -14,7 +14,11 @@ import {
 } from "./evaluate";
 import { importKey } from "./import-key";
 import type { Library } from "./library";
-import { callSiteFromElement, type Explain } from "./live-walk";
+import {
+  callSiteFromElement,
+  type Explain,
+  instanceMembers,
+} from "./live-walk";
 import { parse } from "./parser";
 import { type CallSite, type ComponentUsage, newComponentUsage } from "./usage";
 import {
@@ -519,6 +523,8 @@ function appEvaluator(
   explain: Explain;
   /** Binds an `{#each}`'s item while its body is read; returns the unbinding. */
   bindEach: (node: Extract<Node, { type: "EachBlock" }>) => () => void;
+  /** What `bind:this={expression}` binds is used for: see `instanceMembers`. */
+  instance: (expression: Expression) => Set<string> | null;
 } {
   let scope: ReturnType<typeof createScope> | undefined;
   try {
@@ -548,6 +554,8 @@ function appEvaluator(
     explain: (expression) =>
       scope ? whyUnknownLater(expression, scope) : () => "isn't a literal",
     bindEach: (node) => (scope ? bindEach(node, scope) : () => {}),
+    instance: (expression) =>
+      scope ? instanceMembers(expression, scope.model.scopes) : null,
   };
 }
 
@@ -809,6 +817,7 @@ export function collectSvelteUsage(
             props.value,
             props.spread,
             explainAt(node),
+            props.instance,
           );
           site.location = { file, line: line(node) };
           usage.sites.push(site);
@@ -824,6 +833,7 @@ export function collectSvelteUsage(
             props.value,
             props.spread,
             explainAt(node),
+            props.instance,
           );
           site.location = { file, line: line(node) };
           usage.sites.push(site);

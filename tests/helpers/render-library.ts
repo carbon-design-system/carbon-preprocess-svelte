@@ -118,6 +118,22 @@ async function render(root: string, overrides: ReadonlyMap<string, string>) {
   return html.replace(COMMENT, "").replace(WHITESPACE, " ").trim();
 }
 
+async function specialize(
+  root: string,
+  files: Array<{ file: string; code: string }>,
+  options: { unwrap: boolean },
+) {
+  const result = await specializeFiles({
+    library: MYLIB,
+    projectRoot: root,
+    files,
+    failure: { feature: "specialize", fallback: "nothing was rewritten" },
+    options,
+  });
+  if ("warning" in result) throw new Error(result.warning);
+  return result;
+}
+
 /**
  * Specializes `shape`'s library (and app components) for its app, then
  * SSR-renders the app with the original and the rewritten sources.
@@ -128,14 +144,7 @@ export async function renderSpecialized(
 ): Promise<{ before: string; after: string; edits: number }> {
   const { root, files } = writeProject(shape);
   try {
-    const result = await specializeFiles({
-      library: MYLIB,
-      projectRoot: root,
-      files,
-      failure: { feature: "specialize", fallback: "nothing was rewritten" },
-      options,
-    });
-    if ("warning" in result) throw new Error(result.warning);
+    const result = await specialize(root, files, options);
     const overrides = new Map(
       [...result.sources].map(([file, { code }]) => [file, code]),
     );
@@ -144,6 +153,26 @@ export async function renderSpecialized(
       after: await render(root, overrides),
       edits: result.edits,
     };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/** `shape`'s library files as specialized for its app, by path in its `src/`. */
+export async function specializedLibrary(
+  shape: LibraryApp,
+): Promise<Record<string, string>> {
+  const { root, files } = writeProject(shape);
+  try {
+    const result = await specialize(root, files, { unwrap: false });
+    const src = realpathSync(
+      path.join(root, "node_modules", MYLIB.name, "src"),
+    );
+    const sources: Record<string, string> = {};
+    for (const [file, { code }] of result.sources) {
+      if (file.startsWith(src)) sources[path.relative(src, file)] = code;
+    }
+    return sources;
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

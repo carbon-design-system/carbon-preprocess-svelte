@@ -16,6 +16,7 @@ import {
   addCallSite,
   type CallSite,
   type ComponentUsage,
+  checkTarget,
   newComponentUsage,
 } from "./usage";
 import { isObject, UNKNOWN, type Value } from "./values";
@@ -204,8 +205,13 @@ export function collectAppUsage(
       usage = newComponentUsage();
       usages.set(site.component, usage);
     }
-    const merged = openApps ? { ...site, open: true } : site;
-    const propNames = modelOf(site.component)?.propNames.values() ?? [];
+    const model = modelOf(site.component);
+    const merged = openApps
+      ? { ...site, open: true }
+      : model
+        ? checkTarget(site, model)
+        : site;
+    const propNames = model?.propNames.values() ?? [];
     if (addCallSite(usage, merged, propNames, library.svelteMajor)) {
       queue.add(site.component);
     }
