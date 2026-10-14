@@ -474,6 +474,24 @@ const barrel = (markup: string, script = ""): LibraryApp => ({
   app: appRendering(markup, script),
 });
 
+test.each([false, true])(
+  "reads a prop `export { … as … }` renames (unwrap: %p)",
+  async (unwrap) => {
+    const shape: LibraryApp = {
+      lib: {
+        "Label.svelte": `<script>
+  export let fore = null;
+  export { fore as for };
+</script>
+<label for={fore}>{#if fore}<b>for</b>{:else}<i>none</i>{/if}</label>`,
+      },
+      app: appRendering('<Label for="e" />'),
+    };
+    const { before, after } = await renderSpecialized(shape, { unwrap });
+    expect(after).toBe(before);
+  },
+);
+
 describe("barrels", () => {
   const RENDER: Record<string, LibraryApp> = {
     "`export *`": barrel("<Outer /><Inner kind='b' />"),
