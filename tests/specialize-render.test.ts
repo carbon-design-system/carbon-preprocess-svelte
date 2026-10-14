@@ -287,3 +287,138 @@ describe("imports a library component renders through", () => {
     ).rejects.toThrow("Bare.svelte uses `L`, a namespace import, as a value");
   });
 });
+
+// Svelte syntax the rewrite has to keep working around: each component
+// branches on `kind`, which every call site passes as "b".
+
+/** A component that renders `body` and branches on `kind`, in runes mode. */
+const runes = (body: string, script = "", lang = "") => `<script${lang}>
+  let { kind = "a" } = $props();
+  ${script}
+</script>
+{#if kind === "a"}<i>A</i>{:else}<b>B</b>{/if}
+${body}`;
+
+/** The same, in legacy mode. */
+const legacy = (body: string, script = "") => `<script>
+  export let kind = "a";
+  ${script}
+</script>
+{#if kind === "a"}<i>A</i>{:else}<b>B</b>{/if}
+${body}`;
+
+const SYNTAX: Record<string, string> = {
+  "$state.raw and $derived.by": runes(
+    "<p>{list.length} {label}</p>",
+    "let list = $state.raw([1, 2]);\n  let label = $derived.by(() => kind + list.length);",
+  ),
+  "$effect, $inspect and $props.id": runes(
+    "<p id={id}>{kind}</p>",
+    "const id = $props.id();\n  $effect(() => { console.log(kind); });\n  $inspect(kind);",
+  ),
+  "{@attach}": runes(
+    "<div {@attach (node) => { node.dataset.kind = kind; }}>x</div>",
+  ),
+  "<svelte:boundary>": runes(
+    "<svelte:boundary><p>{kind}</p>{#snippet failed(error)}<p>failed</p>{/snippet}</svelte:boundary>",
+  ),
+  "class as an array and an object": runes(
+    '<p class={["x", kind === "a" && "is-a", { "is-b": kind === "b" }]}>c</p>',
+  ),
+  "{#each} without `as`": runes(
+    "{#each { length: kind === 'a' ? 1 : 2 }}<span>*</span>{/each}",
+  ),
+  "<svelte:head>, <svelte:window>, <svelte:document> and <svelte:body>": runes(
+    "<svelte:head><title>{kind}</title></svelte:head><svelte:window onresize={() => {}} /><svelte:document onclick={() => {}} /><svelte:body onkeydown={() => {}} />",
+  ),
+  generics: runes(
+    "<p>{items.length}</p>",
+    "const items: T[] = [];",
+    ' lang="ts" generics="T extends string"',
+  ),
+  "<script module>": `<script module>
+  export const KINDS = ["a", "b"];
+</script>
+${runes("<p>{KINDS.join()}</p>")}`,
+  "use:, transition: and animate:": legacy(
+    '{#each [kind] as k (k)}<p use:act={kind} transition:fade={{ duration: kind === "a" ? 1 : 2 }} animate:flip>{k}</p>{/each}',
+    'import { fade } from "svelte/transition";\n  import { flip } from "svelte/animate";\n  const act = () => {};',
+  ),
+  "<svelte:element>": runes(
+    '<svelte:element this={kind === "a" ? "em" : "strong"}>e</svelte:element>',
+  ),
+  "{#key} and {@html}": runes(
+    '{#key kind}<p>{@html kind === "a" ? "<u>a</u>" : "<s>b</s>"}</p>{/key}',
+  ),
+  createEventDispatcher: legacy(
+    "<button on:click={() => dispatch(kind)}>d</button>",
+    'import { createEventDispatcher } from "svelte";\n  const dispatch = createEventDispatcher();',
+  ),
+  "<svelte:options>": `<svelte:options immutable />
+${legacy("<p>{kind}</p>")}`,
+  "<svelte:fragment slot>": legacy('<div><slot name="title" /></div>'),
+};
+
+describe("syntax around a rewrite", () => {
+  const shape = (component: string): LibraryApp => ({
+    lib: { "Syntax.svelte": component },
+    app: appRendering(
+      '<Syntax kind="b" /><Syntax kind="b"><svelte:fragment slot="title">t</svelte:fragment></Syntax>',
+    ),
+  });
+  const cases = Object.keys(SYNTAX).flatMap((name): [string, boolean][] => [
+    [name, false],
+    [name, true],
+  ]);
+  test.each(cases)("%s (unwrap: %p)", async (name, unwrap) => {
+    const { before, after, edits } = await renderSpecialized(
+      shape(SYNTAX[name]),
+      { unwrap },
+    );
+    expect(after).toBe(before);
+    expect(edits).toBeGreaterThan(0);
+  });
+});
+
+describe("writes a rewrite keeps", () => {
+  const WRITES: Record<string, string> = {
+    "in $effect": runes("", '$effect(() => { kind = "a"; });'),
+    "in $effect.pre": runes("", '$effect.pre(() => { kind = "a"; });'),
+    "in {@attach}": runes('<div {@attach () => { kind = "a"; }}>x</div>'),
+    "in an action's argument": runes(
+      '<div use:act={() => (kind = "a")}>x</div>',
+      "const act = () => {};",
+    ),
+    "by bind:value": runes("<input bind:value={kind} />"),
+    "by a function binding": runes(
+      "<input bind:value={() => kind, (value) => (kind = value)} />",
+    ),
+    "in an event attribute": runes(
+      '<button onclick={() => (kind = "a")}>a</button>',
+    ),
+  };
+  test.each(Object.keys(WRITES))("%s", async (name) => {
+    const sources = await specializedLibrary({
+      lib: { "Syntax.svelte": WRITES[name] },
+      app: appRendering('<Syntax kind="b" />'),
+    });
+    const code = sources["Syntax.svelte"] ?? WRITES[name];
+    expect(code).toContain("<i>A</i>");
+    expect(code).toContain("<b>B</b>");
+  });
+});
+
+test("`await` in markup is rewritten around", async () => {
+  // Rendering it needs `experimental.async`; only the rewrite is checked.
+  const sources = await specializedLibrary({
+    lib: {
+      "Syntax.svelte": runes(
+        "<p>{await load(kind)}</p>",
+        "const load = async (k) => k;",
+      ),
+    },
+    app: appRendering('<Syntax kind="b" />'),
+  });
+  expect(sources["Syntax.svelte"]).toContain('{await load("b")}');
+  expect(sources["Syntax.svelte"]).not.toContain("<i>A</i>");
+});
