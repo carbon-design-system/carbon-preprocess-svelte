@@ -10,6 +10,7 @@ import {
   isReference,
   locate,
   type Pattern,
+  type VariableDeclarator,
   walk,
 } from "sveast/walk";
 import { forEachNode, type Node } from "./ast";
@@ -193,30 +194,18 @@ export class UnsupportedComponentError extends Error {}
 /** Runes whose argument is the value they declare. */
 const VALUE_RUNES = new Set(["$state", "$state.raw", "$derived"]);
 
-/** `$state`, `$state.raw`, … for a rune callee; `undefined` otherwise. */
-function runeName(callee: Node): string | undefined {
-  if (callee.type === "Identifier") {
-    return callee.name.startsWith("$") ? callee.name : undefined;
-  }
-  if (
-    callee.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.object.type === "Identifier" &&
-    callee.object.name.startsWith("$") &&
-    callee.property.type === "Identifier"
-  ) {
-    return `${callee.object.name}.${callee.property.name}`;
-  }
-  return undefined;
-}
-
-/** The rune `init` calls, if it's a call to one. */
+/**
+ * The rune `declarator`'s initializer calls (`$state`, `$props`), unless a
+ * binding or a store shadows it (see `Binding.rune`), and its argument.
+ */
 function runeCall(
-  init: Expression | null,
+  model: ComponentModel,
+  declarator: VariableDeclarator,
 ): { rune: string; argument: Expression | null } | undefined {
-  if (init?.type !== "CallExpression") return undefined;
-  const rune = runeName(init.callee as Node);
-  if (!rune) return undefined;
+  const [id] = extractIdentifiers(declarator.id as Pattern);
+  const rune = id && model.scopes.bindingOf(id)?.rune;
+  const { init } = declarator;
+  if (!rune || init?.type !== "CallExpression") return undefined;
   const [first] = init.arguments;
   return {
     rune,
@@ -1110,7 +1099,7 @@ function readTopLevelStatement(
 
   if (declaration.type === "VariableDeclaration") {
     for (const declarator of declaration.declarations) {
-      const rune = runeCall(declarator.init ?? null);
+      const rune = runeCall(model, declarator);
       if (rune?.rune === "$props" && isInstance) {
         readPropsRune(model, declarator.id as Node);
         continue;
@@ -1406,10 +1395,11 @@ function readPropsRune(model: ComponentModel, pattern: Node): void {
       markUnknown(model, value, "is a nested `$props()` pattern");
       continue;
     }
-    const bindable = runeCall(fallback);
+    // Its default, without `$bindable(…)`.
+    const binding = model.scopes.bindingOf(local);
     model.props.set(
       local.name,
-      bindable?.rune === "$bindable" ? bindable.argument : fallback,
+      binding ? (binding.initial as Expression | null) : fallback,
     );
     model.propNames.set(local.name, passedAs);
   }
