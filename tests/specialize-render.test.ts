@@ -422,3 +422,99 @@ test("`await` in markup is rewritten around", async () => {
   expect(sources["Syntax.svelte"]).toContain('{await load("b")}');
   expect(sources["Syntax.svelte"]).not.toContain("<i>A</i>");
 });
+
+// What a library's barrel exports: `export *`, namespaces, components with
+// members, and values. One the analysis can't tell keeps every component.
+
+const KIND = `<script>
+  export let kind = "a";
+</script>
+{#if kind === "b"}<b>B</b>{:else}<i>A</i>{/if}`;
+
+const BARREL_LIBRARY = {
+  "index.js": `export { default as Outer } from "./Outer.svelte";
+export * from "./parts/index.js";
+export * from "./parts/index.js";
+export * as Parts from "./parts/index.js";
+export { Card } from "./card.js";
+export * from "./Sizes.svelte";
+export { cn, pick } from "./helpers.js";`,
+  "parts/index.js": 'export { default as Inner } from "./Inner.svelte";',
+  "parts/Inner.svelte": KIND,
+  "Outer.svelte": `<script>
+  import Inner from "./parts/Inner.svelte";
+</script>
+<Inner kind="a" />`,
+  "card.js": `import Root from "./Root.svelte";
+import Item from "./parts/Inner.svelte";
+export const Card = Object.assign(Root, { Item });`,
+  "Root.svelte": "<div><slot /></div>",
+  "Sizes.svelte": `<script module>
+  export const SIZES = ["sm", "md"];
+</script>`,
+  "helpers.js": `import Inner from "./parts/Inner.svelte";
+export function cn(...parts) {
+  return parts.join(" ");
+}
+export function pick() {
+  return Inner;
+}`,
+};
+
+const barrel = (markup: string, script = ""): LibraryApp => ({
+  lib: BARREL_LIBRARY,
+  app: appRendering(markup, script),
+});
+
+describe("barrels", () => {
+  const RENDER: Record<string, LibraryApp> = {
+    "`export *`": barrel("<Outer /><Inner kind='b' />"),
+    "a namespace re-export": barrel("<Outer /><Parts.Inner kind='b' />"),
+    "a component with members": barrel(
+      "<Outer /><Card><Card.Item kind='b' /></Card>",
+    ),
+    "a value it exports": barrel(
+      "<Inner kind='b' />{SIZES.length}{cn('x')}",
+      'import { SIZES, cn } from "mylib";',
+    ),
+  };
+  const cases = Object.keys(RENDER).flatMap((name): [string, boolean][] => [
+    [name, false],
+    [name, true],
+  ]);
+  test.each(cases)(
+    "%s renders as the original (unwrap: %p)",
+    async (name, unwrap) => {
+      const { before, after } = await renderSpecialized(RENDER[name], {
+        unwrap,
+      });
+      expect(after).toBe(before);
+    },
+  );
+
+  test.each([
+    ["`export *`", "<Inner kind='b' />"],
+    ["a namespace re-export", "<Parts.Inner kind='b' />"],
+    ["a component with members", "<Card><Card.Item kind='b' /></Card>"],
+  ])("reads a call site through %s", async (_, markup) => {
+    const sources = await specializedLibrary(barrel(markup));
+    expect(sources["parts/Inner.svelte"]).not.toContain("<i>A</i>");
+  });
+
+  test("a value it exports leaves the rest rewritten", async () => {
+    const sources = await specializedLibrary(
+      barrel("<Inner kind='b' />{cn('x')}", 'import { cn } from "mylib";'),
+    );
+    expect(sources["parts/Inner.svelte"]).not.toContain("<i>A</i>");
+  });
+
+  test("an export that may hold a component keeps every one", async () => {
+    const sources = await specializedLibrary(
+      barrel(
+        "<Inner kind='b' /><svelte:component this={pick()} />",
+        'import { pick } from "mylib";',
+      ),
+    );
+    expect(sources["parts/Inner.svelte"] ?? KIND).toContain("<i>A</i>");
+  });
+});

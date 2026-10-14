@@ -24,7 +24,10 @@ const MYLIB: LibrarySpec = {
 
 /** An app and the library it renders, as files. */
 export type LibraryApp = {
-  /** Files in the library's `src/`; its top-level `.svelte` files are its barrel's exports. */
+  /**
+   * Files in the library's `src/`. Without an `index.js`, its top-level
+   * `.svelte` files are its barrel's exports.
+   */
   lib: Record<string, string>;
   /** Files in the app's `src/`; `App.svelte` is rendered. */
   app: Record<string, string>;
@@ -57,7 +60,9 @@ function writeProject({ lib, app, packages = {} }: LibraryApp) {
       barrel.push(`export { default as ${name} } from "./${file}";`);
     }
   }
-  write(path.join(pkg, "src/index.js"), barrel.join("\n"));
+  if (lib["index.js"] === undefined) {
+    write(path.join(pkg, "src/index.js"), barrel.join("\n"));
+  }
   write(
     path.join(pkg, "package.json"),
     JSON.stringify({
