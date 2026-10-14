@@ -284,7 +284,9 @@ describe("imports a library component renders through", () => {
   test("a namespace used as a value turns the analysis off", async () => {
     await expect(
       specializedLibrary(imports("<Bare /><Inner />")),
-    ).rejects.toThrow("Bare.svelte uses `L`, a namespace import, as a value");
+    ).rejects.toThrow(
+      "Bare.svelte uses `L`, an object of components, as a value",
+    );
   });
 });
 
@@ -438,7 +440,8 @@ export * from "./parts/index.js";
 export * as Parts from "./parts/index.js";
 export { Card } from "./card.js";
 export * from "./Sizes.svelte";
-export { cn, pick } from "./helpers.js";`,
+export { cn, pick } from "./helpers.js";
+export { default as Uses } from "./Uses.svelte";`,
   "parts/index.js": 'export { default as Inner } from "./Inner.svelte";',
   "parts/Inner.svelte": KIND,
   "Outer.svelte": `<script>
@@ -452,6 +455,11 @@ export const Card = Object.assign(Root, { Item });`,
   "Sizes.svelte": `<script module>
   export const SIZES = ["sm", "md"];
 </script>`,
+  "Uses.svelte": `<script>
+  import { Parts, Card } from "./index.js";
+</script>
+<Parts.Inner kind="b" />
+<Card><Card.Item kind="b" /></Card>`,
   "helpers.js": `import Inner from "./parts/Inner.svelte";
 export function cn(...parts) {
   return parts.join(" ");
@@ -473,6 +481,7 @@ describe("barrels", () => {
     "a component with members": barrel(
       "<Outer /><Card><Card.Item kind='b' /></Card>",
     ),
+    "the library's own imports of those": barrel("<Uses /><Inner />"),
     "a value it exports": barrel(
       "<Inner kind='b' />{SIZES.length}{cn('x')}",
       'import { SIZES, cn } from "mylib";',
@@ -498,6 +507,11 @@ describe("barrels", () => {
     ["a component with members", "<Card><Card.Item kind='b' /></Card>"],
   ])("reads a call site through %s", async (_, markup) => {
     const sources = await specializedLibrary(barrel(markup));
+    expect(sources["parts/Inner.svelte"]).not.toContain("<i>A</i>");
+  });
+
+  test("reads the library's own call sites through them", async () => {
+    const sources = await specializedLibrary(barrel("<Uses />"));
     expect(sources["parts/Inner.svelte"]).not.toContain("<i>A</i>");
   });
 

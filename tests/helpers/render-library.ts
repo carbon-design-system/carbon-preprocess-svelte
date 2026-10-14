@@ -22,7 +22,6 @@ const MYLIB: LibrarySpec = {
   tool: "mylib-plugin",
 };
 
-/** An app and the library it renders, as files. */
 export type LibraryApp = {
   /**
    * Files in the library's `src/`. Without an `index.js`, its top-level
