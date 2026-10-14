@@ -72,6 +72,11 @@ export type ComponentModel = {
    * `export let kind`, `class` for `let className; export { className as class }`.
    */
   propNames: Map<string, string>;
+  /**
+   * `<svelte:options customElement>`: whatever renders it as an element
+   * can set its props.
+   */
+  customElement: boolean;
   /** Top-level `let`/`const`, functions, and `$: x = …` declarations. */
   declarations: Map<string, Expression | null | typeof FUNCTION_DECLARATION>;
   /** Top-level `function` declarations, by name. */
@@ -442,6 +447,10 @@ export function buildComponentModel(
     scopes: analyzeScopes(ast),
     props: new Map(),
     propNames: new Map(),
+    customElement:
+      ast.options?.attributes.some(
+        (attribute) => attribute.name === "customElement",
+      ) ?? false,
     declarations: new Map(),
     functions: new Map(),
     reactiveDeclarations: new WeakSet(),

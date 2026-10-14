@@ -25,6 +25,12 @@ export type CallSite = {
    * Svelte 5 passes it as the `children` prop (see `addCallSite`).
    */
   children?: boolean;
+  /**
+   * With `bind:this`: the members the parent reads off the component's
+   * instance, or `null` when it uses the instance any other way (see
+   * `instanceMembers`).
+   */
+  instance?: ReadonlySet<string> | null;
   /** Where the site is. Only set for app files, for the report. */
   location?: { file: string; line: number };
   /** Why the site is `open`, for the report. */
@@ -82,6 +88,35 @@ function sameValue(a: Value | undefined, b: Value | undefined): boolean {
   if (a.size !== b.size) return false;
   for (const p of a) if (!b.has(p)) return false;
   return true;
+}
+
+/**
+ * `site`, open when what it renders can get props no call site shows: a
+ * custom element, or one whose parent may set them through its instance
+ * (`$set`, accessors, or by handing the instance on).
+ */
+export function checkTarget(
+  site: CallSite,
+  target: {
+    propNames: ReadonlyMap<string, string>;
+    customElement: boolean;
+  },
+): CallSite {
+  if (site.open) return site;
+  if (target.customElement) {
+    return { ...site, open: true, reason: "is a custom element" };
+  }
+  const { instance } = site;
+  if (instance === undefined) return site;
+  const props = new Set(target.propNames.values());
+  if (instance === null || [...instance].some((name) => props.has(name))) {
+    return {
+      ...site,
+      open: true,
+      reason: "is bound with `bind:this`, and its instance may set its props",
+    };
+  }
+  return site;
 }
 
 /**

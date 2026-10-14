@@ -21,6 +21,7 @@ import {
   addCallSite,
   type CallSite,
   type ComponentUsage,
+  checkTarget,
   newComponentUsage,
 } from "./usage";
 import {
@@ -261,6 +262,7 @@ function runPass(
       if (excluded.has(site.component) && !site.open) {
         site = { ...site, open: true, reason: "excluded" };
       }
+      site = checkTarget(site, model);
       if (addCallSite(usage, site, model.propNames.values(), svelteMajor)) {
         queue.add(site.component);
       }

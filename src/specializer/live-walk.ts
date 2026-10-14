@@ -1,3 +1,4 @@
+import type { Scopes } from "sveast/scope";
 import { type AST, children, type Expression, locate } from "sveast/walk";
 import type { Node } from "./ast";
 import { UnsupportedComponentError } from "./component-model";
@@ -213,6 +214,7 @@ function visit(node: Node, scope: Scope, result: Walk): void {
               (expression) => evaluate(expression, scope),
               (argument) => spreadProps(argument, scope),
               explainAt(node, scope),
+              (expression) => instanceMembers(expression, scope.model.scopes),
             ),
             node,
             scope,
@@ -230,6 +232,7 @@ function visit(node: Node, scope: Scope, result: Walk): void {
           (expression) => evaluate(expression, scope),
           (argument) => spreadProps(argument, scope),
           explainAt(node, scope),
+          (expression) => instanceMembers(expression, scope.model.scopes),
         ),
       );
       break;
@@ -376,11 +379,72 @@ function attributeWhy(
   };
 }
 
+/** Members of an instance that set no props: Svelte 3/4's `$destroy` and `$on`. */
+const INSTANCE_METHODS = new Set(["$destroy", "$on"]);
+
+/**
+ * The members code reads off the instance `bind:this={expression}` binds,
+ * in the component `scopes` analyzes (`dialog.open` in `dialog.open()`);
+ * `null` when the instance may be used any other way: handed on, its
+ * members written, or a member like `$set` called. Testing it (`if
+ * (dialog)`, `dialog && …`), reassigning it and comparing it are fine.
+ */
+export function instanceMembers(
+  expression: Expression,
+  scopes: Scopes,
+): Set<string> | null {
+  if (expression.type !== "Identifier") return null;
+  const binding = scopes.bindingOf(expression);
+  if (!binding) return null;
+  const members = new Set<string>();
+  for (const { node, parent, mutates } of binding.references) {
+    if (mutates) return null;
+    switch (parent.type) {
+      case "BindDirective":
+        if (parent.name === "this" && parent.expression === node) continue;
+        return null;
+      case "MemberExpression": {
+        const { property } = parent;
+        if (
+          parent.object !== node ||
+          parent.computed ||
+          property.type !== "Identifier" ||
+          (property.name.startsWith("$") &&
+            !INSTANCE_METHODS.has(property.name))
+        ) {
+          return null;
+        }
+        members.add(property.name);
+        continue;
+      }
+      case "AssignmentExpression":
+        if (parent.left === node && parent.operator === "=") continue;
+        return null;
+      case "LogicalExpression":
+        // Only a falsy `dialog` gets past `&&`.
+        if (parent.left === node && parent.operator === "&&") continue;
+        return null;
+      case "IfStatement":
+      case "IfBlock":
+      case "ConditionalExpression":
+        if (parent.test === node) continue;
+        return null;
+      case "UnaryExpression":
+      case "BinaryExpression":
+        continue;
+      default:
+        return null;
+    }
+  }
+  return members;
+}
+
 /**
  * A call site for `<Component …>`, its props evaluated by
  * `evaluateExpression`. `spread` gives the props a spread passes when it
  * can tell (the component's own `$$restProps`); any other spread makes
- * the site open.
+ * the site open. `instance` reads what `bind:this` binds (see
+ * `instanceMembers`); without it, the instance may be used any way.
  */
 export function callSiteFromElement(
   node: AST.Component | AST.SvelteSelf,
@@ -388,6 +452,7 @@ export function callSiteFromElement(
   evaluateExpression: (expression: Expression) => Value,
   spread?: (argument: Expression) => Map<string, PassedProp> | undefined,
   explain?: Explain,
+  instance?: (expression: Expression) => Set<string> | null,
 ): CallSite {
   const { slots, snippets, children } = readContent(node.fragment);
   const site: CallSite = {
@@ -431,6 +496,11 @@ export function callSiteFromElement(
         }
         break;
       case "BindDirective": {
+        if (attribute.name === "this") {
+          site.instance =
+            instance?.(attribute.expression as Expression) ?? null;
+          break;
+        }
         site.props.set(attribute.name, UNKNOWN);
         const why = explain?.(attribute.expression as Expression);
         whyOf(site).set(
