@@ -28,6 +28,7 @@ function specializeWith(code: string, props: Map<string, Value>) {
     usage,
     { component: model.key, open: false, props, slots: new Set() },
     model.props.keys(),
+    undefined,
   );
   const result = specializeComponent(
     createScope(model, usage, () => possible(undefined)),
@@ -54,6 +55,7 @@ function specialize(
       slots: new Set(slots),
     },
     model.props.keys(),
+    undefined,
   );
   const result = specializeComponent(
     createScope(model, usage, () => possible(undefined)),
@@ -561,6 +563,7 @@ function possibleValues(
       slots: new Set(),
     },
     model.props.keys(),
+    undefined,
   );
   const value = evaluate(
     { type: "Identifier", name } as Expression,

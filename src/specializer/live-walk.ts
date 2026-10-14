@@ -15,6 +15,7 @@ import {
   isEmptyArray,
   isNeverNullish,
   join,
+  OBJECT,
   possible,
   stringify,
   type Truth,
@@ -305,14 +306,30 @@ function attributeValue(
 
 const WHITESPACE_ONLY = /^\s*$/;
 
-/** The slots an element's children fill; `null` if that can't be told. */
-function filledSlots(fragment: AST.Fragment): Set<string> | null {
-  const slots = new Set<string>();
+/**
+ * What an element's content passes: the slots it fills (`null` if that
+ * can't be told), the snippets it passes as props, and whether anything
+ * else is left for the default slot, Svelte 5's `children`.
+ */
+function readContent(fragment: AST.Fragment): {
+  slots: Set<string> | null;
+  snippets: string[];
+  children: boolean;
+} {
+  let slots: Set<string> | null = new Set();
+  const snippets: string[] = [];
+  let children = false;
   for (const child of fragment.nodes) {
     if (child.type === "Comment") continue;
     if (child.type === "Text" && WHITESPACE_ONLY.test(child.data)) continue;
-    // Svelte 5 snippets can stand in for slots.
-    if (child.type === "SnippetBlock") return null;
+    // A snippet is a prop by its name, and fills that slot
+    // (`children` the default one).
+    if (child.type === "SnippetBlock") {
+      const { name } = child.expression;
+      snippets.push(name);
+      slots?.add(name === "children" ? "default" : name);
+      continue;
+    }
     const slot =
       "attributes" in child
         ? child.attributes.find(
@@ -321,15 +338,18 @@ function filledSlots(fragment: AST.Fragment): Set<string> | null {
           )
         : undefined;
     if (!slot) {
-      slots.add("default");
+      children = true;
+      slots?.add("default");
       continue;
     }
-    if (slot.type !== "Attribute" || !Array.isArray(slot.value)) return null;
-    const [text] = slot.value;
-    if (slot.value.length !== 1 || text.type !== "Text") return null;
-    slots.add(text.data);
+    const text =
+      slot.type === "Attribute" && Array.isArray(slot.value)
+        ? slot.value
+        : null;
+    if (text?.length === 1 && text[0].type === "Text") slots?.add(text[0].data);
+    else slots = null;
   }
-  return slots;
+  return { slots, snippets, children };
 }
 
 function whyOf(site: CallSite): NonNullable<CallSite["why"]> {
@@ -369,11 +389,13 @@ export function callSiteFromElement(
   spread?: (argument: Expression) => Map<string, PassedProp> | undefined,
   explain?: Explain,
 ): CallSite {
+  const { slots, snippets, children } = readContent(node.fragment);
   const site: CallSite = {
     component,
     open: false,
     props: new Map(),
-    slots: filledSlots(node.fragment),
+    slots,
+    ...(children && { children }),
   };
   for (const attribute of node.attributes) {
     switch (attribute.type) {
@@ -419,5 +441,6 @@ export function callSiteFromElement(
       }
     }
   }
+  for (const name of snippets) site.props.set(name, possible(OBJECT));
   return site;
 }

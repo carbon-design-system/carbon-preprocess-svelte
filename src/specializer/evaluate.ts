@@ -63,6 +63,8 @@ export type Scope = {
   locals: ReadonlyMap<Binding, Value>;
   /** Values of imported names, when known (the app's own constants). */
   imported: ReadonlyMap<string, Value>;
+  /** Major version of the Svelte the app compiles with, if known. */
+  svelteMajor: number | undefined;
 };
 
 const NO_LOCALS: ReadonlyMap<Binding, Value> = new Map();
@@ -72,7 +74,10 @@ export function createScope(
   model: ComponentModel,
   usage: ComponentUsage,
   context: ContextResolver,
-  imported: ReadonlyMap<string, Value> = NO_IMPORTS,
+  options: {
+    imported?: ReadonlyMap<string, Value>;
+    svelteMajor?: number;
+  } = {},
 ): Scope {
   return {
     model,
@@ -81,7 +86,8 @@ export function createScope(
     memo: new Map(),
     pending: new Set(),
     locals: NO_LOCALS,
-    imported,
+    imported: options.imported ?? NO_IMPORTS,
+    svelteMajor: options.svelteMajor,
   };
 }
 
@@ -339,23 +345,34 @@ export function isPropsObject(node: Identifier, scope: Scope): boolean {
 export type PassedProp = { value: Value; maybeAbsent: boolean; why?: string };
 
 /**
- * What `$$props` holds (or `$$restProps`, with `rest`: only the keys the
- * component doesn't declare): every key a call site passes. `undefined`
- * when some site spreads props or the component is used as a value.
+ * What props object `name` holds: for `$$props`, every key a call site
+ * passes; for `$$restProps` and the rest of `$props()`, only the keys the
+ * component doesn't declare. `undefined` when some site spreads props or
+ * the component is used as a value.
  */
 function passedProps(
   scope: Scope,
-  rest: boolean,
+  name: string,
 ): Map<string, PassedProp> | undefined {
   const { model, usage } = scope;
   if (usage.open) return undefined;
+  const rest = name !== "$$props";
   const declared = new Set(rest ? model.propNames.values() : []);
+  // Svelte 5 leaves `children` out of `$$props` and `$$restProps` (not
+  // out of the rest of `$props()`).
+  const legacy = name !== model.restPropsName;
   const props = new Map<string, PassedProp>();
   for (const [key, value] of usage.props) {
     if (declared.has(key)) continue;
+    let maybeAbsent = usage.omitted.has(key);
+    if (legacy && key === "children") {
+      const { svelteMajor } = scope;
+      if (svelteMajor === undefined) maybeAbsent = true;
+      else if (svelteMajor >= 5) continue;
+    }
     props.set(key, {
       value,
-      maybeAbsent: usage.omitted.has(key),
+      maybeAbsent,
       why: usage.unknownBecause.get(key),
     });
   }
@@ -368,7 +385,7 @@ export function spreadProps(
   scope: Scope,
 ): Map<string, PassedProp> | undefined {
   if (argument.type === "Identifier" && isPropsObject(argument, scope)) {
-    return passedProps(scope, argument.name !== "$$props");
+    return passedProps(scope, argument.name);
   }
   return spreadObjects(evaluate(argument, scope));
 }
@@ -917,9 +934,7 @@ function evaluateMember(
     if (isPropsObject(object, scope)) {
       const key = memberKey(node);
       const props =
-        key === undefined
-          ? undefined
-          : passedProps(scope, object.name !== "$$props");
+        key === undefined ? undefined : passedProps(scope, object.name);
       if (key === undefined || !props) return UNKNOWN;
       const prop = props.get(key);
       if (!prop) return UNDEFINED;

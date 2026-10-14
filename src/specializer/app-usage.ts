@@ -206,7 +206,9 @@ export function collectAppUsage(
     }
     const merged = openApps ? { ...site, open: true } : site;
     const propNames = modelOf(site.component)?.propNames.values() ?? [];
-    if (addCallSite(usage, merged, propNames)) queue.add(site.component);
+    if (addCallSite(usage, merged, propNames, library.svelteMajor)) {
+      queue.add(site.component);
+    }
   };
 
   for (const key of sources.keys()) {
@@ -243,7 +245,7 @@ export function collectAppUsage(
       const usage = usages.get(file);
       const model = modelOf(file);
       return closed.has(file) && usage && model
-        ? appScope(model, file, usage, constants)
+        ? appScope(model, file, usage, constants, library)
         : undefined;
     },
   };
