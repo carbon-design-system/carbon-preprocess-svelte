@@ -7,13 +7,23 @@ export type AssetDiff = {
   optimizedCss: string;
 };
 
-const formatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+let formatter: Intl.NumberFormat | undefined;
+
+/**
+ * `n` with at most two decimals. The formatter is made on first use: an
+ * `Intl.NumberFormat` costs milliseconds, and every tool that loads
+ * `svelte.config.js` imports this module.
+ */
+function format(n: number): string {
+  formatter ??= new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+  return formatter.format(n);
+}
 
 function toHumanReadableSize(bytes: number) {
   const kb = bytes / BYTES_PER_KB;
   return kb >= BYTES_PER_KB
-    ? `${formatter.format(kb / BYTES_PER_KB)} MB`
-    : `${formatter.format(kb)} kB`;
+    ? `${format(kb / BYTES_PER_KB)} MB`
+    : `${format(kb)} kB`;
 }
 
 /**
@@ -29,9 +39,7 @@ export function formatDiff(diff: AssetDiff): string | null {
   const original = toHumanReadableSize(originalSize);
   const optimized = toHumanReadableSize(optimizedSize);
   const width = Math.max(original.length, optimized.length);
-  const percent = formatter.format(
-    ((originalSize - optimizedSize) / originalSize) * 100,
-  );
+  const percent = format(((originalSize - optimizedSize) / originalSize) * 100);
 
   return `\n\nOptimized ${diff.id}\nBefore: ${original.padStart(width)}\nAfter:  ${optimized.padStart(width)} (-${percent}%)\n`;
 }

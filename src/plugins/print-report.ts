@@ -1,11 +1,10 @@
 import { BYTES_PER_KB } from "../constants";
 import { byteLength } from "../utils";
 
-const countFormatter = new Intl.NumberFormat("en-US");
-const sizeFormatter = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+// Made on first use, like `print-diff.ts`'s: an `Intl.NumberFormat` costs
+// milliseconds at import.
+let countFormatter: Intl.NumberFormat | undefined;
+let sizeFormatter: Intl.NumberFormat | undefined;
 
 const COLUMN_GAP = "   ";
 
@@ -44,6 +43,10 @@ export function toAssetReport(
 }
 
 function toKB(bytes: number): string {
+  sizeFormatter ??= new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   return `${sizeFormatter.format(bytes / BYTES_PER_KB)} kB`;
 }
 
@@ -55,7 +58,9 @@ function padColumn(values: string[]): string[] {
 
 export function printReport(input: OptimizeCssReportInput): void {
   const { components, allowlistSize, moduleTokens, assets, dryRun } = input;
-  const count = (n: number) => countFormatter.format(n);
+  countFormatter ??= new Intl.NumberFormat("en-US");
+  const counts = countFormatter;
+  const count = (n: number) => counts.format(n);
 
   const sources = [
     ...(moduleTokens === undefined
