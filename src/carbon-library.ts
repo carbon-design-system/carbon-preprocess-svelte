@@ -1,10 +1,9 @@
+import type { Failure, LibrarySpec } from "severan";
 import { CarbonSvelte, PACKAGE_NAME } from "./constants";
 import { extractCarbonClassTokens } from "./indexer/extract-runtime-classes";
 import { collectCarbonTokens } from "./plugins/scan-content";
-import type { Failure } from "./specializer/analysis";
-import type { LibrarySpec } from "./specializer/library-paths";
 
-/** Carbon, as the specializer reads and rewrites it. */
+/** Carbon, as severan reads and rewrites it. */
 export const CARBON: LibrarySpec = {
   name: CarbonSvelte.Components,
   srcDir: "src",

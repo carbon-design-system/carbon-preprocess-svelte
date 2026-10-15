@@ -1,6 +1,5 @@
-import { lexStrings } from "sveast/lexer";
-import { type AST, walk } from "sveast/walk";
-import { parse } from "../specializer/parser";
+import { type AST, lexStrings, walk } from "severan/internal";
+import { parse } from "severan/internal/analysis";
 import {
   componentImports,
   extractCarbonClassTokens,

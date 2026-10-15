@@ -10,8 +10,8 @@
 
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { specializeFiles } from "severan/internal/analysis";
 import { CARBON, SPECIALIZE_FAILURE } from "../src/carbon-library";
-import { specializeFiles } from "../src/specializer/analysis";
 import { goldenApps } from "./golden-apps";
 
 const { values: args } = parseArgs({

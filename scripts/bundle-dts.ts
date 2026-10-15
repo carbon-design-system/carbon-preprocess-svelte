@@ -2,6 +2,7 @@
  * Uses `@typescript/typescript6` because TypeScript 7's `typescript` package
  * no longer ships the classic Compiler API.
  */
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
@@ -12,6 +13,11 @@ const EXPORT_RE = /^export\b/;
 const EXPORT_DEFAULT_RE = /^export\s+default\b/;
 const EXPORT_DEFAULT_PREFIX_RE = /^export\s+default\s+/;
 const EXPORT_PREFIX_RE = /^export\s+/;
+/**
+ * Packages bundled into `dist/`: consumers don't install them, so their
+ * declarations are inlined like the project's own.
+ */
+const BUNDLED_RE = /^severan(?:\/|$)/;
 
 interface Decl {
   names: string[];
@@ -31,7 +37,7 @@ export async function bundleDts(opts: {
   const srcRoot = join(root, "src");
   const emitted = emitDeclarations([source, ...ambientRoots], srcRoot);
   const entryDts = sourceToDtsPath(source, srcRoot, emitted);
-  const text = rollupDts(entryDts, emitted);
+  const text = rollupDts(entryDts, emitted, root);
   await mkdir(dirname(outFile), { recursive: true });
   await writeFile(outFile, text.endsWith("\n") ? text : `${text}\n`);
 }
@@ -111,9 +117,14 @@ function sourceToDtsPath(
   );
 }
 
-function rollupDts(entryDts: string, emitted: Map<string, string>): string {
+function rollupDts(
+  entryDts: string,
+  emitted: Map<string, string>,
+  root: string,
+): string {
   const reachable = new Set<string>();
-  const externalLines = new Map<string, string>();
+  /** External imports and re-exports, with the local names an import binds. */
+  const externalLines = new Map<string, string[] | null>();
 
   const visit = (file: string) => {
     if (reachable.has(file)) return;
@@ -122,8 +133,12 @@ function rollupDts(entryDts: string, emitted: Map<string, string>): string {
     for (const stmt of sf.statements) {
       const spec = moduleSpecifierOf(stmt);
       if (spec) {
+        if (BUNDLED_RE.test(spec)) {
+          visit(bundledDts(root, spec, emitted));
+          continue;
+        }
         if (!isRelative(spec)) {
-          externalLines.set(stmt.getText(sf), stmt.getText(sf));
+          externalLines.set(stmt.getText(sf), importedNames(stmt));
           continue;
         }
 
@@ -131,7 +146,7 @@ function rollupDts(entryDts: string, emitted: Map<string, string>): string {
         try {
           resolved = resolveDts(file, spec, emitted);
         } catch {
-          externalLines.set(stmt.getText(sf), stmt.getText(sf));
+          externalLines.set(stmt.getText(sf), importedNames(stmt));
           continue;
         }
 
@@ -229,7 +244,7 @@ function rollupDts(entryDts: string, emitted: Map<string, string>): string {
     for (const ref of collectTypeRefs(decl.node)) queue.push(ref);
   }
 
-  const chunks: string[] = [...externalLines.values()];
+  const chunks: string[] = [];
 
   for (const decl of allDecls) {
     if (!kept.has(decl)) continue;
@@ -253,7 +268,47 @@ function rollupDts(entryDts: string, emitted: Map<string, string>): string {
     }
   }
 
-  return `${chunks.join("\n\n")}\n`;
+  // Only the imports what's kept uses: an unused one of a package the
+  // consumer doesn't have (one bundled into the build) fails their check.
+  const body = chunks.join("\n\n");
+  const imports = [...externalLines]
+    .filter(
+      ([, names]) =>
+        names === null ||
+        names.some((name) => new RegExp(`\\b${name}\\b`).test(body)),
+    )
+    .map(([text]) => text);
+  return `${[...imports, body].join("\n\n")}\n`;
+}
+
+/** The local names an `import` binds; `null` for anything else, which is kept. */
+function importedNames(stmt: ts.Statement): string[] | null {
+  if (!ts.isImportDeclaration(stmt) || !stmt.importClause) return null;
+  const { name, namedBindings } = stmt.importClause;
+  const names = name ? [name.text] : [];
+  if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+    names.push(namedBindings.name.text);
+  } else if (namedBindings) {
+    for (const element of namedBindings.elements) names.push(element.name.text);
+  }
+  return names;
+}
+
+/** The declaration file of bundled package entry `spec`, read into `emitted`. */
+function bundledDts(
+  root: string,
+  spec: string,
+  emitted: Map<string, string>,
+): string {
+  const [name, ...rest] = spec.split("/");
+  const dir = join(root, "node_modules", name);
+  const manifest: { exports: Record<string, { types: string }> } = JSON.parse(
+    readFileSync(join(dir, "package.json"), "utf8"),
+  );
+  const subpath = rest.length > 0 ? `./${rest.join("/")}` : ".";
+  const file = norm(join(dir, manifest.exports[subpath].types));
+  if (!emitted.has(file)) emitted.set(file, readFileSync(file, "utf8"));
+  return file;
 }
 
 /**

@@ -1,10 +1,10 @@
-import { CarbonSvelte, RE_EXT_CSS, RE_STYLE_QUERY } from "./constants";
 import {
   errorMessage,
   isSvelteFile,
   RE_EXT_STYLESHEET,
   stripQuery,
-} from "./specializer/util";
+} from "severan/internal";
+import { CarbonSvelte, RE_EXT_CSS, RE_STYLE_QUERY } from "./constants";
 
 export { errorMessage, isSvelteFile, stripQuery };
 

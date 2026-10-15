@@ -4,7 +4,6 @@
     "src/index.ts",
     "src/cli.ts",
     "src/optimize-components-loader.ts",
-    "src/specializer/index.ts",
     "scripts/*.ts",
     "bench/*.ts",
     "tests/helpers/*.cjs"
@@ -16,5 +15,6 @@
     "tests/**/*.{ts,cjs}"
   ],
   "ignoreBinaries": ["check"],
+  "ignoreDependencies": ["sveast"],
   "svelte": false
 }

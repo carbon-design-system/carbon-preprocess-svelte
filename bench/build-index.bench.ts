@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { group, task } from "ostia";
+import { listJsAndSvelteFiles } from "severan/internal";
 import { CarbonSvelte } from "../src/constants";
 import { buildComponentIndex } from "../src/indexer/build-index";
 import {
@@ -13,7 +14,6 @@ import {
 } from "../src/indexer/extract-runtime-classes";
 import { extractFromSvelte } from "../src/indexer/extract-selectors";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
-import { listJsAndSvelteFiles } from "../src/specializer/list-files";
 import { isSvelteFile } from "../src/utils";
 
 const carbonRoot = resolveCarbonRoot();

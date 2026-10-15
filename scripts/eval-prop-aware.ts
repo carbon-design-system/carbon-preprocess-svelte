@@ -31,15 +31,17 @@ import { parseArgs } from "node:util";
 import { plugin } from "bun";
 import { filterCss } from "caligula";
 import { requiredClasses } from "caligula/selector";
+import {
+  analyzeFiles,
+  libraryAt,
+  loadComponentModel,
+} from "severan/internal/analysis";
 import { compile } from "svelte/compiler";
 import { render } from "svelte/server";
 import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
 import { loadComponentIndex } from "../src/indexer/load-index";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { optimizeCssWithReport } from "../src/plugins/create-optimized-css";
-import { analyzeFiles } from "../src/specializer/analysis";
-import { loadComponentModel } from "../src/specializer/component-model";
-import { libraryAt } from "../src/specializer/library";
 import { buildCases, caseSource } from "./prop-aware-cases";
 
 // Components that schedule DOM work after an SSR render (`tick().then(…)`)

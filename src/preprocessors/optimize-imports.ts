@@ -1,14 +1,15 @@
 import path from "node:path";
-import { type LexedImport, lexImportsExports } from "sveast/lexer";
+import {
+  isIdentifierName,
+  type LexedImport,
+  lexImportsExports,
+  MappingsBuilder,
+  type PackageExport,
+} from "severan/internal";
 import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { readCarbonExports } from "../indexer/carbon-exports";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
-import { MappingsBuilder } from "../specializer/mappings-builder";
-import {
-  isIdentifierName,
-  type PackageExport,
-} from "../specializer/package-exports";
 import { errorMessage } from "../utils";
 
 const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;

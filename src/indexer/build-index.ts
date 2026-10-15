@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { listJsAndSvelteFiles } from "severan/internal";
 import { CarbonSvelte } from "../constants";
-import { listJsAndSvelteFiles } from "../specializer/list-files";
 import { isSvelteFile } from "../utils";
 import { readCarbonExports } from "./carbon-exports";
 import { extractCssOrphans, resolveCarbonCssPath } from "./extract-css-context";

@@ -1,7 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { lexComponent, lexImportsExports } from "sveast/lexer";
-import { isSvelteFile, RE_EXT_SVELTE } from "../specializer/util";
+import {
+  isSvelteFile,
+  lexComponent,
+  lexImportsExports,
+  RE_EXT_SVELTE,
+} from "severan/internal";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;

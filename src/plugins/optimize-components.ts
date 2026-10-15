@@ -1,9 +1,9 @@
+import type { SeveranOptions } from "severan";
+import { severan } from "severan/vite";
 import type { Plugin } from "vite";
 import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
-import type { SpecializerOptions } from "../specializer/optimizer";
-import { specializerPlugin } from "../specializer/vite";
 
-export type OptimizeComponentsOptions = SpecializerOptions;
+export type OptimizeComponentsOptions = SeveranOptions;
 
 /**
  * Vite, Rollup and Rolldown plugin that rewrites each Carbon component
@@ -20,7 +20,7 @@ export type OptimizeComponentsOptions = SpecializerOptions;
 export const optimizeComponents = (
   options?: OptimizeComponentsOptions,
 ): Plugin =>
-  specializerPlugin(CARBON, options, {
+  severan(CARBON, options, {
     id: "vite:carbon:optimize-components",
     plugin: "optimizeComponents",
     failure: SPECIALIZE_FAILURE,

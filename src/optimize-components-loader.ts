@@ -1,2 +1,2 @@
-/** The loader `OptimizeComponentsPlugin` adds; see `specializer/loader`. */
-export { default } from "./specializer/loader";
+/** The loader `OptimizeComponentsPlugin` adds; see severan's `loader.ts`. */
+export { loader as default } from "severan/internal";
