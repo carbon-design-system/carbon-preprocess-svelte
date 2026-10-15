@@ -1,11 +1,9 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { WebpackCompiler } from "severan/internal";
+import { SeveranPlugin } from "severan/webpack";
 import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
-import {
-  SpecializerWebpackPlugin,
-  type WebpackCompiler,
-} from "../specializer/webpack";
 import type { OptimizeComponentsOptions } from "./optimize-components";
 
 /** The loader's built file next to the bundle, or its source in a checkout. */
@@ -28,10 +26,10 @@ const LOADER = (() => {
  * module outside `content` imports a Carbon component.
  */
 export class OptimizeComponentsPlugin {
-  private plugin: SpecializerWebpackPlugin;
+  private plugin: SeveranPlugin;
 
   public constructor(options?: OptimizeComponentsOptions) {
-    this.plugin = new SpecializerWebpackPlugin(CARBON, options, {
+    this.plugin = new SeveranPlugin(CARBON, options, {
       plugin: "OptimizeComponentsPlugin",
       failure: SPECIALIZE_FAILURE,
       loader: LOADER,

@@ -1,6 +1,6 @@
 /**
  * Accuracy and payoff check for specializing Carbon components
- * (`src/specializer/specialize.ts`), the core of `optimizeComponents`.
+ * (severan's `specializeComponent`), the core of `optimizeComponents`.
  *
  * For each app in the prop-aware corpus (see `./prop-aware-cases.ts`):
  *
@@ -33,13 +33,15 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import type { BunPlugin } from "bun";
+import {
+  analyzeFiles,
+  collectAppUsage,
+  libraryAt,
+  parse,
+  specializeComponent,
+} from "severan/internal/analysis";
 import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
-import { analyzeFiles } from "../src/specializer/analysis";
-import { collectAppUsage } from "../src/specializer/app-usage";
-import { libraryAt } from "../src/specializer/library";
-import { parse } from "../src/specializer/parser";
-import { specializeComponent } from "../src/specializer/specialize";
 import { goldenApps } from "./golden-apps";
 import { buildCases, caseSource } from "./prop-aware-cases";
 import { wrapperCases } from "./wrapper-cases";

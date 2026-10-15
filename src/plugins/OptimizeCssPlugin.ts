@@ -1,15 +1,16 @@
-import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
-import { LOG_PREFIX } from "../constants";
-import { loadComponentIndex } from "../indexer/load-index";
-import type { UsageCollector, UsageResult } from "../specializer/analysis";
-import { type LibraryImport, libraryPaths } from "../specializer/library-paths";
 import {
   importEdges,
   isProduction,
+  type LibraryImport,
+  libraryPaths,
   moduleSource,
   type WebpackConnection,
   type WebpackModule,
-} from "../specializer/webpack-util";
+} from "severan/internal";
+import type { UsageCollector, UsageResult } from "severan/internal/analysis";
+import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
+import { LOG_PREFIX } from "../constants";
+import { loadComponentIndex } from "../indexer/load-index";
 import {
   errorMessage,
   isCarbonSvelteImport,
@@ -182,7 +183,7 @@ export class OptimizeCssPlugin {
             if (warning) warn(warning);
 
             const analyzer = propAware
-              ? await import("../specializer/analysis")
+              ? await import("severan/internal/analysis")
               : undefined;
             let usage: UsageResult | undefined;
             if (analyzer && propAware) {

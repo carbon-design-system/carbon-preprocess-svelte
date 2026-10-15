@@ -1,5 +1,7 @@
-import type { UsageOptions as PropAwareOptions } from "../specializer/analyze-usage";
+import type { UsageOptions } from "severan/internal/analysis";
 import type { SafelistEntry } from "./safelist";
+
+type PropAwareOptions = UsageOptions;
 
 export type OptimizeCssOptions = {
   /**

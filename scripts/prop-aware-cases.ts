@@ -10,7 +10,7 @@ import { collectCarbonImports } from "../src/plugins/scan-imports";
 /** Carbon component export name -> module key (`Button` -> `Button/Button.svelte`). */
 type CarbonComponents = ReadonlyMap<string, string>;
 
-import { loadComponentModel } from "../src/specializer/component-model";
+import { loadComponentModel } from "severan/internal/analysis";
 
 export type Case = {
   id: string;

@@ -468,7 +468,7 @@ Full set-ups: [examples/webpack](examples/webpack), [examples/webpack@svelte-5](
 
 ### `optimizeComponents`
 
-Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). Your own wrapper components are rewritten the same way when every place that renders them is in `content`. It's the JavaScript counterpart of prop-aware pruning, using the same analysis.
+Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). Your own wrapper components are rewritten the same way when every place that renders them is in `content`. It's the JavaScript counterpart of prop-aware pruning, using the same analysis ([severan](https://github.com/metonym/severan)).
 
 ```js
 // vite.config.js

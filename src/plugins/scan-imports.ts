@@ -1,5 +1,5 @@
+import { collectLibraryImports } from "severan/internal";
 import { CARBON } from "../carbon-library";
-import { collectLibraryImports } from "../specializer/imports";
 
 /**
  * Adds the Carbon component names `source` (a whole `.svelte` file is

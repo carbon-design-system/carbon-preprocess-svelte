@@ -1,11 +1,10 @@
+import { type LibraryImport, libraryImports } from "severan/internal";
+import type { UsageCollector, UsageResult } from "severan/internal/analysis";
 import type { Plugin, Rollup } from "vite";
 import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
-import type { UsageCollector, UsageResult } from "../specializer/analysis";
-import type { LibraryImport } from "../specializer/library-paths";
-import { libraryImports } from "../specializer/module-graph";
 import {
   errorMessage,
   isCarbonSvelteImport,
@@ -60,7 +59,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   /** Call sites per module for `propAware`. */
   let collector: UsageCollector | undefined;
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
-  let analyzer: typeof import("../specializer/analysis") | undefined;
+  let analyzer: typeof import("severan/internal/analysis") | undefined;
   /** The module graph's edges into Carbon, read in `buildEnd`. */
   let edges: LibraryImport[] = [];
 
@@ -81,7 +80,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       contentClasses = undefined;
       components = await loadComponentIndex(root);
       if (propAware && !collector) {
-        analyzer = await import("../specializer/analysis");
+        analyzer = await import("severan/internal/analysis");
         try {
           collector = analyzer.createUsageCollector(
             CARBON,
