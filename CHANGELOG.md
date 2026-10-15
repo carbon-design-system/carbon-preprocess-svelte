@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.55](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.55) - 2026-10-14
+
+**Fixes**
+
+- specializer: read what a library's barrel exports, whatever its shape
+- specializer: read a prop `export { … as … }` renames
+
+**Performance**
+
+- load the parser only when a build starts (~21.3 → ~17.4 ms import)
+- make the size formatters on first use (~17.4 → ~7.3 ms import)
+
 ## [0.11.54](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.54) - 2026-10-13
 
 **Fixes**
