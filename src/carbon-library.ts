@@ -2,7 +2,7 @@ import { CarbonSvelte, PACKAGE_NAME } from "./constants";
 import { extractCarbonClassTokens } from "./indexer/extract-runtime-classes";
 import { collectCarbonTokens } from "./plugins/scan-content";
 import type { Failure } from "./specializer/analysis";
-import type { LibrarySpec } from "./specializer/library";
+import type { LibrarySpec } from "./specializer/library-paths";
 
 /** Carbon, as the specializer reads and rewrites it. */
 export const CARBON: LibrarySpec = {

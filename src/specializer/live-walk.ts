@@ -11,7 +11,7 @@ import {
   whyUnknownLater,
 } from "./evaluate";
 import { memberOf } from "./exports";
-import type { ClassTokens, LibraryPaths } from "./library";
+import type { ClassTokens, LibraryPaths } from "./library-paths";
 import type { CallSite } from "./usage";
 import {
   isEmptyArray,

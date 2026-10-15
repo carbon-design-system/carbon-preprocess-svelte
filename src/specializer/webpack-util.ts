@@ -1,4 +1,4 @@
-import type { LibraryImport } from "./library";
+import type { LibraryImport } from "./library-paths";
 
 /**
  * Structural subset of a webpack/Rspack module and its incoming

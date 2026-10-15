@@ -1,5 +1,9 @@
 import { lexImportsExports } from "sveast/lexer";
-import { type LibraryImport, type LibrarySpec, libraryPaths } from "./library";
+import {
+  type LibraryImport,
+  type LibrarySpec,
+  libraryPaths,
+} from "./library-paths";
 import { stripQuery } from "./util";
 
 /** The parts of a Rollup/Vite plugin context the module graph is read with. */

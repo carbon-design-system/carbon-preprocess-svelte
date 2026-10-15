@@ -1,5 +1,8 @@
 import { CarbonSvelte } from "../constants";
-import { type PackageExport, readPackageExports } from "../specializer/exports";
+import {
+  type PackageExport,
+  readPackageExports,
+} from "../specializer/package-exports";
 
 /**
  * Maps every name exported by `carbon-components-svelte`'s `src/index.js` to

@@ -5,6 +5,7 @@ import { $, build } from "bun";
 import { bundleDts } from "./bundle-dts";
 
 const SVELTE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*)["']svelte/;
+const STATIC_IMPORT = /\b(?:from|import)\s*["']\.\/([^"']+)["']/g;
 const SHEBANG = "#!/usr/bin/env node\n";
 const JS_FILE = /\.js$/;
 const STRIP_PKG_FIELDS = new Set(["devDependencies", "scripts", "files"]);
@@ -127,6 +128,30 @@ async function buildProject() {
       process.exit(1);
     }
     return;
+  }
+
+  // Every tool that loads `svelte.config.js` imports the entry, so it may
+  // not load sveast's parser: the plugins import it when a build starts.
+  // Walk the chunks it imports statically for the template parser.
+  const texts = new Map(bundles.map(({ file, text }) => [file, text]));
+  const pending = ["index.js"];
+  const seen = new Set<string>();
+  for (let file = pending.pop(); file; file = pending.pop()) {
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const text = texts.get(file) ?? "";
+    if (text.includes("svelte:boundary")) {
+      console.error(
+        `Build failed: dist/index.js loads the parser (through dist/${file}). Import it lazily.`,
+      );
+      if (!isWatchMode) {
+        process.exit(1);
+      }
+      return;
+    }
+    for (const [, next] of text.matchAll(STATIC_IMPORT)) {
+      pending.push(next);
+    }
   }
 
   // `src/cli.ts` has no shebang so tests can import it as a module.
