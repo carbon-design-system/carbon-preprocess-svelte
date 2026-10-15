@@ -2,7 +2,7 @@ import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
 import type { UsageCollector, UsageResult } from "../specializer/analysis";
-import { type LibraryImport, libraryPaths } from "../specializer/library";
+import { type LibraryImport, libraryPaths } from "../specializer/library-paths";
 import {
   importEdges,
   isProduction,

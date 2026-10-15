@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { type LibrarySpec, libraryPaths } from "./library";
+import { type LibrarySpec, libraryPaths } from "./library-paths";
 import {
   createComponentOptimizer,
   type ImportResolver,

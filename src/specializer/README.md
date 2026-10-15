@@ -7,7 +7,7 @@ This directory is meant to become its own package. It imports nothing from the r
 ## Describing a library
 
 ```ts
-import type { LibrarySpec } from "./library";
+import type { LibrarySpec } from "./library-paths";
 
 const MY_LIBRARY: LibrarySpec = {
   name: "my-library", // the package apps import

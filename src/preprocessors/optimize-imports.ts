@@ -4,8 +4,11 @@ import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { readCarbonExports } from "../indexer/carbon-exports";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
-import { isIdentifierName, type PackageExport } from "../specializer/exports";
 import { MappingsBuilder } from "../specializer/mappings-builder";
+import {
+  isIdentifierName,
+  type PackageExport,
+} from "../specializer/package-exports";
 import { errorMessage } from "../utils";
 
 const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;

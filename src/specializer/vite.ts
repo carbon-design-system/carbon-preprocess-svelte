@@ -1,5 +1,5 @@
 import type { Plugin } from "vite";
-import type { LibrarySpec } from "./library";
+import type { LibrarySpec } from "./library-paths";
 import { libraryImports } from "./module-graph";
 import {
   createComponentOptimizer,

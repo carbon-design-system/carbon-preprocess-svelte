@@ -13,7 +13,7 @@ import {
   type LibraryPaths,
   type LibrarySpec,
   libraryPaths,
-} from "./library";
+} from "./library-paths";
 import { installedMajor } from "./package";
 import { RE_EXT_STYLESHEET, stripQuery } from "./util";
 

@@ -11,13 +11,12 @@ import {
 } from "./analyze-usage";
 import { type AppUsage, collectAppUsage } from "./app-usage";
 import { type ModuleUsage, readLibraryImport } from "./call-sites";
+import { type Library, loadLibrary } from "./library";
 import {
-  type Library,
   type LibraryImport,
   type LibrarySpec,
   libraryPaths,
-  loadLibrary,
-} from "./library";
+} from "./library-paths";
 import { type SourceMap, toSourceMap } from "./mapped-text";
 import { type SpecializeOptions, specializeComponent } from "./specialize";
 import type { CallSite } from "./usage";

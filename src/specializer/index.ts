@@ -10,14 +10,12 @@ export type {
   UsageResult,
 } from "./analysis";
 export type { UsageAnalysis, UsageOptions } from "./analyze-usage";
+export { Library, libraryAt, loadLibrary } from "./library";
 export {
-  Library,
   type LibraryImport,
   LibraryPaths,
   type LibrarySpec,
-  libraryAt,
-  loadLibrary,
-} from "./library";
+} from "./library-paths";
 export { libraryImports, type ModuleGraph } from "./module-graph";
 export type { SpecializerOptions } from "./optimizer";
 export { specializerPlugin } from "./vite";

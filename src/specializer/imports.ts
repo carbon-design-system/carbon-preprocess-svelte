@@ -1,5 +1,5 @@
 import { lexImportsExports } from "sveast/lexer";
-import { type LibrarySpec, libraryPatterns } from "./library";
+import { type LibrarySpec, libraryPatterns } from "./library-paths";
 
 /**
  * Adds the names of `spec`'s components `source` (a whole `.svelte` file

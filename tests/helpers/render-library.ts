@@ -9,7 +9,7 @@ import path from "node:path";
 import type { BunPlugin } from "bun";
 import { compile } from "svelte/compiler";
 import { specializeFiles } from "../../src/specializer/analysis";
-import type { LibrarySpec } from "../../src/specializer/library";
+import type { LibrarySpec } from "../../src/specializer/library-paths";
 
 /** A library that isn't Carbon, as the specializer reads it. */
 const MYLIB: LibrarySpec = {

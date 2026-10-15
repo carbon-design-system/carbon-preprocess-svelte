@@ -4,7 +4,7 @@ import { LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
 import { loadComponentIndex } from "../indexer/load-index";
 import type { UsageCollector, UsageResult } from "../specializer/analysis";
-import type { LibraryImport } from "../specializer/library";
+import type { LibraryImport } from "../specializer/library-paths";
 import { libraryImports } from "../specializer/module-graph";
 import {
   errorMessage,
