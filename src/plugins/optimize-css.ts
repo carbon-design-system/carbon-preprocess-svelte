@@ -12,6 +12,7 @@ import {
   isScannableModule,
   toCssString,
 } from "../utils";
+import type { BundlerPlugin } from "./bundler-plugin";
 import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
@@ -35,7 +36,7 @@ function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
  * `transform` records which Carbon components are imported; `generateBundle`
  * then splices unused rules out of the CSS assets in place.
  */
-export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
+export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   const silent = options?.silent === true;
   /**
    * Carbon component files seen by `transform`, across `vite build --watch`
@@ -63,7 +64,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
   /** The module graph's edges into Carbon, read in `buildEnd`. */
   let edges: LibraryImport[] = [];
 
-  return {
+  const plugin: Plugin = {
     name: "vite:carbon:optimize-css",
     apply: "build",
     enforce: "post",
@@ -199,4 +200,5 @@ export const optimizeCss = (options?: OptimizeCssOptions): Plugin => {
       });
     },
   };
+  return plugin;
 };

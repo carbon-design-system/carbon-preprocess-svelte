@@ -6,7 +6,6 @@ import {
   MappingsBuilder,
   type PackageExport,
 } from "severan/internal";
-import type { SveltePreprocessor } from "svelte/types/compiler/preprocess";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { readCarbonExports } from "../indexer/carbon-exports";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
@@ -180,6 +179,20 @@ function createCarbonExportsResolver(): (
 }
 
 /**
+ * A Svelte script preprocessor, as `svelte/compiler`'s `PreprocessorGroup`
+ * takes it: declared here so the published types need no Svelte version's.
+ */
+type ScriptPreprocessor = {
+  name: string;
+  script(options: {
+    content: string;
+    attributes?: Record<string, string | boolean>;
+    markup?: string;
+    filename?: string;
+  }): { code: string; map?: string | object } | undefined;
+};
+
+/**
  * Svelte preprocessor that transforms barrel imports from Carbon libraries
  * into direct path imports for better tree-shaking and faster builds.
  *
@@ -201,7 +214,7 @@ function createCarbonExportsResolver(): (
  * `carbon-components-svelte` each file resolves, so they match the installed
  * version. Names that barrel doesn't export stay on the barrel.
  */
-export const optimizeImports: SveltePreprocessor<"script"> = () => {
+export const optimizeImports = (): ScriptPreprocessor => {
   const carbonExportsFor = createCarbonExportsResolver();
 
   return {

@@ -138,7 +138,11 @@ function rollupDts(
           continue;
         }
         if (!isRelative(spec)) {
-          externalLines.set(stmt.getText(sf), importedNames(stmt));
+          // Another file's `export … from "pkg"` is that file's export, not
+          // the entry's (severan's lexer re-exports): only imports carry over.
+          if (ts.isImportDeclaration(stmt) || file === entryDts) {
+            externalLines.set(stmt.getText(sf), importedNames(stmt));
+          }
           continue;
         }
 

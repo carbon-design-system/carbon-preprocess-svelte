@@ -25,6 +25,9 @@ jobs:
       - name: Run unit tests
         run: bun run test
 
+      - name: Use the package as a consumer would
+        run: bun run test:package
+
       - name: Run e2e tests
         run: bun run test:e2e
         env:
