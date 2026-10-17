@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.3",
     "@types/jest": "^30.0.0",
     "@typescript/typescript6": "^6.0.2",
     "caligula": "^0.3.0",
@@ -41,12 +41,12 @@
     "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
     "knip": "^6.41.0",
     "ostia": "^0.2.11",
-    "playwright": "1.64.0",
+    "playwright": "1.64.1",
     "severan": "^0.2.0",
-    "sveast": "^0.9.5",
+    "sveast": "^0.9.6",
     "svelte": "^5.57.2",
     "vite": "^8.3.4",
-    "webpack": "^5.111.1"
+    "webpack": "^5.112.0"
   },
   "repository": {
     "type": "git",
