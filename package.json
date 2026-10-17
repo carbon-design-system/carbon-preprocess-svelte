@@ -16,6 +16,7 @@
   "scripts": {
     "build": "bun scripts/build.ts",
     "test": "rm -rf node_modules/.cache/carbon-preprocess-svelte && bun test --parallel",
+    "test:package": "bun scripts/test-package.ts",
     "test:e2e": "bun tests/test-e2e.ts",
     "test:e2e:update": "UPDATE_SNAPSHOTS=true bun tests/test-e2e.ts",
     "snapshots:from-ci": "bun scripts/snapshots-from-ci.ts",

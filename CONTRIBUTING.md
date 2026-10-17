@@ -46,6 +46,7 @@ bun install
 | `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`), after clearing the component index cache in `node_modules/.cache` (it's keyed by package versions, so it would otherwise hide local indexer changes; `test:e2e` clears each example's too). |
 | `bun run build` | Bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
 | `bun run typecheck` | `bun check` (Bun's built-in type checker) over `bench/`, `scripts/`, `src/`, `tests/`. |
+| `bun run test:package` | Build and pack `dist/`, install it next to Svelte and Vite in a scratch project, load every export and the CLI in Node, and type-check a consumer of every public export with `skipLibCheck: false`, on Svelte 4 and 5. The published types import nothing: a webpack project has no Vite, and no project has the bundled packages (`sveast`, `severan`), so the plugins' return type is declared here ([`bundler-plugin.ts`](src/plugins/bundler-plugin.ts)) and so is `optimizeImports`'s. The webpack consumer is checked before Vite is installed. |
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
 | `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). Set `EXAMPLES=vite,vite@svelte-5` to build (and update) only those examples. |
 | `bun run snapshots:from-ci` | When a pull request changes sizes on purpose: rewrite `e2e.json` with what CI's e2e step observed for the current commit (needs `gh`), without building the examples locally. |
@@ -227,7 +228,8 @@ bun run test:e2e:update
 2. `bun run lint`
 3. `bun run typecheck`
 4. `bun run test`
-5. `bun run test:e2e`
+5. `bun run test:package`
+6. `bun run test:e2e`
 
 Run those locally before pushing. The e2e suite runs in CI, so a snapshot you forgot to update will fail the build; the failed run uploads what it observed, and `bun run snapshots:from-ci` writes it to `e2e.json` when the change is intended.
 

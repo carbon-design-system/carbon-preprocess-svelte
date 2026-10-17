@@ -1,7 +1,7 @@
 import type { SeveranOptions } from "severan";
 import { severan } from "severan/vite";
-import type { Plugin } from "vite";
 import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
+import type { BundlerPlugin } from "./bundler-plugin";
 
 export type OptimizeComponentsOptions = SeveranOptions;
 
@@ -19,7 +19,7 @@ export type OptimizeComponentsOptions = SeveranOptions;
  */
 export const optimizeComponents = (
   options?: OptimizeComponentsOptions,
-): Plugin =>
+): BundlerPlugin =>
   severan(CARBON, options, {
     id: "vite:carbon:optimize-components",
     plugin: "optimizeComponents",
