@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { g100, white } from "@carbon/themes";
-import { TOKEN_TYPES } from "carbon-preprocess-svelte/code";
+import { TOKEN_TYPES } from "carbon-preprocess-svelte/browser";
 
 const TYPES: readonly string[] = TOKEN_TYPES;
 const OUT = path.join(import.meta.dirname, "../src/syntax.css");

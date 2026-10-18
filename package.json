@@ -19,10 +19,10 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./code": {
-      "types": "./dist/code.d.ts",
-      "import": "./dist/code.js",
-      "default": "./dist/code.js"
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js",
+      "default": "./dist/browser.js"
     },
     "./package.json": "./package.json"
   },

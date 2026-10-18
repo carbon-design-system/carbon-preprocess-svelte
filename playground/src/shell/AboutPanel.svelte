@@ -27,7 +27,7 @@
   <p class="help">
     The playground builds with carbon-preprocess-svelte from this repo: <code>markdown()</code>,
     <code>optimizeImports()</code>, <code>optimizeCss()</code>, and code views on
-    <code>carbon-preprocess-svelte/code</code>.
+    <code>carbon-preprocess-svelte/browser</code>.
   </p>
   <p class="help">
     To use a checkout (for Prose): <code>CCS_DIR=…</code> in <code>playground/.env.local</code>, then

@@ -10,7 +10,7 @@
   // horizontally, so the anchor moves left by as much as the card would
   // overflow.
   import { FloatingPortal } from "carbon-components-svelte";
-  import { highlight } from "carbon-preprocess-svelte/code";
+  import { highlight } from "carbon-preprocess-svelte/browser";
   import { eventType, oneLine as flat, resolveGenerics } from "./analyze.js";
   import { hover, loadApi } from "../settings.js";
 
