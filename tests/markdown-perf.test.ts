@@ -36,6 +36,21 @@ describe("encodeTokens", () => {
     expect(code.slice(ranges[0].start, ranges[0].end)).toBe("import");
   });
 
+  test("leaves out tokens on lines over 1,000 characters", () => {
+    const long = `const data = ${JSON.stringify(Array.from({ length: 300 }, (_, i) => i))};`;
+    const code = `const a = 1;\n${long}\nconst b = 2;`;
+    const ranges = decodeTokens(encodeTokens(code, "js") ?? []);
+    const lineOf = (offset: number) => code.slice(0, offset).split("\n").length;
+    expect(long.length).toBeGreaterThan(1000);
+    expect(ranges.some((r) => lineOf(r.start) === 1)).toBe(true);
+    expect(ranges.some((r) => lineOf(r.start) === 2)).toBe(false);
+    // Offsets after the long line still line up with the code.
+    expect(ranges.slice(-2).map((r) => code.slice(r.start, r.end))).toEqual([
+      "2",
+      ";",
+    ]);
+  });
+
   test("is undefined for a language the tokenizer doesn't know", () => {
     expect(encodeTokens("x", "cobol")).toBeUndefined();
   });
