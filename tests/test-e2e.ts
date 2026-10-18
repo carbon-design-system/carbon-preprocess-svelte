@@ -362,6 +362,9 @@ async function buildExample(
 }
 
 async function main() {
+  // The playground uses the installed carbon-components-svelte here, not a
+  // checkout its `.env.local` may name: its CSS snapshot depends on it.
+  process.env.CCS_DIR ??= "";
   console.log("Building and linking package...\n");
   await $`bun run build && bun link`;
 
@@ -370,8 +373,14 @@ async function main() {
   const results: BuildOutcome[] = [];
 
   const examples: string[] = [];
+  const dirs: string[] = [];
   for await (const dir of $`find examples -maxdepth 1 -mindepth 1 -type d`.lines()) {
-    if (!dir) continue;
+    if (dir) dirs.push(dir);
+  }
+  // The playground builds like an example too (its own browser tests run
+  // in `test:playground`).
+  dirs.push("playground");
+  for (const dir of dirs) {
     if (
       ONLY_EXAMPLES &&
       !ONLY_EXAMPLES.includes(dir.replace("examples/", ""))

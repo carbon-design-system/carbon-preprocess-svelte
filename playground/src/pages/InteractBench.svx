@@ -1,0 +1,25 @@
+---
+title: Interaction latency
+description: Carbon components on large data, for scripts/interact-bench.ts to open, filter, and sort.
+---
+
+<script>
+  import { ComboBox, DataTable, Dropdown, MultiSelect, Toolbar, ToolbarContent, ToolbarSearch } from "carbon-components-svelte";
+
+  const items = (n) => Array.from({ length: n }, (_, i) => ({ id: String(i), text: `Option ${i}` }));
+  const many = items(5000);
+  const headers = [{ key: "name", value: "Name" }, { key: "port", value: "Port" }, { key: "rule", value: "Rule" }];
+  const rows = Array.from({ length: 1000 }, (_, i) => ({ id: i, name: `Load balancer ${i}`, port: (i * 37) % 9000, rule: i % 2 ? "Round robin" : "DNS delegation" }));
+</script>
+
+<div id="combo-virtual"><ComboBox labelText="ComboBox, 5,000 items" items={many} /></div>
+
+<div id="combo-plain"><ComboBox labelText="ComboBox, 5,000 items, virtualize off" items={many} virtualize={false} /></div>
+
+<div id="dropdown"><Dropdown labelText="Dropdown, 5,000 items" items={many} selectedId="0" /></div>
+
+<div id="multiselect"><MultiSelect filterable labelText="MultiSelect, 5,000 items" items={many} /></div>
+
+<div id="table"><DataTable sortable {headers} {rows}><Toolbar><ToolbarContent><ToolbarSearch persistent shouldFilterRows /></ToolbarContent></Toolbar></DataTable></div>
+
+<div id="table-virtual"><DataTable sortable virtualize {headers} {rows}><Toolbar><ToolbarContent><ToolbarSearch persistent shouldFilterRows /></ToolbarContent></Toolbar></DataTable></div>

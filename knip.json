@@ -15,6 +15,7 @@
     "bench/**/*.ts",
     "tests/**/*.{ts,cjs}"
   ],
+  "ignore": ["playground/**"],
   "ignoreDependencies": ["sveast", "prettier", "prettier-plugin-svelte"],
   "svelte": false
 }

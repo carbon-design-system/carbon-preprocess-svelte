@@ -1,0 +1,11 @@
+- Unordered item
+- Item with a nested list
+  - Nested item
+  - Another nested item
+- Last item
+
+1. Ordered item
+2. Second item
+
+- [x] Done task
+- [ ] Open task
