@@ -13,6 +13,19 @@
   "engines": {
     "node": ">=22"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js",
+      "default": "./dist/browser.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "bun scripts/build.ts",
     "test": "rm -rf node_modules/.cache/carbon-preprocess-svelte && bun test --parallel",
