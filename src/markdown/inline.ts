@@ -102,7 +102,7 @@ export function normalizeLabel(label: string): string {
 /**
  * Named character references decoded in URLs, titles, and fence info:
  * the common ones, not HTML's 2,231 (this ships to the browser in
- * `carbon-preprocess-svelte/code`). Others stay as written.
+ * `carbon-preprocess-svelte/browser`). Others stay as written.
  */
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",

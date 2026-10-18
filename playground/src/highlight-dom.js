@@ -2,7 +2,7 @@
 // code block's text and register a Range per token. Nothing in the DOM
 // changes, so it works on CodeSnippet and on any `<pre><code>` (Chrome 105,
 // Safari 17.2, Firefox 140). The tokenizer is the same one the build uses.
-import { tokenize, tokenName } from "carbon-preprocess-svelte/code";
+import { tokenize, tokenName } from "carbon-preprocess-svelte/browser";
 import { clearRanges, setRanges, supported } from "./intel/registry.js";
 
 const OWNER = "page";

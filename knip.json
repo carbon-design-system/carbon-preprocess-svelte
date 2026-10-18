@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     "src/index.ts",
-    "src/code.ts",
+    "src/browser.ts",
     "src/cli.ts",
     "src/optimize-components-loader.ts",
     "scripts/*.ts",

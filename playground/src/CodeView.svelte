@@ -35,7 +35,7 @@
     prepareFence,
     stripAnsi,
     tokenName,
-  } from "carbon-preprocess-svelte/code";
+  } from "carbon-preprocess-svelte/browser";
   import { analyze } from "./intel/analyze.js";
   import { clearRanges, setRanges, supported } from "./intel/registry.js";
   import { MANAGERS, packageManagerVariants } from "./intel/package-managers.js";

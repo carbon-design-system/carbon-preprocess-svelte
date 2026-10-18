@@ -223,12 +223,12 @@ declare module "*.md" {
 | `slug`, `frontmatter` | GitHub's slugger; a YAML subset | Heading ids, and the frontmatter parser (`false` reads `---` as Markdown) |
 | `footnoteLabels`, `alertTitles` | English | Labels, for translation |
 
-#### In the browser: `carbon-preprocess-svelte/code`
+#### In the browser: `carbon-preprocess-svelte/browser`
 
 The compiler has no Node dependencies, so it also runs in the browser, for an editor or CMS preview:
 
 ```js
-import { compileMarkdown, markdownToHtml } from "carbon-preprocess-svelte/code";
+import { compileMarkdown, markdownToHtml } from "carbon-preprocess-svelte/browser";
 
 // The Svelte component markdown() would write, with its headings and frontmatter.
 const { code, headings, metadata } = await compileMarkdown(source);
