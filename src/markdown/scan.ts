@@ -28,6 +28,16 @@ const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea"]);
 
 const TAG_NAME = /[A-Za-z][\w.-]*(?::[A-Za-z][\w.-]*)?/y;
 const AFTER_TAG_NAME = /[\s/>]/;
+const WHITESPACE = /\s/;
+const COMPONENT_NAME = /^[A-Z]|\./;
+const NAME_END = /[\s=>"'{]/;
+const UNQUOTED_VALUE_END = /[\s>]/;
+/**
+ * Characters Svelte rejects in an attribute name (`attribute_invalid_name`,
+ * its `regex_illegal_attribute_character`); directives, with a `:`, and
+ * a component's custom properties (`--x`) are checked apart and pass.
+ */
+const ILLEGAL_ATTRIBUTE_NAME = /(^[0-9-.])|[\^$@%&#?!|()[\]{}^*+~;]/;
 
 export interface ScannedTag {
   name: string;
@@ -94,12 +104,54 @@ export function scanTag(src: string, start: number): ScannedTag | null {
   const name = match[0];
   i += name.length;
   if (!AFTER_TAG_NAME.test(src[i] ?? "")) return null;
+  const component = COMPONENT_NAME.test(name);
 
   while (i < src.length) {
     const c = src[i];
     if (c === ">") return { name, closing, selfClosing: false, end: i + 1 };
     if (c === "/" && src[i + 1] === ">") {
       return { name, closing, selfClosing: true, end: i + 2 };
+    }
+    if (WHITESPACE.test(c)) {
+      i++;
+      continue;
+    }
+    if (c === "=") {
+      // An unquoted value; quoted ones and expressions are read below.
+      i++;
+      while (WHITESPACE.test(src[i] ?? "")) i++;
+      if (src[i] !== '"' && src[i] !== "'" && src[i] !== "{") {
+        while (i < src.length && !UNQUOTED_VALUE_END.test(src[i])) i++;
+      }
+      continue;
+    }
+    // A JavaScript comment between attributes, as Svelte 5 allows:
+    // `<Input on:input={log} // string | null />`.
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      const close = src[i + 1] === "/" ? "\n" : "*/";
+      const end = src.indexOf(close, i + 2);
+      if (end < 0) return null;
+      i = end + close.length;
+      continue;
+    }
+    if (c !== "{" && c !== '"' && c !== "'") {
+      // An attribute name: one Svelte can't parse makes this text, not a tag.
+      let j = i;
+      while (j < src.length && !NAME_END.test(src[j])) {
+        if (src[j] === "/" && src[j + 1] === ">") break;
+        j++;
+      }
+      const attribute = src.slice(i, j);
+      if (
+        attribute === "/" ||
+        (!attribute.includes(":") &&
+          !(component && attribute.startsWith("--")) &&
+          ILLEGAL_ATTRIBUTE_NAME.test(attribute))
+      ) {
+        return null;
+      }
+      i = j;
+      continue;
     }
     if (c === "{") {
       i = skipExpression(src, i);

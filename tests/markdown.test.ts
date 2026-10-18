@@ -366,6 +366,64 @@ export let proseProps = {};
     expect(() => compile(code, { filename: "page.md" })).not.toThrow();
   });
 
+  test("decodes entities in link URLs, titles, and fence info, once", async () => {
+    const { html } = await renderMarkdown(
+      '[a](/f&ouml;&ouml; "t &quot;q&quot;") [b](/x&#38;ouml;) [c](/&bogus;)\n\n``` f&ouml;\nx\n```',
+    );
+    expect(html).toContain(
+      '<a href="/f%C3%B6%C3%B6" title="t &quot;q&quot;">a</a>',
+    );
+    // `&#38;` decodes to `&`, and the result isn't decoded again.
+    expect(html).toContain('<a href="/x&amp;ouml;">b</a>');
+    // Names outside the table stay as written.
+    expect(html).toContain('<a href="/&amp;bogus;">c</a>');
+    expect(html).toContain('class="language-fö"');
+  });
+
+  test("escapes a tag with an attribute name Svelte can't parse", async () => {
+    const { code } = await compileMarkdown(
+      'A <foo bar=baz bim!bop /> and <bar/ > and <i --c="red">x</i>.\n\n<Box --c="red" class:on={a} on:click|once={go} {...rest}>ok</Box>',
+      { prose: false },
+    );
+    expect(code).toContain("&lt;foo bar=baz bim!bop /&gt;");
+    expect(code).toContain("&lt;bar/ &gt;");
+    expect(code).toContain("&lt;i --c=&quot;red&quot;&gt;");
+    // Comments between attributes, as Svelte 5 allows, stay markup.
+    const commented = await compileMarkdown(
+      '<Input\n  on:input={log} // string | null\n  /* more */ labelText="Name"\n/>',
+      { prose: false },
+    );
+    expect(commented.code).toContain(
+      "<Input\n  on:input={log} // string | null",
+    );
+    expect(() =>
+      compile(commented.code, { filename: "page.md" }),
+    ).not.toThrow();
+    // A component's custom property and Svelte's directives stay markup.
+    expect(code).toContain(
+      '<Box --c="red" class:on={a} on:click|once={go} {...rest}>ok</Box>',
+    );
+  });
+
+  test("a reference definition after a blank line in a list item makes the list loose", async () => {
+    const { html } = await renderMarkdown("- a\n- b\n\n  [ref]: /url\n- d\n");
+    expect(html.replace(/\n/g, "")).toBe(
+      "<ul><li><p>a</p></li><li><p>b</p></li><li><p>d</p></li></ul>",
+    );
+  });
+
+  test("ends a comment's block on the line that closes it", async () => {
+    const { code } = await compileMarkdown(
+      '<!-- prettier-ignore -->\n```json\n{ "a": 1 }\n```\n\n<!--\nTwo lines.\n-->\nText.',
+      { prose: false },
+    );
+    expect(code).toContain(
+      '<!-- prettier-ignore -->\n<pre><code class="language-json">&#123; &quot;a&quot;: 1 &#125;\n</code></pre>',
+    );
+    expect(code).toContain("<!--\nTwo lines.\n-->\n<p>Text.</p>");
+    expect(() => compile(code, { filename: "page.md" })).not.toThrow();
+  });
+
   test("keeps a block element without a blank line, and a component's body, whole", async () => {
     const html =
       "<details>\n  <summary>S</summary>\n  <p>Hidden.</p>\n</details>";
@@ -461,6 +519,20 @@ describe("markdown preprocessor", () => {
     expect(second?.code).toContain("<Prose {...proseProps}>");
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0][0])).toContain("has no Prose");
+    warn.mockRestore();
+  });
+
+  test("warns about a raw HTML event handler written as a string, with its line", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    await markdown().markup({
+      content:
+        'Intro.\n\nPress <button onclick="go()">go</button>.\n\n`<a onclick="x">` in code.\n\n```html\n<b onclick="y">\n```\n\n<i onclick={() => go()}>ok</i>',
+      filename: "page.md",
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain(
+      'page.md:3: `onclick="…"` is a string',
+    );
     warn.mockRestore();
   });
 
