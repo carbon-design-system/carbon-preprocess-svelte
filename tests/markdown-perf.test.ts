@@ -1,15 +1,15 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { markdown } from "carbon-preprocess-svelte";
+import { renderMarkdown } from "carbon-preprocess-svelte/markdown/compile";
 import {
   decodeTokens,
   encodeTokens,
-  imageSize,
-  markdown,
   TOKEN_TYPES,
   tokenize,
-} from "carbon-preprocess-svelte";
-import { renderMarkdown } from "carbon-preprocess-svelte/markdown/compile";
+} from "carbon-preprocess-svelte/markdown/highlight";
+import { imageSize } from "carbon-preprocess-svelte/markdown/image-size";
 
 describe("encodeTokens", () => {
   test("round-trips to the tokenizer's colored ranges", () => {

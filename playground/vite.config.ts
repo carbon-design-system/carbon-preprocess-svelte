@@ -25,7 +25,6 @@ import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import {
   carbonCodeIcon,
   compileMarkdown,
-  encodeTokens,
   highlight,
   type MarkdownOptions,
   markdown,
@@ -33,10 +32,14 @@ import {
   optimizeComponents,
   optimizeCss,
   optimizeImports,
+} from "carbon-preprocess-svelte";
+// The code view's helpers, as a docs site's client would use them.
+import {
+  encodeTokens,
   parseCodeMeta,
   prepareFence,
   terminalLines,
-} from "carbon-preprocess-svelte";
+} from "carbon-preprocess-svelte/code";
 import { sveld } from "sveld";
 import { createLogger, loadEnv } from "vite";
 import { GALLERY, GALLERY_BASE } from "./gallery";
