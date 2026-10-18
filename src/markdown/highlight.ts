@@ -588,6 +588,11 @@ export interface TokenRange {
  * plain text before the token and `type` indexes `TOKEN_TYPES`. Tokenizing
  * at build time leaves the browser only the painting. Returns `undefined`
  * for a language the tokenizer doesn't know.
+ *
+ * Tokens that start on a line longer than 1,000 characters are left out:
+ * Chrome paints Highlight API ranges slowly when one text node holds
+ * thousands (a line of minified JSON took 17 seconds), so such lines stay
+ * plain.
  */
 export function encodeTokens(code: string, lang: string): number[] | undefined {
   const tokens = tokenize(code, lang);
@@ -595,8 +600,17 @@ export function encodeTokens(code: string, lang: string): number[] | undefined {
   const data: number[] = [];
   let offset = 0;
   let last = 0;
+  // The line holding `offset`, and whether it's too long to color.
+  let lineEnd = -1;
+  let long = false;
   for (const { type, text } of tokens) {
-    if (type && text.length > 0) {
+    while (offset > lineEnd && lineEnd < code.length) {
+      const start = lineEnd + 1;
+      const next = code.indexOf("\n", start);
+      lineEnd = next < 0 ? code.length : next;
+      long = lineEnd - start > MAX_LINE_LENGTH;
+    }
+    if (type && text.length > 0 && !long) {
       data.push(offset - last, text.length, TYPE_INDEX.get(type) ?? 0);
       last = offset + text.length;
     }
@@ -619,6 +633,8 @@ export function decodeTokens(data: readonly number[]): TokenRange[] {
 }
 
 const KEBAB = /[A-Z]/g;
+/** Lines longer than this get no token data (see `encodeTokens`). */
+const MAX_LINE_LENGTH = 1000;
 
 /** `controlKeyword` -> `control-keyword`, matching Carbon's `syntax-*` token names. */
 export function tokenName(type: TokenType): string {
