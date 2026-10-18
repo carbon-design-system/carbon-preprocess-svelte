@@ -1,5 +1,6 @@
-import { highlight, tokenize } from "carbon-preprocess-svelte";
+import { highlight } from "carbon-preprocess-svelte";
 import { exampleSource } from "carbon-preprocess-svelte/markdown/example";
+import { tokenize } from "carbon-preprocess-svelte/markdown/highlight";
 
 const types = (code: string, lang: string) =>
   tokenize(code, lang)

@@ -1,12 +1,12 @@
+import { renderMarkdown } from "carbon-preprocess-svelte/markdown/compile";
+import { highlight } from "carbon-preprocess-svelte/markdown/highlight";
 import {
   parseCodeMeta,
   renderCodeLines,
   splitHtmlLines,
   stripCodeMarkers,
   terminalLines,
-} from "carbon-preprocess-svelte";
-import { renderMarkdown } from "carbon-preprocess-svelte/markdown/compile";
-import { highlight } from "carbon-preprocess-svelte/markdown/highlight";
+} from "carbon-preprocess-svelte/markdown/lines";
 
 const marks = (meta: ReturnType<typeof parseCodeMeta>) =>
   Object.fromEntries(

@@ -281,7 +281,7 @@ export function splitHtmlLines(html: string): string[] {
   return lines;
 }
 
-export interface DiffLines {
+interface DiffLines {
   /** The code without its `+`, `-`, and ` ` columns. */
   code: string;
   /** 1-based header lines (`@@ … @@`, `--- a/x`), shown as plain text. */
@@ -292,10 +292,7 @@ export interface DiffLines {
  * A unified diff: `+` lines are inserted, `-` lines deleted, and the sign
  * column is removed so the rest can be highlighted as its own language.
  */
-export function diffLines(
-  code: string,
-  marks: Map<number, Set<LineMark>>,
-): DiffLines {
+function diffLines(code: string, marks: Map<number, Set<LineMark>>): DiffLines {
   const headers = new Set<number>();
   const lines = code.split("\n").map((line, index) => {
     const number = index + 1;
