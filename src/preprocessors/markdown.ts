@@ -23,6 +23,35 @@ const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;
 // `https:`, `data:`, `//cdn…`, or a Svelte expression: not a local file.
 const NOT_LOCAL = /^(?:[a-z][a-z\d+.-]*:|\/\/|\{)/i;
 const QUERY_OR_HASH = /[?#].*$/;
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
+const CODE_SPAN = /(`+)[\s\S]*?\1/g;
+// An HTML tag in the text with a quoted `on…` attribute: `<button onclick="…">`.
+const STRING_HANDLER = /<[A-Za-z][\w:-]*\b[^>]*?\s(on[a-z]+)\s*=\s*["']/;
+
+/**
+ * Raw HTML event handlers written as strings, which Svelte rejects
+ * ("Event attribute must be a JavaScript expression"): each as a line
+ * number and attribute name, skipping fenced code and code spans.
+ */
+function stringHandlers(content: string): { line: number; name: string }[] {
+  const found: { line: number; name: string }[] = [];
+  let fence: string | undefined;
+  for (const [index, line] of content.split("\n").entries()) {
+    const marker = FENCE_LINE.exec(line)?.[1];
+    if (fence) {
+      if (marker?.[0] === fence[0] && marker.length >= fence.length)
+        fence = undefined;
+      continue;
+    }
+    if (marker) {
+      fence = marker;
+      continue;
+    }
+    const name = STRING_HANDLER.exec(line.replace(CODE_SPAN, ""))?.[1];
+    if (name) found.push({ line: index + 1, name });
+  }
+  return found;
+}
 
 const sizes = new Map<string, { mtime: number; size: ImageSize | undefined }>();
 
@@ -129,6 +158,12 @@ export function markdown(options: MarkdownOptions = {}) {
                 configured?.size ??
                 ((src) => localImageSize(src, filename, configured?.root)),
             };
+      // Svelte's own error names the compiled line; this names the source's.
+      for (const { line, name } of stringHandlers(content)) {
+        console.warn(
+          `${LOG_PREFIX} markdown: ${path.relative(process.cwd(), filename)}:${line}: \`${name}="…"\` is a string; Svelte needs an expression, as in \`${name}={() => …}\`.`,
+        );
+      }
       const { code } = await compileMarkdown(content, {
         ...options,
         images,

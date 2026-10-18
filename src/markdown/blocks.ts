@@ -314,12 +314,16 @@ function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
   let paragraph: string[] = [];
   let gap = false;
   let blankBefore = false;
+  // Blocks so far, counting reference definitions, which render nothing but
+  // still make a list loose when a blank line separates them from a block.
+  let seen = 0;
   let i = 0;
 
-  const add = (block: Block) => {
-    if (blankBefore && blocks.length > 0) gap = true;
+  const add = (block?: Block) => {
+    if (blankBefore && seen > 0) gap = true;
     blankBefore = false;
-    blocks.push(block);
+    seen++;
+    if (block) blocks.push(block);
   };
   const flush = () => {
     if (paragraph.length === 0) return;
@@ -328,7 +332,7 @@ function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
       ctx.refs,
     );
     paragraph = [];
-    if (text.trim() !== "") add({ type: "paragraph", text });
+    add(text.trim() !== "" ? { type: "paragraph", text } : undefined);
   };
   /** Index of the line holding source offset `at`. */
   const lineOf = (at: number) => {
@@ -385,6 +389,14 @@ function parseBlocks(lines: string[], ctx: BlockContext): ParsedBlocks {
       // A block element's closing tag, as `</details>` after Markdown in it.
       if (tag.closing)
         return isHtmlBlock(tag.name) ? blockEnd(i, tag.end) : "text";
+    }
+    // A comment ends its block on the line that closes it, as in CommonMark:
+    // `<!-- prettier-ignore -->` right above a fence leaves the fence a fence.
+    if (!tag) {
+      const close = source.indexOf("-->", start + 4);
+      if (source.startsWith("<!--", start) && close >= 0) {
+        return lineOf(close);
+      }
     }
     const end = markupEnd(start);
     const lineStop = offsets[i] + lines[i].length;
