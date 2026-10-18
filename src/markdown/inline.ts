@@ -65,7 +65,8 @@ const LINK_LABEL = /\[((?:[^\\[\]]|\\.){0,999})\]/y;
 const TRAILING_SPACES = / +$/;
 const WHITESPACE_RUN = /[ \t\r\n]+/g;
 const BACKSLASH_ESCAPE = /\\([!-/:-@[-`{-~])/g;
-const NUMERIC_ENTITY = /&#([xX]?)([0-9a-fA-F]+);/g;
+/** An entity in a URL, title, or fence info, captured for decoding. */
+const ENTITY_TO_DECODE = /&(?:#([xX]?)([0-9a-fA-F]+)|([A-Za-z][A-Za-z\d]*));/g;
 const UNSAFE_URL_CHAR =
   /[^A-Za-z0-9\-._~:/?#@!$&'()*+,;=%]|%(?![0-9a-fA-F]{2})/g;
 const ESCAPE_TEXT = /[&<>"{}]/g;
@@ -98,18 +99,115 @@ export function normalizeLabel(label: string): string {
   return label.trim().replace(WHITESPACE_RUN, " ").toLowerCase().toUpperCase();
 }
 
-function decodeNumericEntities(text: string): string {
-  return text.replace(NUMERIC_ENTITY, (whole, hex: string, digits: string) => {
-    const code = Number.parseInt(digits, hex ? 16 : 10);
-    return Number.isNaN(code) || code > 0x10ffff
-      ? whole
-      : String.fromCodePoint(code || 0xfffd);
-  });
-}
+/**
+ * Named character references decoded in URLs, titles, and fence info:
+ * the common ones, not HTML's 2,231 (this ships to the browser in
+ * `carbon-preprocess-svelte/code`). Others stay as written.
+ */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  copy: "©",
+  reg: "®",
+  trade: "™",
+  hellip: "…",
+  mdash: "—",
+  ndash: "–",
+  lsquo: "‘",
+  rsquo: "’",
+  ldquo: "“",
+  rdquo: "”",
+  laquo: "«",
+  raquo: "»",
+  middot: "·",
+  bull: "•",
+  times: "×",
+  divide: "÷",
+  deg: "°",
+  plusmn: "±",
+  micro: "µ",
+  para: "¶",
+  sect: "§",
+  euro: "€",
+  pound: "£",
+  yen: "¥",
+  cent: "¢",
+  larr: "←",
+  rarr: "→",
+  uarr: "↑",
+  darr: "↓",
+  harr: "↔",
+  le: "≤",
+  ge: "≥",
+  ne: "≠",
+  asymp: "≈",
+  infin: "∞",
+  shy: "­",
+  iexcl: "¡",
+  iquest: "¿",
+  Auml: "Ä",
+  Ouml: "Ö",
+  Uuml: "Ü",
+  auml: "ä",
+  ouml: "ö",
+  uuml: "ü",
+  szlig: "ß",
+  Aacute: "Á",
+  Eacute: "É",
+  Iacute: "Í",
+  Oacute: "Ó",
+  Uacute: "Ú",
+  aacute: "á",
+  eacute: "é",
+  iacute: "í",
+  oacute: "ó",
+  uacute: "ú",
+  agrave: "à",
+  egrave: "è",
+  igrave: "ì",
+  ograve: "ò",
+  ugrave: "ù",
+  acirc: "â",
+  ecirc: "ê",
+  icirc: "î",
+  ocirc: "ô",
+  ucirc: "û",
+  euml: "ë",
+  iuml: "ï",
+  atilde: "ã",
+  otilde: "õ",
+  ntilde: "ñ",
+  Ntilde: "Ñ",
+  ccedil: "ç",
+  Ccedil: "Ç",
+  aring: "å",
+  Aring: "Å",
+  oslash: "ø",
+  Oslash: "Ø",
+  aelig: "æ",
+  AElig: "Æ",
+  yacute: "ý",
+};
 
-/** Remove backslash escapes and decode numeric entities in a URL or title. */
+/** Remove backslash escapes and decode entities in a URL, title, or fence info. */
 export function unescapeString(text: string): string {
-  return decodeNumericEntities(text.replace(BACKSLASH_ESCAPE, "$1"));
+  // One pass, so `&#38;ouml;` decodes to `&ouml;`, not to `ö`.
+  return text
+    .replace(BACKSLASH_ESCAPE, "$1")
+    .replace(
+      ENTITY_TO_DECODE,
+      (whole, hex: string, digits: string, name: string) => {
+        if (name !== undefined) return NAMED_ENTITIES[name] ?? whole;
+        const code = Number.parseInt(digits, hex ? 16 : 10);
+        return Number.isNaN(code) || code > 0x10ffff
+          ? whole
+          : String.fromCodePoint(code || 0xfffd);
+      },
+    );
 }
 
 export function normalizeUrl(url: string): string {
