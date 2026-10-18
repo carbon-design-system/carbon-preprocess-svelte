@@ -39,8 +39,8 @@ async function emitTypeDeclarations() {
     });
     await bundleDts({
       root,
-      source: resolve(root, "src/code.ts"),
-      outFile: resolve(outDir, "code.d.ts"),
+      source: resolve(root, "src/browser.ts"),
+      outFile: resolve(outDir, "browser.d.ts"),
     });
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
@@ -66,7 +66,7 @@ async function slimPackageManifest() {
     pkg.bin[name] = path.replace(DIST_PREFIX, "");
   }
   // The root `exports` map points into `dist/` (so linked examples resolve
-  // subpaths like `carbon-preprocess-svelte/code`); here, `dist/` is the root.
+  // subpaths like `carbon-preprocess-svelte/browser`); here, `dist/` is the root.
   const ordered: Record<string, unknown> = JSON.parse(
     JSON.stringify(pkg, (_key, value) =>
       typeof value === "string" ? value.replace(DIST_PREFIX, "./") : value,
@@ -94,10 +94,10 @@ async function buildProject() {
     external: ["svelte", "svelte/*"],
   });
 
-  // `carbon-preprocess-svelte/code`: for browsers, one self-contained file,
+  // `carbon-preprocess-svelte/browser`: for browsers, one self-contained file,
   // apart from the Node chunks above.
   const code = await build({
-    entrypoints: ["./src/code.ts"],
+    entrypoints: ["./src/browser.ts"],
     outdir: outDir,
     format: "esm",
     target: "browser",

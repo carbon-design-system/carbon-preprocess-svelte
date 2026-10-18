@@ -4,7 +4,7 @@ carbon-preprocess-svelte's own docs-site testbed: a Vite app whose pages go
 through `markdown()`, whose imports go through `optimizeImports()`, whose
 Carbon components go through `optimizeComponents()`, whose CSS goes through
 `optimizeCss({ propAware: true })`, and whose code views use the browser-safe
-`carbon-preprocess-svelte/code`. CI builds it (with the examples' CSS
+`carbon-preprocess-svelte/browser`. CI builds it (with the examples' CSS
 snapshot) and runs its browser tests.
 
 ```sh
@@ -130,7 +130,7 @@ Every setting is in the URL, by its key:
 - **KitchenSink** shows every Markdown element and code-block feature. Its
   Button `tooltip` example is a deliberate type error.
 - **Try markdown()** compiles Markdown in the browser as you type, with
-  `carbon-preprocess-svelte/code`'s `markdownToHtml` (a Prose preview, with
+  `carbon-preprocess-svelte/browser`'s `markdownToHtml` (a Prose preview, with
   placeholders for components) and `compileMarkdown` (the Svelte component
   `markdown()` writes, and the headings and frontmatter it exports). Toggles
   set options; Svelte's compiler (loaded with the Svelte tab) checks the

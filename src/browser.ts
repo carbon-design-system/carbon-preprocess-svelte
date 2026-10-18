@@ -1,5 +1,5 @@
 /**
- * `carbon-preprocess-svelte/code`: what's safe to ship to the browser (no
+ * `carbon-preprocess-svelte/browser`: what's safe to ship to the browser (no
  * Node APIs). The Markdown compiler, for previews of what `markdown()`
  * builds (`markdownToHtml`, `compileMarkdown`), and the code-block helpers
  * for a client-side code view: tokens for the CSS Custom Highlight API, a

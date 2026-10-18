@@ -2,7 +2,7 @@
 // through markdown() (the kitchen sink twice: `.svx` with one Prose per
 // Markdown run, `.md`, a symlink, with one Prose for the page), imports
 // through optimizeImports(), and the build through optimizeComponents() and
-// optimizeCss(). Code views use the browser-safe `carbon-preprocess-svelte/code`.
+// optimizeCss(). Code views use `carbon-preprocess-svelte/browser`.
 //
 // carbon-components-svelte is the installed package. `CCS_DIR=<checkout>`
 // uses a local CCS checkout instead, for unreleased work such as Prose, and
@@ -39,7 +39,7 @@ import {
   parseCodeMeta,
   prepareFence,
   terminalLines,
-} from "carbon-preprocess-svelte/code";
+} from "carbon-preprocess-svelte/browser";
 import { sveld } from "sveld";
 import { createLogger, loadEnv } from "vite";
 import { GALLERY, GALLERY_BASE } from "./gallery";

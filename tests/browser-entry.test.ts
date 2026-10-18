@@ -10,12 +10,12 @@ import {
   prepareFence,
   renderCodeLines,
   tokenName,
-} from "carbon-preprocess-svelte/code";
+} from "carbon-preprocess-svelte/browser";
 
 const SRC = resolve(import.meta.dirname, "../src");
 const IMPORT = /^\s*(?:import|export)\s[^;]*?\sfrom\s+["']([^"']+)["']/gm;
 
-/** Every module `src/code.ts` reaches, and the external specifiers they import. */
+/** Every module `src/browser.ts` reaches, and the external specifiers they import. */
 function graph(entry: string) {
   const seen = new Set<string>();
   const externals = new Set<string>();
@@ -35,9 +35,9 @@ function graph(entry: string) {
   };
 }
 
-describe("carbon-preprocess-svelte/code", () => {
+describe("carbon-preprocess-svelte/browser", () => {
   test("reaches no Node built-in, so it's safe to ship to the browser", () => {
-    const { files, externals } = graph(join(SRC, "code.ts"));
+    const { files, externals } = graph(join(SRC, "browser.ts"));
     expect(externals).toEqual([]);
     expect(files.some((f) => f.includes("preprocessors"))).toBe(false);
   });

@@ -6,7 +6,7 @@
    * headings and frontmatter it exports. The draft stays in CCS's
    * `LocalStorage`.
    *
-   * Both come from `carbon-preprocess-svelte/code`: `compileMarkdown` for
+   * Both come from `carbon-preprocess-svelte/browser`: `compileMarkdown` for
    * the component, `markdownToHtml` for the preview. Options change the
    * compile; Svelte's own compiler (loaded with the Svelte tab) checks the
    * output. A draft can be shared as a link (`#draft=`, gzipped): the
@@ -37,7 +37,7 @@
   import Reset from "carbon-icons-svelte/lib/Reset.svelte";
   import TableOfContents from "carbon-icons-svelte/lib/TableOfContents.svelte";
   import View from "carbon-icons-svelte/lib/View.svelte";
-  import { carbonCodeIcon, compileMarkdown, highlight, markdownToHtml } from "carbon-preprocess-svelte/code";
+  import { carbonCodeIcon, compileMarkdown, highlight, markdownToHtml } from "carbon-preprocess-svelte/browser";
   import CodeView from "../CodeView.svelte";
   import { compressAndEncode, decodeAndDecompress } from "../intel/playground.js";
   import { sanitize } from "./sanitize.js";

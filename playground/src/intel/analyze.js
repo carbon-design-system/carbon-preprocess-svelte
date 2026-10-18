@@ -3,7 +3,7 @@
 // same tokenizer as the build-time highlighter plus Carbon's component API.
 // No TypeScript compiler: types come from sveld's COMPONENT_API.json and a
 // small initializer inference.
-import { tokenize } from "carbon-preprocess-svelte/code";
+import { tokenize } from "carbon-preprocess-svelte/browser";
 
 const IDENTIFIER_TYPES = new Set([
   null,
