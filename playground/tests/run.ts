@@ -35,6 +35,9 @@ await $`bun scripts/typecheck-examples.ts`.cwd(HERE);
 console.log("Building the playground…");
 await $`bunx vite build --logLevel error`.cwd(HERE).quiet();
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI color codes
+const ANSI_COLOR = /\x1b\[[0-9;]*m/g;
+
 // Serve the build, and read the URL Vite picked.
 const server = spawn("bunx", ["vite", "preview", "--port", "4173"], {
   cwd: HERE,
@@ -45,7 +48,9 @@ const url = await new Promise<string>((resolve, reject) => {
     30_000,
   );
   server.stdout.on("data", (chunk: Buffer) => {
-    const found = /(http:\/\/localhost:\d+)/.exec(chunk.toString());
+    // Vite colors its output when `CI` is set: the port is wrapped in codes.
+    const text = chunk.toString().replace(ANSI_COLOR, "");
+    const found = /(http:\/\/localhost:\d+)/.exec(text);
     if (found) {
       clearTimeout(timer);
       resolve(found[1]);
