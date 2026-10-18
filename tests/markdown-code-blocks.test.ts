@@ -1,17 +1,19 @@
+import { carbonCodeIcon } from "carbon-preprocess-svelte";
 import {
   ansiToHtml,
-  carbonCodeIcon,
-  carbonCodeIconName,
   parseAnsi,
-  parseCodeMeta,
-  prepareFence,
-  renderCodeLines,
   stripAnsi,
-} from "carbon-preprocess-svelte";
+} from "carbon-preprocess-svelte/markdown/ansi";
+import { carbonCodeIconName } from "carbon-preprocess-svelte/markdown/code-icons";
 import {
   compileMarkdown,
   renderMarkdown,
 } from "carbon-preprocess-svelte/markdown/compile";
+import {
+  parseCodeMeta,
+  prepareFence,
+  renderCodeLines,
+} from "carbon-preprocess-svelte/markdown/lines";
 
 const ESC = "\u001b";
 

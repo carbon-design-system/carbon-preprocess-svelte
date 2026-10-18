@@ -5,15 +5,8 @@
  * for a client-side code view: tokens for the CSS Custom Highlight API, a
  * fence's shown code and line marks, ANSI colors, and header icons.
  */
-export {
-  type AnsiRun,
-  type AnsiStyle,
-  ansiToHtml,
-  hasAnsi,
-  parseAnsi,
-  stripAnsi,
-} from "./markdown/ansi";
-export { carbonCodeIcon, carbonCodeIconName } from "./markdown/code-icons";
+export { ansiToHtml, hasAnsi, stripAnsi } from "./markdown/ansi";
+export { carbonCodeIcon } from "./markdown/code-icons";
 export {
   type CodeIcon,
   type CodeIconTarget,
@@ -36,17 +29,11 @@ export {
   tokenName,
 } from "./markdown/highlight";
 export {
-  type CodeKind,
   type CodeMeta,
-  type DiffLines,
-  diffLines,
-  type LineMark,
   type PreparedFence,
   parseCodeMeta,
   prepareFence,
   renderCodeLines,
-  splitHtmlLines,
-  stripCodeMarkers,
   type TerminalLines,
   terminalLines,
 } from "./markdown/lines";
