@@ -1,0 +1,15 @@
+node_modules
+dist
+# Written at startup: a performance fixture.
+src/pages/Stress.svx
+# Type-checked examples and their diagnostics (scripts/typecheck-examples.ts).
+.typecheck
+# Screenshot output (scripts/screenshot.ts).
+screenshots
+# Local settings, such as CCS_DIR (see README).
+.env.local
+src/gallery/
+src/pages/Options.svx
+src/pages/Readme.svx
+src/pages/Contributing.svx
+src/pages/PlaygroundReadme.svx

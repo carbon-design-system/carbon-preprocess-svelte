@@ -17,5 +17,6 @@
   ],
   "ignoreBinaries": ["check"],
   "svelte": false,
+  "ignore": ["playground/**"],
   "ignoreDependencies": ["sveast", "prettier", "prettier-plugin-svelte"]
 }

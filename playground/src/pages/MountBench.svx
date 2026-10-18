@@ -1,0 +1,10 @@
+---
+title: Mount cost
+description: "What each Carbon component costs to mount: 40 instances, flushed and laid out, median of three runs. scripts/mount-bench.ts reads these results."
+---
+
+<script>
+  import MountBench from "../MountBench.svelte";
+</script>
+
+<MountBench />
