@@ -42,7 +42,7 @@ import {
 } from "carbon-preprocess-svelte/browser";
 import { sveld } from "sveld";
 import { createLogger, loadEnv } from "vite";
-import { GALLERY, GALLERY_BASE } from "./gallery";
+import { GALLERY, GALLERY_BASE } from "./gallery.ts";
 import { analyze } from "./src/intel/analyze.js";
 import { toJSDoc, toTypeScript } from "./src/intel/typescript.js";
 
