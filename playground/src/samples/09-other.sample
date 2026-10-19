@@ -1,0 +1,16 @@
+<dl>
+  <dt>Term</dt>
+  <dd>Its definition.</dd>
+</dl>
+
+<details>
+  <summary>Details and summary</summary>
+  <p>Hidden content.</p>
+</details>
+
+---
+
+<figure>
+  <svg viewBox="0 0 320 80" width="100%" role="img" aria-label="Placeholder figure"><rect width="320" height="80" fill="var(--cds-ui-03)" /></svg>
+  <figcaption>A figure caption.</figcaption>
+</figure>
