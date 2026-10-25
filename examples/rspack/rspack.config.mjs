@@ -6,7 +6,6 @@ import {
   OptimizeCssPlugin,
   optimizeImports,
 } from "carbon-preprocess-svelte";
-import { sveltePreprocess } from "svelte-preprocess";
 
 /** @type {"development" | "production"} */
 const NODE_ENV =
@@ -41,7 +40,7 @@ export default {
           loader: "svelte-loader",
           options: {
             hotReload: !PROD,
-            preprocess: [sveltePreprocess(), optimizeImports()],
+            preprocess: [optimizeImports()],
             compilerOptions: { dev: !PROD },
           },
         },

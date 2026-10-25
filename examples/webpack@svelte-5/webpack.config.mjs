@@ -6,7 +6,6 @@ import {
   optimizeImports,
 } from "carbon-preprocess-svelte";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
-import { sveltePreprocess } from "svelte-preprocess";
 import webpack from "webpack";
 
 /** @type {"development" | "production"} */
@@ -76,7 +75,7 @@ export default {
           loader: "svelte-loader",
           options: {
             hotReload: !PROD,
-            preprocess: [sveltePreprocess(), optimizeImports()],
+            preprocess: [optimizeImports()],
             compilerOptions: { dev: !PROD },
           },
         },
