@@ -32,7 +32,7 @@
     "eval:interactions": "bun scripts/eval-interactions.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.3",
     "@types/bun": "^1.4.3",
     "@types/jest": "^30.0.0",
     "@typescript/typescript6": "^6.0.2",
