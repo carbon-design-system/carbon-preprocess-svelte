@@ -136,7 +136,7 @@ Supporting modules: [`safelist.ts`](src/plugins/safelist.ts) (string = literal c
 
 ### The analysis: `propAware` and `optimizeComponents`
 
-The analysis behind both is [severan](https://github.com/metonym/severan), bundled into `dist/` like sveast. Its [CONTRIBUTING](https://github.com/metonym/severan/blob/master/CONTRIBUTING.md) covers how it works and the rules a change to it must keep: fix the analysis there, with a render test, then bump the version here. The component plugins come from severan's public entries (`severan/vite`, `severan/webpack`), the rest from its unstable internal ones:
+The analysis behind both is [severan](https://github.com/metonym/severan), bundled into `dist/` like sveast. Its [CONTRIBUTING](https://github.com/metonym/severan/blob/master/CONTRIBUTING.md) covers how it works and the rules a change to it must keep: fix the analysis there, with a render test, then bump the version here. A bump changes what `dist/` ships, so commit it as `perf` or `fix` rather than `chore(deps-dev)`, and expect it to move the golden sizes. The component plugins come from severan's public entries (`severan/vite`, `severan/webpack`), the rest from its unstable internal ones:
 
 - `severan/internal`: library paths, barrel and package resolution, the module-graph checks, the webpack helpers and loader, and sveast's lexer and walker (import them from here, not from `sveast`, so `dist/` holds one copy). It never loads the parser. Its declarations re-export sveast's types, which is why `sveast` stays a devDependency that nothing imports (`ignoreDependencies` in `knip.json`).
 - `severan/internal/analysis`: the analysis and its types. Import it lazily (`await import("severan/internal/analysis")`), so builds without `propAware` or `optimizeComponents` never evaluate it and `svelte.config.js` never loads the parser; `bun run build` fails if `dist/index.js` reaches it statically. Type-only imports are free, and its types must come from it rather than `severan/internal`: each entry's declarations are rolled up on their own.
@@ -147,7 +147,7 @@ Carbon comes in through a `LibrarySpec`, [`CARBON`](src/carbon-library.ts): its 
 
 ## Conventions
 
-Biome enforces most of this in CI (`bun run lint`). Config: [`biome.json`](biome.json), space indent, multiline attributes, imports auto-organized. The recommended preset is on by default. Extra rules in `biome.json` are errors. Warnings also fail CI.
+Biome enforces most of this in CI (`bun run lint`). Config: [`biome.json`](biome.json), space indent, multiline attributes, imports auto-organized. The recommended preset is on by default. Extra rules in `biome.json` are errors. Warnings also fail CI. Markdown isn't formatted: Biome 2.6's formatter re-indents tables inside blockquotes on every pass, so it's off. Try it again on the next Biome bump.
 
 - **Hoist regexes to module scope.** `useTopLevelRegex` is an error. A regex literal inside a function fails lint. Declare it as a named top-level `const` (see the `*_REGEX` / `CARBON_*` constants at the top of nearly every module).
 - **No `await` in loops, no `forEach`.** `noAwaitInLoops` and `noForEach` are errors. Build the work and `await Promise.all(...)`, or use `for...of` with hoisted awaits. The two intentional sequential-await loops in [`tests/test-e2e.ts`](tests/test-e2e.ts) carry `// biome-ignore` comments explaining why. Match that pattern if you genuinely need ordering.
@@ -214,7 +214,7 @@ Other Svelte frameworks (Routify, …) run Vite under the hood, so the Vite exam
 bun run test:e2e:update
 ```
 
-`bun run upgrade-examples` bumps each example's dependencies.
+`bun run upgrade-examples` takes the in-range updates in each example. Some pins are deliberate, so don't chase `bun outdated` past them: Svelte 4, Vite 5 and Carbon 0.85 are the test matrix. TypeScript 7 has no JS compiler API, and two things still call it: `svelte-preprocess`, which the `webpack` example needs for Svelte 4's `lang="ts"`, and SvelteKit 3. So those two stay on TypeScript 6 and 5.9.
 
 ## Build
 
