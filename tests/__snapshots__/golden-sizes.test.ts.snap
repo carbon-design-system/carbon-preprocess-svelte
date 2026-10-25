@@ -4,19 +4,19 @@ exports[`golden app sizes admin-dashboard 1`] = `
 {
   "baseline": {
     "css_kb": 544.33,
-    "js_kb": 248.63,
+    "js_kb": 248.59,
   },
   "css": {
     "css_kb": 198.53,
-    "js_kb": 248.63,
+    "js_kb": 248.59,
   },
   "full": {
     "css_kb": 95.57,
-    "js_kb": 181.45,
+    "js_kb": 181.42,
   },
   "prop-aware": {
     "css_kb": 95.57,
-    "js_kb": 248.63,
+    "js_kb": 248.59,
   },
 }
 `;
@@ -25,19 +25,19 @@ exports[`golden app sizes signup-wizard 1`] = `
 {
   "baseline": {
     "css_kb": 544.33,
-    "js_kb": 200.17,
+    "js_kb": 200.13,
   },
   "css": {
     "css_kb": 152.33,
-    "js_kb": 200.17,
+    "js_kb": 200.13,
   },
   "full": {
     "css_kb": 61.15,
-    "js_kb": 150.1,
+    "js_kb": 150.08,
   },
   "prop-aware": {
     "css_kb": 61.15,
-    "js_kb": 200.17,
+    "js_kb": 200.13,
   },
 }
 `;
@@ -46,19 +46,19 @@ exports[`golden app sizes docs-site 1`] = `
 {
   "baseline": {
     "css_kb": 544.33,
-    "js_kb": 162.09,
+    "js_kb": 162.05,
   },
   "css": {
     "css_kb": 134.83,
-    "js_kb": 162.09,
+    "js_kb": 162.05,
   },
   "full": {
     "css_kb": 57.81,
-    "js_kb": 132.55,
+    "js_kb": 132.52,
   },
   "prop-aware": {
     "css_kb": 57.81,
-    "js_kb": 162.09,
+    "js_kb": 162.05,
   },
 }
 `;
@@ -67,19 +67,19 @@ exports[`golden app sizes product-catalog 1`] = `
 {
   "baseline": {
     "css_kb": 544.33,
-    "js_kb": 251.07,
+    "js_kb": 251.03,
   },
   "css": {
     "css_kb": 188.32,
-    "js_kb": 251.07,
+    "js_kb": 251.03,
   },
   "full": {
     "css_kb": 83.19,
-    "js_kb": 197.3,
+    "js_kb": 197.27,
   },
   "prop-aware": {
     "css_kb": 83.19,
-    "js_kb": 251.07,
+    "js_kb": 251.03,
   },
 }
 `;
