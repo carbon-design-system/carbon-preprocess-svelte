@@ -21,12 +21,14 @@ await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
 await page.waitForTimeout(12_000);
 const files = await page.evaluate(() => [
   ...new Set(
+    // biome-ignore lint/performance/useDomNodeTextContent: the file names a reader sees, not hidden panels'
     document.body.innerText.match(/App\.svelte|Example\.svelte/g) ?? [],
   ),
 ]);
 const frame = page.frames().find((f) => f !== page.mainFrame());
 const preview = frame
-  ? await frame.evaluate(() => document.body.innerText)
+  ? // biome-ignore lint/performance/useDomNodeTextContent: the preview as rendered
+    await frame.evaluate(() => document.body.innerText)
   : "";
 await browser.close();
 console.log(`files: ${files.join(", ")}\npreview: ${preview.slice(0, 80)}`);
