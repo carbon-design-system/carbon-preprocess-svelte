@@ -11,7 +11,6 @@
     ToastNotification,
   } from "carbon-components-svelte";
   import { NAV, type PageId } from "./lib/constants";
-  // biome-ignore lint/correctness/noUnusedImports: read as `$toasts`
   import { toasts } from "./lib/stores";
   import Overview from "./Overview.svelte";
   import Settings from "./Settings.svelte";

@@ -10,7 +10,6 @@
     Toggle,
   } from "carbon-components-svelte";
   import { t } from "./lib/i18n";
-  // biome-ignore lint/correctness/noUnusedImports: `theme` is bound as `$theme`
   import { notify, theme } from "./lib/stores";
 
   let workspace = $state("Acme");
