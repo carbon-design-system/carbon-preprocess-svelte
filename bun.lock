@@ -15,7 +15,7 @@
         "knip": "^6.43.0",
         "ostia": "^0.2.12",
         "playwright": "1.64.1",
-        "severan": "^0.2.0",
+        "severan": "^0.4.0",
         "sveast": "^0.9.6",
         "svelte": "^5.57.2",
         "vite": "^8.3.5",
@@ -448,7 +448,7 @@
 
     "schema-utils": ["schema-utils@4.8.1", "", { "dependencies": { "@types/json-schema": "^7.0.15", "ajv": "^8.20.0", "ajv-formats": "^3.0.1", "ajv-keywords": "^5.1.0" }, "peerDependencies": { "webpack": "^5.112.0" }, "optionalPeers": ["webpack"], "bin": { "schema-utils": "bin/schema-utils.js" } }, "sha512-x39pYlJPyH7Uge5QO64B9XGP9zLDc9WNmiQZc+CE3IzZPvMu3lHOuAMGpYNoPixEL7MSWlGhYTg5UlLSL8G6iw=="],
 
-    "severan": ["severan@0.2.0", "", {}, "sha512-S+h8dtFRjlbUgzwu3zYpSdVd6IWzm9kd9v0pLHwVBTUr7rG17z3/ajD0BgzKnBQbJdAGbm8kadokTG4h/gZZ4w=="],
+    "severan": ["severan@0.4.0", "", {}, "sha512-ueb8xk7TAynjFVws/IcFqTDL8fOEi/l6mEBQ72lAC/YpqPULvTfaUt3DchnMx1ifMG7Mc4vGYHMdyqRQSiP+eA=="],
 
     "slash": ["slash@3.0.0", "", {}, "sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q=="],
 
