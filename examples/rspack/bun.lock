@@ -70,7 +70,7 @@
 
     "@rspack/core": ["@rspack/core@2.2.9", "", { "dependencies": { "@rspack/binding": "2.2.9" }, "peerDependencies": { "@module-federation/runtime-tools": "^0.24.1 || ^2.0.0", "@swc/helpers": "^0.5.23" }, "optionalPeers": ["@module-federation/runtime-tools", "@swc/helpers"] }, "sha512-Tp6/ZdM5UrGB3BeLfvh69l1iX03PZ46IgXjKqubVEuJVAhnOjpshooH/YAxcxR0AymcBLKA997Z4v+LV2aXzCw=="],
 
-    "@rspack/dev-middleware": ["@rspack/dev-middleware@2.0.5", "", { "peerDependencies": { "@rspack/core": "^2.0.0" }, "optionalPeers": ["@rspack/core"] }, "sha512-e8296ZqjWTn4f8MnJmnq5Al94hxMgPEiMmwyMvbCNM6kMvFbfnG5UMOTwUljTBxiwBd6yLysGma1VDnYQaB8zg=="],
+    "@rspack/dev-middleware": ["@rspack/dev-middleware@2.0.6", "", { "peerDependencies": { "@rspack/core": "^2.0.0" }, "optionalPeers": ["@rspack/core"] }, "sha512-Rcx7dlDZQ9ddUJGuutFvnSeAKl+ZOc1fnC3htibs8yew3zMD9VgvSUe4MAwEn94Gb390l5heA+s/j5KhoSG5MQ=="],
 
     "@rspack/dev-server": ["@rspack/dev-server@2.2.1", "", { "dependencies": { "@rspack/dev-middleware": "^2.0.3" }, "peerDependencies": { "@rspack/core": "^2.0.0", "selfsigned": "^5.0.0" }, "optionalPeers": ["selfsigned"] }, "sha512-Il8HbYGK3rH5rM0XmUOsOGZVw69BKRpBZ61P28Fy8ry35CtfniDBWtbo/rvJtIT/sK0qwijmNrhF498ltsV+uA=="],
 
