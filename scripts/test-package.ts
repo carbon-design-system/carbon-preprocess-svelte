@@ -1,3 +1,4 @@
+// @depends-on scripts/build.ts
 // Packs dist/, installs the tarball into a scratch project next to Vite and
 // Svelte, and checks it the way a consumer would: every export loading in
 // Node, the CLI running, and the types resolving through `exports` with

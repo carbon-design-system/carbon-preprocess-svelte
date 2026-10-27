@@ -8,10 +8,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The test plan diffs a PR against its merge base with the base branch.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Install dependencies
         run: bun ci
+
+      - name: Plan tests
+        # A PR runs the tests its changes can reach (bivium.config.ts); a push
+        # to main skips this step, so every suite below runs in full.
+        id: plan
+        if: github.event_name == 'pull_request'
+        run: bunx bivium plan origin/${{ github.base_ref }} --github
+
+      - name: Check the test plan can read every test's inputs
+        run: bunx bivium check --max-unknown 0
 
       - name: Lint and format
         run: bun run lint
@@ -23,12 +36,17 @@ jobs:
         run: bun run knip
 
       - name: Run unit tests
-        run: bun run test
+        if: steps.plan.outputs.unit-tests != 'none'
+        run: |
+          rm -rf node_modules/.cache/carbon-preprocess-svelte
+          bun test --parallel ${{ steps.plan.outputs.unit-tests != 'all' && steps.plan.outputs.unit-tests || '' }}
 
       - name: Use the package as a consumer would
+        if: steps.plan.outputs.package-tests != 'none'
         run: bun run test:package
 
       - name: Run e2e tests
+        if: steps.plan.outputs.e2e-tests != 'none'
         run: bun run test:e2e
         env:
           E2E_OBSERVED: e2e-observed.json
