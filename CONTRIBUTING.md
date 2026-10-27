@@ -44,6 +44,7 @@ bun install
 | Script | What it does |
 | --- | --- |
 | `bun run test` | Unit + fixture snapshot tests (`bun test --parallel`), after clearing the component index cache in `node_modules/.cache` (it's keyed by package versions, so it would otherwise hide local indexer changes; `test:e2e` clears each example's too). |
+| `bun run test:changed` | The unit tests the working tree's changes since `main` can reach, picked by [bivium](https://github.com/metonym/bivium) from [`bivium.config.ts`](bivium.config.ts), after clearing the same cache. |
 | `bun run build` | Bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
 | `bun run typecheck` | `bun check` (Bun's built-in type checker) over `bench/`, `scripts/`, `src/`, `tests/`. |
 | `bun run test:package` | Build and pack `dist/`, install it next to Svelte and Vite in a scratch project, load every export and the CLI in Node, and type-check a consumer of every public export with `skipLibCheck: false`, on Svelte 4 and 5. The published types import nothing: a webpack project has no Vite, and no project has the bundled packages (`sveast`, `severan`), so the plugins' return type is declared here ([`bundler-plugin.ts`](src/plugins/bundler-plugin.ts)) and so is `optimizeImports`'s. The webpack consumer is checked before Vite is installed. |
@@ -168,6 +169,7 @@ Tests use the Bun test runner and live in [`tests/`](tests), mostly one `*.test.
 
 ```sh
 bun run test                       # everything, in parallel
+bun run test:changed               # only what your changes can reach
 bun test optimize-imports          # filter by file-path substring
 bun test tests/utils.test.ts       # a single file
 bun test --watch                   # watch mode
@@ -231,9 +233,12 @@ To try unreleased `carbon-components-svelte` work, link the checkout into the pr
 1. `bun ci`
 2. `bun run lint`
 3. `bun run typecheck`
-4. `bun run test`
-5. `bun run test:package`
-6. `bun run test:e2e`
+4. `bunx bivium check --max-unknown 0`
+5. `bun run test`
+6. `bun run test:package`
+7. `bun run test:e2e`
+
+On a PR, `bivium plan` decides which of steps 5 to 7 run: the unit tests a change can reach, and `test:package` and `test:e2e` only when a change can reach them. Pushes to `main` run everything. bivium follows imports; a file that reads one of this repository's files from disk (a fixture, a golden app, an example) names it with `// @reads <glob>`, or the plan misses it. `src/`, `tests/*.test.ts` and `tests/helpers/` are `hermetic` in `bivium.config.ts`: their other disk reads are the user's project, the installed Carbon packages, or temp directories. `bunx bivium why <test>` shows why a test was picked, and `bunx bivium check` lists anything the plan can't read.
 
 Run those locally before pushing. The e2e suite runs in CI, so a snapshot you forgot to update will fail the build; the failed run uploads what it observed, and `bun run snapshots:from-ci` writes it to `e2e.json` when the change is intended.
 

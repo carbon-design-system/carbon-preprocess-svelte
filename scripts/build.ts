@@ -1,3 +1,4 @@
+// @depends-on src/** package.json tsconfig.json
 import { existsSync, watch } from "node:fs";
 import { chmod, cp, readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";

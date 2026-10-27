@@ -1,3 +1,4 @@
+// @reads golden/**
 import { readdirSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import { buildGolden, GOLDEN_VARIANTS } from "../scripts/golden-build";

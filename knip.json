@@ -6,7 +6,8 @@
     "src/optimize-components-loader.ts",
     "scripts/*.ts",
     "bench/*.ts",
-    "tests/helpers/*.cjs"
+    "tests/helpers/*.cjs",
+    "bivium.config.ts"
   ],
   "project": [
     "src/**/*.ts",

@@ -1,3 +1,6 @@
+// Builds every example against the build in `dist/`.
+// @depends-on scripts/build.ts
+// @reads examples/** tests/__snapshots__/e2e.json
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { $ } from "bun";
