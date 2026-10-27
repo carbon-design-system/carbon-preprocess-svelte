@@ -21,10 +21,10 @@ jobs:
         # to main skips this step, so every suite below runs in full.
         id: plan
         if: github.event_name == 'pull_request'
-        run: bunx bivium plan origin/${{ github.base_ref }} --github
+        run: bunx --bun bivium plan origin/${{ github.base_ref }} --github
 
       - name: Check the test plan can read every test's inputs
-        run: bunx bivium check --max-unknown 0
+        run: bunx --bun bivium check --max-unknown 0
 
       - name: Lint and format
         run: bun run lint
