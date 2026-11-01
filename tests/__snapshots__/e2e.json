@@ -87,6 +87,12 @@
     "after_kb": 40.35,
     "reduction_percent": 92.82
   },
+  "vite-markdown@svelte-5": {
+    "file": "assets/index-*.css",
+    "before_kb": 649.54,
+    "after_kb": 128.47,
+    "reduction_percent": 80.22
+  },
   "vite-matrix@svelte-4": {
     "css": {
       "file": "assets/index-*.css",
