@@ -38,6 +38,10 @@ export default defineConfig({
     ".github/FUNDING.yml",
     ".github/workflows/{bench,eval,release}.yml",
   ],
+  // Each test's snapshot, which `bun test` reads beside it.
+  reads: { "tests/*.test.ts": "tests/__snapshots__/$1.test.ts.snap" },
+  // Tools CI runs on its own: a bump that only reaches them selects nothing.
+  inert: ["@biomejs/biome", "knip", "ostia", "@types/*"],
   // tsconfig `paths`: tests and examples import the package by name.
   alias: { "carbon-preprocess-svelte": "src" },
   // The preprocessors and plugins read their user's project and the
