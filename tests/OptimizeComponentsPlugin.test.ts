@@ -1,3 +1,4 @@
+// @depends-on tests/helpers/svelte-source-loader.cjs
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { optimizerRegistry } from "severan/internal";
