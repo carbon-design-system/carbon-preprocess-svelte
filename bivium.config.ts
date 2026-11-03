@@ -8,6 +8,9 @@ export default defineConfig({
       root: "tests",
       // Read by the e2e suite, never by `bun test`.
       nonInputs: ["tests/test-e2e.ts", "tests/__snapshots__/e2e.json"],
+      // `bun test` runs the code: an `import type` or a declaration file
+      // can't change what a test does.
+      types: false,
     },
     package: {
       tests: "scripts/test-package.ts",
