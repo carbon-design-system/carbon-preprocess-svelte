@@ -43,6 +43,8 @@ export default defineConfig({
   ],
   // Each test's snapshot, which `bun test` reads beside it.
   reads: { "tests/*.test.ts": "tests/__snapshots__/$1.test.ts.snap" },
+  // The CLI the test spawns, which it doesn't import.
+  edges: { "tests/cli.test.ts": "src/cli.ts" },
   // Tools CI runs on its own: a bump that only reaches them selects nothing.
   inert: ["@biomejs/biome", "knip", "ostia", "@types/*"],
   // tsconfig `paths`: tests and examples import the package by name.
