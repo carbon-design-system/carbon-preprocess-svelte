@@ -30,6 +30,7 @@ Pick the tool for your bundler or pipeline; each works on its own.
 | Tool | Type | Works with | What it does |
 | :--- | :--- | :--- | :--- |
 | [`optimizeImports`](#optimizeimports) | Svelte preprocessor | Any bundler | Rewrites Carbon imports to source paths, for faster dev and build times |
+| [`markdown`](#markdown-experimental) (experimental) | Svelte preprocessor | Any bundler | Compiles Markdown pages to Svelte components, styled with Carbon's `Prose` |
 | [`optimizeCss`](#optimizecss) | Build plugin | Vite, SvelteKit, Astro, Rollup, Rolldown | Prunes unused Carbon styles, shrinking CSS bundles up to 90% |
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss` for Webpack and Rspack |
 | [`optimizeComponents`](#optimizecomponents) | Build plugin | Vite, SvelteKit, Astro, Rollup, Rolldown | Rewrites Carbon components for the props your app passes, removing code it never runs |
@@ -141,6 +142,110 @@ export default {
 #### Rspack
 
 [Rspack](https://rspack.rs) implements webpack's loader API, so the [Webpack](#webpack) set-up works unchanged in `rspack.config.mjs`. Full set-up: [examples/rspack](examples/rspack).
+
+### `markdown` (experimental)
+
+Compiles Markdown files to Svelte components at build time, with no dependencies. A page can hold Svelte too: a `<script>`, components, and `{#if}` blocks, with blank lines inside them. The rendered HTML is wrapped in Carbon's `Prose`, which styles it.
+
+> [!WARNING]
+> Experimental: the API may change. `Prose` isn't in a carbon-components-svelte release yet. Until it is, pages render as plain HTML (with `prose: true`, the build also warns).
+
+```js
+// vite.config.js (SvelteKit: the same options in svelte.config.js)
+import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import { markdown, optimizeImports } from "carbon-preprocess-svelte";
+
+export default {
+  plugins: [
+    svelte({
+      extensions: [".svelte", ".md"],
+      // markdown() first, so optimizeImports() rewrites the imports it adds.
+      preprocess: [markdown(), vitePreprocess(), optimizeImports()],
+    }),
+  ],
+};
+```
+
+A page exports its frontmatter as `metadata` and its headings as `headings` (`{ id, text, depth }[]`, for a table of contents that renders on the server). Its parent can set `Prose` props at runtime: `<Guide proseProps={{ variant: "compact" }} />`. For TypeScript, declare `.md` modules once:
+
+```ts
+// src/md.d.ts
+declare module "*.md" {
+  import type { MarkdownHeading } from "carbon-preprocess-svelte";
+  import type { Component } from "svelte";
+  export const headings: MarkdownHeading[];
+  export const metadata: Record<string, unknown>;
+  const component: Component;
+  export default component;
+}
+```
+
+**Markdown.** CommonMark plus GitHub's tables, task lists, strikethrough, URL autolinks, footnotes, and alerts (`> [!NOTE]`). It passes 95.8% of the CommonMark spec's examples that don't conflict with Svelte. Where Svelte and CommonMark disagree, Svelte wins:
+
+- Indentation doesn't make a code block (it's layout in Svelte markup); use a fence.
+- An element runs to its closing tag, blank lines included. A block element (`<details>`, `<div>`) with a blank line inside holds Markdown, as on GitHub.
+- Braces in text are literal (`returns { key, value }`), unless `expressions` is on.
+- Raw HTML passes through as written, so it must be valid in a Svelte component: an event handler is `onclick={…}`, not a string (the build warns with the line).
+
+**Code blocks.** Options go after the fence's language, as in VitePress and Expressive Code:
+
+| Fence | Renders |
+| :--- | :--- |
+| `` ```js title="app.js" `` or `` ```js [app.js] `` | A header with the file's name and icon |
+| `` ```js {2,5-7} ``, `ins={3}`, `del={4}`, `focus={2}` | Highlighted, added, removed, or focused lines; `// [!code ++]` at a line's end works too |
+| `showLineNumbers`, `showLineNumbers=10`, `wrap` | Line numbers (from 10); soft-wrapped lines |
+| `collapse={3-9}` | Lines folded behind a "7 lines" row that opens without JavaScript |
+| `kind="error"`, `do`, `dont`, `label="Deprecated"` | A status in the header |
+| `` ```diff-svelte `` | A diff, highlighted as Svelte |
+| `` ```sh `` with `$ ` prompts | A terminal session: prompts kept out of the copied text, output lines marked |
+| `theme="g100"`, `iconOnly` | A Carbon theme for the block; an icon with no visible name |
+| `::: code-group` … `:::` | Several blocks as file tabs; `::: compare` lays out do and don't side by side |
+
+`highlight` colors code with any highlighter (Shiki, Prism, or the built-in `highlight` with Carbon's syntax tokens).
+
+| Option | Default | What it does |
+| :--- | :--- | :--- |
+| `extensions` | `[".md"]` | Files to compile |
+| `layout` | none | A component (import path) that wraps each page and receives its frontmatter and `headings` |
+| `prose` | `true` when the installed Carbon has `Prose` | Wrap pages in `Prose`, or an object of `Prose` props |
+| `proseScope` | `"page"` | `"markdown"`: one `Prose` per run of Markdown, with components between them outside it |
+| `carbonDir` | the installed package | Where `carbon-components-svelte` is, when aliased to a checkout |
+| `anchors` | `false` | A `#` link on each heading; `{ depths: [2, 3] }` limits them |
+| `alerts` | `"blockquote"` | `"InlineNotification"` renders alerts as the component |
+| `codeSnippet` | `false` | Render fences as `CodeSnippet` |
+| `codeIcons` | Carbon's icons, when `carbon-icons-svelte` is installed | Icons in code block headers, or `false` |
+| `highlight` | none | `(code, lang, meta) => html`, sync or async |
+| `images` | lazy loading, and `width` and `height` from local files | `{ root }`: where `/logo.png` resolves; `{ size }`: your own sizes; `false` leaves images as written |
+| `expressions` | `false` | Treat `{…}` in text as Svelte expressions |
+| `autolinks` | `true` | Link bare `https://…` and `www.…` URLs |
+| `autoImport` | none | Components to import when a page uses them: `{ Kbd: "$lib/Kbd.svelte" }` |
+| `transform`, `renderers` | none | Change the parsed tree, or how a block type renders |
+| `slug`, `frontmatter` | GitHub's slugger; a YAML subset | Heading ids, and the frontmatter parser (`false` reads `---` as Markdown) |
+| `footnoteLabels`, `alertTitles` | English | Labels, for translation |
+
+#### In the browser: `carbon-preprocess-svelte/browser`
+
+The compiler has no Node dependencies, so it also runs in the browser, for an editor or CMS preview:
+
+```js
+import { compileMarkdown, markdownToHtml } from "carbon-preprocess-svelte/browser";
+
+// The Svelte component markdown() would write, with its headings and frontmatter.
+const { code, headings, metadata } = await compileMarkdown(source);
+
+// Plain HTML for a preview: no Svelte. Wrap it in Prose to style it.
+const { html } = await markdownToHtml(source, {
+  // Components and {#if} blocks are dropped unless you render them.
+  svelteBlock: (markup) => `<p class="placeholder">A component renders here</p>`,
+});
+```
+
+> [!CAUTION]
+> `markdownToHtml` passes the Markdown's raw HTML through, `<script>` and `onerror` included. Sanitize its output before rendering content you don't control.
+
+The entry also exports the code-block helpers behind the rendering above (`highlight`, `encodeTokens`, `prepareFence`, `ansiToHtml`, `carbonCodeIcon`), for a client-side code view. A bundle that imports only those leaves the compiler out.
+
+**Example:** [vite-markdown@svelte-5](examples/vite-markdown@svelte-5)
 
 ### `optimizeCss`
 
@@ -769,6 +874,7 @@ Runnable set-ups for every supported bundler, under [examples](examples):
 | [vite](examples/vite) | Vite | 4 | |
 | [vite@svelte-5](examples/vite@svelte-5) | Vite | 5 | |
 | [vite@carbon-0.85](examples/vite@carbon-0.85) | Vite | 4 | Pinned to Carbon 0.85.0 |
+| [vite-markdown@svelte-5](examples/vite-markdown@svelte-5) | Vite | 5 | `markdown()`: a Markdown page with a layout, a table of contents, and live components |
 | [vite-matrix@svelte-4](examples/vite-matrix@svelte-4), [@svelte-5](examples/vite-matrix@svelte-5) | Vite | 4, 5 | One app built four ways, from no optimization to `optimizeComponents`, with a size table |
 | [sveltekit-matrix@svelte-5](examples/sveltekit-matrix@svelte-5) | SvelteKit | 5 | The same app and comparison, prerendered and hydrated |
 | [astro](examples/astro) | Astro | 5 | `build:optimized` script |
