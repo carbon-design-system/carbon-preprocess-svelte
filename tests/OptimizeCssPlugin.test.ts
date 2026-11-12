@@ -13,8 +13,7 @@ import { createFakeProject } from "./helpers/fake-project";
 const KIND_TERTIARY = /kind\s+"tertiary"/;
 
 type ModuleResource =
-  | string
-  | { resource: string; source?: string; throwOnSource?: boolean };
+  string | { resource: string; source?: string; throwOnSource?: boolean };
 
 // Mock webpack compiler and related types
 const createMockCompiler = (

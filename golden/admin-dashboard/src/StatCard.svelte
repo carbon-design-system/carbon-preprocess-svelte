@@ -27,11 +27,7 @@
   {:else}
     <p class="value">{value}</p>
   {/if}
-  <Tag
-    type={tagType}
-    size="sm"
-    >{trend}</Tag
-  >
+  <Tag type={tagType} size="sm">{trend}</Tag>
 </Tile>
 
 <style>

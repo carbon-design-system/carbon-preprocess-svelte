@@ -298,7 +298,7 @@ describe("optimizeComponents", () => {
         getModuleIds: () =>
           Object.keys(edges)
             .map((key) => path.join(carbon, "src", key))
-            [Symbol.iterator](),
+            .values(),
         getModuleInfo: (id: string) => ({
           importers: edges[path.relative(path.join(carbon, "src"), id)] ?? [],
           dynamicImporters: [],

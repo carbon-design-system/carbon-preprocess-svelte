@@ -21,17 +21,11 @@
   ] as const;
 </script>
 
-<TableContainer
-  title="Users"
-  description="Manage team members"
->
+<TableContainer title="Users" description="Manage team members">
   <Toolbar>
     <ToolbarContent>
       <ToolbarSearch />
     </ToolbarContent>
   </Toolbar>
-  <DataTable
-    {headers}
-    {rows}
-  />
+  <DataTable {headers} {rows} />
 </TableContainer>

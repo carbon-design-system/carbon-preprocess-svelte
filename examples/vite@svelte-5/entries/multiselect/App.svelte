@@ -11,8 +11,4 @@
   let selectedIds: (typeof items)[number]["id"][] = ["option-1"];
 </script>
 
-<MultiSelect
-  labelText="Regions"
-  {items}
-  bind:selectedIds
-/>
+<MultiSelect labelText="Regions" {items} bind:selectedIds />

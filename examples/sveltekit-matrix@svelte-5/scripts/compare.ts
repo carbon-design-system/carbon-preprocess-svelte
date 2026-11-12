@@ -40,7 +40,6 @@ function measure(variant: string): Sizes {
 const results = new Map<string, Sizes>();
 for (const variant of VARIANTS) {
   console.log(`\nBuilding ${variant}\n`);
-  // biome-ignore lint/performance/noAwaitInLoops: sequential builds keep logs readable
   await $`cd ${dir} && VARIANT=${variant} vite build`;
   results.set(variant, measure(variant));
 }

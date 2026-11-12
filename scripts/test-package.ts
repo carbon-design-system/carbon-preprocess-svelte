@@ -110,7 +110,6 @@ void report;
   // The types name no Svelte's, so each major's own must accept them.
   // Svelte 3's own types don't check with `skipLibCheck: false`.
   for (const svelte of ["5", "4"]) {
-    // biome-ignore lint/performance/noAwaitInLoops: one install at a time
     await $`npm install svelte@${svelte} --no-audit --no-fund --silent`.cwd(
       dir,
     );

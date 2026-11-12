@@ -19,23 +19,14 @@
   ] as const;
 </script>
 
-<DataTable
-  {headers}
-  {rows}
->
-  <svelte:fragment
-    slot="cell"
-    let:cell
-  >
+<DataTable {headers} {rows}>
+  <svelte:fragment slot="cell" let:cell>
     {#if cell.key === "link"}
       <Link href="#">{cell.value}</Link>
     {:else if cell.key === "action"}
       <OverflowMenu flipped>
         <OverflowMenuItem text="Edit" />
-        <OverflowMenuItem
-          text="Delete"
-          danger
-        />
+        <OverflowMenuItem text="Delete" danger />
       </OverflowMenu>
     {:else}
       {cell.value}

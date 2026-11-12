@@ -11,10 +11,7 @@
   export let values;
 </script>
 
-<FormField
-  label="Full name"
-  bind:value={values.name}
-/>
+<FormField label="Full name" bind:value={values.name} />
 <FormField
   label="Company"
   helper="Leave blank if you're signing up for yourself"
@@ -26,18 +23,9 @@
   items={COUNTRIES}
   bind:selectedId={values.country}
 />
-<RadioButtonGroup
-  legendText="Plan"
-  bind:selected={values.plan}
->
+<RadioButtonGroup legendText="Plan" bind:selected={values.plan}>
   {#each PLANS as plan}
-    <RadioButton
-      labelText={plan}
-      value={plan}
-    />
+    <RadioButton labelText={plan} value={plan} />
   {/each}
 </RadioButtonGroup>
-<Checkbox
-  labelText="Send me product updates"
-  bind:checked={values.updates}
-/>
+<Checkbox labelText="Send me product updates" bind:checked={values.updates} />

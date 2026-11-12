@@ -4,8 +4,5 @@
 </script>
 
 <DatePicker datePickerType="single">
-  <DatePickerInput
-    labelText="Start date"
-    placeholder="mm/dd/yyyy"
-  />
+  <DatePickerInput labelText="Start date" placeholder="mm/dd/yyyy" />
 </DatePicker>

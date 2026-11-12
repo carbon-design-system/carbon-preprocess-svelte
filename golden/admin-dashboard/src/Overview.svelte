@@ -7,37 +7,14 @@
 <h1>{t("overview.title")}</h1>
 <Grid>
   <Row>
-    <Column
-      sm={4}
-      md={4}
-      lg={4}
-    >
-      <StatCard
-        label="Active users"
-        value="1,204"
-        trend="up"
-      />
+    <Column sm={4} md={4} lg={4}>
+      <StatCard label="Active users" value="1,204" trend="up" />
     </Column>
-    <Column
-      sm={4}
-      md={4}
-      lg={4}
-    >
-      <StatCard
-        label="Pending invites"
-        value="38"
-      />
+    <Column sm={4} md={4} lg={4}>
+      <StatCard label="Pending invites" value="38" />
     </Column>
-    <Column
-      sm={4}
-      md={4}
-      lg={4}
-    >
-      <StatCard
-        label="Suspended"
-        value="5"
-        trend="down"
-      />
+    <Column sm={4} md={4} lg={4}>
+      <StatCard label="Suspended" value="5" trend="down" />
     </Column>
   </Row>
 </Grid>

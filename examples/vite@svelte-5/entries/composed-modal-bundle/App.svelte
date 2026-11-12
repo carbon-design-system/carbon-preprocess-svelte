@@ -14,10 +14,7 @@
 <Button on:click={() => (modalOpen = true)}>Open composed modal</Button>
 
 <ComposedModal bind:open={modalOpen}>
-  <ModalHeader
-    label="Production"
-    title="Confirm deployment"
-  />
+  <ModalHeader label="Production" title="Confirm deployment" />
   <ModalBody>
     <p>Deploy the current build to production?</p>
   </ModalBody>

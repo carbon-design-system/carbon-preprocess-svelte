@@ -180,7 +180,7 @@ export async function buildRuntimeClassMap(
       if (!current || visited.has(current)) continue;
 
       visited.add(current);
-      // biome-ignore lint/performance/noAwaitInLoops: graph walk is intentionally sequential
+      // eslint-disable-next-line no-await-in-loop -- the graph walk is sequential on purpose
       await ensureModuleLoaded(current);
 
       for (const cls of runtimeByModule.get(current) ?? []) collected.add(cls);

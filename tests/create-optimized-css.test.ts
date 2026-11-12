@@ -345,9 +345,8 @@ button.bx--btn.bx--btn--primary { color: white }`);
 .bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button):hover { background-color: #e5e5e5 }`,
       ids: ["HeaderGlobalAction"],
     });
-    expect(
-      result,
-    ).toEqual(`.bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button) { color: inherit }
+    expect(result)
+      .toEqual(`.bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button) { color: inherit }
 .bx--header__global button.bx--header__action.bx--header__action:not(.bx--header-search-button):hover { background-color: #e5e5e5 }`);
   });
 
@@ -407,9 +406,8 @@ button, .flatpickr-day.selected { color: red }`,
 .flatpickr-current-month .cur-month { margin: 0 .25rem }`,
       ids: ["DatePicker"],
     });
-    expect(
-      result,
-    ).toEqual(`@keyframes fpFadeInDown { from { opacity: 0 } to { opacity: 1 } }
+    expect(result)
+      .toEqual(`@keyframes fpFadeInDown { from { opacity: 0 } to { opacity: 1 } }
 .flatpickr-calendar { visibility: hidden }
 .numInputWrapper:hover { background-color: #353535 }
 .flatpickr-current-month .cur-month { margin: 0 .25rem }`);

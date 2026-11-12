@@ -33,40 +33,19 @@
       invalid={nameError !== ""}
       invalidText={nameError}
     />
-    <Select
-      labelText="Theme"
-      bind:selected={$theme}
-    >
-      <SelectItem
-        value="white"
-        text="White"
-      />
-      <SelectItem
-        value="g10"
-        text="Gray 10"
-      />
-      <SelectItem
-        value="g90"
-        text="Gray 90"
-      />
-      <SelectItem
-        value="g100"
-        text="Gray 100"
-      />
+    <Select labelText="Theme" bind:selected={$theme}>
+      <SelectItem value="white" text="White" />
+      <SelectItem value="g10" text="Gray 10" />
+      <SelectItem value="g90" text="Gray 90" />
+      <SelectItem value="g100" text="Gray 100" />
     </Select>
   </FormGroup>
   <FormGroup legendText="Notifications">
-    <Toggle
-      labelText="Weekly email digest"
-      bind:toggled={emailDigest}
-    />
+    <Toggle labelText="Weekly email digest" bind:toggled={emailDigest} />
   </FormGroup>
   <ButtonSet>
     <Button kind="secondary">{t("settings.cancel")}</Button>
-    <Button
-      type="submit"
-      disabled={nameError !== ""}
-    >
+    <Button type="submit" disabled={nameError !== ""}>
       {t("settings.save")}
     </Button>
   </ButtonSet>

@@ -7,11 +7,6 @@
   export let title;
 </script>
 
-<InlineNotification
-  {kind}
-  {title}
-  lowContrast
-  hideCloseButton
->
+<InlineNotification {kind} {title} lowContrast hideCloseButton>
   <div slot="subtitle"><slot /></div>
 </InlineNotification>

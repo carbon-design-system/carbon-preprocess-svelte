@@ -23,10 +23,7 @@
   } = $props();
 </script>
 
-<Search
-  placeholder="Search products"
-  bind:value={query}
-/>
+<Search placeholder="Search products" bind:value={query} />
 <MultiSelect
   labelText="Category"
   label="Any category"
@@ -46,7 +43,4 @@
   step={50}
   bind:value={maxPrice}
 />
-<Toggle
-  labelText="In stock only"
-  bind:toggled={inStockOnly}
-/>
+<Toggle labelText="In stock only" bind:toggled={inStockOnly} />

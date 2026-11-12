@@ -201,7 +201,6 @@ const MATRIX_STEPS: Step[] = [
     run: async (page) => {
       await page.locator("body").click({ position: { x: 1, y: 1 } });
       for (let i = 0; i < 6; i++) {
-        // biome-ignore lint/performance/noAwaitInLoops: key presses run in order
         await page.keyboard.press("Tab");
       }
     },
@@ -239,7 +238,6 @@ const DATATABLE_STEPS: Step[] = [
     run: async (page) => {
       await page.locator("body").click({ position: { x: 1, y: 1 } });
       for (let i = 0; i < 4; i++) {
-        // biome-ignore lint/performance/noAwaitInLoops: key presses run in order
         await page.keyboard.press("Tab");
       }
     },
@@ -474,7 +472,6 @@ async function runScenario(
   for (const step of spec.steps) {
     let error: string | undefined;
     try {
-      // biome-ignore lint/performance/noAwaitInLoops: steps run in order
       await step.run(page);
     } catch (e) {
       error = (e as Error).message.split("\n")[0];
@@ -535,7 +532,6 @@ for (const example of EXAMPLES) {
   const runs = new Map<string, Run>();
   for (const variant of spec.variants) {
     if (!args["no-build"]) {
-      // biome-ignore lint/performance/noAwaitInLoops: one build at a time
       if (spec.golden) await buildGolden(dir, variant, spec.outDir(variant));
       else await $`cd ${dir} && bun run build:${variant}`.quiet();
     }
