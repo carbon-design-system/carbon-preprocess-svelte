@@ -29,7 +29,13 @@
  *   bun --conditions=svelte scripts/eval-specialize.ts --apps "examples/*\/src/App.svelte"
  */
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import type { BunPlugin } from "bun";
@@ -69,7 +75,10 @@ const { values: args } = parseArgs({
 });
 
 const ROOT = path.resolve(import.meta.dir, "..");
-const PROJECT = path.resolve(args.project ?? ROOT);
+// Bun.build hands plugins real paths, so the override keys must be real
+// paths too. On macOS `/tmp` is a symlink to `/private/tmp`: without this,
+// no override applies and every case passes without being tested.
+const PROJECT = realpathSync(path.resolve(args.project ?? ROOT));
 // Inside the project, so apps and entries resolve its `svelte` and Carbon.
 const OUT = path.join(PROJECT, ".eval-specialize");
 const carbonRoot = resolveCarbonRoot(PROJECT);
@@ -141,6 +150,7 @@ const typescript = new Bun.Transpiler({ loader: "ts" });
 const CSS_FILE = /\.css$/;
 const WHITESPACE = /\s+/;
 const SCOPING_CLASS = /^svelte-[a-z0-9]+$/;
+const EMPTY_ELEMENT_WHITESPACE = /(<([a-z][\w-]*)\b[^<>]*>)\s+(<\/\2>)/g;
 const compiled = new Map<string, string>();
 
 function sveltePlugin(
@@ -234,6 +244,14 @@ async function ssr(appFile: string, overrides: Map<string, string>) {
           .filter((name) => !SCOPING_CLASS.test(name));
         return `class="${classes.join(" ")}"`;
       })
+      // An empty `class` matches the same selectors as no `class`. Svelte
+      // omits the attribute for a dynamic empty value but keeps a static
+      // one, so inlining a prop can add or drop it.
+      .replaceAll(' class=""', "")
+      // Whitespace that is an element's only content collapses away
+      // under normal `white-space`. Svelte 5 keeps it or not by the
+      // blocks around it, and dropping a dead `{#if}` can change that.
+      .replace(EMPTY_ELEMENT_WHITESPACE, "$1$3")
   );
 }
 
