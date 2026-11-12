@@ -47,19 +47,21 @@ bun install
 | `bun run test:changed` | The unit tests the working tree's changes since `main` can reach, picked by [bivium](https://github.com/metonym/bivium) from [`bivium.config.ts`](bivium.config.ts), after clearing the same cache. |
 | `bun run build` | Bundle `src/index.ts` and `src/cli.ts` to `dist/`, emit `.d.ts`, write a publish-ready `dist/package.json`. Add `-w` for watch mode. |
 | `bun run typecheck` | `bun check` (Bun's built-in type checker) over `bench/`, `scripts/`, `src/`, `tests/`. |
+| `bun run typecheck:svelte` | [svelte-typecheck](https://github.com/metonym/svelte-typecheck) over the `.svelte` files in [`golden/`](golden/README.md). Warnings fail. |
 | `bun run test:package` | Build and pack `dist/`, install it next to Svelte and Vite in a scratch project, load every export and the CLI in Node, and type-check a consumer of every public export with `skipLibCheck: false`, on Svelte 4 and 5. The published types import nothing: a webpack project has no Vite, and no project has the bundled packages (`sveast`, `severan`), so the plugins' return type is declared here ([`bundler-plugin.ts`](src/plugins/bundler-plugin.ts)) and so is `optimizeImports`'s. The webpack consumer is checked before Vite is installed. |
 | `bun run test:e2e` | Link the package into every `examples/*` project, build each, snapshot CSS reduction. |
 | `bun run test:e2e:update` | Same, but rewrite [`tests/__snapshots__/e2e.json`](tests/__snapshots__/e2e.json). Set `EXAMPLES=vite,vite@svelte-5` to build (and update) only those examples. |
 | `bun run snapshots:from-ci` | When a pull request changes sizes on purpose: rewrite `e2e.json` with what CI's e2e step observed for the current commit (needs `gh`), without building the examples locally. |
 | `bun run test:fixtures:update` | Rewrite the `optimize-css` fixture baselines under [`tests/fixtures/`](tests/fixtures/optimize-css). |
-| `bun run lint` | `biome ci --error-on-warnings` (lint + format check, no write). |
-| `bun run lint:fix` | `biome check --write --unsafe .` (lint + format + organize imports). |
+| `bun run lint:all` | Format with `bun fmt`, then fix what `bun lint` and svelte-lint can. CI runs `bun fmt --check`, `bun lint` and `bun run lint:svelte`, which write nothing. |
+| `bun run lint:changed` | Same, on staged files only. |
+| `bun run lint:svelte` | [svelte-lint](https://github.com/metonym/svelte-lint) over every `.svelte` file: the `bun lint` rules on its scripts, and the Svelte compiler's warnings on its markup. |
 | `bun run upgrade-examples` | `bun update` inside each `examples/*` project. |
 | `bun run eval:prop-aware` | Accuracy check for `propAware`: SSR-renders an app per Carbon component and prop value (plus random mixes), and fails if a selector matching rendered classes was pruned. `--apps <glob>` runs it on existing app files; `--control` prunes everything to prove the check catches it. |
 | `bun run eval:specialize` | Accuracy and size check for component specialization (severan's `specializeComponent`): rewrites the Carbon components each app renders for its props, then requires byte-identical SSR HTML against the originals (`Math.random` seeded, hydration comments removed) and reports minified JS savings. Same `--only`/`--apps`/`--combos` flags, plus `--wrappers` (only the apps with their own wrappers and recursive components, from [`scripts/wrapper-cases.ts`](scripts/wrapper-cases.ts)), `--golden` (the apps in [`golden/`](golden/README.md)), `--unwrap`, `--project <dir>` (another install's Svelte 3, 4 or 5 and Carbon) and `--json <file>`. |
 | `bun run eval:interactions` | Builds the optimized variants of the `vite-matrix`, `sveltekit-matrix`, `astro`, `rollup`, `rolldown`, `webpack`, `webpack@svelte-5` and `rspack` examples and drives each through the same clicks, typing, hovers and key presses as the unoptimized build in Chromium (Playwright), requiring identical DOM and pixels after every step. For the prerendered SvelteKit and Astro examples it also compares the prerendered HTML, console messages, and markup thrown away while hydrating. Catches what SSR can't: effects, hydration, interactive states. Needs each example installed with the package linked (see its README); `--examples a,b` runs a subset (`golden/<app>` too), and `--no-build` reuses the last builds. |
 
-Scope test and lint runs to what you touched (`bun test optimize-imports`, `bunx biome check --write src/plugins`). The full e2e suite is slow because it builds every app under [`examples/`](examples).
+Scope test and lint runs to what you touched (`bun test optimize-imports`, `bun lint --fix src/plugins`). The full e2e suite is slow because it builds every app under [`examples/`](examples).
 
 ## How it works
 
@@ -148,16 +150,16 @@ Carbon comes in through a `LibrarySpec`, [`CARBON`](src/carbon-library.ts): its 
 
 ## Conventions
 
-Biome enforces most of this in CI (`bun run lint`). Config: [`biome.json`](biome.json), space indent, multiline attributes, imports auto-organized. The recommended preset is on by default. Extra rules in `biome.json` are errors. Warnings also fail CI. Markdown isn't formatted: Biome 2.6's formatter re-indents tables inside blockquotes on every pass, so it's off. Try it again on the next Biome bump.
+`bun fmt` and `bun lint` enforce most of this in CI. Both are in Bun canary builds only until 1.4.5 ships, so CI installs canary. On a stable Bun, use the `lint:*` scripts. Config: the `[fmt]`, `[lint]` and `[svelte-lint]` sections of [`bunfig.toml`](bunfig.toml). The recommended rules are on by default, and the extra rules there are errors. Warnings also fail CI. `bun fmt` leaves Markdown and YAML alone.
 
-- **Hoist regexes to module scope.** `useTopLevelRegex` is an error. A regex literal inside a function fails lint. Declare it as a named top-level `const` (see the `*_REGEX` / `CARBON_*` constants at the top of nearly every module).
-- **No `await` in loops, no `forEach`.** `noAwaitInLoops` and `noForEach` are errors. Build the work and `await Promise.all(...)`, or use `for...of` with hoisted awaits. The two intentional sequential-await loops in [`tests/test-e2e.ts`](tests/test-e2e.ts) carry `// biome-ignore` comments explaining why. Match that pattern if you genuinely need ordering.
-- **No namespace imports, no barrel re-exports, no import cycles.** `noNamespaceImport`, `noReExportAll`, `noImportCycles`. Export named bindings explicitly, as [`src/index.ts`](src/index.ts) does.
-- **No `delete`, no accumulating spread, prefer arrow functions and literal keys.** `noDelete`, `noAccumulatingSpread`, `useArrowFunction`, `useLiteralKeys`.
-- **No `!important` in authored styles** (`noImportantStyles`) and **no `bun:test` imports**. The Bun test globals (`describe`, `test`, `expect`) are ambient. Importing them is an error.
-- **Use `node:` import specifiers**, e.g. `import path from "node:path"`, as the scripts and plugins do. `useNodejsImportProtocol` is an error.
-- **No `enum`, no `@ts-ignore`, no `any`.** `noEnum`, `noTsIgnore`, `noExplicitAny`. Use `@ts-expect-error` when a test must suppress a type error. Use `import type` / `export type` (`useImportType`, `useExportType`).
-- **No focused or skipped tests.** `noFocusedTests` and `noSkippedTests`. Do not land `.only` or `.skip`.
+- **Hoist regexes to module scope.** A regex literal inside a function fails lint, unless it has the `g` or `y` flag. Declare it as a named top-level `const` (see the `*_REGEX` / `CARBON_*` constants at the top of nearly every module).
+- **No `await` in loops, no `forEach`.** `no-await-in-loop` and `unicorn/no-array-for-each` are errors. Build the work and `await Promise.all(...)`, or use `for...of` with hoisted awaits. `scripts/`, `examples/` and the build-driven tests turn `no-await-in-loop` off, since they run builds one at a time so each one's output stays readable. Elsewhere, add `// eslint-disable-next-line no-await-in-loop -- <why>`, as [`extract-runtime-classes.ts`](src/indexer/extract-runtime-classes.ts) does.
+- **No namespace imports, no barrel re-exports, no import cycles.** `no-restricted-syntax` and `import/no-cycle`. Export named bindings explicitly, as [`src/index.ts`](src/index.ts) does.
+- **No `delete` on a named property, no accumulating spread, prefer arrow functions and dot notation.** `no-restricted-syntax`, `oxc/no-accumulating-spread`, `prefer-arrow-callback`, `dot-notation`.
+- **No `bun:test` imports**. The Bun test globals (`describe`, `test`, `expect`) are ambient. Importing them is an error.
+- **Use `node:` import specifiers**, e.g. `import path from "node:path"`, as the scripts and plugins do. `unicorn/prefer-node-protocol` is an error.
+- **No `enum`, no `@ts-ignore`, no `any`.** `no-restricted-syntax`, `@typescript-eslint/ban-ts-comment`, `@typescript-eslint/no-explicit-any`. Use `@ts-expect-error` when a test must suppress a type error. Use `import type` / `export type` (`@typescript-eslint/consistent-type-imports` and `consistent-type-exports`).
+- **No focused or skipped tests.** `jest/no-focused-tests` and `jest/no-disabled-tests`. Do not land `.only` or `.skip`.
 
 TypeScript ([`tsconfig.json`](tsconfig.json)) is check-only (`noEmit`). JS and `.d.ts` come from [`scripts/build.ts`](scripts/build.ts) and [`scripts/bundle-dts.ts`](scripts/bundle-dts.ts). It runs `strict` with `noUnusedLocals`, `noUnusedParameters`, and `erasableSyntaxOnly` (no runtime-emitting TS syntax: enums, parameter properties, etc.). The `carbon-preprocess-svelte` path alias resolves to `src/` so tests import the package by name.
 
