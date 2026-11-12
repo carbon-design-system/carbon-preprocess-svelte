@@ -16,5 +16,6 @@
     "tests/**/*.{ts,cjs}"
   ],
   "ignoreDependencies": ["sveast"],
-  "svelte": false
+  "svelte": false,
+  "ignoreBinaries": ["lint"]
 }

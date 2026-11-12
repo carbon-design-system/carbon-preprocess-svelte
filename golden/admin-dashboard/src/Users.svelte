@@ -53,10 +53,7 @@
 </script>
 
 {#if loading}
-  <DataTableSkeleton
-    {headers}
-    rows={DEFAULT_PAGE_SIZE}
-  />
+  <DataTableSkeleton {headers} rows={DEFAULT_PAGE_SIZE} />
 {:else}
   <DataTable
     title={t("users.title")}
@@ -70,19 +67,11 @@
   >
     <Toolbar>
       <ToolbarContent>
-        <ToolbarSearch
-          persistent
-          shouldFilterRows
-          bind:filteredRowIds
-        />
+        <ToolbarSearch persistent shouldFilterRows bind:filteredRowIds />
         <Button>{t("users.add")}</Button>
       </ToolbarContent>
     </Toolbar>
-    <svelte:fragment
-      slot="cell"
-      let:row
-      let:cell
-    >
+    <svelte:fragment slot="cell" let:row let:cell>
       {#if cell.key === "status"}
         <Tag type={STATUS_TAG[cell.value as User["status"]]}>{cell.value}</Tag>
       {:else if cell.key === "actions"}

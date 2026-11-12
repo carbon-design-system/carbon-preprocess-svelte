@@ -54,7 +54,8 @@ import { Airplane } from "carbon-pictograms-svelte";
 import { Airplane as Airplane2 } from "carbon-pictograms-svelte";
 import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`,
       }),
-    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+    )
+      .toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import Accordion2 from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import { breakpoints } from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
@@ -74,7 +75,8 @@ import Airplane3 from "carbon-pictograms-svelte/lib/Airplane.svelte";`);
       preprocess({
         content: `import { filterTreeById, filterTreeByText as byText, filterTreeNodes } from "carbon-components-svelte";`,
       }),
-    ).toEqual(`import { filterTreeById } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";
+    )
+      .toEqual(`import { filterTreeById } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";
 import { filterTreeByText as byText } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";
 import { filterTreeNodes } from "carbon-components-svelte/src/utils/filter-tree-nodes.js";`);
   });
@@ -100,7 +102,8 @@ import { filterTreeNodes } from "carbon-components-svelte/src/utils/filter-tree-
       preprocess({
         content: `import { Button, someFutureUtil } from "carbon-components-svelte";`,
       }),
-    ).toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
+    )
+      .toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
 import { someFutureUtil } from "carbon-components-svelte";`);
   });
 
@@ -111,7 +114,8 @@ import { someFutureUtil } from "carbon-components-svelte";`);
 import { Add, Download } from "carbon-icons-svelte";
 import { Airplane, Analytics } from "carbon-pictograms-svelte";`,
       }),
-    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+    )
+      .toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import { breakpoints as bp } from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
 import Add from "carbon-icons-svelte/lib/Add.svelte";
@@ -209,7 +213,8 @@ import Analytics from "carbon-pictograms-svelte/lib/Analytics.svelte";`);
       preprocess({
         content: `import { Button, type ButtonSize } from "carbon-components-svelte";`,
       }),
-    ).toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
+    )
+      .toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
 import { type ButtonSize } from "carbon-components-svelte";`);
   });
 
@@ -222,7 +227,8 @@ import { ContainedList, ContainedListItem } from "carbon-components-svelte";
 import { filterTreeNodes, toHierarchy } from "carbon-components-svelte";
 import { NewComponent } from "carbon-components-svelte";`,
       }),
-    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+    )
+      .toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import AccordionItem from "carbon-components-svelte/src/Accordion/AccordionItem.svelte";
 import AccordionSkeleton from "carbon-components-svelte/src/Accordion/AccordionSkeleton.svelte";
 import { breakpointObserver } from "carbon-components-svelte/src/Breakpoint/breakpoint-observer.js";
@@ -247,7 +253,8 @@ import { Button } from "carbon-components-svelte";\`;`;
         content: `import Carbon, { Button } from "carbon-components-svelte";
 import * as Icons from "carbon-icons-svelte";`,
       }),
-    ).toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
+    )
+      .toEqual(`import Button from "carbon-components-svelte/src/Button/Button.svelte";
 import Carbon from "carbon-components-svelte";
 import * as Icons from "carbon-icons-svelte";`);
   });
@@ -344,7 +351,8 @@ describe("readCarbonExports", () => {
         `import { Accordion, breakpoints, ContainedList } from "carbon-components-svelte";`,
         resolvePackageRoot("carbon-components-svelte-old"),
       ),
-    ).toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
+    )
+      .toEqual(`import Accordion from "carbon-components-svelte/src/Accordion/Accordion.svelte";
 import breakpoints from "carbon-components-svelte/src/Breakpoint/breakpoints.js";
 import { ContainedList } from "carbon-components-svelte";`);
   });
@@ -391,7 +399,8 @@ export { default as Tab } from "./Tab.svelte";`,
           `import { fuzzyMatch, TabItem } from "carbon-components-svelte";`,
           fixture.root,
         ),
-      ).toEqual(`import { fuzzyMatch } from "carbon-components-svelte/src/utils/fuzzy-match.js";
+      )
+        .toEqual(`import { fuzzyMatch } from "carbon-components-svelte/src/utils/fuzzy-match.js";
 import TabItem from "carbon-components-svelte/src/Tabs/Tab.svelte";`);
     } finally {
       fixture.dispose();

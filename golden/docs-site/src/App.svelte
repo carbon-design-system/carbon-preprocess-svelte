@@ -28,26 +28,14 @@
   let selected = 0;
 </script>
 
-<Header
-  platformName="Carbon Svelte"
-  href="/"
->
+<Header platformName="Carbon Svelte" href="/">
   <HeaderNav>
     {#each NAV as item}
-      <HeaderNavItem
-        href={item.href}
-        text={item.text}
-      />
+      <HeaderNavItem href={item.href} text={item.text} />
     {/each}
     <HeaderNavMenu text="Resources">
-      <HeaderNavItem
-        href="#changelog"
-        text="Changelog"
-      />
-      <HeaderNavItem
-        href="#github"
-        text="GitHub"
-      />
+      <HeaderNavItem href="#changelog" text="Changelog" />
+      <HeaderNavItem href="#github" text="GitHub" />
     </HeaderNavMenu>
   </HeaderNav>
 </Header>
@@ -58,18 +46,14 @@
       <Column>
         <Breadcrumb noTrailingSlash>
           <BreadcrumbItem href="/">Docs</BreadcrumbItem>
-          <BreadcrumbItem
-            href="#start"
-            isCurrentPage
+          <BreadcrumbItem href="#start" isCurrentPage
             >Get started</BreadcrumbItem
           >
         </Breadcrumb>
         <h1 id="start">Get started</h1>
         <p>
           Carbon Svelte implements the
-          <Link
-            href="https://carbondesignsystem.com"
-            inline
+          <Link href="https://carbondesignsystem.com" inline
             >Carbon Design System</Link
           >
           in Svelte.
@@ -109,11 +93,7 @@
     </Row>
     <Row>
       {#each GUIDES as guide, index}
-        <Column
-          sm={4}
-          md={4}
-          lg={5}
-        >
+        <Column sm={4} md={4} lg={5}>
           <GuideCard
             title={guide.title}
             href={guide.href}
@@ -134,10 +114,7 @@
             </AccordionItem>
           {/each}
         </Accordion>
-        <Callout
-          kind="warning"
-          title="Svelte 3"
-        >
+        <Callout kind="warning" title="Svelte 3">
           Svelte 3 support ends with the next major release.
         </Callout>
         <UnorderedList>

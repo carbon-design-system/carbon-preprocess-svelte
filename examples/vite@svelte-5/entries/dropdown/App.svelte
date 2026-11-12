@@ -11,8 +11,4 @@
   let selectedId: (typeof items)[number]["id"] = "option-1";
 </script>
 
-<Dropdown
-  label="Region"
-  {items}
-  bind:selectedId
-/>
+<Dropdown label="Region" {items} bind:selectedId />

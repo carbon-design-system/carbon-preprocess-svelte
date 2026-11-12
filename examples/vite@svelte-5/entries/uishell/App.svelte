@@ -13,20 +13,11 @@
 </script>
 
 <SkipToContent />
-<Header
-  bind:isSideNavOpen
-  companyName="Carbon App"
-/>
+<Header bind:isSideNavOpen companyName="Carbon App" />
 <SideNav bind:isOpen={isSideNavOpen}>
   <SideNavItems>
-    <SideNavLink
-      href="#"
-      text="Dashboard"
-    />
-    <SideNavLink
-      href="#"
-      text="Settings"
-    />
+    <SideNavLink href="#" text="Dashboard" />
+    <SideNavLink href="#" text="Settings" />
   </SideNavItems>
 </SideNav>
 <Content>

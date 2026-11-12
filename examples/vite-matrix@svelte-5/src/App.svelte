@@ -76,22 +76,13 @@
   let deleting = false;
 </script>
 
-<Header
-  company="IBM"
-  platformName="Carbon Svelte"
->
+<Header company="IBM" platformName="Carbon Svelte">
   <svelte:fragment slot="skip-to-content">
     <SkipToContent />
   </svelte:fragment>
   <HeaderNav>
-    <HeaderNavItem
-      href="/"
-      text="Overview"
-    />
-    <HeaderNavItem
-      href="/"
-      text="Settings"
-    />
+    <HeaderNavItem href="/" text="Overview" />
+    <HeaderNavItem href="/" text="Settings" />
   </HeaderNav>
 </Header>
 
@@ -130,55 +121,20 @@
 
     <!-- Medium: forms and list boxes, some props bound to state. -->
     <Row>
-      <Column
-        sm={4}
-        md={4}
-        lg={8}
-      >
+      <Column sm={4} md={4} lg={8}>
         <Tile>
-          <TextInput
-            labelText="Name"
-            placeholder="my-load-balancer"
-          />
-          <PasswordInput
-            labelText="API key"
-            placeholder="Enter an API key"
-          />
-          <NumberInput
-            label="Instances"
-            value={3}
-            min={1}
-            max={10}
-          />
-          <Select
-            labelText="Protocol"
-            selected="https"
-          >
-            <SelectItem
-              value="http"
-              text="HTTP"
-            />
-            <SelectItem
-              value="https"
-              text="HTTPS"
-            />
+          <TextInput labelText="Name" placeholder="my-load-balancer" />
+          <PasswordInput labelText="API key" placeholder="Enter an API key" />
+          <NumberInput label="Instances" value={3} min={1} max={10} />
+          <Select labelText="Protocol" selected="https">
+            <SelectItem value="http" text="HTTP" />
+            <SelectItem value="https" text="HTTPS" />
           </Select>
-          <Slider
-            labelText="Timeout (seconds)"
-            min={5}
-            max={60}
-            value={30}
-          />
+          <Slider labelText="Timeout (seconds)" min={5} max={60} value={30} />
           <Checkbox labelText="Enable health checks" />
           <Toggle labelText="Sticky sessions" />
-          <RadioButtonGroup
-            legendText="Algorithm"
-            selected="round-robin"
-          >
-            <RadioButton
-              labelText="Round robin"
-              value="round-robin"
-            />
+          <RadioButtonGroup legendText="Algorithm" selected="round-robin">
+            <RadioButton labelText="Round robin" value="round-robin" />
             <RadioButton
               labelText="Least connections"
               value="least-connections"
@@ -186,11 +142,7 @@
           </RadioButtonGroup>
         </Tile>
       </Column>
-      <Column
-        sm={4}
-        md={4}
-        lg={8}
-      >
+      <Column sm={4} md={4} lg={8}>
         <Tile>
           <Dropdown
             titleText="Region"
@@ -208,10 +160,7 @@
             items={regions}
           />
           <ProgressIndicator currentIndex={1}>
-            <ProgressStep
-              label="Create"
-              complete
-            />
+            <ProgressStep label="Create" complete />
             <ProgressStep label="Configure" />
             <ProgressStep label="Deploy" />
           </ProgressIndicator>
@@ -272,10 +221,7 @@
 
     <Row>
       <Column>
-        <ActionButton
-          primary
-          onclick={() => (saved = true)}
-        >
+        <ActionButton primary onclick={() => (saved = true)}>
           Save settings
         </ActionButton>
         <ActionButton>Cancel</ActionButton>
@@ -313,10 +259,5 @@
   on:submit={() => (deleting = false)}
 >
   <p>Traffic to these balancers stops.</p>
-  <Button
-    kind="ghost"
-    size="small"
-    icon={Copy}
-    iconDescription="Copy names"
-  />
+  <Button kind="ghost" size="small" icon={Copy} iconDescription="Copy names" />
 </Modal>

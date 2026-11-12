@@ -5,8 +5,4 @@
   let name = "";
 </script>
 
-<TextInput
-  labelText="Name"
-  placeholder="Enter name"
-  bind:value={name}
-/>
+<TextInput labelText="Name" placeholder="Enter name" bind:value={name} />

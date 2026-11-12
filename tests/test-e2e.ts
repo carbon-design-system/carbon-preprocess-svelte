@@ -294,7 +294,6 @@ async function buildMultiEntry(
 
   for (const entry of entries) {
     console.log(`\n--- entry: ${entry} ---\n`);
-    // biome-ignore lint/performance/noAwaitInLoops: build entries sequentially to capture output correctly
     const { stdout, warnings } = await runBuild(dir, `build:${entry}`);
 
     const label = `${exampleName}/${entry}`;
@@ -385,7 +384,6 @@ async function main() {
   }
 
   for (const dir of examples) {
-    // biome-ignore lint/performance/noAwaitInLoops: build examples sequentially to capture output correctly
     const outcomes = await buildExample(dir, snapshots, newSnapshots);
     results.push(...outcomes);
   }

@@ -52,10 +52,7 @@
   <Row>
     <Column>
       <h1>Create your account</h1>
-      <ProgressIndicator
-        currentIndex={current}
-        spaceEqually
-      >
+      <ProgressIndicator currentIndex={current} spaceEqually>
         {#each STEPS as step, index (step.id)}
           <ProgressStep
             label={step.label}

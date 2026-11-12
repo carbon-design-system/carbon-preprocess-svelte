@@ -9,6 +9,5 @@ const manifest = JSON.parse(
 
 for (const entry of manifest) {
   console.log(`\nBuilding entry: ${entry}\n`);
-  // biome-ignore lint/performance/noAwaitInLoops: sequential builds avoid dist races and keep logs readable
   await $`cd ${exampleDir} && ENTRY=${entry} vite build`;
 }

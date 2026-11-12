@@ -68,20 +68,13 @@
   <Row>
     <Column><h1>Shop</h1></Column>
     <Column>
-      <Button
-        kind="ghost"
-        on:click={() => (cartOpen = true)}
-      >
+      <Button kind="ghost" on:click={() => (cartOpen = true)}>
         Cart ({cart.lines.length})
       </Button>
     </Column>
   </Row>
   <Row>
-    <Column
-      sm={4}
-      md={2}
-      lg={4}
-    >
+    <Column sm={4} md={2} lg={4}>
       <Filters
         bind:query
         bind:categories
@@ -90,46 +83,26 @@
         bind:inStockOnly
       />
     </Column>
-    <Column
-      sm={4}
-      md={6}
-      lg={12}
-    >
+    <Column sm={4} md={6} lg={12}>
       {#if loading}
-        <SkeletonText
-          paragraph
-          lines={6}
-        />
+        <SkeletonText paragraph lines={6} />
       {:else if filtered.length === 0}
         <p>No products match these filters.</p>
       {:else}
         <Row>
           {#each visible as product (product.id)}
-            <Column
-              sm={4}
-              md={4}
-              lg={4}
-            >
-              <ProductCard
-                {product}
-                onadd={add}
-              />
+            <Column sm={4} md={4} lg={4}>
+              <ProductCard {product} onadd={add} />
             </Column>
           {/each}
         </Row>
-        <PaginationNav
-          bind:page
-          total={pageCount}
-        />
+        <PaginationNav bind:page total={pageCount} />
       {/if}
     </Column>
   </Row>
 </Grid>
 
-<ComposedModal
-  bind:open={cartOpen}
-  size="sm"
->
+<ComposedModal bind:open={cartOpen} size="sm">
   <ModalHeader title="Your cart" />
   <ModalBody>
     {#each cart.lines as line (line.product.id)}

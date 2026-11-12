@@ -33,7 +33,6 @@ describe("golden app sizes", () => {
       const sizes: Record<string, { css_kb: number; js_kb: number }> = {};
       for (const variant of GOLDEN_VARIANTS) {
         const outDir = path.join(OUT, app, variant);
-        // biome-ignore lint/performance/noAwaitInLoops: one build at a time
         await buildGolden(path.join(ROOT, "golden", app), variant, outDir);
         sizes[variant] = assetSizes(outDir);
       }

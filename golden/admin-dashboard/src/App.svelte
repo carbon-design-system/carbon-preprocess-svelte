@@ -20,11 +20,7 @@
   let page: PageId = $state("overview");
 </script>
 
-<Header
-  companyName="Acme"
-  platformName="Admin"
-  bind:isSideNavOpen
->
+<Header companyName="Acme" platformName="Admin" bind:isSideNavOpen>
   <svelte:fragment slot="skipToContent">
     <SkipToContent />
   </svelte:fragment>

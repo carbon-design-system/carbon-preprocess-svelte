@@ -45,7 +45,6 @@ const record = (kind: string, example: string) => {
 };
 
 for (const app of goldenApps(ROOT, args.only)) {
-  // biome-ignore lint/performance/noAwaitInLoops: one app at a time keeps output readable
   const result = await specializeFiles({
     library: CARBON,
     failure: SPECIALIZE_FAILURE,

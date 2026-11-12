@@ -8,9 +8,8 @@ const require = createRequire(import.meta.url);
 // Node rejects `./package.json` (it isn't in Carbon's exports map); Bun accepts it.
 let carbonComponentsSvelteOldPackageJson: string | undefined;
 try {
-  carbonComponentsSvelteOldPackageJson = require.resolve(
-    "carbon-components-svelte-old/package.json",
-  );
+  carbonComponentsSvelteOldPackageJson =
+    require.resolve("carbon-components-svelte-old/package.json");
 } catch {
   carbonComponentsSvelteOldPackageJson = undefined;
 }

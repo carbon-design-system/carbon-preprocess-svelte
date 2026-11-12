@@ -324,7 +324,6 @@ for (const [n, testCase] of cases.entries()) {
 
   // The app's own components, closed when every call site is in `files`.
   const appUsage = collectAppUsage(files, library);
-  // biome-ignore lint/performance/noAwaitInLoops: one app at a time keeps output attributable
   const result = await analyzeFiles({
     library: CARBON,
     failure: PROP_AWARE_FAILURE,

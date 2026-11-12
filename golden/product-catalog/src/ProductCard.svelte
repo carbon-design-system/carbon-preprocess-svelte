@@ -18,18 +18,10 @@
 <Tile>
   <h3>{product.name}</h3>
   {#if product.onSale}
-    <Tag
-      type="red"
-      size="sm"
-      >Sale</Tag
-    >
+    <Tag type="red" size="sm">Sale</Tag>
   {/if}
   {#if !product.inStock}
-    <Tag
-      type="gray"
-      size="sm"
-      >Out of stock</Tag
-    >
+    <Tag type="gray" size="sm">Out of stock</Tag>
   {/if}
   {#if !compact}
     <p>{product.description}</p>

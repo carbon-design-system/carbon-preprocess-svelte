@@ -159,7 +159,6 @@ for (const testCase of cases) {
 
   let rendered: Set<string>;
   try {
-    // biome-ignore lint/performance/noAwaitInLoops: one app at a time keeps errors attributable
     const App = (await import(file)).default;
     const { body } = render(App, { props: {} });
     rendered = new Set();

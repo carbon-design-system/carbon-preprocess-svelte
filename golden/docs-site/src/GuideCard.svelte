@@ -8,10 +8,7 @@
   export let featured = false;
 </script>
 
-<ClickableTile
-  {href}
-  light={featured}
->
+<ClickableTile {href} light={featured}>
   <h3 class:featured>{title}</h3>
   {#if summary}
     <p>{summary}</p>
