@@ -5,10 +5,10 @@
     "ModalBody",
     "ModalFooter"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 51277,
-  "reduction_percent": 90.87,
-  "kept_rules": 314,
+  "before_bytes": 773243,
+  "after_bytes": 75865,
+  "reduction_percent": 90.19,
+  "kept_rules": 380,
   "leaked_count": 0,
   "leaked_classes": []
 }

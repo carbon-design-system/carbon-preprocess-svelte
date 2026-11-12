@@ -2,10 +2,10 @@
   "ids": [
     "Slider"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 23043,
-  "reduction_percent": 95.9,
-  "kept_rules": 147,
+  "before_bytes": 773243,
+  "after_bytes": 39521,
+  "reduction_percent": 94.89,
+  "kept_rules": 158,
   "leaked_count": 0,
   "leaked_classes": []
 }

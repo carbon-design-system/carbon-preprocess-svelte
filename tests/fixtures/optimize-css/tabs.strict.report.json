@@ -2,10 +2,10 @@
   "ids": [
     "Tabs"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 18175,
-  "reduction_percent": 96.76,
-  "kept_rules": 102,
+  "before_bytes": 773243,
+  "after_bytes": 39246,
+  "reduction_percent": 94.92,
+  "kept_rules": 129,
   "leaked_count": 0,
   "leaked_classes": []
 }

@@ -4,10 +4,10 @@
     "FileUploaderButton",
     "FileUploaderItem"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 44188,
-  "reduction_percent": 92.13,
-  "kept_rules": 260,
+  "before_bytes": 773243,
+  "after_bytes": 62586,
+  "reduction_percent": 91.91,
+  "kept_rules": 280,
   "leaked_count": 0,
   "leaked_classes": []
 }
