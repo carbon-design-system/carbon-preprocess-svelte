@@ -36,7 +36,7 @@ export default defineConfig({
     "**/*.md",
     "LICENSE",
     ".gitignore",
-    // Options for `bun fmt` and `bun lint` only.
+    // Options for `bun fmt`, `bun lint` and svelte-lint only.
     "bunfig.toml",
     "knip.json",
     ".github/FUNDING.yml",
@@ -47,7 +47,7 @@ export default defineConfig({
   // The CLI the test spawns, which it doesn't import.
   edges: { "tests/cli.test.ts": "src/cli.ts" },
   // Tools CI runs on its own: a bump that only reaches them selects nothing.
-  inert: ["knip", "ostia", "@types/*"],
+  inert: ["knip", "ostia", "svelte-lint", "svelte-typecheck", "@types/*"],
   // tsconfig `paths`: tests and examples import the package by name.
   alias: { "carbon-preprocess-svelte": "src" },
   // The preprocessors and plugins read their user's project and the

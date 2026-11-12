@@ -35,10 +35,14 @@ jobs:
         run: bun fmt --check
 
       - name: Lint
-        run: bun lint
+        run: |
+          bun lint
+          bun run lint:svelte
 
       - name: Typecheck
-        run: bun run typecheck
+        run: |
+          bun run typecheck
+          bun run typecheck:svelte
 
       - name: Find unused files, exports, and dependencies
         run: bun run knip
