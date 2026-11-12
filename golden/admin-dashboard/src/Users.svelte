@@ -29,7 +29,7 @@
     { key: "role", value: "Role" },
     { key: "status", value: "Status" },
     { key: "actions", empty: true },
-  ];
+  ] as const;
 
   let users: User[] = $state([]);
   let loading = $state(true);

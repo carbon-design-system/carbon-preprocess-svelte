@@ -56,6 +56,14 @@ files = [
 ]
 rules = { "no-await-in-loop" = "off" }
 
+# Rules for the markup of `.svelte` files, which `bun lint` can't read:
+# svelte-lint (`bun run lint:svelte`) lints their scripts and markup
+# expressions with the rules above, and their markup with these.
+[svelte-lint]
+# `svelte/compiler`: the compiler's own warnings, such as a scoped selector
+# that matches nothing, which Svelte drops from the CSS without a word.
+rules = { "svelte/require-each-key" = "off", "svelte/compiler" = "error" }
+
 [fmt]
 # Markdown and YAML stay hand-formatted. Fixtures are inputs the tests
 # compare byte for byte.
