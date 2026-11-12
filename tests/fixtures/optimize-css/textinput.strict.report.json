@@ -2,10 +2,10 @@
   "ids": [
     "TextInput"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 21944,
-  "reduction_percent": 96.09,
-  "kept_rules": 135,
+  "before_bytes": 773243,
+  "after_bytes": 38870,
+  "reduction_percent": 94.97,
+  "kept_rules": 146,
   "leaked_count": 0,
   "leaked_classes": []
 }

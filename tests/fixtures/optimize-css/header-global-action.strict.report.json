@@ -2,10 +2,10 @@
   "ids": [
     "HeaderGlobalAction"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 47808,
-  "reduction_percent": 91.49,
-  "kept_rules": 278,
+  "before_bytes": 773243,
+  "after_bytes": 69581,
+  "reduction_percent": 91,
+  "kept_rules": 321,
   "leaked_count": 1,
   "leaked_classes": [
     ".bx--header__global"

@@ -2,10 +2,10 @@
   "ids": [
     "MultiSelect"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 54682,
-  "reduction_percent": 90.26,
-  "kept_rules": 392,
+  "before_bytes": 773243,
+  "after_bytes": 172970,
+  "reduction_percent": 77.63,
+  "kept_rules": 1059,
   "leaked_count": 0,
   "leaked_classes": []
 }

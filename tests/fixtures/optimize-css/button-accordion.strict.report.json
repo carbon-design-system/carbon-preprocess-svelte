@@ -3,10 +3,10 @@
     "Button",
     "Accordion"
   ],
-  "before_bytes": 561637,
-  "after_bytes": 52063,
-  "reduction_percent": 90.73,
-  "kept_rules": 318,
+  "before_bytes": 773243,
+  "after_bytes": 74760,
+  "reduction_percent": 90.33,
+  "kept_rules": 370,
   "leaked_count": 0,
   "leaked_classes": []
 }
