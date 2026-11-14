@@ -115,6 +115,16 @@ describe("scanContent", () => {
     }
   });
 
+  test("collects literal Carbon token names", () => {
+    const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
+    try {
+      writeFileSync(join(dir, "theme.css"), ".x{color:var(--cds-layer)}");
+      expect(scanContent([join(dir, "*.css")]).tokens).toEqual(["--cds-layer"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("reports matchedFiles: 0 on a miss", () => {
     const dir = mkdtempSync(join(tmpdir(), "scan-content-"));
     try {

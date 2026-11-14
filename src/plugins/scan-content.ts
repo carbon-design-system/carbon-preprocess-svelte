@@ -1,6 +1,7 @@
 import { globSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { errorMessage } from "../utils";
+import { collectTokenNames } from "./prune-tokens";
 
 /** Literal `bx--`-prefixed tokens as they appear in source markup. */
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;
@@ -36,6 +37,8 @@ export function* readFiles(
 export type ContentScan = {
   /** Class selectors found (`.bx--grid`). */
   classes: string[];
+  /** Literal `--cds-` token names found. */
+  tokens: string[];
   /** Files the globs matched (readable or not). */
   matchedFiles: number;
   /** Message from a glob failure, if any. */
@@ -44,7 +47,7 @@ export type ContentScan = {
 
 /**
  * Scans files matched by `content` globs (relative to `cwd`) for literal
- * `bx--` tokens. Also reports how many files matched and any glob failure so
+ * `bx--` tokens and `--cds-` token names. Also reports how many files matched and any glob failure so
  * callers can warn on a misconfigured `content`.
  *
  * For ``class={`bx--btn--${kind}`}`` only the prefix `bx--btn--` is found;
@@ -54,20 +57,33 @@ export function scanContent(
   content?: readonly string[],
   cwd: string = process.cwd(),
 ): ContentScan {
-  if (!content || content.length === 0) return { classes: [], matchedFiles: 0 };
+  if (!content || content.length === 0) {
+    return { classes: [], tokens: [], matchedFiles: 0 };
+  }
 
   let files: string[];
   try {
     files = globSync([...content], { cwd });
   } catch (error) {
-    return { classes: [], matchedFiles: 0, error: errorMessage(error) };
+    return {
+      classes: [],
+      tokens: [],
+      matchedFiles: 0,
+      error: errorMessage(error),
+    };
   }
 
   const classes = new Set<string>();
+  const tokens = new Set<string>();
 
   for (const { code } of readFiles(files, cwd)) {
     collectCarbonTokens(code, classes);
+    collectTokenNames(code, tokens);
   }
 
-  return { classes: [...classes], matchedFiles: files.length };
+  return {
+    classes: [...classes],
+    tokens: [...tokens],
+    matchedFiles: files.length,
+  };
 }

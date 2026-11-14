@@ -125,9 +125,9 @@ const BEHAVIOR_CHANGES: Record<
     "{color:red}.bx--btn{a:b}",
     0,
   ],
-  "duplicate empty named @layer kept, not deduplicated": [
+  "empty named @layer dropped once an earlier block fixes its order": [
     "@layer a{.bx--btn{c:d}}@layer a{.bx--unused{a:b}}",
-    "@layer a{.bx--btn{c:d}}@layer a{}",
+    "@layer a{.bx--btn{c:d}}",
     1,
   ],
 };

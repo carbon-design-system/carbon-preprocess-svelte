@@ -21,6 +21,7 @@ import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
+import { canNameTokens, collectTokenNames } from "./prune-tokens";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
@@ -32,6 +33,19 @@ import { hasOptimizableCss } from "./strict-css-optimizer";
 type WebpackAssetSource = {
   source(): string | Buffer;
 };
+
+/** `--cds-` names in the compilation's scripts and markup. */
+function assetTokenNames(
+  assets: Record<string, WebpackAssetSource>,
+): Set<string> {
+  const names = new Set<string>();
+  for (const [id, asset] of Object.entries(assets)) {
+    if (canNameTokens(id)) {
+      collectTokenNames(asset.source().toString(), names);
+    }
+  }
+  return names;
+}
 
 type WebpackCompilation = {
   /** Absent on the mock compilations unit tests pass. */
@@ -229,6 +243,7 @@ export class OptimizeCssPlugin {
               options,
               moduleTokens: moduleClasses.size,
               contentTokens: scan.classes.length,
+              tokenNames: [...assetTokenNames(assets), ...scan.tokens],
               reportExtra: () =>
                 analyzer && usage
                   ? analyzer.formatPropAwareReport(

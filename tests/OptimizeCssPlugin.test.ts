@@ -238,6 +238,31 @@ describe("OptimizeCssPlugin", () => {
     );
   });
 
+  test("removes Carbon tokens no asset or script reads", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const mockCompiler = createMockCompiler({
+      assets: {
+        "styles.css": {
+          source: () =>
+            ":root{--cds-a:1;--cds-b:2;--cds-c:3}.bx--btn{color:var(--cds-a)}",
+        },
+        "main.js": { source: () => 'const token = "--cds-b";' },
+      },
+      moduleResources: [
+        `node_modules/${CarbonSvelte.Components}/Button.svelte`,
+      ],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    const [[id, written]] = mockCompiler.compilation.updateAsset.mock.calls;
+    expect(id).toBe("styles.css");
+    expect(written.source()).toBe(
+      ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}",
+    );
+  });
+
   test("propAware reads call sites from each .svelte module's source", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
     const dir = mkdtempSync(join(tmpdir(), "cps-webpack-prop-aware-"));
