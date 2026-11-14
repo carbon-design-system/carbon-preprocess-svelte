@@ -13,14 +13,14 @@ Each build sets `VARIANT` ([vite.config.ts](vite.config.ts)):
 | `prop-aware` | `optimizeCss({ propAware: true })`: also drops styles for props the app never passes |
 | `full` | prop-aware CSS, plus `optimizeComponents()`: rewrites Carbon components for the props the app passes |
 
-With carbon-components-svelte 0.113.0, `bun run build` printed:
+With carbon-components-svelte 0.114.1, `bun run build` printed:
 
 | Variant | CSS | CSS gzip | JS | JS gzip |
 | --- | --- | --- | --- | --- |
-| baseline | 562.26 kB | 66.28 kB | 637.82 kB | 174.08 kB |
-| css | 316.60 kB (-43.7%) | 36.39 kB (-45.1%) | 637.82 kB | 174.08 kB |
-| prop-aware | 231.98 kB (-58.7%) | 27.09 kB (-59.1%) | 637.82 kB | 174.08 kB |
-| full | 231.98 kB (-58.7%) | 27.09 kB (-59.1%) | 463.26 kB (-27.4%) | 134.76 kB (-22.6%) |
+| baseline | 774.07 kB | 93.99 kB | 882.38 kB | 247.25 kB |
+| css | 386.33 kB (-50.1%) | 46.43 kB (-50.6%) | 882.38 kB | 247.25 kB |
+| prop-aware | 217.89 kB (-71.9%) | 28.69 kB (-69.5%) | 882.38 kB | 247.25 kB |
+| full | 217.89 kB (-71.9%) | 28.69 kB (-69.5%) | 570.79 kB (-35.3%) | 174.17 kB (-29.6%) |
 
 ## Usage
 
