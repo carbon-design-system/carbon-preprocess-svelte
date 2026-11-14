@@ -170,6 +170,7 @@ It runs on production builds, after other plugins (`apply: "build"`, `enforce: "
    - flatpickr and legacy `bx-` rules go unless a flatpickr-based component (DatePicker) is bundled;
    - `:is(…)` and `:not(…)` groups are parsed, not split on commas.
 4. Empty rules are dropped.
+5. **Carbon tokens** (`--cds-*` custom properties) that nothing reads are removed. A token stays if a `var()` in the kept CSS reads it, a kept token's value reads it, or the bundle's scripts or markup (or `content` files) name it. Carbon 0.114 defines about 400 of them, and an app typically reads a few dozen.
 
 Validated against most Carbon components and common multi-component bundles with no unexplained survivors. Its one blind spot is in the warning under the [API](#optimizecss-api): class names that never appear as a literal `bx--` token.
 
@@ -388,6 +389,8 @@ optimizeCss({
 > | Keep selectors explicitly | `safelist: [".bx--grid", /^\.bx--btn--/]` |
 > | Scan extra files for tokens | `content: ["**/*.{md,html}"]` |
 > | See what was detected | `report: true` |
+>
+> Carbon tokens work the same way: one read only outside the bundle (a stylesheet in `public/`, a CMS template) is removed unless `content` covers that file. A name built at runtime keeps every token whose name starts with the literal part (`` `--cds-${name}` `` keeps them all).
 
 #### Prop-aware pruning
 
@@ -606,7 +609,7 @@ const result = await Bun.build({ entrypoints: ["src/main.js"], outdir: "dist" })
 const components = ["Button", "Accordion"];
 const sources = await Promise.all(
   result.outputs
-    .filter((output) => output.kind === "entry-point")
+    .filter((output) => output.kind === "entry-point" || output.kind === "chunk")
     .map((output) => output.text()),
 );
 
@@ -633,7 +636,9 @@ optimizeCarbonCss(css, {
 
   /**
    * Source code to scan for literal `bx--` tokens, for example the JS output
-   * of your bundler. Same detection as the plugins' `scanModules`.
+   * of your bundler. Same detection as the plugins' `scanModules`. When
+   * given, it should be everything the app ships besides this CSS: Carbon
+   * tokens (`--cds-*`) that neither it nor the CSS reads are removed too.
    * @default undefined
    */
   sources: [],

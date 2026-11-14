@@ -35,7 +35,7 @@ export type CssOptimizerOptions = PruneOptions & {
 
 export type OptimizedCssReport = {
   css: string;
-  /** Rules, selectors, and `@font-face` blocks removed. */
+  /** Rules, selectors, `@font-face` blocks and token declarations removed. */
   removed: number;
 };
 

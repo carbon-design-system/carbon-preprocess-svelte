@@ -73,6 +73,19 @@ describe("optimizeCarbonCss", () => {
     expect(result.removed).toBe(0);
   });
 
+  test("`sources` lets it remove Carbon tokens nothing reads", async () => {
+    const css = ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}";
+    expect((await optimizeCarbonCss(css, { components: ["Button"] })).css).toBe(
+      css,
+    );
+    expect(
+      await optimizeCarbonCss(css, { components: ["Button"], sources: [""] }),
+    ).toEqual({
+      css: ":root{--cds-a:1}.bx--btn{color:var(--cds-a)}",
+      removed: 1,
+    });
+  });
+
   test("`content` resolves from `cwd`", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-carbon-css-"));
     try {
