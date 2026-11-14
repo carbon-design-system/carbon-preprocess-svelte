@@ -11,6 +11,7 @@ import {
   type PruneOptions,
 } from "./create-optimized-css";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
+import { collectTokenNames, pruneUnusedTokens } from "./prune-tokens";
 import { collectCarbonTokens, readFiles, scanContent } from "./scan-content";
 
 type OptimizeCarbonCssOptions = PruneOptions &
@@ -24,7 +25,9 @@ type OptimizeCarbonCssOptions = PruneOptions &
 
     /**
      * Source code to scan for literal `bx--` tokens, for example the JS output
-     * of your bundler. Same detection as the plugins' `scanModules`.
+     * of your bundler. Same detection as the plugins' `scanModules`. When
+     * given, it should be everything the app ships besides this CSS: Carbon
+     * tokens (`--cds-*`) that neither it nor the CSS reads are removed too.
      */
     sources?: Iterable<string>;
 
@@ -50,14 +53,15 @@ export async function optimizeCarbonCss(
   // Without components, or if the index failed (already warned): unpruned.
   if (!components) return { css: toCssString(css), removed: 0 };
 
-  const contentClasses = new Set(
-    scanContent(options.content, options.cwd).classes,
-  );
+  const scan = scanContent(options.content, options.cwd);
+  const contentClasses = new Set(scan.classes);
+  const tokenNames = options.sources ? new Set(scan.tokens) : undefined;
   for (const source of options.sources ?? []) {
     collectCarbonTokens(source, contentClasses);
+    if (tokenNames) collectTokenNames(source, tokenNames);
   }
 
-  return optimizeCssWithReport({
+  const report = optimizeCssWithReport({
     source: css,
     components,
     ids,
@@ -66,6 +70,9 @@ export async function optimizeCarbonCss(
     preserveAllIBMFonts: options.preserveAllIBMFonts,
     propAware: await analyzePropAware(options, ids),
   });
+  if (!tokenNames) return report;
+  const tokens = pruneUnusedTokens([report.css], tokenNames);
+  return { css: tokens.css[0], removed: report.removed + tokens.removed[0] };
 }
 
 /**

@@ -17,8 +17,24 @@ import { createCssOptimizer } from "./create-optimized-css";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
+import { canNameTokens, collectTokenNames } from "./prune-tokens";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
+
+/**
+ * `--cds-` names in everything the bundle ships besides CSS: chunks, and
+ * text assets like `index.html`.
+ */
+function bundleTokenNames(bundle: Rollup.OutputBundle): Set<string> {
+  const names = new Set<string>();
+  for (const [id, file] of Object.entries(bundle)) {
+    if (file.type === "chunk") collectTokenNames(file.code, names);
+    else if (canNameTokens(id)) {
+      collectTokenNames(toCssString(file.source), names);
+    }
+  }
+  return names;
+}
 
 /** True if any emitted CSS asset has Carbon rules the optimizer can prune. */
 function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
@@ -52,6 +68,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   let logInfo: ((message: string) => void) | undefined;
   /** Classes from `content` globs; cached after the first scan of a build. */
   let contentClasses: string[] | undefined;
+  /** `--cds-` names from `content` globs, scanned with `contentClasses`. */
+  let contentTokens: string[] = [];
   /** Literal `bx--` classes in each scanned module, kept per module like `ids`. */
   const moduleClasses = new Map<string, Set<string>>();
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
@@ -153,6 +171,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         const warning = contentScanWarning(options?.content, root, scan);
         if (!silent && warning) this.warn(warning);
         contentClasses = scan.classes;
+        contentTokens = scan.tokens;
       }
 
       let usage: UsageResult | undefined;
@@ -188,6 +207,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         options: options ?? {},
         moduleTokens: moduleTokens.size,
         contentTokens: contentClasses.length,
+        tokenNames: [...bundleTokenNames(bundle), ...contentTokens],
         log: logInfo,
         reportExtra: () =>
           analyzer && usage
