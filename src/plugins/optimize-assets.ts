@@ -2,6 +2,7 @@ import type { CssOptimizer } from "./create-optimized-css";
 import type { OptimizeCssOptions } from "./options";
 import { logAssetDiff } from "./print-diff";
 import { type AssetReport, printReport, toAssetReport } from "./print-report";
+import { pruneUnusedTokens } from "./prune-tokens";
 
 export type CssAsset = {
   id: string;
@@ -11,9 +12,10 @@ export type CssAsset = {
 };
 
 /**
- * Runs `optimizer` over each asset, writes the result back (unless
- * `dryRun`), and prints the size log and report the options ask for.
- * Shared by the plugins and the CLI.
+ * Runs `optimizer` over each asset, then (given `tokenNames`) drops the
+ * Carbon tokens no asset reads, writes the results back (unless `dryRun`),
+ * and prints the size log and report the options ask for. Shared by the
+ * plugins and the CLI.
  */
 export function optimizeAssets({
   assets,
@@ -23,6 +25,7 @@ export function optimizeAssets({
   contentTokens,
   log,
   reportExtra,
+  tokenNames,
 }: {
   assets: Iterable<CssAsset>;
   optimizer: CssOptimizer;
@@ -34,12 +37,33 @@ export function optimizeAssets({
   log?: (message: string) => void;
   /** Lines appended to the report, read after every asset has run. */
   reportExtra?: () => string[];
+  /**
+   * `--cds-` names found in the build's scripts and markup. Only a caller
+   * that sees everything the build ships can pass them; without them every
+   * token stays.
+   */
+  tokenNames?: Iterable<string>;
 }): void {
   const silent = options.silent === true;
   const reports: AssetReport[] = [];
 
-  for (const { id, source, write } of assets) {
-    const { css, removed } = optimizer.run(source);
+  const list = [...assets];
+  const results = list.map(({ source }) => optimizer.run(source));
+  if (tokenNames) {
+    const tokens = pruneUnusedTokens(
+      results.map((result) => result.css),
+      tokenNames,
+    );
+    for (const [i, result] of results.entries()) {
+      results[i] = {
+        css: tokens.css[i],
+        removed: result.removed + tokens.removed[i],
+      };
+    }
+  }
+
+  for (const [i, { id, source, write }] of list.entries()) {
+    const { css, removed } = results[i];
 
     if (!options.dryRun && removed > 0) write(css);
 

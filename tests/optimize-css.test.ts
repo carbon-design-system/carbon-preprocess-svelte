@@ -143,6 +143,27 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(secondCtx.warn).toHaveBeenCalledWith(NO_CARBON_IMPORTS);
   });
 
+  test("removes Carbon tokens no asset or chunk reads", async () => {
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+
+    const bundle = {
+      ...makeCssBundle(
+        ":root{--cds-a:1;--cds-b:2;--cds-c:3}.bx--btn{color:var(--cds-a)}",
+      ),
+      "app.js": {
+        type: "chunk",
+        code: 'el.style.setProperty("color", "var(--cds-b)")',
+      },
+    } as unknown as OutputBundle;
+    await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toBe(
+      ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}",
+    );
+  });
+
   test("keeps literal bx-- classes found in app modules", async () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     const cssContent = `.bx--btn { color: blue }
