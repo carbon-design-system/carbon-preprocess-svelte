@@ -4,8 +4,8 @@
     "Tab",
     "TabContent"
   ],
-  "before_bytes": 773243,
-  "after_bytes": 62048,
+  "before_bytes": 773234,
+  "after_bytes": 62046,
   "reduction_percent": 91.98,
   "kept_rules": 264,
   "leaked_count": 0,
