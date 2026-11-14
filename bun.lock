@@ -9,7 +9,7 @@
         "@types/jest": "^30.0.0",
         "@typescript/typescript6": "^6.0.2",
         "bivium": "^0.4.0",
-        "caligula": "^0.3.0",
+        "caligula": "^0.4.0",
         "carbon-components-svelte": "0.114.1",
         "carbon-components-svelte-old": "npm:carbon-components-svelte@0.85.0",
         "knip": "^6.43.0",
@@ -268,7 +268,7 @@
 
     "bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
-    "caligula": ["caligula@0.3.0", "", {}, "sha512-jenFEuzgTIyNmUJWgYTo49X5ZJHbQZUftq4BkTI5p16KDAz5z3w2xf7WjAgrO9Egzz0VNT9s4h9D+TOO0U4/SQ=="],
+    "caligula": ["caligula@0.4.0", "", {}, "sha512-bNGMZ8bJ6kxHi0QoRB1RmBLbJP/yQ3HUNhDmd1vFLxXIPWF+WXNvyjbEYy1Dy9yHEi8SoGXNOFmSilbLHMbDsA=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001760", "", {}, "sha512-7AAMPcueWELt1p3mi13HR/LHH0TJLT11cnwDJEs3xA4+CK/PLKeO9Kl1oru24htkyUKtkGCvAx4ohB0Ttry8Dw=="],
 
