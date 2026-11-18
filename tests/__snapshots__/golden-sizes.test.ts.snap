@@ -25,19 +25,19 @@ exports[`golden app sizes signup-wizard 1`] = `
 {
   "baseline": {
     "css_kb": 754.63,
-    "js_kb": 262.99,
+    "js_kb": 263.27,
   },
   "css": {
     "css_kb": 178.17,
-    "js_kb": 262.99,
+    "js_kb": 263.27,
   },
   "full": {
     "css_kb": 81.65,
-    "js_kb": 179.62,
+    "js_kb": 179.9,
   },
   "prop-aware": {
     "css_kb": 81.65,
-    "js_kb": 262.99,
+    "js_kb": 263.27,
   },
 }
 `;
@@ -67,19 +67,19 @@ exports[`golden app sizes product-catalog 1`] = `
 {
   "baseline": {
     "css_kb": 754.63,
-    "js_kb": 361.75,
+    "js_kb": 362.14,
   },
   "css": {
     "css_kb": 243.2,
-    "js_kb": 361.75,
+    "js_kb": 362.14,
   },
   "full": {
     "css_kb": 133.42,
-    "js_kb": 261.9,
+    "js_kb": 262.3,
   },
   "prop-aware": {
     "css_kb": 133.42,
-    "js_kb": 361.75,
+    "js_kb": 362.14,
   },
 }
 `;
