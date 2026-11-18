@@ -2,9 +2,9 @@
   "ids": [
     "ComboBox"
   ],
-  "before_bytes": 773234,
+  "before_bytes": 774089,
   "after_bytes": 66184,
-  "reduction_percent": 91.44,
+  "reduction_percent": 91.45,
   "kept_rules": 363,
   "leaked_count": 0,
   "leaked_classes": []

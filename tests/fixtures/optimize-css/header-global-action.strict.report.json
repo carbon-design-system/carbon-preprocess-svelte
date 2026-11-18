@@ -2,9 +2,9 @@
   "ids": [
     "HeaderGlobalAction"
   ],
-  "before_bytes": 773234,
-  "after_bytes": 69581,
-  "reduction_percent": 91,
+  "before_bytes": 774089,
+  "after_bytes": 69618,
+  "reduction_percent": 91.01,
   "kept_rules": 321,
   "leaked_count": 1,
   "leaked_classes": [

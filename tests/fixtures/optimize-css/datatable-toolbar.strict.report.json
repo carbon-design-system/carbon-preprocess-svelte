@@ -4,8 +4,8 @@
     "Toolbar",
     "ToolbarSearch"
   ],
-  "before_bytes": 773234,
-  "after_bytes": 93127,
+  "before_bytes": 774089,
+  "after_bytes": 93164,
   "reduction_percent": 87.96,
   "kept_rules": 544,
   "leaked_count": 0,
