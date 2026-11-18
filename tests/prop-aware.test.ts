@@ -30,13 +30,14 @@ describe("propAware", () => {
         content: [join(dir, "*.svelte")],
       };
 
-      const without = await optimizeCarbonCss(BUTTON_CSS, options);
+      const without = await optimizeCarbonCss(BUTTON_CSS, {
+        ...options,
+        propAware: false,
+      });
       expect(without.css).toContain(".bx--btn--danger");
 
-      const result = await optimizeCarbonCss(BUTTON_CSS, {
-        ...options,
-        propAware: true,
-      });
+      // On by default, with `content` to read.
+      const result = await optimizeCarbonCss(BUTTON_CSS, options);
       expect(result.css).toBe(".bx--btn{a:1}.bx--btn--tertiary{a:2}");
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -94,46 +95,75 @@ describe("propAware", () => {
     }
   });
 
-  test("the Vite plugin reads call sites from each `.svelte` module's source", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
-    const appFile = join(dir, "App.svelte");
-    const buttonFile = join(carbonRoot, "src", BUTTON);
-    try {
-      writeFileSync(
-        appFile,
-        app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
-      );
-      const plugin = optimizeCss({
-        silent: true,
-        propAware: true,
-      }) as unknown as {
-        buildStart(this: { warn: (message: string) => void }): Promise<void>;
-        transform(code: string, id: string): void;
-        generateBundle(
-          this: { warn: (message: string) => void },
-          options: unknown,
-          bundle: Rollup.OutputBundle,
-        ): Promise<void>;
-      };
-      const ctx = { warn: jest.fn() };
-      await plugin.buildStart.call(ctx);
-      // The plugin sees compiled JS; the source is read from disk.
-      plugin.transform(
-        `import { Button } from "carbon-components-svelte";`,
-        appFile,
-      );
-      plugin.transform("", buttonFile);
-      const bundle = {
-        "styles.css": { type: "asset", source: BUTTON_CSS },
-      } as unknown as Rollup.OutputBundle;
-      await plugin.generateBundle.call(ctx, {}, bundle);
+  test.each([
+    ["by default", {}, ".bx--btn{a:1}.bx--btn--tertiary{a:2}"],
+    [
+      "not with `propAware: false`",
+      { propAware: false },
+      ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}",
+    ],
+  ] as const)(
+    "the Vite plugin reads call sites from each `.svelte` module's source %s",
+    async (_, options, expected) => {
+      const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
+      const appFile = join(dir, "App.svelte");
+      const buttonFile = join(carbonRoot, "src", BUTTON);
+      try {
+        writeFileSync(
+          appFile,
+          app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
+        );
+        const plugin = optimizeCss({
+          silent: true,
+          ...options,
+        }) as unknown as {
+          buildStart(this: { warn: (message: string) => void }): Promise<void>;
+          transform(code: string, id: string): void;
+          generateBundle(
+            this: { warn: (message: string) => void },
+            options: unknown,
+            bundle: Rollup.OutputBundle,
+          ): Promise<void>;
+        };
+        const ctx = { warn: jest.fn() };
+        await plugin.buildStart.call(ctx);
+        // The plugin sees compiled JS; the source is read from disk.
+        plugin.transform(
+          `import { Button } from "carbon-components-svelte";`,
+          appFile,
+        );
+        plugin.transform("", buttonFile);
+        const bundle = {
+          "styles.css": { type: "asset", source: BUTTON_CSS },
+        } as unknown as Rollup.OutputBundle;
+        await plugin.generateBundle.call(ctx, {}, bundle);
 
-      expect((bundle["styles.css"] as Rollup.OutputAsset).source).toBe(
-        ".bx--btn{a:1}.bx--btn--tertiary{a:2}",
-      );
-      expect(ctx.warn).not.toHaveBeenCalled();
+        expect((bundle["styles.css"] as Rollup.OutputAsset).source).toBe(
+          expected,
+        );
+        expect(ctx.warn).not.toHaveBeenCalled();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test("optimizeCarbonCss without `content` warns only when asked for propAware", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const quiet = await optimizeCarbonCss(BUTTON_CSS, {
+        components: ["Button"],
+      });
+      expect(quiet.css).toContain(".bx--btn--danger");
+      expect(warn).not.toHaveBeenCalled();
+
+      await optimizeCarbonCss(BUTTON_CSS, {
+        components: ["Button"],
+        propAware: true,
+      });
+      expect(warn.mock.calls[0]?.[0]).toContain("propAware needs `content`");
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      warn.mockRestore();
     }
   });
 });
