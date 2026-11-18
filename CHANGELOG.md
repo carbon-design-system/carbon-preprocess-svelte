@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.61](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.61) - 2026-11-18
+
+**Performance**
+
+- prune Carbon design tokens (`--cds-*`) nothing reads (9.0–15.0% smaller optimized CSS on carbon-components-svelte 0.114)
+
+**Fixes**
+
+- upgrade caligula to 0.4.0: drop a repeated empty `@layer` block once an earlier one fixes its order, as PostCSS does
+
 ## [0.11.60](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.60) - 2026-11-18
 
 **Performance**
