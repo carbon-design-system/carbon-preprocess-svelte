@@ -3,9 +3,12 @@ name: Evaluate
 # Accuracy checks for CSS pruning (default and prop-aware) and component
 # specialization. Slow (minutes per job), so they run only when the code
 # they exercise (the analyzer, the component index, the plugins and
-# `optimizeImports`), the examples and golden apps they build or the
-# evaluation scripts change: once per pull request, and again on main
-# after merge.
+# `optimizeImports`), the examples and golden apps they build, the
+# evaluation scripts, or the dependencies change: once per pull request,
+# and again on main after merge. A dependency bump counts because severan
+# and sveast are bundled into `dist/`, and severan's own checks render
+# on the server only: an action or transition it breaks shows up only in
+# `interactions`.
 on:
   pull_request:
     paths:
@@ -29,6 +32,8 @@ on:
       - "scripts/wrapper-cases.ts"
       - "scripts/golden-*.ts"
       - "golden/**"
+      - "package.json"
+      - "bun.lock"
       - ".github/workflows/eval.yml"
   push:
     branches: [main]
@@ -53,6 +58,8 @@ on:
       - "scripts/wrapper-cases.ts"
       - "scripts/golden-*.ts"
       - "golden/**"
+      - "package.json"
+      - "bun.lock"
       - ".github/workflows/eval.yml"
   workflow_dispatch:
 
