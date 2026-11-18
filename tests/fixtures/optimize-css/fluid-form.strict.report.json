@@ -3,9 +3,9 @@
     "TextInput",
     "FluidForm"
   ],
-  "before_bytes": 773234,
+  "before_bytes": 774089,
   "after_bytes": 40508,
-  "reduction_percent": 94.76,
+  "reduction_percent": 94.77,
   "kept_rules": 159,
   "leaked_count": 0,
   "leaked_classes": []

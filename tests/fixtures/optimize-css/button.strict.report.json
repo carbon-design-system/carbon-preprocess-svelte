@@ -2,9 +2,9 @@
   "ids": [
     "Button"
   ],
-  "before_bytes": 773234,
-  "after_bytes": 67557,
-  "reduction_percent": 91.26,
+  "before_bytes": 774089,
+  "after_bytes": 67594,
+  "reduction_percent": 91.27,
   "kept_rules": 303,
   "leaked_count": 0,
   "leaked_classes": []

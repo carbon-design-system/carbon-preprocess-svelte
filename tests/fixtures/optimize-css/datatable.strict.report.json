@@ -2,9 +2,9 @@
   "ids": [
     "DataTable"
   ],
-  "before_bytes": 773234,
+  "before_bytes": 774089,
   "after_bytes": 60507,
-  "reduction_percent": 92.17,
+  "reduction_percent": 92.18,
   "kept_rules": 300,
   "leaked_count": 0,
   "leaked_classes": []

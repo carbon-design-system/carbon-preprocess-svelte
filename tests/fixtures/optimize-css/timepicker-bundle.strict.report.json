@@ -3,9 +3,9 @@
     "TimePicker",
     "TimePickerSelect"
   ],
-  "before_bytes": 773234,
+  "before_bytes": 774089,
   "after_bytes": 52040,
-  "reduction_percent": 93.27,
+  "reduction_percent": 93.28,
   "kept_rules": 239,
   "leaked_count": 0,
   "leaked_classes": []
