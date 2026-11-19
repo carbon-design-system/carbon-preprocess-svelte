@@ -5,7 +5,7 @@ import {
   lexImportsExports,
   MappingsBuilder,
   type PackageExport,
-} from "severan/internal";
+} from "svelte-prune/internal";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { readCarbonExports } from "../indexer/carbon-exports";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { listJsAndSvelteFiles } from "severan/internal";
+import { listJsAndSvelteFiles } from "svelte-prune/internal";
 import { CarbonSvelte } from "../constants";
 import { isSvelteFile } from "../utils";
 import { readCarbonExports } from "./carbon-exports";

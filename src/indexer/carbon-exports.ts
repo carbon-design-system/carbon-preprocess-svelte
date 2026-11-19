@@ -1,4 +1,4 @@
-import { type PackageExport, readPackageExports } from "severan/internal";
+import { type PackageExport, readPackageExports } from "svelte-prune/internal";
 import { CarbonSvelte } from "../constants";
 
 /**

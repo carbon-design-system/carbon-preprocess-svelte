@@ -92,7 +92,7 @@ async function analyzePropAware(
     );
     return undefined;
   }
-  const { analyzeFiles } = await import("severan/internal/analysis");
+  const { analyzeFiles } = await import("svelte-prune/internal/analysis");
   const result = await analyzeFiles({
     library: CARBON,
     failure: PROP_AWARE_FAILURE,

@@ -1,9 +1,9 @@
-import type { SeveranOptions } from "severan";
-import { severan } from "severan/vite";
+import type { SveltePruneOptions } from "svelte-prune";
+import { sveltePrune } from "svelte-prune/vite";
 import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
 import type { BundlerPlugin } from "./bundler-plugin";
 
-export type OptimizeComponentsOptions = SeveranOptions;
+export type OptimizeComponentsOptions = SveltePruneOptions;
 
 /**
  * Vite, Rollup and Rolldown plugin that rewrites each Carbon component
@@ -20,7 +20,7 @@ export type OptimizeComponentsOptions = SeveranOptions;
 export const optimizeComponents = (
   options?: OptimizeComponentsOptions,
 ): BundlerPlugin =>
-  severan(CARBON, options, {
+  sveltePrune(CARBON, options, {
     id: "vite:carbon:optimize-components",
     plugin: "optimizeComponents",
     failure: SPECIALIZE_FAILURE,

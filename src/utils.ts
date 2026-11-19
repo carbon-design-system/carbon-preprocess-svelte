@@ -3,7 +3,7 @@ import {
   isSvelteFile,
   RE_EXT_STYLESHEET,
   stripQuery,
-} from "severan/internal";
+} from "svelte-prune/internal";
 import { CarbonSvelte, RE_EXT_CSS, RE_STYLE_QUERY } from "./constants";
 
 export { errorMessage, isSvelteFile, stripQuery };

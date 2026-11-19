@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { group, task } from "ostia";
-import { listJsAndSvelteFiles } from "severan/internal";
+import { listJsAndSvelteFiles } from "svelte-prune/internal";
 import { CarbonSvelte } from "../src/constants";
 import { buildComponentIndex } from "../src/indexer/build-index";
 import {

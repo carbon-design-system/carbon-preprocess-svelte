@@ -17,7 +17,7 @@ const EXPORT_PREFIX_RE = /^export\s+/;
  * Packages bundled into `dist/`: consumers don't install them, so their
  * declarations are inlined like the project's own.
  */
-const BUNDLED_RE = /^severan(?:\/|$)/;
+const BUNDLED_RE = /^svelte-prune(?:\/|$)/;
 
 interface Decl {
   names: string[];
@@ -139,7 +139,7 @@ function rollupDts(
         }
         if (!isRelative(spec)) {
           // Another file's `export … from "pkg"` is that file's export, not
-          // the entry's (severan's lexer re-exports): only imports carry over.
+          // the entry's (svelte-prune's lexer re-exports): only imports carry over.
           if (ts.isImportDeclaration(stmt) || file === entryDts) {
             externalLines.set(stmt.getText(sf), importedNames(stmt));
           }
@@ -231,7 +231,7 @@ function rollupDts(
 
   collectPublicBindings(entryDts, emitted, declsByFileAndName, markPublic);
   // A name the entry exports means that declaration, not a bundled
-  // package's private one of the same name (severan's `SafelistEntry`).
+  // package's private one of the same name (svelte-prune's `SafelistEntry`).
   for (const decl of kept) {
     for (const name of decl.names) declsByName.set(name, decl);
   }
