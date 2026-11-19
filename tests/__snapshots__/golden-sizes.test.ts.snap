@@ -11,11 +11,11 @@ exports[`golden app sizes admin-dashboard 1`] = `
     "js_kb": 337.53,
   },
   "full": {
-    "css_kb": 121.27,
-    "js_kb": 208.91,
+    "css_kb": 117.14,
+    "js_kb": 208.81,
   },
   "prop-aware": {
-    "css_kb": 121.27,
+    "css_kb": 117.14,
     "js_kb": 337.53,
   },
 }
@@ -33,7 +33,7 @@ exports[`golden app sizes signup-wizard 1`] = `
   },
   "full": {
     "css_kb": 81.65,
-    "js_kb": 179.9,
+    "js_kb": 179.74,
   },
   "prop-aware": {
     "css_kb": 81.65,
@@ -53,11 +53,11 @@ exports[`golden app sizes docs-site 1`] = `
     "js_kb": 214.86,
   },
   "full": {
-    "css_kb": 73.74,
-    "js_kb": 149.24,
+    "css_kb": 71.69,
+    "js_kb": 143.75,
   },
   "prop-aware": {
-    "css_kb": 73.74,
+    "css_kb": 71.69,
     "js_kb": 214.86,
   },
 }
@@ -75,7 +75,7 @@ exports[`golden app sizes product-catalog 1`] = `
   },
   "full": {
     "css_kb": 111.94,
-    "js_kb": 224.12,
+    "js_kb": 223.78,
   },
   "prop-aware": {
     "css_kb": 111.94,
