@@ -230,6 +230,11 @@ function rollupDts(
   };
 
   collectPublicBindings(entryDts, emitted, declsByFileAndName, markPublic);
+  // A name the entry exports means that declaration, not a bundled
+  // package's private one of the same name (severan's `SafelistEntry`).
+  for (const decl of kept) {
+    for (const name of decl.names) declsByName.set(name, decl);
+  }
 
   const queue: string[] = [];
   const seenName = new Set<string>();
