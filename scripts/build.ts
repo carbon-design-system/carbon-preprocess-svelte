@@ -108,7 +108,7 @@ async function buildProject() {
     return;
   }
 
-  // The component index parses Carbon with the bundled `sveast`, so nothing
+  // The component index parses Carbon with the bundled `svelte-ast`, so nothing
   // in dist/ may import svelte: it would load the consumer's compiler, or
   // fail where none resolves. Scan every emitted file because code splitting
   // can put the import in a shared chunk.
@@ -123,7 +123,7 @@ async function buildProject() {
   const offender = bundles.find(({ text }) => SVELTE_IMPORT.test(text));
   if (offender) {
     console.error(
-      `Build failed: dist/${offender.file} imports svelte. Parse with sveast instead.`,
+      `Build failed: dist/${offender.file} imports svelte. Parse with svelte-ast instead.`,
     );
     if (!isWatchMode) {
       process.exit(1);
@@ -132,7 +132,7 @@ async function buildProject() {
   }
 
   // Every tool that loads `svelte.config.js` imports the entry, so it may
-  // not load sveast's parser: the plugins import it when a build starts.
+  // not load svelte-ast's parser: the plugins import it when a build starts.
   // Walk the chunks it imports statically for the template parser.
   const texts = new Map(bundles.map(({ file, text }) => [file, text]));
   const pending = ["index.js"];
