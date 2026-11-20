@@ -757,7 +757,7 @@ The CSS tools (`optimizeCss`, `OptimizeCssPlugin`, `optimizeCarbonCss`, the CLI)
 
 | | |
 | :--- | :--- |
-| Parsing | With [sveast](https://github.com/metonym/sveast), bundled in, so your project's `svelte` version doesn't matter |
+| Parsing | With [svelte-ast](https://github.com/metonym/svelte-ast), bundled in, so your project's `svelte` version doesn't matter |
 | Cost | Built once, well under a second |
 | Cache | `node_modules/.cache/carbon-preprocess-svelte/<carbon-version>_<preprocessor-version>.json`; bumping either package rebuilds it. A linked Carbon checkout (`bun link`, `npm link`, `workspace:`) isn't cached, so source edits apply on the next build. |
 | On failure | The build warns and leaves Carbon CSS unpruned, instead of failing |

@@ -6,7 +6,7 @@ name: Evaluate
 # `optimizeImports`), the examples and golden apps they build, the
 # evaluation scripts, or the dependencies change: once per pull request,
 # and again on main after merge. A dependency bump counts because severan
-# and sveast are bundled into `dist/`, and severan's own checks render
+# and svelte-ast are bundled into `dist/`, and severan's own checks render
 # on the server only: an action or transition it breaks shows up only in
 # `interactions`.
 on:

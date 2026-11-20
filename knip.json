@@ -15,7 +15,7 @@
     "bench/**/*.ts",
     "tests/**/*.{ts,cjs}"
   ],
-  "ignoreDependencies": ["sveast"],
+  "ignoreDependencies": ["svelte-ast"],
   "svelte": false,
   "ignoreBinaries": ["lint"]
 }
