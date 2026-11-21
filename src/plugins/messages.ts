@@ -29,3 +29,13 @@ export function contentScanWarning(
 
 /** `optimizeComponents` is in the build, but its analysis failed. */
 export const SHARED_ANALYSIS_FAILED = `${LOG_PREFIX} propAware is off for this build: optimizeComponents could not analyze it, so CSS was pruned by the imported components alone.`;
+
+/** For `--cds-*` names the CSS reads that nothing declares. */
+export function undeclaredTokens(names: readonly string[]): string {
+  const one = names.length === 1;
+  const list = names.map((name) => `\`${name}\``).join(", ");
+  return (
+    `${LOG_PREFIX} ${list} ${one ? "is" : "are"} read with no fallback, but nothing declares ${one ? "it" : "them"}, so ${one ? "it resolves" : "they resolve"} to nothing. ` +
+    "Carbon 0.114 dropped the v10 token names: `--cds-ui-01` is now `--cds-layer-01`, for example."
+  );
+}

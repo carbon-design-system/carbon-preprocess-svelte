@@ -251,6 +251,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         contentTokens: contentClasses.length,
         tokenNames: [...bundleTokenNames(bundle), ...contentTokens],
         log: logInfo,
+        warn: (message) => this.warn(message),
         reportExtra: () =>
           usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
       });

@@ -276,6 +276,7 @@ export class OptimizeCssPlugin {
               moduleTokens: moduleClasses.size,
               contentTokens: scan.classes.length,
               tokenNames: [...assetTokenNames(assets), ...scan.tokens],
+              warn,
               reportExtra: () =>
                 usage?.report?.(
                   optimizer.usage.prunedByProps,

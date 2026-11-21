@@ -15,6 +15,7 @@ describe("pruneUnusedTokens", () => {
     expect(prune([`${ROOT}.bx--btn{color:var(--cds-c)}`])).toEqual({
       css: [":root{--cds-c:#fff;--ccs-x:1}.bx--btn{color:var(--cds-c)}"],
       removed: [2],
+      undeclared: [],
     });
   });
 
@@ -49,6 +50,7 @@ describe("pruneUnusedTokens", () => {
     expect(prune([ROOT, broken])).toEqual({
       css: [ROOT, broken],
       removed: [0, 0],
+      undeclared: [],
     });
   });
 
@@ -56,7 +58,32 @@ describe("pruneUnusedTokens", () => {
     expect(prune([".bx--btn{a:b}"])).toEqual({
       css: [".bx--btn{a:b}"],
       removed: [0],
+      undeclared: [],
     });
+  });
+
+  test("lists tokens read with no fallback that nothing declares", () => {
+    const css = `${ROOT}.app{background:var(--cds-ui-01);color:var( --cds-text-01 )}.x{a:var(--cds-a)}`;
+    expect(prune([css]).undeclared).toEqual(["--cds-text-01", "--cds-ui-01"]);
+  });
+
+  test("lists them across sheets, and from a read token's value", () => {
+    const sheets = [ROOT, ":root{--cds-d:var(--cds-gone)}.app{a:var(--cds-d)}"];
+    expect(prune(sheets).undeclared).toEqual(["--cds-gone"]);
+  });
+
+  test("skips reads with a fallback, and ones only an unread token makes", () => {
+    const css = `${ROOT}:root{--cds-d:var(--cds-gone)}.app{a:var(--cds-x, #000);b:var(--cds-y,var(--cds-a))}`;
+    expect(prune([css]).undeclared).toEqual([]);
+  });
+
+  test("skips names that scripts or markup name, exactly or by prefix", () => {
+    const css = `${ROOT}.app{a:var(--cds-x);b:var(--cds-button-y)}`;
+    expect(prune([css], ["--cds-x", "--cds-button-"]).undeclared).toEqual([]);
+  });
+
+  test("lists nothing when no sheet declares a token", () => {
+    expect(prune([".app{a:var(--cds-layer-01)}"]).undeclared).toEqual([]);
   });
 });
 

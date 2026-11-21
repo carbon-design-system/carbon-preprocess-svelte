@@ -10,6 +10,7 @@ import {
   type PropAwareUsage,
   type PruneOptions,
 } from "./create-optimized-css";
+import { undeclaredTokens } from "./messages";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
 import { collectTokenNames, pruneUnusedTokens } from "./prune-tokens";
 import { collectCarbonTokens, readFiles, scanContent } from "./scan-content";
@@ -72,6 +73,9 @@ export async function optimizeCarbonCss(
   });
   if (!tokenNames) return report;
   const tokens = pruneUnusedTokens([report.css], tokenNames);
+  if (tokens.undeclared.length > 0) {
+    console.warn(undeclaredTokens(tokens.undeclared));
+  }
   return { css: tokens.css[0], removed: report.removed + tokens.removed[0] };
 }
 

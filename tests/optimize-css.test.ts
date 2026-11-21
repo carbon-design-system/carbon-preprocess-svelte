@@ -6,6 +6,7 @@ import { CarbonSvelte } from "../src/constants";
 import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
+  undeclaredTokens,
 } from "../src/plugins/messages";
 import { optimizeCss as optimizeCssPlugin } from "../src/plugins/optimize-css";
 import type { OptimizeCssOptions } from "../src/plugins/options";
@@ -170,6 +171,25 @@ describe("optimizeCss (Vite plugin)", () => {
     expect((bundle["styles.css"] as OutputAsset).source).toBe(
       ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}",
     );
+  });
+
+  test("warns about Carbon tokens read but never declared", async () => {
+    const plugin = resolvePlugin(optimizeCss());
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+
+    const bundle = makeCssBundle(
+      ":root{--cds-a:1}.bx--btn{color:var(--cds-a)}.app{background:var(--cds-ui-01)}",
+    );
+    const ctx = { warn: jest.fn() };
+    const logSpy = jest.spyOn(console, "log").mockImplementation();
+    try {
+      await plugin.generateBundle.call(ctx, {}, bundle);
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(ctx.warn).toHaveBeenCalledWith(undeclaredTokens(["--cds-ui-01"]));
   });
 
   test("keeps literal bx-- classes found in app modules", async () => {

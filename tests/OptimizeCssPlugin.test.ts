@@ -6,6 +6,7 @@ import { CarbonSvelte } from "../src/constants";
 import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
+  undeclaredTokens,
 } from "../src/plugins/messages";
 import { OptimizeCssPlugin } from "../src/plugins/OptimizeCssPlugin";
 import type { OptimizeCssOptions } from "../src/plugins/options";
@@ -269,6 +270,35 @@ describe("OptimizeCssPlugin", () => {
     expect(written.source()).toBe(
       ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}",
     );
+  });
+
+  test("warns about Carbon tokens read but never declared", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation();
+    try {
+      const plugin = new OptimizeCssPlugin();
+      const mockCompiler = createMockCompiler({
+        assets: {
+          "styles.css": {
+            source: () =>
+              ":root{--cds-a:1}.bx--btn{color:var(--cds-a)}.app{background:var(--cds-ui-01)}",
+          },
+        },
+        moduleResources: [
+          `node_modules/${CarbonSvelte.Components}/Button.svelte`,
+        ],
+      });
+
+      plugin.apply(asCompiler(mockCompiler));
+      await mockCompiler.waitForProcessAssets();
+
+      expect(
+        mockCompiler.compilation.warnings.map(
+          (warning: Error) => warning.message,
+        ),
+      ).toEqual([undeclaredTokens(["--cds-ui-01"])]);
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 
   test("propAware reads call sites from each .svelte module's source", async () => {

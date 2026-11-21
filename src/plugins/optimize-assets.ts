@@ -1,5 +1,6 @@
 import type { CssOptimizer } from "./create-optimized-css";
 import type { OptimizeCssOptions } from "./options";
+import { undeclaredTokens } from "./messages";
 import { logAssetDiff } from "./print-diff";
 import { type AssetReport, printReport, toAssetReport } from "./print-report";
 import { pruneUnusedTokens } from "./prune-tokens";
@@ -13,9 +14,9 @@ export type CssAsset = {
 
 /**
  * Runs `optimizer` over each asset, then (given `tokenNames`) drops the
- * Carbon tokens no asset reads, writes the results back (unless `dryRun`),
- * and prints the size log and report the options ask for. Shared by the
- * plugins and the CLI.
+ * Carbon tokens no asset reads and warns about the ones read but never
+ * declared, writes the results back (unless `dryRun`), and prints the size
+ * log and report the options ask for. Shared by the plugins and the CLI.
  */
 export function optimizeAssets({
   assets,
@@ -24,6 +25,7 @@ export function optimizeAssets({
   moduleTokens,
   contentTokens,
   log,
+  warn = console.warn,
   reportExtra,
   tokenNames,
 }: {
@@ -35,6 +37,8 @@ export function optimizeAssets({
   contentTokens: number;
   /** Where size logs go; `console.log` when unset. */
   log?: (message: string) => void;
+  /** Where warnings go; `console.warn` when unset. */
+  warn?: (message: string) => void;
   /** Lines appended to the report, read after every asset has run. */
   reportExtra?: () => string[];
   /**
@@ -54,6 +58,9 @@ export function optimizeAssets({
       results.map((result) => result.css),
       tokenNames,
     );
+    if (!silent && tokens.undeclared.length > 0) {
+      warn(undeclaredTokens(tokens.undeclared));
+    }
     for (const [i, result] of results.entries()) {
       results[i] = {
         css: tokens.css[i],

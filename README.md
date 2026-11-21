@@ -170,7 +170,7 @@ It runs on production builds, after other plugins (`apply: "build"`, `enforce: "
    - flatpickr and legacy `bx-` rules go unless a flatpickr-based component (DatePicker) is bundled;
    - `:is(…)` and `:not(…)` groups are parsed, not split on commas.
 4. Empty rules are dropped.
-5. **Carbon tokens** (`--cds-*` custom properties) that nothing reads are removed. A token stays if a `var()` in the kept CSS reads it, a kept token's value reads it, or the bundle's scripts or markup (or `content` files) name it. Carbon 0.114 defines about 400 of them, and an app typically reads a few dozen.
+5. **Carbon tokens** (`--cds-*` custom properties) that nothing reads are removed. A token stays if a `var()` in the kept CSS reads it, a kept token's value reads it, or the bundle's scripts or markup (or `content` files) name it. Carbon 0.114 defines about 400 of them, and an app typically reads a few dozen. A token the CSS reads with no fallback that nothing declares or names gets a warning, since it resolves to nothing: often a v10 name Carbon 0.114 dropped, like `--cds-ui-01`.
 
 Validated against most Carbon components and common multi-component bundles with no unexplained survivors. Its one blind spot is in the warning under the [API](#optimizecss-api): class names that never appear as a literal `bx--` token.
 

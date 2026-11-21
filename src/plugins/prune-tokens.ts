@@ -16,8 +16,11 @@ export function canNameTokens(id: string): boolean {
   return RE_SCRIPT_OR_MARKUP.test(id);
 }
 
-/** Token names a `var()` reads. */
-const VAR_READ = /var\(\s*(--cds-[A-Za-z0-9_-]+)/g;
+/**
+ * Token names a `var()` reads. The second group is `)` for a read with no
+ * fallback.
+ */
+const VAR_READ = /var\(\s*(--cds-[A-Za-z0-9_-]+)\s*(\))?/g;
 
 /**
  * Adds every literal `--cds-` name in `source` to `into`. The `includes`
@@ -28,21 +31,29 @@ export function collectTokenNames(source: string, into: Set<string>): void {
   for (const name of source.match(TOKEN_LITERAL) ?? []) into.add(name);
 }
 
-function addReads(value: string, into: Set<string>): void {
+/** The tokens some CSS reads, and the ones it reads with no fallback. */
+type Reads = { all: Set<string>; bare: Set<string> };
+
+const createReads = (): Reads => ({ all: new Set(), bare: new Set() });
+
+function addReads(value: string, into: Reads): void {
   if (!value.includes(TOKEN_PREFIX)) return;
-  for (const match of value.matchAll(VAR_READ)) into.add(match[1]);
+  for (const match of value.matchAll(VAR_READ)) {
+    into.all.add(match[1]);
+    if (match[2]) into.bare.add(match[1]);
+  }
 }
 
 /** What one stylesheet reads, and what each token it defines reads. */
 type TokenUsage = {
-  reads: Set<string>;
+  reads: Reads;
   /** Token name to the tokens its values read. */
-  definitions: Map<string, Set<string>>;
+  definitions: Map<string, Reads>;
 };
 
 /** `undefined` if caligula can't read `css`, so its reads are unknown. */
 function readTokenUsage(css: string): TokenUsage | undefined {
-  const usage: TokenUsage = { reads: new Set(), definitions: new Map() };
+  const usage: TokenUsage = { reads: createReads(), definitions: new Map() };
   const { skipped } = filterCss(css, {
     atRule({ params }) {
       addReads(params, usage.reads);
@@ -54,7 +65,7 @@ function readTokenUsage(css: string): TokenUsage | undefined {
       }
       let reads = usage.definitions.get(prop);
       if (!reads) {
-        reads = new Set();
+        reads = createReads();
         usage.definitions.set(prop, reads);
       }
       addReads(value, reads);
@@ -86,12 +97,20 @@ function createLiteralCheck(literals: Iterable<string>) {
  * (names found in the build's scripts and markup) name it. Leaves every
  * sheet unchanged if any can't be read. `removed` counts each sheet's
  * removed declarations.
+ *
+ * `undeclared` lists the tokens the kept CSS reads with no fallback that
+ * nothing defines or names, so they resolve to nothing. It stays empty
+ * when the sheets define no token: Carbon's CSS is loaded some other way.
  */
 export function pruneUnusedTokens(
   sheets: readonly string[],
   literals: Iterable<string>,
-): { css: string[]; removed: number[] } {
-  const unchanged = { css: [...sheets], removed: sheets.map(() => 0) };
+): { css: string[]; removed: number[]; undeclared: string[] } {
+  const unchanged = {
+    css: [...sheets],
+    removed: sheets.map(() => 0),
+    undeclared: [],
+  };
   if (!sheets.some((css) => css.includes(TOKEN_PREFIX))) return unchanged;
 
   const usages: TokenUsage[] = [];
@@ -103,26 +122,39 @@ export function pruneUnusedTokens(
   }
 
   const named = createLiteralCheck(literals);
-  const definitions = new Map<string, Set<string>>();
+  const definitions = new Map<string, Reads>();
   const read = new Set<string>();
+  const bare = new Set<string>();
   for (const usage of usages) {
-    for (const name of usage.reads) read.add(name);
+    for (const name of usage.reads.all) read.add(name);
+    for (const name of usage.reads.bare) bare.add(name);
     for (const [name, reads] of usage.definitions) {
-      const all = definitions.get(name);
-      if (all) for (const r of reads) all.add(r);
-      else definitions.set(name, new Set(reads));
+      let merged = definitions.get(name);
+      if (!merged) {
+        merged = createReads();
+        definitions.set(name, merged);
+      }
+      for (const r of reads.all) merged.all.add(r);
+      for (const r of reads.bare) merged.bare.add(r);
       if (named(name)) read.add(name);
     }
   }
   const queue = [...read];
   while (queue.length > 0) {
-    for (const name of definitions.get(queue.pop() as string) ?? []) {
+    const reads = definitions.get(queue.pop() as string);
+    if (!reads) continue;
+    for (const name of reads.bare) bare.add(name);
+    for (const name of reads.all) {
       if (!read.has(name)) {
         read.add(name);
         queue.push(name);
       }
     }
   }
+  const undeclared =
+    definitions.size === 0
+      ? []
+      : [...bare].filter((name) => !definitions.has(name) && !named(name));
 
   const removed: number[] = [];
   const css = sheets.map((source) => {
@@ -136,5 +168,5 @@ export function pruneUnusedTokens(
     removed.push(result.removed);
     return result.css;
   });
-  return { css, removed };
+  return { css, removed, undeclared: undeclared.sort() };
 }
