@@ -1,4 +1,4 @@
-import { collectLibraryImports } from "severan/internal";
+import { collectLibraryImports } from "svelte-prune/internal";
 import { CARBON } from "../carbon-library";
 
 /**

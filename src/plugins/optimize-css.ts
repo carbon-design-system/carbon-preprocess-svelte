@@ -1,5 +1,8 @@
-import { type LibraryImport, libraryImports } from "severan/internal";
-import type { UsageCollector, UsageResult } from "severan/internal/analysis";
+import { type LibraryImport, libraryImports } from "svelte-prune/internal";
+import type {
+  UsageCollector,
+  UsageResult,
+} from "svelte-prune/internal/analysis";
 import type { Plugin, Rollup } from "vite";
 import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
@@ -78,7 +81,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   /** Call sites per module for `propAware`. */
   let collector: UsageCollector | undefined;
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
-  let analyzer: typeof import("severan/internal/analysis") | undefined;
+  let analyzer: typeof import("svelte-prune/internal/analysis") | undefined;
   /** The module graph's edges into Carbon, read in `buildEnd`. */
   let edges: LibraryImport[] = [];
 
@@ -99,7 +102,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       contentClasses = undefined;
       components = await loadComponentIndex(root);
       if (propAware && !collector) {
-        analyzer = await import("severan/internal/analysis");
+        analyzer = await import("svelte-prune/internal/analysis");
         try {
           collector = analyzer.createUsageCollector(
             CARBON,

@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { isLinkedCheckout } from "severan/internal";
+import { isLinkedCheckout } from "svelte-prune/internal";
 import { version as OWN_VERSION } from "../../package.json";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { errorMessage } from "../utils";

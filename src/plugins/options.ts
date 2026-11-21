@@ -1,4 +1,4 @@
-import type { UsageOptions } from "severan/internal/analysis";
+import type { UsageOptions } from "svelte-prune/internal/analysis";
 import type { SafelistEntry } from "./safelist";
 
 type PropAwareOptions = UsageOptions;

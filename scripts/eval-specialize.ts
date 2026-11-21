@@ -1,6 +1,6 @@
 /**
  * Accuracy and payoff check for specializing Carbon components
- * (severan's `specializeComponent`), the core of `optimizeComponents`.
+ * (svelte-prune's `specializeComponent`), the core of `optimizeComponents`.
  *
  * For each app in the prop-aware corpus (see `./prop-aware-cases.ts`):
  *
@@ -45,7 +45,7 @@ import {
   libraryAt,
   parse,
   specializeComponent,
-} from "severan/internal/analysis";
+} from "svelte-prune/internal/analysis";
 import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { goldenApps } from "./golden-apps";

@@ -1,5 +1,5 @@
-import { type AST, lexStrings, walk } from "severan/internal";
-import { parse } from "severan/internal/analysis";
+import { type AST, lexStrings, walk } from "svelte-prune/internal";
+import { parse } from "svelte-prune/internal/analysis";
 import {
   componentImports,
   extractCarbonClassTokens,
