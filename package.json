@@ -48,7 +48,7 @@
     "svelte": "^5.57.2",
     "svelte-ast": "^0.12.0",
     "svelte-lint": "^0.1.1",
-    "svelte-prune": "^0.10.1",
+    "svelte-prune": "^0.11.0",
     "svelte-typecheck": "^0.1.21",
     "vite": "^8.3.5",
     "webpack": "^5.112.2"

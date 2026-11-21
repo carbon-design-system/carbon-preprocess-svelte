@@ -1,3 +1,4 @@
+import type { UsageResult } from "svelte-prune/internal/analysis";
 import path from "node:path";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
@@ -18,10 +19,25 @@ export type PruneOptions = Pick<
 /** What `propAware` found, as the optimizer consumes it. */
 export type PropAwareUsage = {
   /** Names of the Carbon components that can render (`Button`, `ButtonSkeleton`). */
-  liveComponents: Set<string>;
+  liveComponents: ReadonlySet<string>;
   /** Whether no rendered component can apply `cls` under the app's props. */
   isPruned(cls: string): boolean;
+  /** The report's prop-aware lines, given the classes it pruned. */
+  report?(prunedClasses: ReadonlySet<string>, root: string): string[];
 };
+
+/** A `UsageResult`, as `PropAwareUsage`. */
+export function propAwareUsage(
+  result: UsageResult,
+  analyzer: typeof import("svelte-prune/internal/analysis"),
+): PropAwareUsage {
+  return {
+    liveComponents: result.liveComponents,
+    isPruned: result.isPruned,
+    report: (prunedClasses, root) =>
+      analyzer.formatPropAwareReport(result, prunedClasses, root),
+  };
+}
 
 export type CssOptimizerOptions = PruneOptions & {
   /** Index of the installed Carbon; see `loadComponentIndex`. */
@@ -48,7 +64,7 @@ function buildUsage(
   componentIndex: ComponentIndex,
   ids: Iterable<string>,
   contentClasses: Iterable<string> = [],
-  liveComponents?: Set<string>,
+  liveComponents?: ReadonlySet<string>,
 ) {
   const allowlist = new Set(ALWAYS_ON_CLASSES);
   const usedComponents = new Set<string>();
