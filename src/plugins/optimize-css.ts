@@ -17,6 +17,7 @@ import {
 } from "../utils";
 import type { BundlerPlugin } from "./bundler-plugin";
 import {
+  type CssOptimizerOptions,
   createCssOptimizer,
   type PropAwareUsage,
   propAwareUsage,
@@ -202,11 +203,19 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       }
 
       let usage: PropAwareUsage | undefined;
+      let engine: CssOptimizerOptions["engine"];
       if (shared && propAware) {
         // The same reading of the call sites `optimizeComponents` rewrote for.
         const analysis = shared();
-        if (analysis && !("warning" in analysis)) usage = analysis.usage;
-        else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
+        if (analysis && !("warning" in analysis) && analyzer) {
+          usage = analysis.usage;
+          engine = {
+            analyzer,
+            root,
+            loadable: analysis.usage.loadable,
+            files: analysis.files,
+          };
+        } else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
       } else if (collector && analyzer && propAware) {
         const result = await collector.analyze(ids, propAware, edges);
         if (!("warning" in result)) usage = propAwareUsage(result, analyzer);
@@ -219,6 +228,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         ids,
         contentClasses: [...contentClasses, ...moduleTokens],
         propAware: usage,
+        engine,
       });
 
       optimizeAssets({
