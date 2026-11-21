@@ -58,8 +58,8 @@
   "sveltekit": {
     "file": "_app/immutable/assets/2.*.css",
     "before_kb": 772.52,
-    "after_kb": 47.09,
-    "reduction_percent": 93.9
+    "after_kb": 29.02,
+    "reduction_percent": 96.24
   },
   "sveltekit-matrix@svelte-5": {
     "css": {
@@ -84,8 +84,8 @@
   "vite": {
     "file": "assets/index-*.css",
     "before_kb": 774.71,
-    "after_kb": 47.39,
-    "reduction_percent": 93.88
+    "after_kb": 29.24,
+    "reduction_percent": 96.23
   },
   "vite-matrix@svelte-4": {
     "css": {
@@ -130,81 +130,81 @@
   "vite@carbon-0.85": {
     "file": "assets/index-*.css",
     "before_kb": 606.42,
-    "after_kb": 88.22,
-    "reduction_percent": 85.45
+    "after_kb": 26.66,
+    "reduction_percent": 95.6
   },
   "vite@svelte-5": {
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 62.04,
-      "reduction_percent": 91.97
+      "after_kb": 39.79,
+      "reduction_percent": 94.85
     },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
       "before_kb": 772.62,
-      "after_kb": 68.5,
-      "reduction_percent": 91.13
+      "after_kb": 37.73,
+      "reduction_percent": 95.12
     },
     "datatable-toolbar": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 80.47,
-      "reduction_percent": 89.58
+      "after_kb": 33.93,
+      "reduction_percent": 95.61
     },
     "datepicker": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 46.3,
-      "reduction_percent": 94.01
+      "after_kb": 34.49,
+      "reduction_percent": 95.54
     },
     "dropdown": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 52.18,
-      "reduction_percent": 93.25
+      "after_kb": 30.22,
+      "reduction_percent": 96.09
     },
     "modal": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 62.04,
-      "reduction_percent": 91.97
+      "after_kb": 39.6,
+      "reduction_percent": 94.87
     },
     "multiselect": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 159.11,
-      "reduction_percent": 79.4
+      "after_kb": 42.09,
+      "reduction_percent": 94.55
     },
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 97.89,
-      "reduction_percent": 87.33
+      "after_kb": 43.55,
+      "reduction_percent": 94.36
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 48.78,
-      "reduction_percent": 93.69
+      "after_kb": 24.08,
+      "reduction_percent": 96.88
     },
     "textinput": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 25.48,
-      "reduction_percent": 96.7
+      "after_kb": 18.7,
+      "reduction_percent": 97.58
     },
     "timepicker-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 38.72,
-      "reduction_percent": 94.99
+      "after_kb": 23.25,
+      "reduction_percent": 96.99
     },
     "uishell": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 26.62,
-      "reduction_percent": 96.55
+      "after_kb": 23.52,
+      "reduction_percent": 96.96
     }
   },
   "webpack": {

@@ -365,10 +365,11 @@ optimizeCss({
 
   /**
    * Also prune styles for the prop values the app never passes.
-   * See "Prop-aware pruning" below.
-   * @default false
+   * See "Prop-aware pruning" below. Set to `false` to prune by the
+   * imported components alone.
+   * @default true
    */
-  propAware: true,
+  propAware: false,
 });
 ```
 
@@ -394,10 +395,10 @@ optimizeCss({
 
 #### Prop-aware pruning
 
-`propAware` also reads the props your app passes, and prunes the variants it never uses:
+By default, `optimizeCss` also reads the props your app passes, and prunes the variants it never uses. It reads which components render, too, so barrel imports (`import { Button } from "carbon-components-svelte"`) prune as well as `optimizeImports` paths do. To prune by the imported components alone:
 
 ```js
-optimizeCss({ propAware: true });
+optimizeCss({ propAware: false });
 ```
 
 ```svelte
@@ -482,7 +483,7 @@ export default {
   plugins: [
     optimizeComponents(), // hands svelte() the rewritten source
     svelte(),
-    optimizeCss({ propAware: true }),
+    optimizeCss(),
   ],
 };
 ```
@@ -561,7 +562,7 @@ import {
 export default {
   plugins: [
     new OptimizeComponentsPlugin(),
-    new OptimizeCssPlugin({ propAware: true }),
+    new OptimizeCssPlugin(),
   ],
 };
 ```
@@ -676,8 +677,10 @@ optimizeCarbonCss(css, {
    * See "Prop-aware pruning" under `optimizeCss`. Reads call sites from the
    * `content` files, so `content` must cover every file that renders Carbon
    * components; a listed component no file renders keeps every variant.
+   * On when `content` is set; `false` turns it off.
+   * @default true
    */
-  propAware: true,
+  propAware: false,
 });
 ```
 

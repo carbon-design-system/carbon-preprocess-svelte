@@ -7,7 +7,15 @@ import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
 } from "../src/plugins/messages";
-import { optimizeCss } from "../src/plugins/optimize-css";
+import { optimizeCss as optimizeCssPlugin } from "../src/plugins/optimize-css";
+import type { OptimizeCssOptions } from "../src/plugins/options";
+
+/**
+ * These tests cover pruning by the imported components, so `propAware` is
+ * off unless a test turns it on; `prop-aware.test.ts` covers it.
+ */
+const optimizeCss = (options: OptimizeCssOptions = {}) =>
+  optimizeCssPlugin({ propAware: false, ...options });
 import { createFakeProject } from "./helpers/fake-project";
 
 type OutputAsset = Rollup.OutputAsset;

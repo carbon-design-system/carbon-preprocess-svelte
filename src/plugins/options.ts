@@ -105,8 +105,9 @@ export type OptimizeCssOptions = {
    * warning.
    *
    * Pass an object to `exclude` components or `assume` values for
-   * props set from expressions.
-   * @default false
+   * props set from expressions, or `false` to prune by the imported
+   * components alone.
+   * @default true
    */
   propAware?: boolean | PropAwareOptions;
 };
@@ -115,7 +116,7 @@ export type OptimizeCssOptions = {
 export function propAwareOptions(
   options?: OptimizeCssOptions,
 ): PropAwareOptions | undefined {
-  const propAware = options?.propAware;
+  const propAware = options?.propAware ?? true;
   if (!propAware) return undefined;
   return propAware === true ? {} : propAware;
 }
