@@ -29,6 +29,11 @@ const FLATPICKR_SELECTOR = new RegExp(
 );
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
 
+/** Whether `selector` names one of flatpickr's classes, which DatePicker's calendar applies. */
+export function isFlatpickrSelector(selector: string): boolean {
+  return MAY_HAVE_FLATPICKR.test(selector) && FLATPICKR_SELECTOR.test(selector);
+}
+
 /**
  * Cheap necessary condition for `FLATPICKR_SELECTOR`: its class names all
  * contain an uppercase letter except `flatpickr-*` and `cur-month`, while
@@ -367,6 +372,21 @@ export function isUnusedIbmPlexFontFace(
   weight: string,
   options: Pick<StrictCssOptimizerOptions, "allowlist" | "components">,
 ): boolean {
+  return isUnusedPlexFace(family, style, weight, () =>
+    matchesAllowlist(
+      ITALIC_TYPE_CLASS,
+      getAllowlistIndex(options.allowlist, options.components),
+    ),
+  );
+}
+
+/** `isUnusedIbmPlexFontFace`, with whether `.bx--type-italic` may render. */
+export function isUnusedPlexFace(
+  family: string,
+  style: string,
+  weight: string,
+  italic: () => boolean,
+): boolean {
   const name = family.replace(QUOTED, "$2");
   if (name !== "IBM Plex Sans" && name !== "IBM Plex Mono") return false;
   const faceWeight = weight === "" || weight === "normal" ? "400" : weight;
@@ -378,11 +398,6 @@ export function isUnusedIbmPlexFontFace(
   }
   return !(
     IBM_PLEX_SANS_WEIGHTS.includes(faceWeight) &&
-    (faceStyle === "normal" ||
-      (faceStyle === "italic" &&
-        matchesAllowlist(
-          ITALIC_TYPE_CLASS,
-          getAllowlistIndex(options.allowlist, options.components),
-        )))
+    (faceStyle === "normal" || (faceStyle === "italic" && italic()))
   );
 }
