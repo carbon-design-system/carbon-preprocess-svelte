@@ -1,7 +1,7 @@
 import { type LibraryImport, libraryImports } from "svelte-prune/internal";
 import type {
+  SharedAnalysis,
   UsageCollector,
-  UsageResult,
 } from "svelte-prune/internal/analysis";
 import type { Plugin, Rollup } from "vite";
 import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
@@ -16,10 +16,22 @@ import {
   toCssString,
 } from "../utils";
 import type { BundlerPlugin } from "./bundler-plugin";
-import { createCssOptimizer } from "./create-optimized-css";
-import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
+import {
+  createCssOptimizer,
+  type PropAwareUsage,
+  propAwareUsage,
+} from "./create-optimized-css";
+import {
+  contentScanWarning,
+  NO_CARBON_IMPORTS,
+  SHARED_ANALYSIS_FAILED,
+} from "./messages";
 import { optimizeAssets } from "./optimize-assets";
-import { type OptimizeCssOptions, propAwareOptions } from "./options";
+import {
+  type OptimizeCssOptions,
+  propAwareOptions,
+  sharesAnalysis,
+} from "./options";
 import { canNameTokens, collectTokenNames } from "./prune-tokens";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
@@ -82,6 +94,10 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   let collector: UsageCollector | undefined;
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
   let analyzer: typeof import("svelte-prune/internal/analysis") | undefined;
+  /** Vite's resolved config, where `optimizeComponents` shares its analysis. */
+  let config: object | undefined;
+  /** `optimizeComponents`' analysis, when it's in the build: no collector then. */
+  let shared: (() => SharedAnalysis | undefined) | undefined;
   /** The module graph's edges into Carbon, read in `buildEnd`. */
   let edges: LibraryImport[] = [];
 
@@ -89,20 +105,28 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     name: "vite:carbon:optimize-css",
     apply: "build",
     enforce: "post",
-    configResolved(config) {
-      root = config.root;
+    configResolved(resolved) {
+      config = resolved;
+      root = resolved.root;
       // Not `this.info`: it prefixes the plugin name and is absent on Rollup 2.
-      logInfo = (message) => config.logger.info(message);
+      logInfo = (message) => resolved.logger.info(message);
     },
     /**
      * Re-reads `content` on `--watch` rebuilds (the plugin instance is
      * reused) and loads the component index while modules transform.
      */
-    async buildStart() {
+    // Tests call it bare; bundlers always pass their options.
+    async buildStart(inputOptions?: { plugins?: readonly object[] }) {
       contentClasses = undefined;
       components = await loadComponentIndex(root);
-      if (propAware && !collector) {
-        analyzer = await import("svelte-prune/internal/analysis");
+      if (propAware && sharesAnalysis(propAware)) {
+        analyzer ??= await import("svelte-prune/internal/analysis");
+        // Rollup and Rolldown have no config: their plugins, then.
+        const build = config ?? inputOptions?.plugins;
+        shared = build && analyzer.siblingAnalysis(build, CARBON.name);
+      }
+      if (propAware && !shared && !collector) {
+        analyzer ??= await import("svelte-prune/internal/analysis");
         try {
           collector = analyzer.createUsageCollector(
             CARBON,
@@ -177,10 +201,15 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         contentTokens = scan.tokens;
       }
 
-      let usage: UsageResult | undefined;
-      if (collector && propAware) {
+      let usage: PropAwareUsage | undefined;
+      if (shared && propAware) {
+        // The same reading of the call sites `optimizeComponents` rewrote for.
+        const analysis = shared();
+        if (analysis && !("warning" in analysis)) usage = analysis.usage;
+        else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
+      } else if (collector && analyzer && propAware) {
         const result = await collector.analyze(ids, propAware, edges);
-        if (!("warning" in result)) usage = result;
+        if (!("warning" in result)) usage = propAwareUsage(result, analyzer);
         else if (!silent) this.warn(result.warning);
       }
 
@@ -213,13 +242,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         tokenNames: [...bundleTokenNames(bundle), ...contentTokens],
         log: logInfo,
         reportExtra: () =>
-          analyzer && usage
-            ? analyzer.formatPropAwareReport(
-                usage,
-                optimizer.usage.prunedByProps,
-                root,
-              )
-            : [],
+          usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
       });
     },
   };

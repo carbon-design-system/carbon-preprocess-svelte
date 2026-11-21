@@ -112,6 +112,17 @@ export type OptimizeCssOptions = {
   propAware?: boolean | PropAwareOptions;
 };
 
+/**
+ * Whether `propAware` can prune from `optimizeComponents`' analysis: only
+ * without `exclude` or `assume`, which the rewrite doesn't read.
+ */
+export function sharesAnalysis(propAware: PropAwareOptions): boolean {
+  return (
+    (propAware.exclude ?? []).length === 0 &&
+    Object.keys(propAware.assume ?? {}).length === 0
+  );
+}
+
 /** `propAware`'s options, or `undefined` when it's off. */
 export function propAwareOptions(
   options?: OptimizeCssOptions,
