@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { optimizeCarbonCss } from "carbon-preprocess-svelte";
 import type { Rollup } from "vite";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
+import { optimizeComponents } from "../src/plugins/optimize-components";
 import { optimizeCss } from "../src/plugins/optimize-css";
 
 const carbonRoot = resolveCarbonRoot();
@@ -166,4 +167,70 @@ describe("propAware", () => {
       warn.mockRestore();
     }
   });
+
+  test.each([
+    [
+      "with `optimizeComponents` in the build",
+      true,
+      ".bx--btn{a:1}.bx--btn--tertiary{a:2}",
+    ],
+    // Its own collector saw no call site of Button: nothing of it renders.
+    ["alone, without the app's module", false, ""],
+  ] as const)(
+    "the Vite plugin prunes from `optimizeComponents`' analysis %s",
+    async (_, both, expected) => {
+      const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
+      const appFile = join(dir, "App.svelte");
+      const buttonFile = join(carbonRoot, "src", BUTTON);
+      try {
+        writeFileSync(
+          appFile,
+          app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
+        );
+        type Hooks = {
+          configResolved(config: object): void;
+          buildStart(this: object, options?: object): Promise<void>;
+          transform(code: string, id: string): void;
+          generateBundle(
+            this: object,
+            options: unknown,
+            bundle: Rollup.OutputBundle,
+          ): Promise<void>;
+        };
+        const config = {
+          root: dir,
+          command: "build",
+          logger: { info: () => {} },
+        };
+        const ctx = {
+          warn: jest.fn(),
+          info: jest.fn(),
+          resolve: async () => null,
+        };
+        if (both) {
+          const components = optimizeComponents({
+            silent: true,
+            content: ["App.svelte"],
+          }) as unknown as Hooks;
+          components.configResolved(config);
+          await components.buildStart.call(ctx);
+        }
+        const css = optimizeCss({ silent: true }) as unknown as Hooks;
+        css.configResolved(config);
+        await css.buildStart.call(ctx, { plugins: [] });
+        // Only Carbon's module: the call sites come from the shared analysis.
+        css.transform("", buttonFile);
+        const bundle = {
+          "styles.css": { type: "asset", source: BUTTON_CSS },
+        } as unknown as Rollup.OutputBundle;
+        await css.generateBundle.call(ctx, {}, bundle);
+        expect(ctx.warn).not.toHaveBeenCalled();
+        expect((bundle["styles.css"] as Rollup.OutputAsset).source).toBe(
+          expected,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

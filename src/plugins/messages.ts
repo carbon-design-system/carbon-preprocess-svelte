@@ -26,3 +26,6 @@ export function contentScanWarning(
   if (scan.matchedFiles === 0) return contentMatchedNothing(content, root);
   return undefined;
 }
+
+/** `optimizeComponents` is in the build, but its analysis failed. */
+export const SHARED_ANALYSIS_FAILED = `${LOG_PREFIX} propAware is off for this build: optimizeComponents could not analyze it, so CSS was pruned by the imported components alone.`;
