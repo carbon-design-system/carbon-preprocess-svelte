@@ -12,15 +12,17 @@ Each build sets `VARIANT` ([vite.config.ts](vite.config.ts)):
 | `css` | `optimizeCss()`: drops styles of components the app doesn't import |
 | `prop-aware` | `optimizeCss({ propAware: true })`: also drops styles for props the app never passes |
 | `full` | prop-aware CSS, plus `optimizeComponents()` (which unwraps live branches on Svelte 5): rewrites Carbon components for the props the app passes |
+| `client-only` | `full` with `optimizeComponents({ hydration: false })`: the app only mounts ([index.html](index.html)), so Svelte's hydration code goes too |
 
-With carbon-components-svelte 0.114.2, `bun run build` printed:
+With carbon-components-svelte 0.114.3, `bun run build` printed:
 
 | Variant | CSS | CSS gzip | JS | JS gzip |
 | --- | --- | --- | --- | --- |
 | baseline | 772.74 kB | 93.96 kB | 523.84 kB | 152.73 kB |
-| css | 385.15 kB (-50.2%) | 46.40 kB (-50.6%) | 523.84 kB | 152.73 kB |
-| prop-aware | 216.81 kB (-71.9%) | 28.64 kB (-69.5%) | 523.84 kB | 152.73 kB |
-| full | 216.81 kB (-71.9%) | 28.64 kB (-69.5%) | 350.41 kB (-33.1%) | 110.75 kB (-27.5%) |
+| css | 371.89 kB (-51.9%) | 44.01 kB (-53.2%) | 523.84 kB | 152.73 kB |
+| prop-aware | 167.52 kB (-78.3%) | 22.14 kB (-76.4%) | 523.84 kB | 152.73 kB |
+| full | 167.52 kB (-78.3%) | 22.14 kB (-76.4%) | 316.30 kB (-39.6%) | 101.27 kB (-33.7%) |
+| client-only | 167.52 kB (-78.3%) | 22.14 kB (-76.4%) | 311.28 kB (-40.6%) | 99.51 kB (-34.8%) |
 
 ## Usage
 

@@ -517,8 +517,28 @@ optimizeComponents({
    * the prop values each call site passes. @default false
    */
   report: false,
+
+  /**
+   * `false` for an app that only mounts (`mount()`) and never hydrates
+   * server-rendered HTML: Svelte 5's client runtime loses its hydration
+   * code. Vite, Rollup and Rolldown on Svelte 5 only.
+   * @default true
+   */
+  hydration: true,
 });
 ```
+
+#### Client-only apps: `hydration: false`
+
+Svelte 5 ships its hydration code in every client bundle, because the flag that guards it isn't one a bundler can fold. An app that only calls `mount()`, never hydrating server-rendered HTML, can drop it:
+
+```js
+optimizeComponents({ hydration: false });
+```
+
+The build fails if its output can still call `hydrate()`, so a wrong setting can't ship: SvelteKit with SSR or prerendering, Astro islands (`client:load`), `hydrate` from `svelte`, or a class component from `svelte/legacy`. Leave it on there. Svelte 3 and 4 bundle hydration code only for components compiled with `hydratable`, and webpack and Rspack keep `hydrate()` in every Svelte 5 bundle, so those ignore it with a warning.
+
+In [vite-matrix@svelte-5](examples/vite-matrix@svelte-5), which only mounts, its `client-only` variant takes gzipped JS from 101.27 kB (`full`) to 99.51 kB, another 1.7%, and behaves identically through the interaction evals.
 
 Where it runs:
 
@@ -549,7 +569,7 @@ JavaScript removed in the examples:
 
 ### `OptimizeComponentsPlugin`
 
-`optimizeComponents` for webpack and Rspack, with the same options. It runs in production mode only, and its pre-loader runs before `svelte-loader` wherever the plugin is listed.
+`optimizeComponents` for webpack and Rspack, with the same options (`hydration: false` warns and does nothing here: webpack keeps `hydrate()` in every Svelte 5 bundle). It runs in production mode only, and its pre-loader runs before `svelte-loader` wherever the plugin is listed.
 
 ```js
 // webpack.config.mjs (or rspack.config.mjs)

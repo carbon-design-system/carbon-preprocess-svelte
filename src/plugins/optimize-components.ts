@@ -15,7 +15,9 @@ export type OptimizeComponentsOptions = SveltePruneOptions;
  * branches.
  *
  * Runs on production builds only, before Svelte compiles. Rewritten
- * components come with source maps back to their original source.
+ * components come with source maps back to their original source. For an
+ * app that only mounts, `hydration: false` also drops Svelte 5's hydration
+ * code; the build fails if it can still hydrate (SvelteKit with SSR).
  */
 export const optimizeComponents = (
   options?: OptimizeComponentsOptions,

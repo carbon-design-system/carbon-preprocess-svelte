@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { $ } from "bun";
 
-const VARIANTS = ["baseline", "css", "prop-aware", "full"];
+const VARIANTS = ["baseline", "css", "prop-aware", "full", "client-only"];
 const dir = join(import.meta.dirname, "..");
 
 type Sizes = { css: number; cssGzip: number; js: number; jsGzip: number };
