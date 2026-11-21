@@ -7,10 +7,7 @@ import {
   type WebpackConnection,
   type WebpackModule,
 } from "svelte-prune/internal";
-import type {
-  UsageCollector,
-  UsageResult,
-} from "svelte-prune/internal/analysis";
+import type { UsageCollector } from "svelte-prune/internal/analysis";
 import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
@@ -20,10 +17,22 @@ import {
   isCssFile,
   isScannableModule,
 } from "../utils";
-import { createCssOptimizer } from "./create-optimized-css";
-import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
+import {
+  createCssOptimizer,
+  type PropAwareUsage,
+  propAwareUsage,
+} from "./create-optimized-css";
+import {
+  contentScanWarning,
+  NO_CARBON_IMPORTS,
+  SHARED_ANALYSIS_FAILED,
+} from "./messages";
 import { optimizeAssets } from "./optimize-assets";
-import { type OptimizeCssOptions, propAwareOptions } from "./options";
+import {
+  type OptimizeCssOptions,
+  propAwareOptions,
+  sharesAnalysis,
+} from "./options";
 import { canNameTokens, collectTokenNames } from "./prune-tokens";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
@@ -202,8 +211,18 @@ export class OptimizeCssPlugin {
             const analyzer = propAware
               ? await import("svelte-prune/internal/analysis")
               : undefined;
-            let usage: UsageResult | undefined;
-            if (analyzer && propAware) {
+            // `OptimizeComponentsPlugin`'s analysis, when it's in the build:
+            // the same reading of the call sites it rewrote for.
+            const shared =
+              analyzer && propAware && sharesAnalysis(propAware)
+                ? analyzer.siblingAnalysis(compiler, CARBON.name)
+                : undefined;
+            let usage: PropAwareUsage | undefined;
+            if (shared) {
+              const analysis = shared();
+              if (analysis && !("warning" in analysis)) usage = analysis.usage;
+              else warn(SHARED_ANALYSIS_FAILED);
+            } else if (analyzer && propAware) {
               let collector: UsageCollector | undefined;
               try {
                 collector = analyzer.createUsageCollector(
@@ -225,7 +244,7 @@ export class OptimizeCssPlugin {
                 carbonImports,
               );
               if (result && "warning" in result) warn(result.warning);
-              else usage = result;
+              else if (result) usage = propAwareUsage(result, analyzer);
             }
 
             const optimizer = createCssOptimizer({
@@ -248,13 +267,10 @@ export class OptimizeCssPlugin {
               contentTokens: scan.classes.length,
               tokenNames: [...assetTokenNames(assets), ...scan.tokens],
               reportExtra: () =>
-                analyzer && usage
-                  ? analyzer.formatPropAwareReport(
-                      usage,
-                      optimizer.usage.prunedByProps,
-                      compiler.context,
-                    )
-                  : [],
+                usage?.report?.(
+                  optimizer.usage.prunedByProps,
+                  compiler.context,
+                ) ?? [],
             });
           },
         );
