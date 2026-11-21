@@ -149,14 +149,14 @@
     "datatable-toolbar": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 38.03,
-      "reduction_percent": 95.08
+      "after_kb": 33.93,
+      "reduction_percent": 95.61
     },
     "datepicker": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 35.44,
-      "reduction_percent": 95.41
+      "after_kb": 34.49,
+      "reduction_percent": 95.54
     },
     "dropdown": {
       "file": "assets/index-*.css",
@@ -173,8 +173,8 @@
     "multiselect": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 86.03,
-      "reduction_percent": 88.86
+      "after_kb": 42.09,
+      "reduction_percent": 94.55
     },
     "select-pagination": {
       "file": "assets/index-*.css",
@@ -185,8 +185,8 @@
     "tabs-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 30.16,
-      "reduction_percent": 96.1
+      "after_kb": 24.08,
+      "reduction_percent": 96.88
     },
     "textinput": {
       "file": "assets/index-*.css",
