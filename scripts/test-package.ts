@@ -70,7 +70,7 @@ const css: OptimizeCssOptions = {
   content: ["src/**/*.svelte"],
   propAware: { exclude: ["Modal"], assume: { Button: { kind: ["ghost"] } } },
 };
-const components: OptimizeComponentsOptions = { unwrap: false, report: true };
+const components: OptimizeComponentsOptions = { unwrap: false, report: true, hydration: false };
 const preprocess: PreprocessorGroup[] = [optimizeImports()];
 const webpack = [new OptimizeCssPlugin(css), new OptimizeComponentsPlugin(components)];
 const report = await optimizeCarbonCss("", { components: ["Button"] });
