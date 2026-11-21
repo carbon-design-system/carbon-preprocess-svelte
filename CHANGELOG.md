@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.62](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.62) - 2026-11-20
+
+**Performance**
+
+- upgrade severan to 0.9.0, now svelte-prune 0.10.1 (2.8–16.1% smaller CSS and up to 14.7% smaller JS from `optimizeComponents` and `propAware` in the golden apps)
+
+**Fixes**
+
+- parse a snippet type parameter with an arrow function type, as `{#snippet f<T extends () => void>(v: T)}` (svelte-ast 0.12.0, sveast's new name)
+
 ## [0.11.61](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.61) - 2026-11-18
 
 **Performance**
