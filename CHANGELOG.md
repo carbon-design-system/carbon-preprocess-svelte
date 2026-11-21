@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.0) - 2026-11-21
+
+**⚠ Breaking**
+
+- `optimizeCss` and `OptimizeCssPlugin` prune by the props your app passes (`propAware`) by default, and `optimizeCarbonCss` does whenever `content` is given. A Carbon class your app builds from data at runtime (`class={"bx--tag--" + color}`) is no longer kept by the component allowlist and needs `safelist`. The CLI keeps `--prop-aware` opt-in.
+
+**Features**
+
+- with `optimizeComponents` in the same build, CSS is pruned from the analysis it rewrote for, so JS and CSS come from one reading of the call sites, using svelte-prune's stylesheet pruner with Carbon's IBM Plex, flatpickr and legacy `bx-` rules on top
+- Carbon's CSS Grid breakpoint classes (`bx--lg:col-span-4`) are pruned when no `CssColumn` renders them
+
+**Performance**
+
+- 12–74% smaller optimized CSS in default setups (`vite` 47.39 kB → 29.24 kB, `vite@svelte-5/multiselect` 159.11 kB → 41.73 kB); 1.6–2.6 kB smaller with `optimizeComponents`
+
+**Migration**
+
+- Nothing to change for most apps: prop-aware pruning reads literal props, constants, your wrapper components and Carbon's own call sites, and keeps every variant of anything it can't read.
+- If a style goes missing, keep the classes your app builds from data with `safelist`: `optimizeCss({ safelist: [/^\.bx--tag--/] })`. `report: true` shows each component's prop values and why any stayed unknown.
+- To prune by imported components alone, as in 0.11: `optimizeCss({ propAware: false })` (or `new OptimizeCssPlugin({ propAware: false })`).
+
 ## [0.11.63](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.11.63) - 2026-11-21
 
 **Features**
