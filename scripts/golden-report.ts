@@ -10,7 +10,7 @@
 
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { specializeFiles } from "severan/internal/analysis";
+import { specializeFiles } from "svelte-prune/internal/analysis";
 import { CARBON, SPECIALIZE_FAILURE } from "../src/carbon-library";
 import { goldenApps } from "./golden-apps";
 

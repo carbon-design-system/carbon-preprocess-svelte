@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { WebpackCompiler } from "severan/internal";
-import { SeveranPlugin } from "severan/webpack";
+import type { WebpackCompiler } from "svelte-prune/internal";
+import { SveltePrunePlugin } from "svelte-prune/webpack";
 import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
 import type { OptimizeComponentsOptions } from "./optimize-components";
 
@@ -26,10 +26,10 @@ const LOADER = (() => {
  * module outside `content` imports a Carbon component.
  */
 export class OptimizeComponentsPlugin {
-  private plugin: SeveranPlugin;
+  private plugin: SveltePrunePlugin;
 
   public constructor(options?: OptimizeComponentsOptions) {
-    this.plugin = new SeveranPlugin(CARBON, options, {
+    this.plugin = new SveltePrunePlugin(CARBON, options, {
       plugin: "OptimizeComponentsPlugin",
       failure: SPECIALIZE_FAILURE,
       loader: LOADER,

@@ -5,7 +5,7 @@ import {
   lexComponent,
   lexImportsExports,
   RE_EXT_SVELTE,
-} from "severan/internal";
+} from "svelte-prune/internal";
 
 const CLASSLIST_LITERAL =
   /classList\.(?:add|remove|toggle)\(\s*["'](bx--[^"']+)["']/g;

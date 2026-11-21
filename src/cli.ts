@@ -1,7 +1,7 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import type { UsageResult } from "severan/internal/analysis";
+import type { UsageResult } from "svelte-prune/internal/analysis";
 import { CARBON, PROP_AWARE_FAILURE } from "./carbon-library";
 import { LOG_PREFIX } from "./constants";
 import { loadComponentIndex } from "./indexer/load-index";
@@ -133,7 +133,7 @@ async function main() {
   };
 
   const analyzer = propAware
-    ? await import("severan/internal/analysis")
+    ? await import("svelte-prune/internal/analysis")
     : undefined;
   let usage: UsageResult | undefined;
   if (analyzer) {

@@ -1,4 +1,4 @@
-import { packageSignature, requirePackageDir } from "severan/internal";
+import { packageSignature, requirePackageDir } from "svelte-prune/internal";
 import { CarbonSvelte } from "../constants";
 
 /** Directory of the installed `carbon-components-svelte`; see `resolvePackageDir`. */

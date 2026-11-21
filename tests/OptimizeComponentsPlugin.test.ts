@@ -1,7 +1,7 @@
 // @depends-on tests/helpers/svelte-source-loader.cjs
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { optimizerRegistry } from "severan/internal";
+import { optimizerRegistry } from "svelte-prune/internal";
 import webpack from "webpack";
 import { OptimizeComponentsPlugin } from "../src/plugins/OptimizeComponentsPlugin";
 import { createFakeProject } from "./helpers/fake-project";

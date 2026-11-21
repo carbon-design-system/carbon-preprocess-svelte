@@ -35,7 +35,7 @@ import {
   analyzeFiles,
   libraryAt,
   loadComponentModel,
-} from "severan/internal/analysis";
+} from "svelte-prune/internal/analysis";
 import { compile } from "svelte/compiler";
 import { render } from "svelte/server";
 import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";

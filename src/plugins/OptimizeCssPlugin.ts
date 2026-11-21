@@ -6,8 +6,11 @@ import {
   moduleSource,
   type WebpackConnection,
   type WebpackModule,
-} from "severan/internal";
-import type { UsageCollector, UsageResult } from "severan/internal/analysis";
+} from "svelte-prune/internal";
+import type {
+  UsageCollector,
+  UsageResult,
+} from "svelte-prune/internal/analysis";
 import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
@@ -197,7 +200,7 @@ export class OptimizeCssPlugin {
             if (warning) warn(warning);
 
             const analyzer = propAware
-              ? await import("severan/internal/analysis")
+              ? await import("svelte-prune/internal/analysis")
               : undefined;
             let usage: UsageResult | undefined;
             if (analyzer && propAware) {
