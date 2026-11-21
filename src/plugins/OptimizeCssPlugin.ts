@@ -18,6 +18,7 @@ import {
   isScannableModule,
 } from "../utils";
 import {
+  type CssOptimizerOptions,
   createCssOptimizer,
   type PropAwareUsage,
   propAwareUsage,
@@ -218,10 +219,18 @@ export class OptimizeCssPlugin {
                 ? analyzer.siblingAnalysis(compiler, CARBON.name)
                 : undefined;
             let usage: PropAwareUsage | undefined;
-            if (shared) {
+            let engine: CssOptimizerOptions["engine"];
+            if (shared && analyzer) {
               const analysis = shared();
-              if (analysis && !("warning" in analysis)) usage = analysis.usage;
-              else warn(SHARED_ANALYSIS_FAILED);
+              if (analysis && !("warning" in analysis)) {
+                usage = analysis.usage;
+                engine = {
+                  analyzer,
+                  root: compiler.context,
+                  loadable: analysis.usage.loadable,
+                  files: analysis.files,
+                };
+              } else warn(SHARED_ANALYSIS_FAILED);
             } else if (analyzer && propAware) {
               let collector: UsageCollector | undefined;
               try {
@@ -253,6 +262,7 @@ export class OptimizeCssPlugin {
               ids,
               contentClasses: [...scan.classes, ...moduleClasses],
               propAware: usage,
+              engine,
             });
 
             optimizeAssets({

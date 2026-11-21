@@ -7,6 +7,10 @@ import {
   type SpliceOptimizerOptions,
   spliceOptimizeCss,
 } from "./css-splice-optimizer";
+import {
+  type CarbonStylePrunerInput,
+  createCarbonStylePruner,
+} from "./carbon-style-pruner";
 import type { OptimizeCssOptions } from "./options";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
@@ -47,6 +51,14 @@ export type CssOptimizerOptions = PruneOptions & {
   /** Class selectors (`.bx--*`) to keep; pre-scanned so no I/O happens here. */
   contentClasses?: Iterable<string>;
   propAware?: PropAwareUsage;
+  /**
+   * With `propAware`: prune with svelte-prune's `libraryStylePruner`, from
+   * the analysis `optimizeComponents` shares, instead of the allowlist.
+   */
+  engine?: Pick<
+    CarbonStylePrunerInput,
+    "analyzer" | "root" | "loadable" | "files"
+  >;
 };
 
 export type OptimizedCssReport = {
@@ -137,6 +149,21 @@ export function createCssOptimizer(options: CssOptimizerOptions) {
     options.propAware?.liveComponents,
   );
   const prunedByProps = new Set<string>();
+  const { engine, propAware } = options;
+  const carbonPruner =
+    engine && propAware
+      ? createCarbonStylePruner({
+          ...engine,
+          isPruned: createPrunedCheck(
+            propAware,
+            options.contentClasses,
+            prunedByProps,
+          ),
+          liveComponents: propAware.liveComponents,
+          safelist: options.safelist ?? [],
+          preserveAllIBMFonts: options.preserveAllIBMFonts === true,
+        })
+      : undefined;
   const optimizerOptions: SpliceOptimizerOptions = {
     allowlist,
     components: options.components,
@@ -160,7 +187,9 @@ export function createCssOptimizer(options: CssOptimizerOptions) {
       const input = toCssString(source);
       if (!hasOptimizableCss(input)) return { css: input, removed: 0 };
 
-      return spliceOptimizeCss(input, optimizerOptions);
+      return carbonPruner
+        ? carbonPruner(input)
+        : spliceOptimizeCss(input, optimizerOptions);
     },
   };
 }

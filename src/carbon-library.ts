@@ -1,7 +1,13 @@
 import type { Failure, LibrarySpec } from "svelte-prune";
 import { CarbonSvelte, PACKAGE_NAME } from "./constants";
-import { extractCarbonClassTokens } from "./indexer/extract-runtime-classes";
 import { collectCarbonTokens } from "./plugins/scan-content";
+
+/**
+ * A Carbon class, with the breakpoint ones CSS Grid columns build
+ * (`bx--lg:col-span-4`). `bx--lg:` alone is a prefix: svelte-prune keeps
+ * every class starting with it.
+ */
+const CLASS_TOKEN = /(?<![\w-])bx--[\w-]+(?::[\w-]*)?/g;
 
 /** Carbon, as svelte-prune reads and rewrites it. */
 export const CARBON: LibrarySpec = {
@@ -14,7 +20,8 @@ export const CARBON: LibrarySpec = {
   tool: PACKAGE_NAME,
   classTokens: {
     marker: "bx--",
-    text: (text) => extractCarbonClassTokens(text),
+    text: (text) =>
+      Array.from(text.matchAll(CLASS_TOKEN), ([token]) => `.${token}`),
     script: collectCarbonTokens,
   },
 };
