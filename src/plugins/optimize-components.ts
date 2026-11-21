@@ -10,12 +10,13 @@ export type OptimizeComponentsOptions = SveltePruneOptions;
  * the app renders for the props it passes: values that never change become
  * literals, and branches that can't run go, along with the components only
  * they render. The app's own wrapper components are rewritten too when
- * every call site is in `content`. Pair it with
- * `optimizeCss({ propAware: true })`, which prunes the styles of the same
- * branches.
+ * every call site is in `content`. With `optimizeCss` in the same build,
+ * CSS is pruned from this analysis, so styles go with the same branches.
  *
  * Runs on production builds only, before Svelte compiles. Rewritten
- * components come with source maps back to their original source.
+ * components come with source maps back to their original source. For an
+ * app that only mounts, `hydration: false` also drops Svelte 5's hydration
+ * code; the build fails if it can still hydrate (SvelteKit with SSR).
  */
 export const optimizeComponents = (
   options?: OptimizeComponentsOptions,
