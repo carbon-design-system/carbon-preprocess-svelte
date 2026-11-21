@@ -1,13 +1,13 @@
 {
   "astro": {
     "default": {
-      "file": "_astro/index.*.css",
+      "file": "_astro/App.*.css",
       "before_kb": 773.13,
       "after_kb": 47.06,
       "reduction_percent": 93.91
     },
     "optimized": {
-      "file": "_astro/index.*.css",
+      "file": "_astro/App.*.css",
       "before_kb": 773.13,
       "after_kb": 27.14,
       "reduction_percent": 96.49
