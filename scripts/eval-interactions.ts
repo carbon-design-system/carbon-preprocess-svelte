@@ -7,7 +7,8 @@
  * hover, modals).
  *
  * - `vite-matrix@svelte-4`, `vite-matrix@svelte-5`: Vite, `baseline` vs
- *   `css`, `prop-aware` and `full`.
+ *   `css`, `prop-aware` and `full`, and on Svelte 5 `client-only`
+ *   (`optimizeComponents({ hydration: false })`).
  * - `sveltekit-matrix@svelte-5`: the same app prerendered by SvelteKit and
  *   hydrated. Also requires the same prerendered HTML, the same console
  *   messages, and no extra DOM removed while hydrating (a hydration mismatch
@@ -266,7 +267,8 @@ const EXAMPLE_SPECS: Record<string, Example> = {
     steps: MATRIX_STEPS,
   },
   "vite-matrix@svelte-5": {
-    variants: MATRIX_VARIANTS,
+    // It only mounts, so it also checks `hydration: false`.
+    variants: [...MATRIX_VARIANTS, "client-only"],
     outDir: (variant) => `dist/${variant}`,
     ready: ".bx--header",
     steps: MATRIX_STEPS,

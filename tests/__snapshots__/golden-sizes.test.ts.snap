@@ -74,11 +74,11 @@ exports[`golden app sizes product-catalog 1`] = `
     "js_kb": 362.14,
   },
   "full": {
-    "css_kb": 111.94,
+    "css_kb": 111.59,
     "js_kb": 223.78,
   },
   "prop-aware": {
-    "css_kb": 111.94,
+    "css_kb": 111.59,
     "js_kb": 362.14,
   },
 }

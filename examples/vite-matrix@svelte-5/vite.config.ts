@@ -11,6 +11,8 @@ import {
  * - `css`: `optimizeCss()`, pruning styles of components the app imports
  * - `prop-aware`: also prunes styles for props the app never passes
  * - `full`: also rewrites Carbon components for the props the app passes
+ * - `client-only`: `full` without Svelte's hydration code
+ *   (`hydration: false`), since this app only mounts
  */
 const variant = process.env.VARIANT ?? "full";
 
@@ -22,6 +24,7 @@ export default {
   },
   plugins: [
     variant === "full" && optimizeComponents(),
+    variant === "client-only" && optimizeComponents({ hydration: false }),
     svelte({ preprocess: [optimizeImports()] }),
     variant !== "baseline" &&
       optimizeCss({
