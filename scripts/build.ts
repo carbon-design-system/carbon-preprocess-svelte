@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { $, build } from "bun";
 import { bundleDts } from "./bundle-dts";
 
-const SVELTE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*)["']svelte/;
+const SVELTE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*)["']svelte["'/]/;
 const STATIC_IMPORT = /\b(?:from|import)\s*["']\.\/([^"']+)["']/g;
 const SHEBANG = "#!/usr/bin/env node\n";
 const JS_FILE = /\.js$/;
