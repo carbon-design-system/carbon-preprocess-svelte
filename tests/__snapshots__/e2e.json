@@ -9,8 +9,8 @@
     "optimized": {
       "file": "_astro/index.*.css",
       "before_kb": 773.13,
-      "after_kb": 28.9,
-      "reduction_percent": 96.26
+      "after_kb": 27.14,
+      "reduction_percent": 96.49
     }
   },
   "rolldown": {
@@ -23,8 +23,8 @@
     "optimized": {
       "file": "bundle-*.css",
       "before_kb": 773.82,
-      "after_kb": 28.97,
-      "reduction_percent": 96.26
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     }
   },
   "rollup": {
@@ -37,8 +37,8 @@
     "optimized": {
       "file": "bundle-*.css",
       "before_kb": 773.82,
-      "after_kb": 28.97,
-      "reduction_percent": 96.26
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     }
   },
   "rspack": {
@@ -51,8 +51,8 @@
     "optimized": {
       "file": "build/bundle.*.css",
       "before_kb": 1910,
-      "after_kb": 40.67,
-      "reduction_percent": 97.87
+      "after_kb": 38.82,
+      "reduction_percent": 97.97
     }
   },
   "sveltekit": {
@@ -71,14 +71,14 @@
     "full": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 772.74,
-      "after_kb": 167.88,
-      "reduction_percent": 78.27
+      "after_kb": 165.21,
+      "reduction_percent": 78.62
     },
     "prop-aware": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 772.74,
-      "after_kb": 167.88,
-      "reduction_percent": 78.27
+      "after_kb": 167.52,
+      "reduction_percent": 78.32
     }
   },
   "vite": {
@@ -97,14 +97,14 @@
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 774.93,
-      "after_kb": 168.96,
-      "reduction_percent": 78.2
+      "after_kb": 166.34,
+      "reduction_percent": 78.54
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 774.93,
-      "after_kb": 168.96,
-      "reduction_percent": 78.2
+      "after_kb": 168.6,
+      "reduction_percent": 78.24
     }
   },
   "vite-matrix@svelte-5": {
@@ -117,14 +117,14 @@
     "full": {
       "file": "assets/index-*.css",
       "before_kb": 772.74,
-      "after_kb": 167.88,
-      "reduction_percent": 78.27
+      "after_kb": 165.21,
+      "reduction_percent": 78.62
     },
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 772.74,
-      "after_kb": 167.88,
-      "reduction_percent": 78.27
+      "after_kb": 167.52,
+      "reduction_percent": 78.32
     }
   },
   "vite@carbon-0.85": {
@@ -173,8 +173,8 @@
     "multiselect": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 42.09,
-      "reduction_percent": 94.55
+      "after_kb": 41.73,
+      "reduction_percent": 94.6
     },
     "select-pagination": {
       "file": "assets/index-*.css",
@@ -217,8 +217,8 @@
     "optimized": {
       "file": "build/bundle.*.css",
       "before_kb": 773.82,
-      "after_kb": 28.97,
-      "reduction_percent": 96.26
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     }
   },
   "webpack@svelte-5": {
@@ -231,8 +231,8 @@
     "optimized": {
       "file": "build/bundle.*.css",
       "before_kb": 773.82,
-      "after_kb": 28.97,
-      "reduction_percent": 96.26
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     }
   }
 }
