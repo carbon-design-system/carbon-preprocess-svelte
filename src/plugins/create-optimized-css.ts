@@ -195,6 +195,11 @@ export function createCssOptimizer(options: CssOptimizerOptions) {
 
   return {
     usage: { components, allowlistSize: allowlist.size, prunedByProps },
+    /**
+     * svelte-prune's pruner already removes the tokens nothing reads; only
+     * the allowlist engine needs `pruneUnusedTokens` after it.
+     */
+    prunesTokens: carbonPruner !== undefined,
     run(source: Uint8Array | string): OptimizedCssReport {
       // Bundlers hand over every CSS asset, including chunks with no Carbon
       // styles; skip the parse unless something removable could be present.
