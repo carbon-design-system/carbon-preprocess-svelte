@@ -43,6 +43,19 @@ export function propAwareUsage(
   };
 }
 
+/**
+ * The `engine` for a usage analysis CPS ran itself, from `files`: the app
+ * sources it read, whose classes, custom properties and keyframes stay.
+ */
+export function collectedEngine(
+  result: UsageResult,
+  analyzer: typeof import("svelte-prune/internal/analysis"),
+  root: string,
+  files: ReadonlyArray<{ code: string }>,
+): NonNullable<CssOptimizerOptions["engine"]> {
+  return { analyzer, root, loadable: result.analysis.loadable, files };
+}
+
 export type CssOptimizerOptions = PruneOptions & {
   /** Index of the installed Carbon; see `loadComponentIndex`. */
   components: ComponentIndex;
@@ -52,8 +65,9 @@ export type CssOptimizerOptions = PruneOptions & {
   contentClasses?: Iterable<string>;
   propAware?: PropAwareUsage;
   /**
-   * With `propAware`: prune with svelte-prune's `libraryStylePruner`, from
-   * the analysis `optimizeComponents` shares, instead of the allowlist.
+   * With `propAware`: prune with svelte-prune's `libraryStylePruner` instead
+   * of the allowlist, from the analysis `optimizeComponents` shares or one
+   * CPS collected itself.
    */
   engine?: Pick<
     CarbonStylePrunerInput,

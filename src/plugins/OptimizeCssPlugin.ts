@@ -19,6 +19,7 @@ import {
 } from "../utils";
 import {
   type CssOptimizerOptions,
+  collectedEngine,
   createCssOptimizer,
   type PropAwareUsage,
   propAwareUsage,
@@ -253,7 +254,15 @@ export class OptimizeCssPlugin {
                 carbonImports,
               );
               if (result && "warning" in result) warn(result.warning);
-              else if (result) usage = propAwareUsage(result, analyzer);
+              else if (result) {
+                usage = propAwareUsage(result, analyzer);
+                engine = collectedEngine(
+                  result,
+                  analyzer,
+                  compiler.context,
+                  propAwareModules.map(([, code]) => ({ code })),
+                );
+              }
             }
 
             const optimizer = createCssOptimizer({

@@ -5,7 +5,11 @@ import type { UsageResult } from "svelte-prune/internal/analysis";
 import { CARBON, PROP_AWARE_FAILURE } from "./carbon-library";
 import { LOG_PREFIX } from "./constants";
 import { loadComponentIndex } from "./indexer/load-index";
-import { createCssOptimizer } from "./plugins/create-optimized-css";
+import {
+  type CssOptimizerOptions,
+  collectedEngine,
+  createCssOptimizer,
+} from "./plugins/create-optimized-css";
 import { optimizeAssets } from "./plugins/optimize-assets";
 import type { SafelistEntry } from "./plugins/safelist";
 import { collectCarbonTokens, readFiles } from "./plugins/scan-content";
@@ -136,6 +140,7 @@ async function main() {
     ? await import("svelte-prune/internal/analysis")
     : undefined;
   let usage: UsageResult | undefined;
+  let engine: CssOptimizerOptions["engine"];
   if (analyzer) {
     const result = await analyzer.analyzeFiles({
       library: CARBON,
@@ -146,7 +151,10 @@ async function main() {
       options: {},
     });
     if ("warning" in result) console.warn(result.warning);
-    else usage = result;
+    else {
+      usage = result;
+      engine = collectedEngine(result, analyzer, cwd, sources);
+    }
   }
 
   const optimizer = createCssOptimizer({
@@ -155,6 +163,7 @@ async function main() {
     ids: components,
     contentClasses,
     propAware: usage,
+    engine,
   });
 
   optimizeAssets({
