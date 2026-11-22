@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.2](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.2) - 2026-11-21
+
+**Fixes**
+
+- `optimizeCss` renames each pruned CSS file whose name hashes its content (`assets/index-[hash].css`) to a hash of the pruned CSS, and updates the HTML, chunks and Vite manifest that name it; chunks that preload CSS change names with the pruning too. Before, two builds that pruned differently could write different CSS under one name, so with long-lived caching (`Cache-Control: immutable`) returning visitors could get the old CSS and miss styles. Under Vite it now prunes before other plugins' `generateBundle`. `cssCodeSplit: false` and the CLI keep their names, and webpack already pruned before hashing ([#318](https://github.com/carbon-design-system/carbon-preprocess-svelte/issues/318))
+
 ## [0.12.1](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.1) - 2026-11-21
 
 **Performance**
