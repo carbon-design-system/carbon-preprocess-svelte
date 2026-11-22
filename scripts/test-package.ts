@@ -40,18 +40,25 @@ try {
     `import assert from "node:assert/strict";
 import * as cps from "carbon-preprocess-svelte";
 
-for (const name of ["optimizeImports", "optimizeCss", "optimizeComponents", "optimizeCarbonCss", "OptimizeCssPlugin", "OptimizeComponentsPlugin"]) {
+for (const name of ["optimizeImports", "optimizeCss", "optimizeComponents", "optimizeCarbonCss", "OptimizeCssPlugin", "OptimizeComponentsPlugin", "createCarbonOptimizer", "optimizeCarbonBun"]) {
   assert.ok(cps[name], name);
 }
 assert.equal(typeof cps.optimizeImports().script, "function");
 assert.equal(cps.optimizeCss().name, "vite:carbon:optimize-css");
 assert.equal(cps.optimizeComponents().apply, "build");
+assert.equal(typeof cps.createCarbonOptimizer().finish, "function");
+assert.equal(typeof cps.optimizeCarbonBun().setup, "function");
 `,
   );
   await $`node smoke.js`.cwd(dir);
   await $`node ${join(dir, "node_modules/carbon-preprocess-svelte/cli.js")} --help`.quiet();
 
   const IMPORTS = `import {
+  type CarbonBunPlugin,
+  type CarbonOptimizer,
+  type CarbonOptimizerOptions,
+  createCarbonOptimizer,
+  optimizeCarbonBun,
   OptimizeComponentsPlugin,
   type OptimizeComponentsOptions,
   OptimizeCssPlugin,
@@ -74,6 +81,20 @@ const components: OptimizeComponentsOptions = { unwrap: false, report: true, hyd
 const preprocess: PreprocessorGroup[] = [optimizeImports()];
 const webpack = [new OptimizeCssPlugin(css), new OptimizeComponentsPlugin(components)];
 const report = await optimizeCarbonCss("", { components: ["Button"] });
+const both: CarbonOptimizerOptions = { root: ".", optimizeComponents: components, optimizeCss: css };
+const optimizer: CarbonOptimizer = createCarbonOptimizer(both);
+await optimizer.prepare();
+const rewritten: string | undefined = optimizer.load("/src/App.svelte")?.code;
+const pruned: Record<string, string> = await optimizer.finish({
+  modules: [{ id: "/src/App.svelte", code: "", imports: [{ id: "/x.svelte", specifier: "./x.svelte" }] }],
+  css: { "style.css": "" },
+  output: { "index.js": "" },
+});
+const bun: CarbonBunPlugin = optimizeCarbonBun({ optimizeCss: false });
+const renamed: Record<string, string> = await bun.pruneBuild({ outputs: [], metafile: { inputs: {}, outputs: {} } });
+void rewritten;
+void pruned;
+void renamed;
 void preprocess;
 void webpack;
 void report;

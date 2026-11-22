@@ -22,7 +22,8 @@ export const GOLDEN_VARIANTS = ["baseline", "css", "prop-aware", "full"];
 const SVELTE_FILE = /\.svelte$/;
 const SVELTE_MODULE = /\.svelte\.[jt]s$/;
 
-function svelte(): Plugin {
+/** Compiles `.svelte` files for Vite, with their styles injected. */
+export function goldenSvelte(): Plugin {
   return {
     name: "golden:svelte",
     async transform(code, id) {
@@ -61,7 +62,7 @@ export async function buildGolden(
 ): Promise<void> {
   const plugins: Plugin[] = [];
   if (variant === "full") plugins.push(optimizeComponents({ silent: true }));
-  plugins.push(svelte());
+  plugins.push(goldenSvelte());
   if (variant !== "baseline") {
     plugins.push(
       optimizeCss({

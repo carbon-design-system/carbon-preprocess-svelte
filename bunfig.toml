@@ -53,6 +53,7 @@ files = [
   "examples/**",
   "tests/test-e2e.ts",
   "tests/golden-sizes.test.ts",
+  "tests/optimize-carbon-bun.test.ts",
 ]
 rules = { "no-await-in-loop" = "off" }
 
