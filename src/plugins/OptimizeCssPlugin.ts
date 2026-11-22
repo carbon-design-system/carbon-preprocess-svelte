@@ -35,7 +35,12 @@ import {
   propAwareOptions,
   sharesAnalysis,
 } from "./options";
-import { canNameTokens, collectTokenNames } from "./prune-tokens";
+import {
+  canNameTokens,
+  collectTokenNames,
+  collectTokenReads,
+  tokenNamesFile,
+} from "./prune-tokens";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
@@ -57,6 +62,23 @@ function assetTokenNames(
     if (canNameTokens(id)) {
       collectTokenNames(asset.source().toString(), names);
     }
+  }
+  return names;
+}
+
+/**
+ * The tokens the app's own CSS assets read: svelte-prune's pruner sees one
+ * asset at a time. Not Carbon's, which it prunes: what those read counts
+ * only once their pruned rules are gone, which it checks itself.
+ */
+function assetTokenReads(
+  assets: Record<string, WebpackAssetSource>,
+): Set<string> {
+  const names = new Set<string>();
+  for (const [id, asset] of Object.entries(assets)) {
+    if (!isCssFile(id)) continue;
+    const css = asset.source().toString();
+    if (!hasOptimizableCss(css)) collectTokenReads(css, names);
   }
   return names;
 }
@@ -219,6 +241,14 @@ export class OptimizeCssPlugin {
               analyzer && propAware && sharesAnalysis(propAware)
                 ? analyzer.siblingAnalysis(compiler, CARBON.name)
                 : undefined;
+            // svelte-prune's pruner reads custom properties in its files:
+            // the token names the scripts, markup and `content` name, and
+            // the other CSS assets read, as the separate token pass did.
+            const namedTokens = tokenNamesFile([
+              ...assetTokenNames(assets),
+              ...assetTokenReads(assets),
+              ...scan.tokens,
+            ]);
             let usage: PropAwareUsage | undefined;
             let engine: CssOptimizerOptions["engine"];
             if (shared && analyzer) {
@@ -229,7 +259,7 @@ export class OptimizeCssPlugin {
                   analyzer,
                   root: compiler.context,
                   loadable: analysis.usage.loadable,
-                  files: analysis.files,
+                  files: [...analysis.files, namedTokens],
                 };
               } else warn(SHARED_ANALYSIS_FAILED);
             } else if (analyzer && propAware) {
@@ -256,12 +286,10 @@ export class OptimizeCssPlugin {
               if (result && "warning" in result) warn(result.warning);
               else if (result) {
                 usage = propAwareUsage(result, analyzer);
-                engine = collectedEngine(
-                  result,
-                  analyzer,
-                  compiler.context,
-                  propAwareModules.map(([, code]) => ({ code })),
-                );
+                engine = collectedEngine(result, analyzer, compiler.context, [
+                  ...propAwareModules.map(([, code]) => ({ code })),
+                  namedTokens,
+                ]);
               }
             }
 

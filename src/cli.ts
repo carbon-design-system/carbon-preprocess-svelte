@@ -10,6 +10,7 @@ import {
   collectedEngine,
   createCssOptimizer,
 } from "./plugins/create-optimized-css";
+import { tokenNamesFile } from "./plugins/prune-tokens";
 import { optimizeAssets } from "./plugins/optimize-assets";
 import type { SafelistEntry } from "./plugins/safelist";
 import { collectCarbonTokens, readFiles } from "./plugins/scan-content";
@@ -153,7 +154,11 @@ async function main() {
     if ("warning" in result) console.warn(result.warning);
     else {
       usage = result;
-      engine = collectedEngine(result, analyzer, cwd, sources);
+      // The CLI sees no build output, so every token stays, as before.
+      engine = collectedEngine(result, analyzer, cwd, [
+        ...sources,
+        tokenNamesFile(["--cds-"]),
+      ]);
     }
   }
 
