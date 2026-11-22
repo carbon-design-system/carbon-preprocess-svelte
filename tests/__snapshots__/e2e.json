@@ -3,8 +3,8 @@
     "default": {
       "file": "_astro/App.*.css",
       "before_kb": 773.13,
-      "after_kb": 47.06,
-      "reduction_percent": 93.91
+      "after_kb": 27.14,
+      "reduction_percent": 96.49
     },
     "optimized": {
       "file": "_astro/App.*.css",
@@ -17,8 +17,8 @@
     "default": {
       "file": "bundle-*.css",
       "before_kb": 773.82,
-      "after_kb": 47.1,
-      "reduction_percent": 93.91
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     },
     "optimized": {
       "file": "bundle-*.css",
@@ -31,8 +31,8 @@
     "default": {
       "file": "bundle-*.css",
       "before_kb": 773.82,
-      "after_kb": 47.1,
-      "reduction_percent": 93.91
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     },
     "optimized": {
       "file": "bundle-*.css",
@@ -44,9 +44,9 @@
   "rspack": {
     "default": {
       "file": "build/bundle.*.css",
-      "before_kb": 1912.2,
-      "after_kb": 58.9,
-      "reduction_percent": 97
+      "before_kb": 1910,
+      "after_kb": 38.82,
+      "reduction_percent": 97.97
     },
     "optimized": {
       "file": "build/bundle.*.css",
@@ -65,16 +65,10 @@
     "css": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 772.74,
-      "after_kb": 371.89,
-      "reduction_percent": 51.87
-    },
-    "full": {
-      "file": "_app/immutable/assets/2.*.css",
-      "before_kb": 772.74,
       "after_kb": 165.21,
       "reduction_percent": 78.62
     },
-    "prop-aware": {
+    "full": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 772.74,
       "after_kb": 165.21,
@@ -91,16 +85,10 @@
     "css": {
       "file": "assets/index-*.css",
       "before_kb": 774.93,
-      "after_kb": 373.12,
-      "reduction_percent": 51.85
-    },
-    "full": {
-      "file": "assets/index-*.css",
-      "before_kb": 774.93,
       "after_kb": 166.34,
       "reduction_percent": 78.54
     },
-    "prop-aware": {
+    "full": {
       "file": "assets/index-*.css",
       "before_kb": 774.93,
       "after_kb": 166.34,
@@ -111,16 +99,10 @@
     "css": {
       "file": "assets/index-*.css",
       "before_kb": 772.74,
-      "after_kb": 371.89,
-      "reduction_percent": 51.87
-    },
-    "full": {
-      "file": "assets/index-*.css",
-      "before_kb": 772.74,
       "after_kb": 165.21,
       "reduction_percent": 78.62
     },
-    "prop-aware": {
+    "full": {
       "file": "assets/index-*.css",
       "before_kb": 772.74,
       "after_kb": 165.21,
@@ -211,8 +193,8 @@
     "default": {
       "file": "build/bundle.*.css",
       "before_kb": 773.82,
-      "after_kb": 47.11,
-      "reduction_percent": 93.91
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     },
     "optimized": {
       "file": "build/bundle.*.css",
@@ -225,8 +207,8 @@
     "default": {
       "file": "build/bundle.*.css",
       "before_kb": 773.82,
-      "after_kb": 47.11,
-      "reduction_percent": 93.91
+      "after_kb": 27.15,
+      "reduction_percent": 96.49
     },
     "optimized": {
       "file": "build/bundle.*.css",

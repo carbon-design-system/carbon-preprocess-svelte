@@ -4,8 +4,11 @@ import { join } from "node:path";
 import { optimizeCarbonCss } from "carbon-preprocess-svelte";
 import { createFakeProject } from "./helpers/fake-project";
 
-describe("optimizeCarbonCss: component index unavailable", () => {
-  test("warns and returns the CSS unpruned", async () => {
+describe("optimizeCarbonCss: Carbon can't be read", () => {
+  test.each([
+    ["by default", {}],
+    ["with `exclude`", { exclude: ["Button"] }],
+  ] as const)("warns and returns the CSS unpruned %s", async (_, options) => {
     const project = createFakeProject();
     project.installBrokenCarbon();
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
@@ -15,10 +18,11 @@ describe("optimizeCarbonCss: component index unavailable", () => {
       const result = await optimizeCarbonCss(css, {
         components: ["Button"],
         cwd: project.root,
+        ...options,
       });
 
       expect(result).toEqual({ css, removed: 0 });
-      expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
+      expect(warn.mock.calls[0][0]).toContain("Carbon CSS is left unpruned");
     } finally {
       warn.mockRestore();
       project.dispose();
@@ -84,16 +88,18 @@ describe("optimizeCarbonCss", () => {
   });
 
   test("`sources` lets it remove Carbon tokens nothing reads", async () => {
-    const css = ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}";
+    const css =
+      ":root{--cds-ai-aura-start:1;--cds-ai-aura-end:2}.bx--btn{color:var(--cds-ai-aura-start)}";
     expect((await optimizeCarbonCss(css, { components: ["Button"] })).css).toBe(
       css,
     );
-    expect(
-      await optimizeCarbonCss(css, { components: ["Button"], sources: [""] }),
-    ).toEqual({
-      css: ":root{--cds-a:1}.bx--btn{color:var(--cds-a)}",
-      removed: 1,
+    const pruned = await optimizeCarbonCss(css, {
+      components: ["Button"],
+      sources: [""],
     });
+    expect(pruned.css).toBe(
+      ":root{--cds-ai-aura-start:1}.bx--btn{color:var(--cds-ai-aura-start)}",
+    );
   });
 
   test("`content` resolves from `cwd`", async () => {

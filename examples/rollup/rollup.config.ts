@@ -10,9 +10,8 @@ import {
 import svelte from "rollup-plugin-svelte";
 
 const production = !process.env.ROLLUP_WATCH;
-// `OPTIMIZE=1` adds the component optimizations: `optimizeComponents`
-// rewrites Carbon components for the props the app passes, and prop-aware
-// `optimizeCss` prunes their unused styles. Built to `public-optimized/`.
+// `OPTIMIZE=1` adds `optimizeComponents`, which rewrites Carbon components
+// for the props the app passes. Built to `public-optimized/`.
 const optimize = production && process.env.OPTIMIZE === "1";
 const outDir = optimize ? "public-optimized" : "public";
 
@@ -95,7 +94,7 @@ export default {
     resolve({ browser: true, dedupe: ["svelte"] }),
     emitCss,
     production && terser(),
-    production && optimizeCss({ propAware: optimize }),
+    production && optimizeCss(),
     emitHtml,
   ],
 };

@@ -21,7 +21,7 @@ const LOADER = (() => {
 /**
  * `optimizeComponents` for webpack and Rspack: rewrites
  * each Carbon component the app renders for the props it passes. Pair it
- * with `new OptimizeCssPlugin({ propAware: true })`.
+ * with `new OptimizeCssPlugin()`.
  *
  * Runs on production builds only. It adds a loader that runs before
  * `svelte-loader` on `.svelte` files, and fails the build if a

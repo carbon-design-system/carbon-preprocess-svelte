@@ -3,25 +3,35 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Rollup } from "vite";
 import { CarbonSvelte } from "../src/constants";
+import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
 } from "../src/plugins/messages";
-import { optimizeCss as optimizeCssPlugin } from "../src/plugins/optimize-css";
+import { optimizeCss } from "../src/plugins/optimize-css";
 import type { OptimizeCssOptions } from "../src/plugins/options";
 
-/**
- * These tests cover pruning by the imported components, so `propAware` is
- * off unless a test turns it on; `prop-aware.test.ts` covers it.
- */
-const optimizeCss = (options: OptimizeCssOptions = {}) =>
-  optimizeCssPlugin({ propAware: false, ...options });
 import { createFakeProject } from "./helpers/fake-project";
 
 type OutputAsset = Rollup.OutputAsset;
 type OutputBundle = Rollup.OutputBundle;
 
-const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+/** Carbon's Button, and an app module that renders it, as a build transforms them. */
+const carbonComponent = join(resolveCarbonRoot(), "src/Button/Button.svelte");
+const appDir = mkdtempSync(join(tmpdir(), "optimize-css-app-"));
+const buttonApp = join(appDir, "ButtonApp.svelte");
+const BUTTON_APP = `<script>
+  import { Button } from "carbon-components-svelte";
+</script>
+<Button>Save</Button>`;
+writeFileSync(buttonApp, BUTTON_APP);
+afterAll(() => rmSync(appDir, { recursive: true, force: true }));
+
+/** Transforms Button and the app module that renders it. */
+function importButton(plugin: ResolvedPlugin): void {
+  plugin.transform(BUTTON_APP, buttonApp);
+  plugin.transform("", carbonComponent);
+}
 /** The summary for one pruned stylesheet: a header, then its row. */
 const SIZE_LINE =
   /^carbon-preprocess-svelte: pruned Carbon CSS\n {2}styles\.css {2}[\d.,]+ kB {2}→ {2}[\d.,]+ kB {2}-\d+%$/;
@@ -64,37 +74,45 @@ function resolvePlugin(plugin: Rollup.Plugin): ResolvedPlugin {
   return plugin as unknown as ResolvedPlugin;
 }
 
-/** A `generateBundle` context whose module graph holds exactly `moduleIds`. */
+/**
+ * A `generateBundle` context whose module graph holds exactly `moduleIds`,
+ * and the app module that renders Button with it.
+ */
 function graphContext(...moduleIds: string[]) {
+  const ids = moduleIds.includes(carbonComponent)
+    ? [...moduleIds, buttonApp]
+    : moduleIds;
   return {
     warn: jest.fn(),
-    getModuleIds: () => moduleIds.values(),
+    getModuleIds: () => ids.values(),
   };
 }
 
-describe("optimizeCss (Vite plugin): component index unavailable", () => {
+describe("optimizeCss (Vite plugin): Carbon can't be read", () => {
   test("warns once and leaves CSS unpruned", async () => {
     const project = createFakeProject();
     project.installBrokenCarbon();
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-
     try {
       const plugin = resolvePlugin(optimizeCss());
       plugin.configResolved({ root: project.root, logger: quietLogger });
-      await plugin.buildStart();
+      const ctx = { warn: jest.fn() };
+      await (
+        plugin.buildStart as unknown as (this: typeof ctx) => Promise<void>
+      ).call(ctx);
       plugin.transform(
         "",
         `node_modules/${CarbonSvelte.Components}/Button.svelte`,
       );
       const css = ".bx--btn{color:red}.bx--accordion{color:blue}";
       const bundle = makeCssBundle(css);
-      await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+      await plugin.generateBundle.call(ctx, {}, bundle);
 
       expect((bundle["styles.css"] as OutputAsset).source).toBe(css);
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
+      expect(ctx.warn).toHaveBeenCalledTimes(1);
+      expect(ctx.warn.mock.calls[0][0]).toContain(
+        "Carbon CSS is left unpruned",
+      );
     } finally {
-      warn.mockRestore();
       project.dispose();
     }
   });
@@ -112,7 +130,7 @@ describe("optimizeCss (Vite plugin)", () => {
     const ctx = { warn: jest.fn() };
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const bundle = makeCssBundle(cssContent);
     await plugin.generateBundle.call(ctx, {}, bundle);
@@ -135,7 +153,7 @@ describe("optimizeCss (Vite plugin)", () => {
     // First build: Button is imported.
     const firstCtx = graphContext(carbonComponent);
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     const firstBundle = makeCssBundle(cssContent);
     await plugin.generateBundle.call(firstCtx, {}, firstBundle);
     expect((firstBundle["styles.css"] as OutputAsset).source).toEqual(
@@ -159,24 +177,28 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(secondCtx.warn).toHaveBeenCalledWith(NO_CARBON_IMPORTS);
   });
 
-  test("removes Carbon tokens no asset or chunk reads", async () => {
+  test("removes Carbon tokens nothing in the build reads", async () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
-
-    const bundle = {
-      ...makeCssBundle(
-        ":root{--cds-a:1;--cds-b:2;--cds-c:3}.bx--btn{color:var(--cds-a)}",
-      ),
-      "app.js": {
-        type: "chunk",
-        code: 'el.style.setProperty("color", "var(--cds-b)")',
-      },
-    } as unknown as OutputBundle;
-    await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+    importButton(plugin);
+    const script = "/app/src/theme.ts";
+    const modules: Record<string, string> = {
+      [buttonApp]: BUTTON_APP,
+      [carbonComponent]: "",
+      [script]: 'el.style.setProperty("color", "var(--cds-ai-aura-end)")',
+    };
+    const ctx = {
+      warn: jest.fn(),
+      getModuleIds: () => Object.keys(modules)[Symbol.iterator](),
+      getModuleInfo: (id: string) => ({ code: modules[id] }),
+    };
+    const bundle = makeCssBundle(
+      ":root{--cds-ai-aura-start:1;--cds-ai-aura-end:2;--cds-ai-aura-hover-start:3}.bx--btn{color:var(--cds-ai-aura-start)}",
+    );
+    await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect((bundle["styles.css"] as OutputAsset).source).toBe(
-      ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}",
+      ":root{--cds-ai-aura-start:1;--cds-ai-aura-end:2}.bx--btn{color:var(--cds-ai-aura-start)}",
     );
   });
 
@@ -185,7 +207,7 @@ describe("optimizeCss (Vite plugin)", () => {
       optimizeCss({ silent: true, fontDisplay: "swap" }),
     );
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const plex =
       "@font-face{font-display:auto;font-family:IBM Plex Sans;src:url(a.woff2)}";
@@ -223,7 +245,7 @@ describe("optimizeCss (Vite plugin)", () => {
   test("prunes around Vite's hash marker and puts it back", async () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const bundle = makeCssBundle(
       ".bx--btn { color: blue }\n.bx--accordion { background: yellow }/*$vite$:1*/",
@@ -239,7 +261,7 @@ describe("optimizeCss (Vite plugin)", () => {
     const fingerprintFor = async (options: OptimizeCssOptions) => {
       const plugin = resolvePlugin(optimizeCss({ silent: true, ...options }));
       await plugin.buildStart();
-      plugin.transform("", carbonComponent);
+      importButton(plugin);
       await plugin.renderStart.call({ warn: jest.fn() });
       return {
         lazy: plugin.augmentChunkHash({ dynamicImports: ["page.js"] }),
@@ -265,10 +287,10 @@ describe("optimizeCss (Vite plugin)", () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
 
     const bundle = makeCssBundle(cssContent);
@@ -289,7 +311,7 @@ describe("optimizeCss (Vite plugin)", () => {
 .bx--accordion { background: yellow }`;
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
 
     const bundle = makeCssBundle(cssContent);
@@ -307,7 +329,7 @@ describe("optimizeCss (Vite plugin)", () => {
 .bx--accordion { background: yellow }`;
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform(
       "bx--accordion",
       "/app/src/App.svelte?svelte&type=style&lang.css",
@@ -329,7 +351,7 @@ describe("optimizeCss (Vite plugin)", () => {
 .bx--accordion { background: yellow }`;
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform(
       "bx--accordion",
       `/n/node_modules/${CarbonSvelte.Components}/src/utils/x.js`,
@@ -352,7 +374,7 @@ describe("optimizeCss (Vite plugin)", () => {
 
     // First build: Button is imported and an app module has a literal token.
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform('const c = "bx--accordion";', app);
     const firstBundle = makeCssBundle(cssContent);
     const firstCtx = graphContext(carbonComponent, app);
@@ -364,7 +386,7 @@ describe("optimizeCss (Vite plugin)", () => {
     // Second build: Button is re-imported but the app module is gone. If
     // its classes outlived it, `.bx--accordion` would survive.
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     const secondBundle = makeCssBundle(cssContent);
     const secondCtx = graphContext(carbonComponent);
     await plugin.generateBundle.call(secondCtx, {}, secondBundle);
@@ -381,12 +403,12 @@ describe("optimizeCss (Vite plugin)", () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
     const app = "/app/src/App.svelte";
     const other = "/app/src/other.ts";
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform('const c = "bx--accordion";', app);
     plugin.transform("export {};", other);
     await plugin.generateBundle.call(
@@ -413,11 +435,11 @@ describe("optimizeCss (Vite plugin)", () => {
     const plugin = resolvePlugin(optimizeCss({ silent: true }));
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
     const app = "/app/src/App.svelte";
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform('const c = "bx--accordion";', app);
     await plugin.generateBundle.call(
       graphContext(carbonComponent, app),
@@ -425,9 +447,9 @@ describe("optimizeCss (Vite plugin)", () => {
       makeCssBundle(cssContent),
     );
 
-    // The edit swaps `bx--accordion` for `bx--modal`.
+    // The edit swaps `bx--accordion` for `bx--data-table`.
     await plugin.buildStart();
-    plugin.transform('const c = "bx--modal";', app);
+    plugin.transform('const c = "bx--data-table";', app);
     const bundle = makeCssBundle(cssContent);
     await plugin.generateBundle.call(
       graphContext(carbonComponent, app),
@@ -437,7 +459,7 @@ describe("optimizeCss (Vite plugin)", () => {
 
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(
       `.bx--btn { color: blue }
-.bx--modal { background: red }`,
+.bx--data-table { background: red }`,
     );
   });
 
@@ -458,11 +480,11 @@ describe("optimizeCss (Vite plugin)", () => {
       );
       const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
 
       await plugin.buildStart();
       plugin.configResolved({ root: dir, logger: quietLogger });
-      plugin.transform("", carbonComponent);
+      importButton(plugin);
 
       const bundle = makeCssBundle(cssContent);
       const ctx = { warn: jest.fn() };
@@ -534,7 +556,7 @@ describe("optimizeCss (Vite plugin)", () => {
       // @ts-expect-error
       plugin.configResolved({ root: dir, logger: quietLogger });
       // @ts-expect-error
-      plugin.transform("", carbonComponent);
+      importButton(plugin);
 
       const bundle = makeCssBundle(cssContent);
       // @ts-expect-error
@@ -563,7 +585,7 @@ describe("optimizeCss (Vite plugin)", () => {
 
       await plugin.buildStart();
       plugin.configResolved({ root: dir, logger: quietLogger });
-      plugin.transform("", carbonComponent);
+      importButton(plugin);
 
       const bundle = makeCssBundle(cssContent);
       await plugin.generateBundle.call(ctx, {}, bundle);
@@ -582,7 +604,7 @@ describe("optimizeCss (Vite plugin)", () => {
     // @ts-expect-error
     await plugin.buildStart();
     // @ts-expect-error
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const bundle = makeCssBundle(cssContent);
     const ctx = { warn: jest.fn() };
@@ -601,7 +623,7 @@ describe("optimizeCss (Vite plugin)", () => {
     // @ts-expect-error
     await plugin.buildStart();
     // @ts-expect-error
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const bundle = makeCssBundle(cssContent);
     const ctx = { warn: jest.fn() };
@@ -625,10 +647,10 @@ describe("optimizeCss (Vite plugin)", () => {
     const plugin = resolvePlugin(optimizeCss({ report: true, silent: true }));
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
     plugin.transform('const c = "bx--accordion";', "/app/src/App.svelte");
 
     const bundle = makeCssBundle(cssContent);
@@ -638,7 +660,11 @@ describe("optimizeCss (Vite plugin)", () => {
     const lines = consoleSpy.mock.calls.map((call) => call.join(" "));
 
     expect(
-      lines.some((line) => line.includes("Detected components (1): Button")),
+      lines.some(
+        (line) =>
+          line.includes("Components that can render") &&
+          line.includes("Button"),
+      ),
     ).toEqual(true);
     expect(lines.some((line) => line.includes("module scan 1 tokens"))).toEqual(
       true,
@@ -672,7 +698,7 @@ describe("optimizeCss (Vite plugin)", () => {
       // @ts-expect-error
       plugin.configResolved({ root: dir, logger: quietLogger });
       // @ts-expect-error
-      plugin.transform("", carbonComponent);
+      importButton(plugin);
 
       const bundle = makeCssBundle(cssContent);
       // @ts-expect-error
@@ -693,7 +719,7 @@ describe("optimizeCss (Vite plugin)", () => {
 
     await plugin.buildStart();
     plugin.configResolved({ root: process.cwd(), logger });
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const bundle = makeCssBundle(cssContent);
     const ctx = { warn: jest.fn() };
@@ -712,7 +738,7 @@ describe("optimizeCss (Vite plugin)", () => {
       ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
 
     await plugin.buildStart();
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const bundle = makeCssBundle(cssContent);
     const ctx = { warn: jest.fn() };
@@ -730,7 +756,7 @@ describe("optimizeCss (Vite plugin)", () => {
 
     await plugin.buildStart();
     plugin.configResolved({ root: process.cwd(), logger });
-    plugin.transform("", carbonComponent);
+    importButton(plugin);
 
     const bundle = makeCssBundle(cssContent);
     const ctx = { warn: jest.fn() };

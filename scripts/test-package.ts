@@ -75,7 +75,8 @@ import type { PreprocessorGroup } from "svelte/compiler";
 const css: OptimizeCssOptions = {
   safelist,
   content: ["src/**/*.svelte"],
-  propAware: { exclude: ["Modal"], assume: { Button: { kind: ["ghost"] } } },
+  exclude: ["Modal"],
+  assume: { Button: { kind: ["ghost"] } },
 };
 const components: OptimizeComponentsOptions = { unwrap: false, report: true, hydration: false };
 const preprocess: PreprocessorGroup[] = [optimizeImports()];

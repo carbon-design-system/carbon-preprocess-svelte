@@ -6,14 +6,8 @@ import {
   type LibraryImport,
   libraryPaths,
 } from "svelte-prune/internal";
-import {
-  CARBON,
-  PROP_AWARE_FAILURE,
-  SPECIALIZE_FAILURE,
-} from "../carbon-library";
+import { CARBON, CSS_FAILURE, SPECIALIZE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
-import type { ComponentIndex } from "../indexer/build-index";
-import { loadComponentIndex } from "../indexer/load-index";
 import {
   errorMessage,
   isCarbonSvelteImport,
@@ -28,12 +22,12 @@ import { logSummary } from "./print-diff";
 import type { OptimizeComponentsOptions } from "./optimize-components";
 import {
   type OptimizeCssOptions,
-  propAwareOptions,
   sharesAnalysis,
+  usageOptions,
 } from "./options";
-import { collectTokenNames, collectTokenReads } from "./prune-tokens";
+import { collectTokenNames, collectTokenReads } from "./token-names";
 import { collectCarbonTokens, scanContent } from "./scan-content";
-import { hasOptimizableCss } from "./strict-css-optimizer";
+import { hasOptimizableCss } from "./carbon-rules";
 
 export type CarbonOptimizerOptions = {
   /**
@@ -50,9 +44,9 @@ export type CarbonOptimizerOptions = {
    */
   optimizeComponents?: OptimizeComponentsOptions | false;
   /**
-   * `optimizeCss`' options, or `false` to leave CSS unpruned. `propAware`
-   * prunes from `optimizeComponents`' analysis when that's on, as in a Vite
-   * build with both plugins.
+   * `optimizeCss`' options, or `false` to leave CSS unpruned. It prunes
+   * from `optimizeComponents`' analysis when that's on, as in a Vite build
+   * with both plugins.
    * @default {}
    */
   optimizeCss?: OptimizeCssOptions | false;
@@ -151,7 +145,6 @@ export function createCarbonOptimizer(
       : (options.optimizeComponents ?? {});
   const cssOptions =
     options.optimizeCss === false ? undefined : (options.optimizeCss ?? {});
-  const propAware = cssOptions && propAwareOptions(cssOptions);
   const silent = cssOptions?.silent === true;
   const warn = (message: string) => {
     if (!silent) console.warn(message);
@@ -167,7 +160,6 @@ export function createCarbonOptimizer(
       { ...componentOptions, hydration: undefined },
       { plugin: "optimizeComponents", failure: SPECIALIZE_FAILURE },
     );
-  let index: ComponentIndex | undefined;
   /**
    * Carbon components this build rewrote, for the summary's header; 0
    * when silent.
@@ -244,8 +236,6 @@ export function createCarbonOptimizer(
     const css = { ...build.css };
     const skip = { css, logged: false };
     if (!cssOptions || Object.keys(css).length === 0) return skip;
-    // `loadComponentIndex` already warned.
-    if (!index) return skip;
 
     const ids = new Set(
       modules.map(({ id }) => id).filter((id) => isCarbonSvelteImport(id)),
@@ -301,36 +291,31 @@ export function createCarbonOptimizer(
 
     const loaded = analyzer;
     const shared =
-      propAware && components && sharesAnalysis(propAware)
+      components && sharesAnalysis(cssOptions)
         ? () => components.shared
         : undefined;
     const { optimizer, usage } = await prepareCssPruning({
       options: cssOptions,
       root,
-      components: index,
-      ids,
       classes: [...scan.classes, ...moduleClasses],
       namedTokens: [
         ...scan.tokens,
         ...codeTokens,
         ...markupTokens,
+        ...outputTokens,
         ...outputReads,
       ],
       analyzer: loaded,
       shared,
       collect:
-        propAware && loaded && !shared
+        loaded && !shared
           ? async () => {
               const collector = (() => {
                 try {
-                  return loaded.createUsageCollector(
-                    CARBON,
-                    root,
-                    PROP_AWARE_FAILURE,
-                  );
+                  return loaded.createUsageCollector(CARBON, root, CSS_FAILURE);
                 } catch (error) {
                   warn(
-                    `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,
+                    `${LOG_PREFIX} Carbon CSS is left unpruned in this build (${errorMessage(error)}).`,
                   );
                   return undefined;
                 }
@@ -340,10 +325,15 @@ export function createCarbonOptimizer(
               return {
                 result: await collector.analyze(
                   ids,
-                  propAware,
+                  usageOptions(cssOptions),
                   libraryEdges(modules),
                 ),
-                files: sources.map(({ code }) => ({ code })),
+                // What the app's modules name stays, unless `scanModules`
+                // is off.
+                files:
+                  cssOptions.scanModules === false
+                    ? []
+                    : sources.map(({ code }) => ({ code })),
               };
             }
           : undefined,
@@ -363,12 +353,6 @@ export function createCarbonOptimizer(
       options: cssOptions,
       moduleTokens: moduleClasses.size,
       contentTokens: scan.classes.length,
-      tokenNames: [
-        ...outputTokens,
-        ...outputReads,
-        ...markupTokens,
-        ...scan.tokens,
-      ],
       reportExtra: () =>
         usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
     });
@@ -392,10 +376,7 @@ export function createCarbonOptimizer(
         for (const line of report ?? []) console.log(line);
       }
       if (cssOptions) {
-        index = await loadComponentIndex(root);
-        if (propAware) {
-          analyzer ??= await import("svelte-prune/internal/analysis");
-        }
+        analyzer ??= await import("svelte-prune/internal/analysis");
       }
     },
     load(id) {

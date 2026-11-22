@@ -34,9 +34,8 @@ const WHITE_CSS = readFileSync(
 );
 
 const VARIANTS = {
-  css: { components: false, propAware: false },
-  "prop-aware": { components: false, propAware: true },
-  full: { components: true, propAware: true },
+  css: { components: false },
+  full: { components: true },
 } as const;
 
 type Variant = keyof typeof VARIANTS;
@@ -53,7 +52,7 @@ afterAll(() => rmSync(out, { recursive: true, force: true }));
  * the CSS `optimizeCss` was handed, and what it left.
  */
 async function viteCss(app: string, variant: Variant) {
-  const { components, propAware } = VARIANTS[variant];
+  const { components } = VARIANTS[variant];
   let input = "";
   let output = "";
   const cssOf = (bundle: Rollup.OutputBundle) => {
@@ -97,7 +96,7 @@ async function viteCss(app: string, variant: Variant) {
       ...(components ? [optimizeComponents({ silent: true })] : []),
       goldenSvelte(),
       before,
-      optimizeCss({ silent: true, propAware }),
+      optimizeCss({ silent: true }),
       after,
     ],
     build: {
@@ -141,13 +140,13 @@ describe("optimizeCarbonBun", () => {
     "prunes %s's CSS as the Vite plugins do",
     async (app) => {
       for (const variant of Object.keys(VARIANTS) as Variant[]) {
-        const { components, propAware } = VARIANTS[variant];
+        const { components } = VARIANTS[variant];
         const vite = await viteCss(app, variant);
         const { carbon, result } = await bunBuild(
           app,
           {
             optimizeComponents: components && { silent: true },
-            optimizeCss: { silent: true, propAware },
+            optimizeCss: { silent: true },
           },
           path.join(out, app, variant, "bun"),
         );

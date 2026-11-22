@@ -2,14 +2,13 @@
 
 Zero-dependency Svelte preprocessors and build plugins for the Carbon Design System
 
-It makes a [carbon-components-svelte](https://github.com/carbon-design-system/carbon-components-svelte) app ship less: it rewrites Carbon's barrel imports so Svelte compiles less, prunes the Carbon CSS your components never render, and rewrites Carbon components for the props your app actually passes. It reads your installed Carbon, so it matches your version. Its one blind spot: a Carbon class your code builds at run time, never written as a literal `bx--` token, gets pruned, so name it in `safelist`.
+It makes a [carbon-components-svelte](https://github.com/carbon-design-system/carbon-components-svelte) app ship less: it rewrites Carbon's barrel imports so Svelte compiles less, prunes the Carbon CSS your app can't render with the props it passes, and rewrites Carbon components for the props your app actually passes. It reads your installed Carbon, so it matches your version. Its one blind spot: a Carbon class your code builds at run time, never written as a literal `bx--` token, gets pruned, so name it in `safelist`.
 
-One app, built five ways ([examples/vite-matrix@svelte-5](https://github.com/carbon-design-system/carbon-preprocess-svelte/tree/main/examples/vite-matrix@svelte-5)):
+One app, built four ways ([examples/vite-matrix@svelte-5](https://github.com/carbon-design-system/carbon-preprocess-svelte/tree/main/examples/vite-matrix@svelte-5)):
 
 | Variant | CSS gzip | JS gzip |
 | --- | --- | --- |
 | `optimizeImports` only | 93.96 kB | 152.73 kB |
-| `optimizeCss({ propAware: false })` | 44.01 kB (-53.2%) | 152.73 kB |
 | `optimizeCss()` | 22.14 kB (-76.4%) | 152.73 kB |
 | plus `optimizeComponents()` | 22.14 kB (-76.4%) | 101.27 kB (-33.7%) |
 | plus `hydration: false` | 22.14 kB (-76.4%) | 99.51 kB (-34.8%) |
@@ -81,15 +80,15 @@ npx carbon-preprocess-svelte optimize-css "dist/**/*.css"
 npx carbon-preprocess-svelte optimize-css "dist/**/*.css" --dry-run --json
 ```
 
-It exits `0` when done and `2` when called wrong or there's nothing to prune; `--json` prints the result, or the error, as one object on stdout.
+It exits `0` when done, and `2` when called wrong, given nothing to prune, or unable to read the app; `--json` prints the result, or the error, as one object on stdout.
 
 ## Docs
 
 - [`optimizeImports`](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/optimize-imports.md): set-ups for SvelteKit, Vite, Rollup, Webpack and Rspack
-- [`optimizeCss`](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/optimize-css.md): set-ups, how it prunes, its options, prop-aware pruning, and `OptimizeCssPlugin`
+- [`optimizeCss`](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/optimize-css.md): set-ups, how it prunes by props, its options, and `OptimizeCssPlugin`
 - [`optimizeComponents`](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/optimize-components.md): what it rewrites, client-only apps, and `OptimizeComponentsPlugin`
 - [Bun](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/bun.md): `optimizeCarbonBun`
 - [From a build script](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/build-scripts.md): `createCarbonOptimizer` and `optimizeCarbonCss`
 - [CLI](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/cli.md): the command, its output, and every option
-- [Component index](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/component-index.md): how it reads your installed Carbon
+- [Your Carbon version](https://github.com/carbon-design-system/carbon-preprocess-svelte/blob/main/docs/carbon-version.md): how it reads your installed Carbon
 - [Examples](https://github.com/carbon-design-system/carbon-preprocess-svelte/tree/main/examples): a runnable set-up for every supported bundler

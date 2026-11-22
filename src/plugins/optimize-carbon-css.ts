@@ -1,33 +1,33 @@
 import { globSync } from "node:fs";
 import path from "node:path";
-import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
-import { LOG_PREFIX } from "../constants";
-import { loadComponentIndex } from "../indexer/load-index";
+import { CARBON, CSS_FAILURE } from "../carbon-library";
 import { toCssString } from "../utils";
 import {
   collectedEngine,
   type CssOptimizerOptions,
   optimizeCssWithReport,
   type OptimizedCssReport,
-  propAwareUsage,
-  type PropAwareUsage,
+  cssUsage,
+  type CssUsage,
   type PruneOptions,
 } from "./create-optimized-css";
 import { setFontDisplay } from "./font-display";
-import { type OptimizeCssOptions, propAwareOptions } from "./options";
 import {
-  collectTokenNames,
-  pruneUnusedTokens,
-  tokenNamesFile,
-} from "./prune-tokens";
+  checkRemovedOptions,
+  type OptimizeCssOptions,
+  usageOptions,
+} from "./options";
+import { collectTokenNames, tokenNamesFile } from "./token-names";
 import { collectCarbonTokens, readFiles, scanContent } from "./scan-content";
 
 type OptimizeCarbonCssOptions = PruneOptions &
-  Pick<OptimizeCssOptions, "content" | "propAware" | "fontDisplay"> & {
+  Pick<OptimizeCssOptions, "content" | "exclude" | "assume" | "fontDisplay"> & {
     /**
      * Carbon components used by the app, as names (`"Button"`) or paths to
-     * their `.svelte` source. Classes referenced by these components are kept.
-     * An empty list returns the CSS unchanged.
+     * their `.svelte` source. Their styles are pruned by the props the
+     * `content` files pass, so `content` must cover every file that renders
+     * them; one no file renders, or every one without `content`, renders
+     * with any props. An empty list returns the CSS unchanged.
      */
     components: Iterable<string>;
 
@@ -36,6 +36,7 @@ type OptimizeCarbonCssOptions = PruneOptions &
      * of your bundler. Same detection as the plugins' `scanModules`. When
      * given, it should be everything the app ships besides this CSS: Carbon
      * tokens (`--cds-*`) that neither it nor the CSS reads are removed too.
+     * Without it, every token stays.
      */
     sources?: Iterable<string>;
 
@@ -58,18 +59,17 @@ export async function optimizeCarbonCss(
   css: string | Uint8Array,
   options: OptimizeCarbonCssOptions,
 ): Promise<OptimizedCssReport> {
+  checkRemovedOptions(options);
   const ids = [...options.components];
-  const components =
-    ids.length > 0 ? await loadComponentIndex(options.cwd) : undefined;
-  // Without components, or if the index failed (already warned): unpruned.
-  if (!components) {
+  if (ids.length === 0) {
     return {
       css: setFontDisplay(toCssString(css), options.fontDisplay),
       removed: 0,
     };
   }
+  const cwd = path.resolve(options.cwd ?? process.cwd());
 
-  const scan = scanContent(options.content, options.cwd);
+  const scan = scanContent(options.content, cwd);
   const contentClasses = new Set(scan.classes);
   const tokenNames = options.sources ? new Set(scan.tokens) : undefined;
   for (const source of options.sources ?? []) {
@@ -78,69 +78,55 @@ export async function optimizeCarbonCss(
   }
 
   // Without `sources`, nothing says which tokens the build reads: every one
-  // stays, as without propAware. A bare `--cds-` keeps them all.
-  const analyzed = await analyzePropAware(
+  // stays. A bare `--cds-` keeps them all.
+  const analyzed = await analyze(
     options,
     ids,
+    cwd,
     tokenNamesFile(tokenNames ?? ["--cds-"]),
   );
   const report = optimizeCssWithReport({
     source: css,
-    components,
-    ids,
     contentClasses,
     safelist: options.safelist,
     preserveAllIBMFonts: options.preserveAllIBMFonts,
-    propAware: analyzed?.usage,
+    analysis: analyzed?.usage,
     engine: analyzed?.engine,
   });
-  if (!tokenNames) {
-    return { ...report, css: setFontDisplay(report.css, options.fontDisplay) };
-  }
-  const tokens = pruneUnusedTokens([report.css], tokenNames);
-  return {
-    css: setFontDisplay(tokens.css[0], options.fontDisplay),
-    removed: report.removed + tokens.removed[0],
-  };
+  return { ...report, css: setFontDisplay(report.css, options.fontDisplay) };
 }
 
 /**
- * `propAware` reads call sites from the `content` files, so it needs
- * them: without `content` it's skipped, with a warning, whether it was
- * asked for or is on by default.
+ * The usage analysis, from the `content` files. Without them, each of
+ * `components` renders with any props: every variant stays, and only what
+ * they never render goes. `undefined` (CSS unpruned, warned) if it fails.
  */
-async function analyzePropAware(
+async function analyze(
   options: OptimizeCarbonCssOptions,
   ids: string[],
+  cwd: string,
   namedTokens: { code: string },
 ): Promise<
-  { usage: PropAwareUsage; engine: CssOptimizerOptions["engine"] } | undefined
+  { usage: CssUsage; engine: CssOptimizerOptions["engine"] } | undefined
 > {
-  const propAware = propAwareOptions(options);
-  if (!propAware) return undefined;
-  const cwd = path.resolve(options.cwd ?? process.cwd());
-  if (!options.content || options.content.length === 0) {
-    console.warn(
-      `${LOG_PREFIX} propAware needs \`content\` globs covering every file that renders Carbon components; CSS was pruned without it. Pass \`content\`, or \`propAware: false\` to prune by \`components\` alone. createCarbonOptimizer prunes from optimizeComponents' analysis instead, as the Vite plugins do.`,
-    );
-    return undefined;
-  }
+  const content = options.content ?? [];
   const analyzer = await import("svelte-prune/internal/analysis");
-  const files = [...readFiles(globSync(options.content, { cwd }), cwd)];
+  const files =
+    content.length > 0 ? [...readFiles(globSync(content, { cwd }), cwd)] : [];
   const result = await analyzer.analyzeFiles({
     library: CARBON,
-    failure: PROP_AWARE_FAILURE,
+    failure: CSS_FAILURE,
     projectRoot: cwd,
     files,
     components: ids,
-    options: propAware,
+    options: usageOptions(options),
   });
-  if (!("warning" in result)) {
-    return {
-      usage: propAwareUsage(result, analyzer),
-      engine: collectedEngine(result, analyzer, cwd, [...files, namedTokens]),
-    };
+  if ("warning" in result) {
+    console.warn(result.warning);
+    return undefined;
   }
-  console.warn(result.warning);
-  return undefined;
+  return {
+    usage: cssUsage(result, analyzer),
+    engine: collectedEngine(result, analyzer, cwd, [...files, namedTokens]),
+  };
 }

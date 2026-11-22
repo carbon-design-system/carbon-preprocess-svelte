@@ -16,15 +16,15 @@ export type AssetReport = {
 };
 
 export type OptimizeCssReportInput = {
+  /** The Carbon components that can render. */
   components: string[];
-  allowlistSize: number;
   /** Tokens from the bundler module scan; omitted by the CLI, which has none. */
   moduleTokens?: number;
   contentTokens: number;
   safelistEntries: number;
   assets: AssetReport[];
   dryRun?: boolean;
-  /** Lines printed after the asset table (`propAware`). */
+  /** Lines printed after the asset table: each component's props. */
   extra?: string[];
 };
 
@@ -57,7 +57,7 @@ function padColumn(values: string[]): string[] {
 }
 
 export function printReport(input: OptimizeCssReportInput): void {
-  const { components, allowlistSize, moduleTokens, assets, dryRun } = input;
+  const { components, moduleTokens, assets, dryRun } = input;
   countFormatter ??= new Intl.NumberFormat("en-US");
   const counts = countFormatter;
   const count = (n: number) => counts.format(n);
@@ -73,11 +73,9 @@ export function printReport(input: OptimizeCssReportInput): void {
   console.log("");
   console.log("carbon-preprocess-svelte report");
   console.log(
-    `  Detected components (${components.length}): ${components.join(", ") || "none"}`,
+    `  Components that can render (${components.length}): ${components.join(", ") || "none"}`,
   );
-  console.log(
-    `  Allowlist: ${count(allowlistSize)} classes (${sources.join(", ")})`,
-  );
+  console.log(`  Kept whatever renders: ${sources.join(", ")}`);
   console.log(`  Assets:${dryRun ? " (dry run, assets unchanged)" : ""}`);
 
   const ids = padColumn(assets.map((asset) => asset.id));

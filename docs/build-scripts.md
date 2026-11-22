@@ -164,12 +164,13 @@ optimizeCarbonCss(css, {
   content: ["src/**/*.{svelte,js,ts}"],
 
   /**
-   * See "Prop-aware pruning" under `optimizeCss`. Reads call sites from the
-   * `content` files, so `content` must cover every file that renders Carbon
-   * components; a listed component no file renders keeps every variant.
-   * Without `content` it's skipped, with a warning; `false` turns it off.
-   * @default true
+   * See "Pruning by props" under `optimizeCss`. Call sites are read from
+   * the `content` files, so `content` must cover every file that renders
+   * Carbon components; a listed component no file renders keeps every
+   * variant. Without `content`, each listed component renders with any
+   * props.
+   * @default []
    */
-  propAware: false,
+  exclude: ["DataTable"],
 });
 ```

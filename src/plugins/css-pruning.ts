@@ -2,18 +2,17 @@ import type {
   SharedAnalysis,
   UsageResult,
 } from "svelte-prune/internal/analysis";
-import type { ComponentIndex } from "../indexer/build-index";
 import {
   type CssOptimizer,
   type CssOptimizerOptions,
   collectedEngine,
   createCssOptimizer,
-  type PropAwareUsage,
-  propAwareUsage,
+  type CssUsage,
+  cssUsage,
 } from "./create-optimized-css";
 import { SHARED_ANALYSIS_FAILED } from "./messages";
 import type { OptimizeCssOptions } from "./options";
-import { tokenNamesFile } from "./prune-tokens";
+import { tokenNamesFile } from "./token-names";
 
 type Analyzer = typeof import("svelte-prune/internal/analysis");
 
@@ -26,24 +25,22 @@ type Collected = {
 
 export type CssPruning = {
   optimizer: CssOptimizer;
-  usage: PropAwareUsage | undefined;
-  /** What svelte-prune's pruner reads custom properties in, with `propAware`. */
+  /** The usage analysis; without it, CSS is left unpruned. */
+  usage: CssUsage | undefined;
+  /** What svelte-prune's pruner reads custom properties in. */
   files: ReadonlyArray<{ code: string }> | undefined;
 };
 
 /**
  * The optimizer a build prunes its CSS with, shared by the plugins and
  * `createCarbonOptimizer`: they differ only in how they collect its
- * inputs. With `propAware`, it prunes from `optimizeComponents`' analysis
- * (`shared`) when that's in the build, else from the call sites `collect`
- * reads, and falls back to the imported components alone with a warning.
+ * inputs. It prunes from `optimizeComponents`' analysis (`shared`) when
+ * that's in the build, else from the call sites `collect` reads, and
+ * leaves the CSS unpruned with a warning when neither can be read.
  */
 export async function prepareCssPruning(input: {
   options: OptimizeCssOptions | undefined;
   root: string;
-  components: ComponentIndex;
-  /** The Carbon components the build bundles. */
-  ids: Iterable<string>;
   /** `bx--` classes from `content` and the scanned modules. */
   classes: Iterable<string>;
   /**
@@ -59,7 +56,7 @@ export async function prepareCssPruning(input: {
 }): Promise<CssPruning> {
   const { analyzer, root } = input;
   const namedTokens = tokenNamesFile(input.namedTokens);
-  let usage: PropAwareUsage | undefined;
+  let usage: CssUsage | undefined;
   let engine: CssOptimizerOptions["engine"];
   if (input.shared) {
     // The same reading of the call sites `optimizeComponents` rewrote for, so
@@ -80,7 +77,7 @@ export async function prepareCssPruning(input: {
     if (result && "warning" in result) {
       input.warn(result.warning);
     } else if (collected && result) {
-      usage = propAwareUsage(result, analyzer);
+      usage = cssUsage(result, analyzer);
       engine = collectedEngine(result, analyzer, root, [
         ...collected.files,
         namedTokens,
@@ -91,10 +88,8 @@ export async function prepareCssPruning(input: {
   return {
     optimizer: createCssOptimizer({
       ...input.options,
-      components: input.components,
-      ids: input.ids,
       contentClasses: classes,
-      propAware: usage,
+      analysis: usage,
       engine,
     }),
     usage,

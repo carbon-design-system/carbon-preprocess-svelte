@@ -4,7 +4,6 @@
  *
  * - `baseline`: no optimization.
  * - `css`: `optimizeCss()`.
- * - `prop-aware`: `optimizeCss({ propAware: true })`.
  * - `full`: that plus `optimizeComponents()`.
  *
  * Svelte is compiled by a minimal plugin rather than
@@ -17,7 +16,7 @@ import { compile, compileModule, preprocess } from "svelte/compiler";
 import { build, defaultClientConditions, type Plugin } from "vite";
 import { optimizeComponents, optimizeCss, optimizeImports } from "../src";
 
-export const GOLDEN_VARIANTS = ["baseline", "css", "prop-aware", "full"];
+export const GOLDEN_VARIANTS = ["baseline", "css", "full"];
 
 const SVELTE_FILE = /\.svelte$/;
 const SVELTE_MODULE = /\.svelte\.[jt]s$/;
@@ -64,11 +63,7 @@ export async function buildGolden(
   if (variant === "full") plugins.push(optimizeComponents({ silent: true }));
   plugins.push(goldenSvelte());
   if (variant !== "baseline") {
-    plugins.push(
-      optimizeCss({
-        propAware: variant === "prop-aware" || variant === "full",
-      }),
-    );
+    plugins.push(optimizeCss());
   }
   await build({
     root: appDir,

@@ -8,9 +8,8 @@ import {
   type WebpackModule,
 } from "svelte-prune/internal";
 import type { UsageCollector } from "svelte-prune/internal/analysis";
-import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
+import { CARBON, CSS_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
-import { loadComponentIndex } from "../indexer/load-index";
 import {
   errorMessage,
   isCarbonSvelteImport,
@@ -23,16 +22,17 @@ import { optimizeAssets } from "./optimize-assets";
 import { type RewriteHeader, rewriteHeader } from "./rewrite-header";
 import {
   type OptimizeCssOptions,
-  propAwareOptions,
+  checkRemovedOptions,
   sharesAnalysis,
+  usageOptions,
 } from "./options";
 import {
   canNameTokens,
   collectTokenNames,
   collectTokenReads,
-} from "./prune-tokens";
+} from "./token-names";
 import { collectCarbonTokens, scanContent } from "./scan-content";
-import { hasOptimizableCss } from "./strict-css-optimizer";
+import { hasOptimizableCss } from "./carbon-rules";
 
 /**
  * Structural subset of the webpack/Rspack `Compiler` and `Compilation`
@@ -128,6 +128,7 @@ export class OptimizeCssPlugin {
   private header: RewriteHeader;
 
   public constructor(options?: OptimizeCssOptions) {
+    checkRemovedOptions(options);
     this.options = { ...options };
     this.header = rewriteHeader(this, options?.silent === true);
   }
@@ -144,7 +145,6 @@ export class OptimizeCssPlugin {
     } = compiler;
     const options = this.options;
     const silent = options.silent === true;
-    const propAware = propAwareOptions(options);
     const carbon = libraryPaths(CARBON);
 
     compiler.hooks.thisCompilation.tap(
@@ -152,9 +152,9 @@ export class OptimizeCssPlugin {
       (compilation) => {
         const ids = new Set<string>();
         const moduleClasses = new Set<string>();
-        /** `[resource, code]` of every scannable module, for `propAware`. */
-        const propAwareModules: Array<[string, string]> = [];
-        /** The module graph's edges into Carbon, for `propAware`. */
+        /** `[resource, code]` of every scannable module, for the analysis. */
+        const analyzedModules: Array<[string, string]> = [];
+        /** The module graph's edges into Carbon, for the analysis. */
         const carbonImports: LibraryImport[] = [];
         const warn = (message: string) => {
           if (!silent) compilation.warnings.push(new WebpackError(message));
@@ -167,7 +167,7 @@ export class OptimizeCssPlugin {
               const resource = module.resource;
               if (typeof resource !== "string") continue;
 
-              if (propAware && carbon.importKey(resource)) {
+              if (carbon.importKey(resource)) {
                 carbonImports.push(
                   ...importEdges(
                     resource,
@@ -183,13 +183,12 @@ export class OptimizeCssPlugin {
               }
 
               if (!isScannableModule(resource)) continue;
-              const scan = options.scanModules !== false;
-              if (!(scan || propAware)) continue;
-
               const code = moduleSource(module);
               if (code !== undefined) {
-                if (scan) collectCarbonTokens(code, moduleClasses);
-                if (propAware) propAwareModules.push([resource, code]);
+                if (options.scanModules !== false) {
+                  collectCarbonTokens(code, moduleClasses);
+                }
+                analyzedModules.push([resource, code]);
               }
             }
           },
@@ -214,10 +213,6 @@ export class OptimizeCssPlugin {
               return;
             }
 
-            const components = await loadComponentIndex(compiler.context);
-            // `loadComponentIndex` already warned.
-            if (!components) return;
-
             const scan = scanContent(options.content, compiler.context);
             const warning = contentScanWarning(
               options.content,
@@ -226,24 +221,19 @@ export class OptimizeCssPlugin {
             );
             if (warning) warn(warning);
 
-            const analyzer = propAware
-              ? await import("svelte-prune/internal/analysis")
-              : undefined;
+            const analyzer = await import("svelte-prune/internal/analysis");
             // `OptimizeComponentsPlugin`'s analysis, when it's in the build, so the
             // CSS keeps exactly what the call sites it rewrote for render.
-            const shared =
-              analyzer && propAware && sharesAnalysis(propAware)
-                ? analyzer.siblingAnalysis(compiler, CARBON.name)
-                : undefined;
+            const shared = sharesAnalysis(options)
+              ? analyzer.siblingAnalysis(compiler, CARBON.name)
+              : undefined;
             const { optimizer, usage } = await prepareCssPruning({
               options,
               root: compiler.context,
-              components,
-              ids,
               classes: [...scan.classes, ...moduleClasses],
               // svelte-prune's pruner reads custom properties in its files:
               // the token names the scripts, markup and `content` name, and
-              // the other CSS assets read, as the separate token pass did.
+              // the other CSS assets read.
               namedTokens: [
                 ...assetTokenNames(assets),
                 ...assetTokenReads(assets),
@@ -251,35 +241,39 @@ export class OptimizeCssPlugin {
               ],
               analyzer,
               shared,
-              collect:
-                analyzer && propAware && !shared
-                  ? async () => {
-                      let collector: UsageCollector | undefined;
-                      try {
-                        collector = analyzer.createUsageCollector(
-                          CARBON,
-                          compiler.context,
-                          PROP_AWARE_FAILURE,
-                        );
-                      } catch (error) {
-                        warn(
-                          `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,
-                        );
-                        return undefined;
-                      }
-                      for (const [resource, code] of propAwareModules) {
-                        collector.add(resource, code);
-                      }
-                      return {
-                        result: await collector.analyze(
-                          ids,
-                          propAware,
-                          carbonImports,
-                        ),
-                        files: propAwareModules.map(([, code]) => ({ code })),
-                      };
+              collect: shared
+                ? undefined
+                : async () => {
+                    let collector: UsageCollector | undefined;
+                    try {
+                      collector = analyzer.createUsageCollector(
+                        CARBON,
+                        compiler.context,
+                        CSS_FAILURE,
+                      );
+                    } catch (error) {
+                      warn(
+                        `${LOG_PREFIX} Carbon CSS is left unpruned in this build (${errorMessage(error)}).`,
+                      );
+                      return undefined;
                     }
-                  : undefined,
+                    for (const [resource, code] of analyzedModules) {
+                      collector.add(resource, code);
+                    }
+                    return {
+                      result: await collector.analyze(
+                        ids,
+                        usageOptions(options),
+                        carbonImports,
+                      ),
+                      // What the app's modules name stays, unless
+                      // `scanModules` is off.
+                      files:
+                        options.scanModules === false
+                          ? []
+                          : analyzedModules.map(([, code]) => ({ code })),
+                    };
+                  },
               warn,
             });
 
@@ -294,7 +288,6 @@ export class OptimizeCssPlugin {
               rewritten: this.header.rewritten,
               moduleTokens: moduleClasses.size,
               contentTokens: scan.classes.length,
-              tokenNames: [...assetTokenNames(assets), ...scan.tokens],
               reportExtra: () =>
                 usage?.report?.(
                   optimizer.usage.prunedByProps,

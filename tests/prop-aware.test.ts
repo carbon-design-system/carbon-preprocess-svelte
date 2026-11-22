@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { optimizeCarbonCss } from "carbon-preprocess-svelte";
+import { OptimizeCssPlugin, optimizeCarbonCss } from "carbon-preprocess-svelte";
 import type { Rollup } from "vite";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { optimizeComponents } from "../src/plugins/optimize-components";
@@ -15,7 +15,7 @@ function app(script: string, markup: string): string {
   return `<script>\n${script}\n</script>\n\n${markup}\n`;
 }
 
-describe("propAware", () => {
+describe("pruning by props", () => {
   const BUTTON_CSS =
     ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}.bx--accordion{a:5}";
 
@@ -31,13 +31,12 @@ describe("propAware", () => {
         content: [join(dir, "*.svelte")],
       };
 
-      const without = await optimizeCarbonCss(BUTTON_CSS, {
+      const excluded = await optimizeCarbonCss(BUTTON_CSS, {
         ...options,
-        propAware: false,
+        exclude: ["Button"],
       });
-      expect(without.css).toContain(".bx--btn--danger");
+      expect(excluded.css).toContain(".bx--btn--danger");
 
-      // On by default, with `content` to read.
       const result = await optimizeCarbonCss(BUTTON_CSS, options);
       expect(result.css).toBe(".bx--btn{a:1}.bx--btn--tertiary{a:2}");
     } finally {
@@ -87,7 +86,6 @@ describe("propAware", () => {
       writeFileSync(appFile, code);
       const plugin = optimizeCss({
         silent: true,
-        propAware: true,
       }) as unknown as {
         buildStart(this: object): Promise<void>;
         transform(code: string, id: string): void;
@@ -116,7 +114,7 @@ describe("propAware", () => {
       } as unknown as Rollup.OutputBundle;
       await plugin.generateBundle.call(ctx, {}, bundle);
 
-      // Every variant stays, as without `propAware`.
+      // Every variant stays, as for an excluded component.
       expect((bundle["styles.css"] as Rollup.OutputAsset).source).toBe(
         ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}",
       );
@@ -183,8 +181,8 @@ describe("propAware", () => {
   test.each([
     ["by default", {}, ".bx--btn{a:1}.bx--btn--tertiary{a:2}"],
     [
-      "not with `propAware: false`",
-      { propAware: false },
+      "keeping every variant of an `exclude`d component",
+      { exclude: ["Button"] },
       ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}",
     ],
   ] as const)(
@@ -233,32 +231,24 @@ describe("propAware", () => {
     },
   );
 
-  test("optimizeCarbonCss without `content` warns that propAware was skipped", async () => {
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      // On by default, skipped all the same: it says so, not silently.
-      const skipped = await optimizeCarbonCss(BUTTON_CSS, {
-        components: ["Button"],
-      });
-      expect(skipped.css).toContain(".bx--btn--danger");
-      expect(warn.mock.calls[0]?.[0]).toContain("propAware needs `content`");
+  test("optimizeCarbonCss without `content` keeps every variant", async () => {
+    const result = await optimizeCarbonCss(BUTTON_CSS, {
+      components: ["Button"],
+    });
+    expect(result.css).toBe(
+      ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}",
+    );
+  });
 
-      warn.mockClear();
-      await optimizeCarbonCss(BUTTON_CSS, {
-        components: ["Button"],
-        propAware: true,
-      });
-      expect(warn.mock.calls[0]?.[0]).toContain("propAware needs `content`");
-
-      warn.mockClear();
-      await optimizeCarbonCss(BUTTON_CSS, {
-        components: ["Button"],
-        propAware: false,
-      });
-      expect(warn).not.toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
+  test("`propAware`, removed in 0.14.0, throws", async () => {
+    const removed = { propAware: false } as object;
+    expect(() => optimizeCss(removed)).toThrow("`propAware` was removed");
+    expect(() => new OptimizeCssPlugin(removed)).toThrow(
+      "`propAware` was removed",
+    );
+    await expect(
+      optimizeCarbonCss(BUTTON_CSS, { components: ["Button"], ...removed }),
+    ).rejects.toThrow("`propAware` was removed");
   });
 
   test.each([

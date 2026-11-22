@@ -1,13 +1,14 @@
 /**
- * Accuracy check for `propAware`.
+ * Accuracy check for pruning by the props the app passes.
  *
  * Generates one tiny app per (Carbon component, prop value): every string
  * literal value a prop's JSDoc `@type` lists, every boolean flipped from its
  * default, plus no props and default-slot content. Then random multi-site
  * apps mixing those. For each app it:
  *
- *   1. prunes Carbon's CSS as today (every bundled component, all props) and
- *      with `propAware` (the app's props), and
+ *   1. prunes Carbon's CSS with every component excluded (each one the app
+ *      renders keeps every variant: the baseline) and by the app's props,
+ *      and
  *   2. SSR-renders the app with Svelte and collects the classes it renders.
  *
  * An app is UNSOUND when a selector in today's CSS whose Carbon classes the
@@ -31,18 +32,13 @@ import { parseArgs } from "node:util";
 import { plugin } from "bun";
 import { filterCss } from "caligula";
 import { requiredClasses } from "caligula/selector";
-import {
-  analyzeFiles,
-  libraryAt,
-  loadComponentModel,
-} from "svelte-prune/internal/analysis";
+import { analyzeFiles, libraryAt } from "svelte-prune/internal/analysis";
 
 /** The analysis module, as the plugins load it, for the pruner. */
 const analyzer = await import("svelte-prune/internal/analysis");
 import { compile } from "svelte/compiler";
 import { render } from "svelte/server";
-import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
-import { loadComponentIndex } from "../src/indexer/load-index";
+import { CARBON, CSS_FAILURE } from "../src/carbon-library";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import {
   collectedEngine,
@@ -85,8 +81,6 @@ const carbonRoot = resolveCarbonRoot(ROOT);
 const carbonSrc = path.join(carbonRoot, "src");
 const carbon = libraryAt(CARBON, carbonRoot).components;
 const css = readFileSync(path.join(carbonRoot, "css/white.css"), "utf8");
-const index = await loadComponentIndex(ROOT);
-if (!index) throw new Error("could not build the component index");
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
@@ -103,18 +97,6 @@ const cases = buildCases({
 const names = new Set(cases.flatMap((c) => c.components));
 
 // ---------- evaluation ----------
-
-/** What a bundler would include: the components and every `.svelte` they import. */
-function bundledClosure(keys: string[]): string[] {
-  const seen = new Set<string>();
-  const queue = [...keys];
-  for (let key = queue.pop(); key; key = queue.pop()) {
-    if (seen.has(key)) continue;
-    seen.add(key);
-    queue.push(...loadComponentModel(carbonSrc, key).componentImports.values());
-  }
-  return [...seen];
-}
 
 const CLASS_ATTR = /class="([^"]*)"/g;
 
@@ -147,12 +129,12 @@ type Outcome = {
   lost?: string[];
   /** Rendered selectors removed whose rules only declared custom properties nothing reads. */
   unread?: string[];
-  /** Rendered selectors default pruning (no `propAware`) removed. */
+  /** Rendered selectors the baseline (every component excluded) removed. */
   defaultLost?: string[];
   error?: string;
 };
 
-/** Every selector in the full stylesheet: what default pruning starts from. */
+/** Every selector in the full stylesheet: what the baseline starts from. */
 const fullSelectors = selectors(css);
 
 /**
@@ -226,14 +208,9 @@ for (const testCase of cases) {
     continue;
   }
 
-  const keys = testCase.components.flatMap((name) => carbon.get(name) ?? []);
-  const bundledNames = bundledClosure(keys).map(
-    (key) => path.posix.parse(key).name,
-  );
-
   const result = await analyzeFiles({
     library: CARBON,
-    failure: PROP_AWARE_FAILURE,
+    failure: CSS_FAILURE,
     projectRoot: ROOT,
     files: [{ file, code }],
     components: testCase.components,
@@ -248,27 +225,37 @@ for (const testCase of cases) {
     continue;
   }
 
-  const baselineKey = [...bundledNames].sort().join(",");
+  // Per case: the baseline reads the app's code too.
+  const baselineKey = `${n}`;
   let today = baselineCache.get(baselineKey);
   if (today === undefined) {
+    // The baseline: every component excluded, rendered with any props, so
+    // only what nothing renders goes.
+    const open = await analyzeFiles({
+      library: CARBON,
+      failure: CSS_FAILURE,
+      projectRoot: ROOT,
+      files: [{ file, code }],
+      components: testCase.components,
+      options: { exclude: [...carbon.keys()] },
+    });
+    if ("warning" in open) throw new Error(open.warning);
     const todayCss = optimizeCssWithReport({
       source: css,
-      components: index,
-      ids: bundledNames,
+      analysis: open,
+      engine: collectedEngine(open, analyzer, ROOT, [{ code }]),
     }).css;
     today = { css: todayCss, selectors: selectors(todayCss) };
     baselineCache.set(baselineKey, today);
   }
   const propAware = optimizeCssWithReport({
     source: css,
-    components: index,
-    ids: bundledNames,
-    propAware: args.control ? { ...result, isPruned: () => true } : result,
+    analysis: args.control ? { ...result, isPruned: () => true } : result,
     // svelte-prune's pruner, as the plugins run it.
     engine: collectedEngine(result, analyzer, ROOT, [{ code }]),
   }).css;
 
-  // Default pruning must keep every rule the app's rendered classes match.
+  // The baseline must keep every rule the app's rendered classes match.
   const defaultLost: string[] = [];
   for (const [selector, classes] of fullSelectors) {
     if (
@@ -276,6 +263,10 @@ for (const testCase of cases) {
       classes.every((cls) => rendered.has(cls)) &&
       !today.selectors.has(selector)
     ) {
+      const props = customOnly.get(selector);
+      if (props && !readsAny(today.css, props) && !readsAny(code, props)) {
+        continue;
+      }
       defaultLost.push(selector);
     }
   }
@@ -334,10 +325,10 @@ prop-aware accuracy (${names.size} components, ${cases.length} apps, ${((perform
   UNSOUND         ${count("unsound")}
   render error    ${count("render-error")}  (app didn't SSR; not evaluated)
   analysis error  ${count("analysis-error")}
-  default pruning lost a rendered selector in ${outcomes.filter((o) => o.defaultLost).length} apps
+  the baseline lost a rendered selector in ${outcomes.filter((o) => o.defaultLost).length} apps
   dropped only custom properties nothing reads in ${outcomes.filter((o) => o.unread).length} apps (sound)
 
-  CSS vs today (sound + unsound apps)
+  CSS vs every component excluded (sound + unsound apps)
     median saving   ${pct(quantile(0.5))}   p10 ${pct(quantile(0.1))}   p90 ${pct(quantile(0.9))}
     total           ${(sum("todayBytes") / 1024).toFixed(0)} KB -> ${(sum("propAwareBytes") / 1024).toFixed(0)} KB (${pct(1 - sum("propAwareBytes") / sum("todayBytes"))})`);
 
@@ -352,7 +343,7 @@ if (unsound.length > 0) {
 
 const defaultUnsound = outcomes.filter((o) => o.defaultLost);
 if (defaultUnsound.length > 0) {
-  console.log("\nDefault pruning removed selectors matching rendered classes:");
+  console.log("\nThe baseline removed selectors matching rendered classes:");
   for (const o of defaultUnsound.slice(0, 50))
     console.log(`  ${o.id}\n    ${o.defaultLost?.join(" ")}`);
 }

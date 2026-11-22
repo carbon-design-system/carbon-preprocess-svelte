@@ -146,13 +146,15 @@ describe("cli optimize-css", () => {
     try {
       const result = runCli(dir, ["dist/app.css", "--report"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Detected components (1): Button");
+      expect(result.stdout).toContain(
+        "Components that can render (2): Button, Loading",
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  test("--prop-aware prunes variants the content never uses", () => {
+  test("prunes variants the content never uses, except for --exclude", () => {
     const dir = createTempProject();
     try {
       writeFileSync(
@@ -163,19 +165,31 @@ describe("cli optimize-css", () => {
         ".bx--btn{a:1}\n.bx--btn--tertiary{a:2}\n.bx--btn--danger{a:3}\n";
       writeFileSync(join(dir, "dist", "app.css"), css);
 
-      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
-      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
-        ".bx--btn--danger",
-      );
-
-      writeFileSync(join(dir, "dist", "app.css"), css);
-      const result = runCli(dir, ["dist/app.css", "--prop-aware", "--report"]);
+      const result = runCli(dir, ["dist/app.css", "--report"]);
       expect(result.status).toBe(0);
       const pruned = readFileSync(join(dir, "dist", "app.css"), "utf-8");
       expect(pruned).toContain(".bx--btn--tertiary");
       expect(pruned).not.toContain(".bx--btn--danger");
-      expect(result.stdout).toContain("Prop-aware:");
       expect(result.stdout).toMatch(KIND_TERTIARY);
+
+      writeFileSync(join(dir, "dist", "app.css"), css);
+      expect(runCli(dir, ["dist/app.css", "--exclude", "Button"]).status).toBe(
+        0,
+      );
+      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
+        ".bx--btn--danger",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("--prop-aware, removed in 0.14.0, fails with what to do", () => {
+    const dir = createTempProject();
+    try {
+      const result = runCli(dir, ["dist/app.css", "--prop-aware"]);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("--prop-aware was removed in 0.14.0");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

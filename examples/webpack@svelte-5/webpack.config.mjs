@@ -12,9 +12,8 @@ import webpack from "webpack";
 const NODE_ENV =
   process.env.NODE_ENV === "production" ? "production" : "development";
 const PROD = NODE_ENV === "production";
-// `OPTIMIZE=1` adds the component optimizations: `OptimizeComponentsPlugin`
-// rewrites Carbon components for the props the app passes, and prop-aware
-// `OptimizeCssPlugin` prunes their unused styles. Built to `public-optimized/`.
+// `OPTIMIZE=1` adds `OptimizeComponentsPlugin`, which rewrites Carbon components
+// for the props the app passes. Built to `public-optimized/`.
 const OPTIMIZE = PROD && process.env.OPTIMIZE === "1";
 
 // Minimal stand-in for html-webpack-plugin: writes a static HTML shell,
@@ -93,7 +92,7 @@ export default {
   mode: NODE_ENV,
   plugins: [
     OPTIMIZE && new OptimizeComponentsPlugin(),
-    new OptimizeCssPlugin({ propAware: OPTIMIZE }),
+    new OptimizeCssPlugin(),
     new MiniCssExtractPlugin({
       filename: PROD ? "[name].[chunkhash].css" : "[name].css",
     }),

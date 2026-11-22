@@ -1,4 +1,4 @@
-import { packageSignature, requirePackageDir } from "svelte-prune/internal";
+import { requirePackageDir } from "svelte-prune/internal";
 import { CarbonSvelte } from "../constants";
 
 /**
@@ -7,9 +7,4 @@ import { CarbonSvelte } from "../constants";
  */
 export function resolveCarbonRoot(from: string = process.cwd()): string {
   return requirePackageDir(CarbonSvelte.Components, from);
-}
-
-/** `packageSignature` of the Carbon at `carbonRoot`. */
-export function carbonSignature(carbonRoot: string): Promise<string> {
-  return packageSignature(carbonRoot, "src");
 }

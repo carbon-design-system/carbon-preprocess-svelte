@@ -46,7 +46,7 @@ import {
   parse,
   specializeComponent,
 } from "svelte-prune/internal/analysis";
-import { CARBON, PROP_AWARE_FAILURE } from "../src/carbon-library";
+import { CARBON, CSS_FAILURE } from "../src/carbon-library";
 import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import { goldenApps } from "./golden-apps";
 import { buildCases, caseSource } from "./prop-aware-cases";
@@ -326,7 +326,7 @@ for (const [n, testCase] of cases.entries()) {
   const appUsage = collectAppUsage(files, library);
   const result = await analyzeFiles({
     library: CARBON,
-    failure: PROP_AWARE_FAILURE,
+    failure: CSS_FAILURE,
     projectRoot: PROJECT,
     files,
     components: testCase.components,
