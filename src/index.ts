@@ -1,3 +1,9 @@
+export { type CarbonBunPlugin, optimizeCarbonBun } from "./plugins/bun";
+export {
+  type CarbonOptimizer,
+  type CarbonOptimizerOptions,
+  createCarbonOptimizer,
+} from "./plugins/carbon-optimizer";
 export { OptimizeComponentsPlugin } from "./plugins/OptimizeComponentsPlugin";
 export { OptimizeCssPlugin } from "./plugins/OptimizeCssPlugin";
 export { optimizeCarbonCss } from "./plugins/optimize-carbon-css";

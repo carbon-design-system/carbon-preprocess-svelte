@@ -34,7 +34,9 @@ Pick the tool for your bundler or pipeline; each works on its own.
 | [`OptimizeCssPlugin`](#optimizecssplugin) | Build plugin | Webpack, Rspack | `optimizeCss` for Webpack and Rspack |
 | [`optimizeComponents`](#optimizecomponents) | Build plugin | Vite, SvelteKit, Astro, Rollup, Rolldown | Rewrites Carbon components for the props your app passes, removing code it never runs |
 | [`OptimizeComponentsPlugin`](#optimizecomponentsplugin) | Build plugin | Webpack, Rspack | `optimizeComponents` for Webpack and Rspack |
-| [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, `Bun.build`, any post-build script | The CSS engine as a function, for any pipeline |
+| [`optimizeCarbonBun`](#optimizecarbonbun) | Build plugin | `Bun.build` | `optimizeComponents` and `optimizeCss` for Bun |
+| [`createCarbonOptimizer`](#createcarbonoptimizer) | Function | Any bundler without the plugins above | `optimizeComponents` and `optimizeCss`, driven by your build script |
+| [`optimizeCarbonCss`](#optimizecarboncss) | Async function | esbuild, any post-build script | The CSS engine as a function, for any pipeline |
 | [CLI](#cli) | Command | esbuild, Bun, any pipeline without a plugin hook | Prunes built CSS files with one command |
 
 ### `optimizeImports`
@@ -453,7 +455,7 @@ DataTable (1 call site)
   page             dynamic: App.svelte:231 `page` is bound with `bind:` at line 253
 ```
 
-The same options work on `OptimizeCssPlugin` and `optimizeCarbonCss` (which needs `content`). The CLI's `--prop-aware` turns it on without `exclude` or `assume`.
+The same options work on `OptimizeCssPlugin`, `createCarbonOptimizer`'s `optimizeCss`, and `optimizeCarbonCss` (which needs `content`). The CLI's `--prop-aware` turns it on without `exclude` or `assume`.
 
 Across 2,416 apps covering every Carbon component and prop value, it left 46% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](#optimizecomponents).
 
@@ -591,9 +593,119 @@ export default {
 };
 ```
 
+### `optimizeCarbonBun`
+
+`optimizeComponents` and `optimizeCss` for `Bun.build`, with the same output as a Vite build with both plugins. Bun runs only the first `onLoad` that matches a file, so this plugin doesn't load `.svelte` files: your Svelte plugin compiles what `load` returns. Bun has no hook after the bundle is written, so the CSS is pruned once `Bun.build` returns, from its `metafile`. For production builds only: the dev server would serve rewritten components stale.
+
+```js
+// build.js
+import { optimizeCarbonBun, optimizeImports } from "carbon-preprocess-svelte";
+import { compile, preprocess } from "svelte/compiler";
+
+const carbon = optimizeCarbonBun();
+
+const svelte = {
+  name: "svelte",
+  setup(build) {
+    build.onLoad({ filter: /\.svelte$/ }, async ({ path }) => {
+      // The component rewritten for this app's props, or the file as it is.
+      const source = carbon.load(path)?.code ?? (await Bun.file(path).text());
+      const { code } = await preprocess(source, [optimizeImports()], {
+        filename: path,
+      });
+      const { js } = compile(code, { filename: path, css: "injected" });
+      return { contents: js.code, loader: "js" };
+    });
+  },
+};
+
+const result = await Bun.build({
+  entrypoints: ["index.html"],
+  outdir: "dist",
+  conditions: ["svelte"],
+  metafile: true,
+  plugins: [carbon, svelte],
+});
+
+// Prunes the CSS files the build wrote. One whose name holds its hash is
+// renamed for its pruned content, and the HTML and JS naming it updated.
+await carbon.pruneBuild(result);
+```
+
+It takes `createCarbonOptimizer`'s [options](#createcarbonoptimizer). After the build, it fails if a module renders Carbon components in a way the rewrite didn't read (a file outside `content`, an alias Bun's resolver can't follow), as the Vite plugin does. `hydration: false` warns and does nothing here.
+
+> [!NOTE]
+> Bun lowers the CSS it bundles for older browsers, which inflates Carbon's: its 847 kB `all.css` grows to 1.07 MB, with about 15,000 `:lang()` selectors, and the pruned sheet keeps that overhead (`golden/docs-site` prunes to 82 kB instead of 72 kB). Leave Carbon's stylesheet out of the build and prune it raw with `pruneCss`, which leaves the build's files as they are:
+>
+> ```js
+> const result = await Bun.build({
+>   // …as above, plus a plugin that serves the stylesheet empty:
+>   plugins: [carbon, svelte, {
+>     name: "carbon-css",
+>     setup(build) {
+>       build.onLoad({ filter: /carbon-components-svelte[\\/]css[\\/].+\.css$/ }, () => ({ contents: "", loader: "css" }));
+>     },
+>   }],
+> });
+> const raw = await Bun.file(Bun.resolveSync("carbon-components-svelte/css/all.css", import.meta.dir)).text();
+> const { carbon: css } = await carbon.pruneCss({ carbon: raw }, result);
+> // Inline `css`, or write it next to the build's own CSS.
+> ```
+
+### `createCarbonOptimizer`
+
+`optimizeComponents` and `optimizeCss` for a bundler without their plugins, which `optimizeCarbonBun` is built on: call `prepare` before the build, `load` from your Svelte plugin's load step, and `finish` with the module graph and CSS after it. `optimizeCss`' `propAware` prunes from `optimizeComponents`' analysis, as in a Vite build with both, which `optimizeCarbonCss` can't.
+
+```ts
+import { createCarbonOptimizer } from "carbon-preprocess-svelte";
+
+const carbon = createCarbonOptimizer({
+  /**
+   * `content` globs and the installed `carbon-components-svelte` resolve
+   * from it.
+   * @default process.cwd()
+   */
+  root: process.cwd(),
+
+  /**
+   * `optimizeComponents`' options, or `false` to bundle Carbon's
+   * components unchanged.
+   * @default {}
+   */
+  optimizeComponents: {},
+
+  /**
+   * `optimizeCss`' options, or `false` to leave CSS unpruned.
+   * @default {}
+   */
+  optimizeCss: {},
+});
+
+// Before the build. `resolve` resolves aliased imports as the bundler does.
+await carbon.prepare(async (specifier, importer) => undefined);
+
+// In the Svelte plugin, before it compiles: `{ code, map }`, or `undefined`
+// to compile the file as it is.
+const rewritten = carbon.load("/app/node_modules/carbon-components-svelte/src/Button/Button.svelte");
+
+// After the build: every module it bundled, its CSS, and what else it ships.
+const pruned = await carbon.finish({
+  modules: [
+    {
+      id: "/app/src/App.svelte", // absolute path, or a virtual module's name
+      code: "…", // its source before Svelte compiles it (`load`'s, if rewritten)
+      imports: [{ id: "/app/src/Card.svelte", specifier: "./Card.svelte" }],
+      entry: false,
+    },
+  ],
+  css: { "style.css": "…" },
+  output: { "index.js": "…", "index.html": "…" },
+});
+```
+
 ### `optimizeCarbonCss`
 
-The engine behind `optimizeCss`, as an async function, for pipelines without a plugin API (esbuild, `Bun.build`, a post-build script). It can't see your imports, so you pass the `components`. It shares the plugins' [blind spot](#optimizecss-api).
+The engine behind `optimizeCss`, as an async function, for pipelines without a plugin API (esbuild, a post-build script). It can't see your imports, so you pass the `components`. It shares the plugins' [blind spot](#optimizecss-api). It doesn't see what `optimizeComponents` rewrote, so it keeps more than a Vite build does: for that, use [`createCarbonOptimizer`](#createcarbonoptimizer) (or [`optimizeCarbonBun`](#optimizecarbonbun) under Bun).
 
 > [!TIP]
 > Can your pipeline run a command after the build? The [CLI](#cli) detects components for you, with no code.
@@ -701,7 +813,7 @@ optimizeCarbonCss(css, {
    * See "Prop-aware pruning" under `optimizeCss`. Reads call sites from the
    * `content` files, so `content` must cover every file that renders Carbon
    * components; a listed component no file renders keeps every variant.
-   * On when `content` is set; `false` turns it off.
+   * Without `content` it's skipped, with a warning; `false` turns it off.
    * @default true
    */
   propAware: false,

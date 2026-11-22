@@ -17,18 +17,8 @@ import {
   isCssFile,
   isScannableModule,
 } from "../utils";
-import {
-  type CssOptimizerOptions,
-  collectedEngine,
-  createCssOptimizer,
-  type PropAwareUsage,
-  propAwareUsage,
-} from "./create-optimized-css";
-import {
-  contentScanWarning,
-  NO_CARBON_IMPORTS,
-  SHARED_ANALYSIS_FAILED,
-} from "./messages";
+import { prepareCssPruning } from "./css-pruning";
+import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
 import {
   type OptimizeCssOptions,
@@ -39,7 +29,6 @@ import {
   canNameTokens,
   collectTokenNames,
   collectTokenReads,
-  tokenNamesFile,
 } from "./prune-tokens";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
@@ -241,65 +230,52 @@ export class OptimizeCssPlugin {
               analyzer && propAware && sharesAnalysis(propAware)
                 ? analyzer.siblingAnalysis(compiler, CARBON.name)
                 : undefined;
-            // svelte-prune's pruner reads custom properties in its files:
-            // the token names the scripts, markup and `content` name, and
-            // the other CSS assets read, as the separate token pass did.
-            const namedTokens = tokenNamesFile([
-              ...assetTokenNames(assets),
-              ...assetTokenReads(assets),
-              ...scan.tokens,
-            ]);
-            let usage: PropAwareUsage | undefined;
-            let engine: CssOptimizerOptions["engine"];
-            if (shared && analyzer) {
-              const analysis = shared();
-              if (analysis && !("warning" in analysis)) {
-                usage = analysis.usage;
-                engine = {
-                  analyzer,
-                  root: compiler.context,
-                  loadable: analysis.usage.loadable,
-                  files: [...analysis.files, namedTokens],
-                };
-              } else warn(SHARED_ANALYSIS_FAILED);
-            } else if (analyzer && propAware) {
-              let collector: UsageCollector | undefined;
-              try {
-                collector = analyzer.createUsageCollector(
-                  CARBON,
-                  compiler.context,
-                  PROP_AWARE_FAILURE,
-                );
-              } catch (error) {
-                warn(
-                  `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,
-                );
-              }
-              for (const [resource, code] of propAwareModules) {
-                collector?.add(resource, code);
-              }
-              const result = await collector?.analyze(
-                ids,
-                propAware,
-                carbonImports,
-              );
-              if (result && "warning" in result) warn(result.warning);
-              else if (result) {
-                usage = propAwareUsage(result, analyzer);
-                engine = collectedEngine(result, analyzer, compiler.context, [
-                  ...propAwareModules.map(([, code]) => ({ code })),
-                  namedTokens,
-                ]);
-              }
-            }
-
-            const optimizer = createCssOptimizer({
-              ...options,
+            const { optimizer, usage } = await prepareCssPruning({
+              options,
+              root: compiler.context,
               components,
               ids,
-              contentClasses: [...scan.classes, ...moduleClasses],
-              propAware: usage,
-              engine,
+              classes: [...scan.classes, ...moduleClasses],
+              // svelte-prune's pruner reads custom properties in its files:
+              // the token names the scripts, markup and `content` name, and
+              // the other CSS assets read, as the separate token pass did.
+              namedTokens: [
+                ...assetTokenNames(assets),
+                ...assetTokenReads(assets),
+                ...scan.tokens,
+              ],
+              analyzer,
+              shared,
+              collect:
+                analyzer && propAware && !shared
+                  ? async () => {
+                      let collector: UsageCollector | undefined;
+                      try {
+                        collector = analyzer.createUsageCollector(
+                          CARBON,
+                          compiler.context,
+                          PROP_AWARE_FAILURE,
+                        );
+                      } catch (error) {
+                        warn(
+                          `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,
+                        );
+                        return undefined;
+                      }
+                      for (const [resource, code] of propAwareModules) {
+                        collector.add(resource, code);
+                      }
+                      return {
+                        result: await collector.analyze(
+                          ids,
+                          propAware,
+                          carbonImports,
+                        ),
+                        files: propAwareModules.map(([, code]) => ({ code })),
+                      };
+                    }
+                  : undefined,
+              warn,
             });
 
             optimizeAssets({

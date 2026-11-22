@@ -21,20 +21,10 @@ import {
   toCssString,
 } from "../utils";
 import type { BundlerPlugin } from "./bundler-plugin";
-import {
-  type CssOptimizerOptions,
-  collectedEngine,
-  createCssOptimizer,
-  type PropAwareUsage,
-  propAwareUsage,
-} from "./create-optimized-css";
-import {
-  contentScanWarning,
-  NO_CARBON_IMPORTS,
-  SHARED_ANALYSIS_FAILED,
-} from "./messages";
+import type { CssOptimizer, PropAwareUsage } from "./create-optimized-css";
+import { prepareCssPruning } from "./css-pruning";
+import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
-import type { CssOptimizer } from "./create-optimized-css";
 import {
   type OptimizeCssOptions,
   propAwareOptions,
@@ -44,7 +34,6 @@ import {
   canNameTokens,
   collectTokenNames,
   collectTokenReads,
-  tokenNamesFile,
 } from "./prune-tokens";
 import { writePrunedCss } from "./rename-pruned-css";
 import { collectCarbonTokens, scanContent } from "./scan-content";
@@ -276,47 +265,31 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       typeof this.getModuleInfo === "function"
         ? graphTokenNames(this)
         : { code: [], markup: [] };
-    // svelte-prune's pruner reads custom properties in its files: the token
-    // names the app's markup, modules and `content` name, and the other
-    // stylesheets read, as the separate token pass did.
-    const namedTokens = tokenNamesFile([
-      ...contentTokens,
-      ...graphTokens.code,
-      ...graphTokens.markup,
-    ]);
-
-    let usage: PropAwareUsage | undefined;
-    let engine: CssOptimizerOptions["engine"];
-    if (shared && propAware) {
-      // The same reading of the call sites `optimizeComponents` rewrote for.
-      const analysis = shared();
-      if (analysis && !("warning" in analysis) && analyzer) {
-        usage = analysis.usage;
-        engine = {
-          analyzer,
-          root,
-          loadable: analysis.usage.loadable,
-          files: [...analysis.files, namedTokens],
-        };
-      } else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
-    } else if (collector && analyzer && propAware) {
-      const result = await collector.analyze(ids, propAware, edges);
-      if (!("warning" in result)) {
-        usage = propAwareUsage(result, analyzer);
-        engine = collectedEngine(result, analyzer, root, [
-          ...[...moduleSources.values()].map((code) => ({ code })),
-          namedTokens,
-        ]);
-      } else if (!silent) this.warn(result.warning);
-    }
-
-    const optimizer = createCssOptimizer({
-      ...options,
+    const classes = [...contentClasses, ...moduleTokens];
+    const usageCollector = collector;
+    const { optimizer, usage, files } = await prepareCssPruning({
+      options,
+      root,
       components,
       ids,
-      contentClasses: [...contentClasses, ...moduleTokens],
-      propAware: usage,
-      engine,
+      classes,
+      namedTokens: [
+        ...contentTokens,
+        ...graphTokens.code,
+        ...graphTokens.markup,
+      ],
+      analyzer,
+      shared: propAware ? shared : undefined,
+      collect:
+        usageCollector && propAware
+          ? async () => ({
+              result: await usageCollector.analyze(ids, propAware, edges),
+              files: [...moduleSources.values()].map((code) => ({ code })),
+            })
+          : undefined,
+      warn: (message) => {
+        if (!silent) this.warn(message);
+      },
     });
 
     return {
@@ -328,11 +301,11 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         options,
         root,
         ids,
-        classes: [...contentClasses, ...moduleTokens],
+        classes,
         tokens: [...contentTokens, ...graphTokens.code, ...graphTokens.markup],
         components,
         usage,
-        files: engine?.files,
+        files,
       }),
     };
   }
