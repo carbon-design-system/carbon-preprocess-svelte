@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.4](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.4) - 2026-11-22
+
+**Features**
+
+- `optimizeCarbonBun`: a `Bun.build` plugin that rewrites Carbon components for the props your app passes (like `optimizeComponents`) and prunes the build's CSS from the same analysis with `pruneBuild()` or `pruneCss()`. Hand `load(path)?.code` to your Svelte plugin's `onLoad`; the CSS is byte-identical to the Vite plugins' on the same input
+- `createCarbonOptimizer`: the bundler-neutral core `optimizeCarbonBun` builds on, for build tools without a plugin here
+
+**Fixes**
+
+- `optimizeCarbonCss` warns when it skips the default `propAware` because `content` is missing, instead of pruning by imported components alone without saying so
+
 ## [0.12.3](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.3) - 2026-11-22
 
 **Fixes**
