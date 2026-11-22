@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.3](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.3) - 2026-11-22
+
+**Fixes**
+
+- keep the Carbon tokens (`--cds-*`) the build's markup and modules name, such as one only `index.html` reads (`<p style="color: var(--cds-ai-aura-start)">`). Since 0.12.0, a build pruned by svelte-prune's pruner (every prop-aware build since 0.12.1) kept only the tokens the app's sources or Carbon's own modules name. `optimizeCarbonCss` without `sources` and the CLI keep every token again.
+
 ## [0.12.2](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.2) - 2026-11-21
 
 **Fixes**
