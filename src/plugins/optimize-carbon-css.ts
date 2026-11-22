@@ -49,6 +49,9 @@ type OptimizeCarbonCssOptions = PruneOptions &
 /**
  * Bundler-agnostic entry point for the CSS optimizer, for build tools
  * without a plugin here: the caller supplies the used components directly.
+ * It reads the app's call sites from `content` itself, without what
+ * `optimizeComponents` rewrote; `createCarbonOptimizer` prunes from that
+ * analysis, as a Vite build with both plugins does.
  */
 export async function optimizeCarbonCss(
   css: string | Uint8Array,
@@ -92,7 +95,8 @@ export async function optimizeCarbonCss(
 
 /**
  * `propAware` reads call sites from the `content` files, so it needs
- * them: without `content` it's skipped, with a warning if it was asked for.
+ * them: without `content` it's skipped, with a warning, whether it was
+ * asked for or is on by default.
  */
 async function analyzePropAware(
   options: OptimizeCarbonCssOptions,
@@ -105,10 +109,8 @@ async function analyzePropAware(
   if (!propAware) return undefined;
   const cwd = path.resolve(options.cwd ?? process.cwd());
   if (!options.content || options.content.length === 0) {
-    // On by default, it needs `content` to run: only asking for it warns.
-    if (options.propAware === undefined) return undefined;
     console.warn(
-      `${LOG_PREFIX} propAware needs \`content\` globs covering every file that renders Carbon components; CSS was pruned without it.`,
+      `${LOG_PREFIX} propAware needs \`content\` globs covering every file that renders Carbon components; CSS was pruned without it. Pass \`content\`, or \`propAware: false\` to prune by \`components\` alone. createCarbonOptimizer prunes from optimizeComponents' analysis instead, as the Vite plugins do.`,
     );
     return undefined;
   }

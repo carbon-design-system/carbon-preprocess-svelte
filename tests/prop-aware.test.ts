@@ -233,20 +233,29 @@ describe("propAware", () => {
     },
   );
 
-  test("optimizeCarbonCss without `content` warns only when asked for propAware", async () => {
+  test("optimizeCarbonCss without `content` warns that propAware was skipped", async () => {
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      const quiet = await optimizeCarbonCss(BUTTON_CSS, {
+      // On by default, skipped all the same: it says so, not silently.
+      const skipped = await optimizeCarbonCss(BUTTON_CSS, {
         components: ["Button"],
       });
-      expect(quiet.css).toContain(".bx--btn--danger");
-      expect(warn).not.toHaveBeenCalled();
+      expect(skipped.css).toContain(".bx--btn--danger");
+      expect(warn.mock.calls[0]?.[0]).toContain("propAware needs `content`");
 
+      warn.mockClear();
       await optimizeCarbonCss(BUTTON_CSS, {
         components: ["Button"],
         propAware: true,
       });
       expect(warn.mock.calls[0]?.[0]).toContain("propAware needs `content`");
+
+      warn.mockClear();
+      await optimizeCarbonCss(BUTTON_CSS, {
+        components: ["Button"],
+        propAware: false,
+      });
+      expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
     }
