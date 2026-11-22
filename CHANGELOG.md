@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.5](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.5) - 2026-11-22
+
+**Features**
+
+- `fontDisplay` sets the `font-display` of the IBM Plex `@font-face` rules the CSS keeps (`fontDisplay: "swap"`), under `optimizeCss`, `OptimizeCssPlugin`, `createCarbonOptimizer` and `optimizeCarbonCss`. Carbon ships `auto`, which hides text while the font loads from IBM's CDN. Other `@font-face` rules stay as they are
+
+**Fixes**
+
+- `optimizeCarbonBun` prunes Carbon's stylesheets as Carbon ships them, not as Bun's CSS bundler rewrites them: Bun lowers CSS for older browsers, which grew `all.css` from 847 kB to 1.07 MB before pruning and left the pruned sheet bigger than Vite's (sveld's playground: 98,369 B → 90,046 B, against 89,857 B with Vite). `stylesheet: "bundled"` keeps Bun's ([#326](https://github.com/carbon-design-system/carbon-preprocess-svelte/issues/326))
+
 ## [0.12.4](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.4) - 2026-11-22
 
 **Features**
