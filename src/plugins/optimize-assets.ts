@@ -49,7 +49,7 @@ export function optimizeAssets({
 
   const list = [...assets];
   const results = list.map(({ source }) => optimizer.run(source));
-  if (tokenNames) {
+  if (tokenNames && !optimizer.prunesTokens) {
     const tokens = pruneUnusedTokens(
       results.map((result) => result.css),
       tokenNames,

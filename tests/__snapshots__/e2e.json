@@ -58,8 +58,8 @@
   "sveltekit": {
     "file": "_app/immutable/assets/2.*.css",
     "before_kb": 772.52,
-    "after_kb": 29.02,
-    "reduction_percent": 96.24
+    "after_kb": 27.1,
+    "reduction_percent": 96.49
   },
   "sveltekit-matrix@svelte-5": {
     "css": {
@@ -77,15 +77,15 @@
     "prop-aware": {
       "file": "_app/immutable/assets/2.*.css",
       "before_kb": 772.74,
-      "after_kb": 167.52,
-      "reduction_percent": 78.32
+      "after_kb": 165.21,
+      "reduction_percent": 78.62
     }
   },
   "vite": {
     "file": "assets/index-*.css",
     "before_kb": 774.71,
-    "after_kb": 29.24,
-    "reduction_percent": 96.23
+    "after_kb": 27.42,
+    "reduction_percent": 96.46
   },
   "vite-matrix@svelte-4": {
     "css": {
@@ -103,8 +103,8 @@
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 774.93,
-      "after_kb": 168.6,
-      "reduction_percent": 78.24
+      "after_kb": 166.34,
+      "reduction_percent": 78.54
     }
   },
   "vite-matrix@svelte-5": {
@@ -123,88 +123,88 @@
     "prop-aware": {
       "file": "assets/index-*.css",
       "before_kb": 772.74,
-      "after_kb": 167.52,
-      "reduction_percent": 78.32
+      "after_kb": 165.21,
+      "reduction_percent": 78.62
     }
   },
   "vite@carbon-0.85": {
     "file": "assets/index-*.css",
     "before_kb": 606.42,
-    "after_kb": 26.66,
-    "reduction_percent": 95.6
+    "after_kb": 24.89,
+    "reduction_percent": 95.9
   },
   "vite@svelte-5": {
     "composed-modal-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 39.79,
-      "reduction_percent": 94.85
+      "after_kb": 37.58,
+      "reduction_percent": 95.14
     },
     "datatable-overflowmenu": {
       "file": "assets/index-*.css",
       "before_kb": 772.62,
-      "after_kb": 37.73,
-      "reduction_percent": 95.12
+      "after_kb": 35.29,
+      "reduction_percent": 95.43
     },
     "datatable-toolbar": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 33.93,
-      "reduction_percent": 95.61
+      "after_kb": 32.78,
+      "reduction_percent": 95.76
     },
     "datepicker": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 34.49,
-      "reduction_percent": 95.54
+      "after_kb": 32.61,
+      "reduction_percent": 95.78
     },
     "dropdown": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 30.22,
-      "reduction_percent": 96.09
+      "after_kb": 28.94,
+      "reduction_percent": 96.25
     },
     "modal": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 39.6,
-      "reduction_percent": 94.87
+      "after_kb": 37.39,
+      "reduction_percent": 95.16
     },
     "multiselect": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 41.73,
-      "reduction_percent": 94.6
+      "after_kb": 39.39,
+      "reduction_percent": 94.9
     },
     "select-pagination": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 43.55,
-      "reduction_percent": 94.36
+      "after_kb": 41.95,
+      "reduction_percent": 94.57
     },
     "tabs-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 24.08,
-      "reduction_percent": 96.88
+      "after_kb": 21.68,
+      "reduction_percent": 97.19
     },
     "textinput": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 18.7,
-      "reduction_percent": 97.58
+      "after_kb": 17.01,
+      "reduction_percent": 97.8
     },
     "timepicker-bundle": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 23.25,
-      "reduction_percent": 96.99
+      "after_kb": 21.33,
+      "reduction_percent": 97.24
     },
     "uishell": {
       "file": "assets/index-*.css",
       "before_kb": 772.52,
-      "after_kb": 23.52,
-      "reduction_percent": 96.96
+      "after_kb": 21.79,
+      "reduction_percent": 97.18
     }
   },
   "webpack": {

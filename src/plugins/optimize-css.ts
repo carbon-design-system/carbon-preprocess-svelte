@@ -18,6 +18,7 @@ import {
 import type { BundlerPlugin } from "./bundler-plugin";
 import {
   type CssOptimizerOptions,
+  collectedEngine,
   createCssOptimizer,
   type PropAwareUsage,
   propAwareUsage,
@@ -88,6 +89,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   let contentTokens: string[] = [];
   /** Literal `bx--` classes in each scanned module, kept per module like `ids`. */
   const moduleClasses = new Map<string, Set<string>>();
+  /** Each scanned module's code, for the pruner, when CPS collects its own call sites. */
+  const moduleSources = new Map<string, string>();
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
   let components: ComponentIndex | undefined;
   const propAware = propAwareOptions(options);
@@ -159,6 +162,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       // Virtual modules too: one may render the app's own components.
       if (collector && (isScannableModule(id) || id.startsWith("\0"))) {
         collector.add(id, code);
+        if (isScannableModule(id)) moduleSources.set(id, code);
       }
       if (options?.scanModules !== false && isScannableModule(id)) {
         const tokens = new Set<string>();
@@ -180,6 +184,9 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         for (const id of ids) if (!graph.has(id)) ids.delete(id);
         for (const id of moduleClasses.keys()) {
           if (!graph.has(id)) moduleClasses.delete(id);
+        }
+        for (const id of moduleSources.keys()) {
+          if (!graph.has(id)) moduleSources.delete(id);
         }
         collector?.retain(graph);
       }
@@ -218,8 +225,15 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         } else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
       } else if (collector && analyzer && propAware) {
         const result = await collector.analyze(ids, propAware, edges);
-        if (!("warning" in result)) usage = propAwareUsage(result, analyzer);
-        else if (!silent) this.warn(result.warning);
+        if (!("warning" in result)) {
+          usage = propAwareUsage(result, analyzer);
+          engine = collectedEngine(
+            result,
+            analyzer,
+            root,
+            [...moduleSources.values()].map((code) => ({ code })),
+          );
+        } else if (!silent) this.warn(result.warning);
       }
 
       const optimizer = createCssOptimizer({

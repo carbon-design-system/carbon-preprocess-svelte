@@ -5,8 +5,11 @@ import { LOG_PREFIX } from "../constants";
 import { loadComponentIndex } from "../indexer/load-index";
 import { toCssString } from "../utils";
 import {
-  type OptimizedCssReport,
+  collectedEngine,
+  type CssOptimizerOptions,
   optimizeCssWithReport,
+  type OptimizedCssReport,
+  propAwareUsage,
   type PropAwareUsage,
   type PruneOptions,
 } from "./create-optimized-css";
@@ -61,6 +64,7 @@ export async function optimizeCarbonCss(
     if (tokenNames) collectTokenNames(source, tokenNames);
   }
 
+  const analyzed = await analyzePropAware(options, ids);
   const report = optimizeCssWithReport({
     source: css,
     components,
@@ -68,7 +72,8 @@ export async function optimizeCarbonCss(
     contentClasses,
     safelist: options.safelist,
     preserveAllIBMFonts: options.preserveAllIBMFonts,
-    propAware: await analyzePropAware(options, ids),
+    propAware: analyzed?.usage,
+    engine: analyzed?.engine,
   });
   if (!tokenNames) return report;
   const tokens = pruneUnusedTokens([report.css], tokenNames);
@@ -82,7 +87,9 @@ export async function optimizeCarbonCss(
 async function analyzePropAware(
   options: OptimizeCarbonCssOptions,
   ids: string[],
-): Promise<PropAwareUsage | undefined> {
+): Promise<
+  { usage: PropAwareUsage; engine: CssOptimizerOptions["engine"] } | undefined
+> {
   const propAware = propAwareOptions(options);
   if (!propAware) return undefined;
   const cwd = path.resolve(options.cwd ?? process.cwd());
@@ -94,16 +101,22 @@ async function analyzePropAware(
     );
     return undefined;
   }
-  const { analyzeFiles } = await import("svelte-prune/internal/analysis");
-  const result = await analyzeFiles({
+  const analyzer = await import("svelte-prune/internal/analysis");
+  const files = [...readFiles(globSync(options.content, { cwd }), cwd)];
+  const result = await analyzer.analyzeFiles({
     library: CARBON,
     failure: PROP_AWARE_FAILURE,
     projectRoot: cwd,
-    files: [...readFiles(globSync(options.content, { cwd }), cwd)],
+    files,
     components: ids,
     options: propAware,
   });
-  if (!("warning" in result)) return result;
+  if (!("warning" in result)) {
+    return {
+      usage: propAwareUsage(result, analyzer),
+      engine: collectedEngine(result, analyzer, cwd, files),
+    };
+  }
   console.warn(result.warning);
   return undefined;
 }
