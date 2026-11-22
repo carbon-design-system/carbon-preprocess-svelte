@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.1](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.1) - 2026-11-21
+
+**Performance**
+
+- prune prop-aware CSS with svelte-prune's stylesheet pruner everywhere, not only with `optimizeComponents`: `optimizeCss` and `OptimizeCssPlugin` on their own, `optimizeCarbonCss` with `content`, and the CLI with `--prop-aware` (1.2–2.4 kB smaller optimized CSS in every e2e example: `vite` 29.24 kB → 27.42 kB, `sveltekit` 29.02 kB → 27.10 kB). It also removes custom properties and `@keyframes` nothing reads. `propAware: false` prunes as before.
+- upgrade svelte-prune to 0.13.1: SvelteKit server builds no longer keep every Carbon token, which made the separate token pass redundant after this pruner
+
 ## [0.12.0](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.0) - 2026-11-21
 
 **⚠ Breaking**
