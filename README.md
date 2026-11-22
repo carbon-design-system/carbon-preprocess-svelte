@@ -328,6 +328,15 @@ optimizeCss({
   preserveAllIBMFonts: true,
 
   /**
+   * The `font-display` of the IBM Plex `@font-face` rules the CSS keeps.
+   * Carbon's stylesheets ship `auto`, which in most browsers hides text
+   * for up to three seconds while the font loads from IBM's CDN; `swap`
+   * shows it in a fallback font until then.
+   * @default unchanged ("auto")
+   */
+  fontDisplay: "swap",
+
+  /**
    * Class selectors to always keep, regardless of which components are
    * imported. Use for Carbon classes the allowlist misses: hand-written
    * classes in app markup (e.g. `<div class="bx--grid">`) and theme/layout
@@ -634,23 +643,15 @@ await carbon.pruneBuild(result);
 
 It takes `createCarbonOptimizer`'s [options](#createcarbonoptimizer). After the build, it fails if a module renders Carbon components in a way the rewrite didn't read (a file outside `content`, an alias Bun's resolver can't follow), as the Vite plugin does. `hydration: false` warns and does nothing here.
 
-> [!NOTE]
-> Bun lowers the CSS it bundles for older browsers, which inflates Carbon's: its 847 kB `all.css` grows to 1.07 MB, with about 15,000 `:lang()` selectors, and the pruned sheet keeps that overhead (`golden/docs-site` prunes to 82 kB instead of 72 kB). Leave Carbon's stylesheet out of the build and prune it raw with `pruneCss`, which leaves the build's files as they are:
->
-> ```js
-> const result = await Bun.build({
->   // …as above, plus a plugin that serves the stylesheet empty:
->   plugins: [carbon, svelte, {
->     name: "carbon-css",
->     setup(build) {
->       build.onLoad({ filter: /carbon-components-svelte[\\/]css[\\/].+\.css$/ }, () => ({ contents: "", loader: "css" }));
->     },
->   }],
-> });
-> const raw = await Bun.file(Bun.resolveSync("carbon-components-svelte/css/all.css", import.meta.dir)).text();
-> const { carbon: css } = await carbon.pruneCss({ carbon: raw }, result);
-> // Inline `css`, or write it next to the build's own CSS.
-> ```
+Carbon's stylesheets (`carbon-components-svelte/css/*.css`) stay out of Bun's CSS bundler. Bun lowers the CSS it bundles for older browsers, with targets you can't change, which inflates Carbon's: its 847 kB `all.css` grows to 1.07 MB, with about 15,000 `:lang()` selectors, and the pruned sheet would keep that overhead. So the plugin bundles each import of one as a placeholder rule, and `pruneBuild` replaces it with the file as Carbon ships it before pruning. `stylesheet: "bundled"` leaves them to Bun instead.
+
+To inline the CSS rather than link it, read the build's CSS files and prune them with `pruneCss`, which replaces the placeholders the same way and leaves the files as they are:
+
+```js
+const files = result.outputs.filter((output) => output.path.endsWith(".css"));
+const css = Object.fromEntries(await Promise.all(files.map(async (file) => [file.path, await file.text()])));
+const pruned = await carbon.pruneCss(css, result);
+```
 
 ### `createCarbonOptimizer`
 
@@ -801,6 +802,12 @@ optimizeCarbonCss(css, {
    * @default false
    */
   preserveAllIBMFonts: false,
+
+  /**
+   * The `font-display` of the IBM Plex `@font-face` rules, as `optimizeCss`'.
+   * @default unchanged ("auto")
+   */
+  fontDisplay: "swap",
 
   /**
    * Glob patterns of source files to scan for literal `bx--`-prefixed
