@@ -17,6 +17,7 @@ import {
   isCarbonSvelteImport,
   isCssFile,
   isScannableModule,
+  stripQuery,
   toCssString,
 } from "../utils";
 import type { BundlerPlugin } from "./bundler-plugin";
@@ -39,7 +40,12 @@ import {
   propAwareOptions,
   sharesAnalysis,
 } from "./options";
-import { canNameTokens, collectTokenNames } from "./prune-tokens";
+import {
+  canNameTokens,
+  collectTokenNames,
+  collectTokenReads,
+  tokenNamesFile,
+} from "./prune-tokens";
 import { writePrunedCss } from "./rename-pruned-css";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
@@ -78,6 +84,11 @@ const VITE_HASH_MARKER = /\/\*\$vite\$:\d+\*\//;
 
 /** Files the module graph reads that can name tokens, but whose code is JS. */
 const RE_MARKUP_FILE = /\.(?:html?|svg)$/;
+const RE_CARBON_STYLESHEET = /[\\/]carbon-components-svelte[\\/]/;
+
+function isCarbonStylesheet(id: string): boolean {
+  return RE_CARBON_STYLESHEET.test(id);
+}
 
 /** What `generateBundle` prunes with, decided before chunks are hashed. */
 type Prepared = {
@@ -108,7 +119,11 @@ function graphTokenNames(
   const markup = new Set<string>();
   for (const id of context.getModuleIds()) {
     const source = context.getModuleInfo(id)?.code;
-    if (source) collectTokenNames(source, code);
+    // A stylesheet names the tokens it defines too: only its reads count,
+    // and not Carbon's own, whose pruned rules' reads don't.
+    if (source && isCssFile(stripQuery(id))) {
+      if (!isCarbonStylesheet(id)) collectTokenReads(source, code);
+    } else if (source) collectTokenNames(source, code);
     if (RE_MARKUP_FILE.test(id) && existsSync(id)) {
       collectTokenNames(readFileSync(id, "utf8"), markup);
     }
@@ -257,6 +272,19 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       contentTokens = scan.tokens;
     }
 
+    const graphTokens =
+      typeof this.getModuleInfo === "function"
+        ? graphTokenNames(this)
+        : { code: [], markup: [] };
+    // svelte-prune's pruner reads custom properties in its files: the token
+    // names the app's markup, modules and `content` name, and the other
+    // stylesheets read, as the separate token pass did.
+    const namedTokens = tokenNamesFile([
+      ...contentTokens,
+      ...graphTokens.code,
+      ...graphTokens.markup,
+    ]);
+
     let usage: PropAwareUsage | undefined;
     let engine: CssOptimizerOptions["engine"];
     if (shared && propAware) {
@@ -268,19 +296,17 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
           analyzer,
           root,
           loadable: analysis.usage.loadable,
-          files: analysis.files,
+          files: [...analysis.files, namedTokens],
         };
       } else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
     } else if (collector && analyzer && propAware) {
       const result = await collector.analyze(ids, propAware, edges);
       if (!("warning" in result)) {
         usage = propAwareUsage(result, analyzer);
-        engine = collectedEngine(
-          result,
-          analyzer,
-          root,
-          [...moduleSources.values()].map((code) => ({ code })),
-        );
+        engine = collectedEngine(result, analyzer, root, [
+          ...[...moduleSources.values()].map((code) => ({ code })),
+          namedTokens,
+        ]);
       } else if (!silent) this.warn(result.warning);
     }
 
@@ -293,10 +319,6 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       engine,
     });
 
-    const graphTokens =
-      typeof this.getModuleInfo === "function"
-        ? graphTokenNames(this)
-        : { code: [], markup: [] };
     return {
       optimizer,
       usage,

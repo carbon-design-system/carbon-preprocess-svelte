@@ -45,6 +45,35 @@ describe("propAware", () => {
     }
   });
 
+  test("optimizeCarbonCss keeps the tokens its `sources` name, and every one without them", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
+    try {
+      writeFileSync(
+        join(dir, "App.svelte"),
+        app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`),
+      );
+      const css = `:root{--cds-ai-border-start:1;--cds-ai-aura-start:2;--cds-ai-aura-hover-start:3}${BUTTON_CSS}.bx--btn{color:var(--cds-ai-border-start)}`;
+      const options = {
+        components: ["Button"],
+        content: [join(dir, "*.svelte")],
+      };
+
+      // Nothing says what the build reads: every token stays.
+      const without = await optimizeCarbonCss(css, options);
+      expect(without.css).toContain("--cds-ai-aura-hover-start");
+
+      const named = await optimizeCarbonCss(css, {
+        ...options,
+        sources: ['<p style="color: var(--cds-ai-aura-start)">'],
+      });
+      expect(named.css).toContain("--cds-ai-border-start:1");
+      expect(named.css).toContain("--cds-ai-aura-start:2");
+      expect(named.css).not.toContain("--cds-ai-aura-hover-start");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("the Vite plugin keeps a component imported in a way it can't read", async () => {
     const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
     const appFile = join(dir, "App.svelte");
@@ -91,6 +120,61 @@ describe("propAware", () => {
       expect((bundle["styles.css"] as Rollup.OutputAsset).source).toBe(
         ".bx--btn{a:1}.bx--btn--tertiary{a:2}.bx--btn--danger{a:3}.bx--btn--sm{a:4}",
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("the Vite plugin keeps the tokens the module graph's markup and modules read", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "prop-aware-"));
+    const appFile = join(dir, "App.svelte");
+    const htmlFile = join(dir, "index.html");
+    const buttonFile = join(carbonRoot, "src", BUTTON);
+    try {
+      const source = app(IMPORT_BUTTON, `<Button kind="tertiary">Hi</Button>`);
+      writeFileSync(appFile, source);
+      writeFileSync(
+        htmlFile,
+        '<p style="color: var(--cds-ai-aura-start)"></p>',
+      );
+      const plugin = optimizeCss({ silent: true }) as unknown as {
+        buildStart(this: object): Promise<void>;
+        transform(code: string, id: string): void;
+        generateBundle(
+          this: object,
+          options: unknown,
+          bundle: Rollup.OutputBundle,
+        ): Promise<void>;
+      };
+      const modules: Record<string, string> = {
+        [appFile]: `${source}\nconst style = "--cds-ai-aura-end";`,
+        [buttonFile]: "",
+        [htmlFile]: "",
+      };
+      const ctx = {
+        warn: jest.fn(),
+        getModuleIds: () => Object.keys(modules)[Symbol.iterator](),
+        getModuleInfo: (id: string) => ({
+          code: modules[id],
+          importers: [],
+          dynamicImporters: [],
+        }),
+      };
+      await plugin.buildStart.call(ctx);
+      plugin.transform(modules[appFile], appFile);
+      plugin.transform("", buttonFile);
+      const css = `:root{--cds-ai-aura-start:1;--cds-ai-aura-end:2;--cds-ai-aura-hover-start:3}${BUTTON_CSS}`;
+      const bundle = {
+        "styles.css": { type: "asset", source: css },
+      } as unknown as Rollup.OutputBundle;
+      await plugin.generateBundle.call(ctx, {}, bundle);
+
+      const pruned = String(
+        (bundle["styles.css"] as Rollup.OutputAsset).source,
+      );
+      expect(pruned).toContain("--cds-ai-aura-start:1");
+      expect(pruned).toContain("--cds-ai-aura-end:2");
+      expect(pruned).not.toContain("--cds-ai-aura-hover-start");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

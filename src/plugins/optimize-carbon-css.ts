@@ -14,7 +14,11 @@ import {
   type PruneOptions,
 } from "./create-optimized-css";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
-import { collectTokenNames, pruneUnusedTokens } from "./prune-tokens";
+import {
+  collectTokenNames,
+  pruneUnusedTokens,
+  tokenNamesFile,
+} from "./prune-tokens";
 import { collectCarbonTokens, readFiles, scanContent } from "./scan-content";
 
 type OptimizeCarbonCssOptions = PruneOptions &
@@ -64,7 +68,13 @@ export async function optimizeCarbonCss(
     if (tokenNames) collectTokenNames(source, tokenNames);
   }
 
-  const analyzed = await analyzePropAware(options, ids);
+  // Without `sources`, nothing says which tokens the build reads: every one
+  // stays, as without propAware. A bare `--cds-` keeps them all.
+  const analyzed = await analyzePropAware(
+    options,
+    ids,
+    tokenNamesFile(tokenNames ?? ["--cds-"]),
+  );
   const report = optimizeCssWithReport({
     source: css,
     components,
@@ -87,6 +97,7 @@ export async function optimizeCarbonCss(
 async function analyzePropAware(
   options: OptimizeCarbonCssOptions,
   ids: string[],
+  namedTokens: { code: string },
 ): Promise<
   { usage: PropAwareUsage; engine: CssOptimizerOptions["engine"] } | undefined
 > {
@@ -114,7 +125,7 @@ async function analyzePropAware(
   if (!("warning" in result)) {
     return {
       usage: propAwareUsage(result, analyzer),
-      engine: collectedEngine(result, analyzer, cwd, files),
+      engine: collectedEngine(result, analyzer, cwd, [...files, namedTokens]),
     };
   }
   console.warn(result.warning);
