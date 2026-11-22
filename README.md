@@ -163,14 +163,16 @@ Optimized index-CU4gbKFa.css
 It runs on production builds, after other plugins (`apply: "build"`, `enforce: "post"`).
 
 1. **`transform`:** collects the Carbon components the app imports, and (unless `scanModules: false`) every literal `bx--` token in other modules.
-2. **`generateBundle`:** for each CSS file, builds an allowlist of the `bx--` classes those components use, plus globals like `.bx--body`. The class index comes from your installed Carbon (see [Component index](#component-index)).
-3. **Prune** Carbon selectors outside the allowlist:
+2. **`renderStart`:** before chunks are hashed, reads the call sites (`propAware`) and folds a hash of everything the pruning depends on into the names of the chunks whose code names CSS files (the preload lists of dynamic imports), so they change when the pruning does.
+3. **`generateBundle`:** for each CSS file, builds an allowlist of the `bx--` classes those components use, plus globals like `.bx--body`. The class index comes from your installed Carbon (see [Component index](#component-index)).
+4. **Prune** Carbon selectors outside the allowlist:
    - from a selector list, only the branches that don't match;
    - a compound selector only survives if every Carbon class in it does, so NumberInput doesn't pull in `.bx--modal .bx--number`;
    - flatpickr and legacy `bx-` rules go unless a flatpickr-based component (DatePicker) is bundled;
    - `:is(…)` and `:not(…)` groups are parsed, not split on commas.
-4. Empty rules are dropped.
-5. **Carbon tokens** (`--cds-*` custom properties) that nothing reads are removed. A token stays if a `var()` in the kept CSS reads it, a kept token's value reads it, or the bundle's scripts or markup (or `content` files) name it. Carbon 0.114 defines about 400 of them, and an app typically reads a few dozen.
+5. Empty rules are dropped.
+6. **Carbon tokens** (`--cds-*` custom properties) that nothing reads are removed. A token stays if a `var()` in the kept CSS reads it, a kept token's value reads it, or the bundle's scripts or markup (or `content` files) name it. Carbon 0.114 defines about 400 of them, and an app typically reads a few dozen.
+7. **Renames** each pruned file whose name hashes its content (`assets/index-[hash].css`) to a hash of the pruned CSS, and updates the HTML, chunks and Vite manifest that name it. Two builds that prune differently never share a file name, so long-lived caching (`Cache-Control: immutable`) is safe. Under Vite this runs before other plugins' `generateBundle`, so Vite's HTML and Astro's pages see the new names.
 
 Validated against most Carbon components and common multi-component bundles with no unexplained survivors. Its one blind spot is in the warning under the [API](#optimizecss-api): class names that never appear as a literal `bx--` token.
 
@@ -470,6 +472,8 @@ export default {
 
 Full set-ups: [examples/webpack](examples/webpack), [examples/webpack@svelte-5](examples/webpack@svelte-5), [examples/rspack](examples/rspack).
 
+It prunes before `optimization.realContentHash` (on by default in production mode) hashes the files, so `[contenthash]` names follow the pruned CSS. With `realContentHash: false`, a name can stay the same across builds that prune differently.
+
 ### `optimizeComponents`
 
 Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). Your own wrapper components are rewritten the same way when every place that renders them is in `content`. It's the JavaScript counterpart of prop-aware pruning, using the same analysis ([svelte-prune](https://github.com/metonym/svelte-prune)).
@@ -706,7 +710,7 @@ optimizeCarbonCss(css, {
 
 ### CLI
 
-Prunes built CSS files in place, for pipelines with no plugin hook. It finds the components to keep by scanning `--content` files for Carbon imports (barrel or direct paths) and literal `bx--` tokens, and shares the plugins' [blind spot](#optimizecss-api).
+Prunes built CSS files in place, for pipelines with no plugin hook. File names don't change, so a name hashed from the CSS before pruning can stay the same across builds that prune differently: don't cache them as immutable. It finds the components to keep by scanning `--content` files for Carbon imports (barrel or direct paths) and literal `bx--` tokens, and shares the plugins' [blind spot](#optimizecss-api).
 
 **Jump to:** [Command](#command) · [Sample output](#sample-output) · [Options](#options)
 

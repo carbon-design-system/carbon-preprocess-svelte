@@ -39,7 +39,13 @@ type ResolvedPlugin = {
   configResolved: (config: {
     root: string;
     logger: { info: (message: string) => void };
+    build?: { cssCodeSplit?: boolean };
   }) => void;
+  renderStart: (this: { warn: (message: string) => void }) => Promise<void>;
+  augmentChunkHash: (chunk: {
+    dynamicImports: string[];
+    viteMetadata?: { importedAssets: Set<string> };
+  }) => string | undefined;
   buildStart: () => Promise<void>;
   transform: (code: string, id: string) => void;
   generateBundle: (
@@ -169,6 +175,68 @@ describe("optimizeCss (Vite plugin)", () => {
 
     expect((bundle["styles.css"] as OutputAsset).source).toBe(
       ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}",
+    );
+  });
+
+  test("prunes before other plugins read CSS names under Vite", () => {
+    const plugin = resolvePlugin(optimizeCss());
+    plugin.configResolved({ root: process.cwd(), logger: quietLogger });
+    expect(typeof plugin.generateBundle).toBe("function");
+
+    plugin.configResolved({
+      root: process.cwd(),
+      logger: quietLogger,
+      build: {},
+    });
+    expect(plugin.generateBundle).toMatchObject({ order: "pre" });
+
+    // Vite emits the CSS in `generateBundle` then.
+    plugin.configResolved({
+      root: process.cwd(),
+      logger: quietLogger,
+      build: { cssCodeSplit: false },
+    });
+    expect(typeof plugin.generateBundle).toBe("function");
+  });
+
+  test("prunes around Vite's hash marker and puts it back", async () => {
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+
+    const bundle = makeCssBundle(
+      ".bx--btn { color: blue }\n.bx--accordion { background: yellow }/*$vite$:1*/",
+    );
+    await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toBe(
+      ".bx--btn { color: blue }/*$vite$:1*/",
+    );
+  });
+
+  test("hashes what it keeps into chunks that name CSS", async () => {
+    const fingerprintFor = async (options: OptimizeCssOptions) => {
+      const plugin = resolvePlugin(optimizeCss({ silent: true, ...options }));
+      await plugin.buildStart();
+      plugin.transform("", carbonComponent);
+      await plugin.renderStart.call({ warn: jest.fn() });
+      return {
+        lazy: plugin.augmentChunkHash({ dynamicImports: ["page.js"] }),
+        url: plugin.augmentChunkHash({
+          dynamicImports: [],
+          viteMetadata: { importedAssets: new Set(["assets/x.css"]) },
+        }),
+        plain: plugin.augmentChunkHash({ dynamicImports: [] }),
+      };
+    };
+
+    const base = await fingerprintFor({});
+    expect(base.lazy).toEqual(expect.any(String));
+    expect(base.url).toBe(base.lazy);
+    expect(base.plain).toBeUndefined();
+    expect((await fingerprintFor({})).lazy).toBe(base.lazy);
+    expect((await fingerprintFor({ safelist: [".bx--modal"] })).lazy).not.toBe(
+      base.lazy,
     );
   });
 

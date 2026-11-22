@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { type LibraryImport, libraryImports } from "svelte-prune/internal";
 import type {
   SharedAnalysis,
   UsageCollector,
 } from "svelte-prune/internal/analysis";
 import type { Plugin, Rollup } from "vite";
+import { version as OWN_VERSION } from "../../package.json";
 import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
 import type { ComponentIndex } from "../indexer/build-index";
@@ -29,12 +33,14 @@ import {
   SHARED_ANALYSIS_FAILED,
 } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
+import type { CssOptimizer } from "./create-optimized-css";
 import {
   type OptimizeCssOptions,
   propAwareOptions,
   sharesAnalysis,
 } from "./options";
 import { canNameTokens, collectTokenNames } from "./prune-tokens";
+import { writePrunedCss } from "./rename-pruned-css";
 import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
@@ -64,10 +70,118 @@ function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
 }
 
 /**
+ * What Vite appends to each CSS file so its hash changes with Vite's CSS
+ * handling, and strips in its `generateBundle`: under Vite, this plugin's
+ * runs first.
+ */
+const VITE_HASH_MARKER = /\/\*\$vite\$:\d+\*\//;
+
+/** Files the module graph reads that can name tokens, but whose code is JS. */
+const RE_MARKUP_FILE = /\.(?:html?|svg)$/;
+
+/** What `generateBundle` prunes with, decided before chunks are hashed. */
+type Prepared = {
+  optimizer: CssOptimizer;
+  usage: PropAwareUsage | undefined;
+  moduleTokens: Set<string>;
+  /**
+   * `--cds-` names in the HTML and SVG files the module graph reads:
+   * `generateBundle` can run before Vite emits `index.html`.
+   */
+  markupTokens: string[];
+  /**
+   * A hash of everything the pruning depends on besides the CSS, for the
+   * names of the chunks whose code names CSS files.
+   */
+  fingerprint: string;
+};
+
+/**
+ * `--cds-` names in the module graph: in its code, which the fingerprint
+ * reads because chunks are hashed before `generateBundle`, and in the HTML
+ * and SVG files it reads, which `generateBundle` can run before Vite emits.
+ */
+function graphTokenNames(
+  context: Pick<Rollup.PluginContext, "getModuleIds" | "getModuleInfo">,
+): { code: string[]; markup: string[] } {
+  const code = new Set<string>();
+  const markup = new Set<string>();
+  for (const id of context.getModuleIds()) {
+    const source = context.getModuleInfo(id)?.code;
+    if (source) collectTokenNames(source, code);
+    if (RE_MARKUP_FILE.test(id) && existsSync(id)) {
+      collectTokenNames(readFileSync(id, "utf8"), markup);
+    }
+  }
+  return { code: [...code], markup: [...markup] };
+}
+
+function serializeOption(_: string, value: unknown): unknown {
+  return value instanceof RegExp ? String(value) : value;
+}
+
+function fingerprint(parts: {
+  options: OptimizeCssOptions | undefined;
+  root: string;
+  ids: Iterable<string>;
+  classes: Iterable<string>;
+  tokens: Iterable<string>;
+  components: ComponentIndex;
+  usage: PropAwareUsage | undefined;
+  files: ReadonlyArray<{ code: string }> | undefined;
+}): string {
+  const hash = createHash("sha256");
+  const add = (label: string, values: Iterable<string>) => {
+    hash.update(`${label}\0${[...new Set(values)].sort().join("\0")}\n`);
+  };
+  add("version", [OWN_VERSION]);
+  add("options", [JSON.stringify(parts.options ?? {}, serializeOption)]);
+  add(
+    "ids",
+    [...parts.ids].map((id) =>
+      path.relative(parts.root, id).replaceAll("\\", "/"),
+    ),
+  );
+  add("classes", parts.classes);
+  add("tokens", parts.tokens);
+  const { usage } = parts;
+  if (usage) {
+    add("live", usage.liveComponents);
+    const classes = Object.values(parts.components).flatMap(
+      (entry) => entry.classes,
+    );
+    add(
+      "pruned",
+      classes.filter((cls) => usage.isPruned(cls)),
+    );
+  }
+  if (parts.files)
+    add(
+      "files",
+      parts.files.map((file) => file.code),
+    );
+  return hash.digest("hex").slice(0, 16);
+}
+
+/** Whether a chunk's code can name a CSS file once Vite fills it in. */
+function namesCss(chunk: Rollup.RenderedChunk): boolean {
+  if (chunk.dynamicImports.length > 0) return true;
+  // Rollup's `import.meta.ROLLUP_FILE_URL_x`, and Vite's `?url` imports.
+  const { referencedFiles, viteMetadata } = chunk as {
+    referencedFiles?: readonly string[];
+    viteMetadata?: { importedAssets?: Set<string> };
+  };
+  if (referencedFiles?.some(isCssFile)) return true;
+  return [...(viteMetadata?.importedAssets ?? [])].some(isCssFile);
+}
+
+/**
  * Vite/Rollup plugin that removes unused Carbon CSS from production builds.
  *
- * `transform` records which Carbon components are imported; `generateBundle`
- * then splices unused rules out of the CSS assets in place.
+ * `transform` records which Carbon components are imported. `renderStart`
+ * decides what to keep, and folds a hash of it into the names of the chunks
+ * that name CSS. `generateBundle` then splices unused rules out of the CSS
+ * assets, renaming each whose name hashes its content.
  */
 export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   const silent = options?.silent === true;
@@ -104,6 +218,152 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   let shared: (() => SharedAnalysis | undefined) | undefined;
   /** The module graph's edges into Carbon, read in `buildEnd`. */
   let edges: LibraryImport[] = [];
+  /** This build's pruning, made once for every output. */
+  let prepared: Promise<Prepared | undefined> | undefined;
+  /** Set once `prepared` settles, for the synchronous `augmentChunkHash`. */
+  let current: Prepared | undefined;
+
+  async function prepare(
+    this: Rollup.PluginContext,
+  ): Promise<Prepared | undefined> {
+    // `loadComponentIndex` already warned.
+    if (!components) return undefined;
+
+    // Absent on the bare contexts unit tests pass, where everything counts.
+    const graph = this.getModuleIds ? new Set(this.getModuleIds()) : undefined;
+    if (graph) {
+      for (const id of ids) if (!graph.has(id)) ids.delete(id);
+      for (const id of moduleClasses.keys()) {
+        if (!graph.has(id)) moduleClasses.delete(id);
+      }
+      for (const id of moduleSources.keys()) {
+        if (!graph.has(id)) moduleSources.delete(id);
+      }
+      collector?.retain(graph);
+    }
+    const moduleTokens = new Set<string>();
+    for (const tokens of moduleClasses.values()) {
+      for (const token of tokens) moduleTokens.add(token);
+    }
+
+    // A secondary build that never imports Carbon has nothing to prune.
+    if (ids.size === 0) return undefined;
+
+    if (contentClasses === undefined) {
+      const scan = scanContent(options?.content, root);
+      const warning = contentScanWarning(options?.content, root, scan);
+      if (!silent && warning) this.warn(warning);
+      contentClasses = scan.classes;
+      contentTokens = scan.tokens;
+    }
+
+    let usage: PropAwareUsage | undefined;
+    let engine: CssOptimizerOptions["engine"];
+    if (shared && propAware) {
+      // The same reading of the call sites `optimizeComponents` rewrote for.
+      const analysis = shared();
+      if (analysis && !("warning" in analysis) && analyzer) {
+        usage = analysis.usage;
+        engine = {
+          analyzer,
+          root,
+          loadable: analysis.usage.loadable,
+          files: analysis.files,
+        };
+      } else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
+    } else if (collector && analyzer && propAware) {
+      const result = await collector.analyze(ids, propAware, edges);
+      if (!("warning" in result)) {
+        usage = propAwareUsage(result, analyzer);
+        engine = collectedEngine(
+          result,
+          analyzer,
+          root,
+          [...moduleSources.values()].map((code) => ({ code })),
+        );
+      } else if (!silent) this.warn(result.warning);
+    }
+
+    const optimizer = createCssOptimizer({
+      ...options,
+      components,
+      ids,
+      contentClasses: [...contentClasses, ...moduleTokens],
+      propAware: usage,
+      engine,
+    });
+
+    const graphTokens =
+      typeof this.getModuleInfo === "function"
+        ? graphTokenNames(this)
+        : { code: [], markup: [] };
+    return {
+      optimizer,
+      usage,
+      moduleTokens,
+      markupTokens: graphTokens.markup,
+      fingerprint: fingerprint({
+        options,
+        root,
+        ids,
+        classes: [...contentClasses, ...moduleTokens],
+        tokens: [...contentTokens, ...graphTokens.code, ...graphTokens.markup],
+        components,
+        usage,
+        files: engine?.files,
+      }),
+    };
+  }
+
+  async function generateBundle(
+    this: Rollup.PluginContext,
+    outputOptions: Rollup.NormalizedOutputOptions,
+    bundle: Rollup.OutputBundle,
+  ): Promise<void> {
+    // Bare unit-test contexts skip `renderStart`.
+    prepared ??= prepare.call(this);
+    const ready = await prepared;
+    if (!ready) {
+      if (components && ids.size === 0 && !silent && hasCarbonCss(bundle)) {
+        this.warn(NO_CARBON_IMPORTS);
+      }
+      return;
+    }
+    const { optimizer, usage, moduleTokens, markupTokens } = ready;
+
+    const pruned = new Map<string, string>();
+    optimizeAssets({
+      assets: Object.entries(bundle).flatMap(([id, file]) => {
+        if (file.type !== "asset" || !isCssFile(id)) return [];
+        // Measured and pruned without Vite's marker, which goes back on so
+        // Vite hashes and strips it as it would have.
+        const css = toCssString(file.source);
+        const marker = VITE_HASH_MARKER.exec(css)?.[0] ?? "";
+        return [
+          {
+            id,
+            source: marker ? css.replace(marker, "") : css,
+            write: (pruneResult: string) => {
+              pruned.set(id, pruneResult + marker);
+            },
+          },
+        ];
+      }),
+      optimizer,
+      options: options ?? {},
+      moduleTokens: moduleTokens.size,
+      contentTokens: contentClasses?.length ?? 0,
+      tokenNames: [
+        ...bundleTokenNames(bundle),
+        ...markupTokens,
+        ...contentTokens,
+      ],
+      log: logInfo,
+      reportExtra: () =>
+        usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
+    });
+    writePrunedCss(this, bundle, pruned, outputOptions?.assetFileNames);
+  }
 
   const plugin: Plugin = {
     name: "vite:carbon:optimize-css",
@@ -114,6 +374,14 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       root = resolved.root;
       // Not `this.info`: it prefixes the plugin name and is absent on Rollup 2.
       logInfo = (message) => resolved.logger.info(message);
+      // Vite emits CSS before `generateBundle`, so prune and rename it before
+      // other plugins copy the names: Vite's HTML, Astro's pages. With
+      // `cssCodeSplit: false`, Vite emits it in `generateBundle`: after that.
+      // Plain Rollup's CSS plugins emit it there too, so it keeps the order.
+      plugin.generateBundle =
+        resolved.build && resolved.build.cssCodeSplit !== false
+          ? { order: "pre", handler: generateBundle }
+          : generateBundle;
     },
     /**
      * Re-reads `content` on `--watch` rebuilds (the plugin instance is
@@ -122,6 +390,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     // Tests call it bare; bundlers always pass their options.
     async buildStart(inputOptions?: { plugins?: readonly object[] }) {
       contentClasses = undefined;
+      prepared = undefined;
+      current = undefined;
       components = await loadComponentIndex(root);
       if (propAware && sharesAnalysis(propAware)) {
         analyzer ??= await import("svelte-prune/internal/analysis");
@@ -172,103 +442,14 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         else moduleClasses.delete(id);
       }
     },
-    async generateBundle(_, bundle) {
-      // `loadComponentIndex` already warned.
-      if (!components) return;
-
-      // Absent on the bare contexts unit tests pass, where everything counts.
-      const graph = this.getModuleIds
-        ? new Set(this.getModuleIds())
-        : undefined;
-      if (graph) {
-        for (const id of ids) if (!graph.has(id)) ids.delete(id);
-        for (const id of moduleClasses.keys()) {
-          if (!graph.has(id)) moduleClasses.delete(id);
-        }
-        for (const id of moduleSources.keys()) {
-          if (!graph.has(id)) moduleSources.delete(id);
-        }
-        collector?.retain(graph);
-      }
-      const moduleTokens = new Set<string>();
-      for (const tokens of moduleClasses.values()) {
-        for (const token of tokens) moduleTokens.add(token);
-      }
-
-      if (ids.size === 0) {
-        // A secondary build that never imports Carbon has nothing to prune.
-        if (!silent && hasCarbonCss(bundle)) this.warn(NO_CARBON_IMPORTS);
-        return;
-      }
-
-      if (contentClasses === undefined) {
-        const scan = scanContent(options?.content, root);
-        const warning = contentScanWarning(options?.content, root, scan);
-        if (!silent && warning) this.warn(warning);
-        contentClasses = scan.classes;
-        contentTokens = scan.tokens;
-      }
-
-      let usage: PropAwareUsage | undefined;
-      let engine: CssOptimizerOptions["engine"];
-      if (shared && propAware) {
-        // The same reading of the call sites `optimizeComponents` rewrote for.
-        const analysis = shared();
-        if (analysis && !("warning" in analysis) && analyzer) {
-          usage = analysis.usage;
-          engine = {
-            analyzer,
-            root,
-            loadable: analysis.usage.loadable,
-            files: analysis.files,
-          };
-        } else if (!silent) this.warn(SHARED_ANALYSIS_FAILED);
-      } else if (collector && analyzer && propAware) {
-        const result = await collector.analyze(ids, propAware, edges);
-        if (!("warning" in result)) {
-          usage = propAwareUsage(result, analyzer);
-          engine = collectedEngine(
-            result,
-            analyzer,
-            root,
-            [...moduleSources.values()].map((code) => ({ code })),
-          );
-        } else if (!silent) this.warn(result.warning);
-      }
-
-      const optimizer = createCssOptimizer({
-        ...options,
-        components,
-        ids,
-        contentClasses: [...contentClasses, ...moduleTokens],
-        propAware: usage,
-        engine,
-      });
-
-      optimizeAssets({
-        assets: Object.entries(bundle).flatMap(([id, file]) =>
-          file.type === "asset" && isCssFile(id)
-            ? [
-                {
-                  id,
-                  source: file.source,
-                  write: (css: string) => {
-                    file.source = css;
-                  },
-                },
-              ]
-            : [],
-        ),
-        optimizer,
-        options: options ?? {},
-        moduleTokens: moduleTokens.size,
-        contentTokens: contentClasses.length,
-        tokenNames: [...bundleTokenNames(bundle), ...contentTokens],
-        log: logInfo,
-        reportExtra: () =>
-          usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
-      });
+    async renderStart() {
+      prepared ??= prepare.call(this);
+      current = await prepared;
     },
+    augmentChunkHash(chunk) {
+      if (current && namesCss(chunk)) return current.fingerprint;
+    },
+    generateBundle,
   };
   return plugin;
 };
