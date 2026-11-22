@@ -13,6 +13,7 @@ import {
   type PropAwareUsage,
   type PruneOptions,
 } from "./create-optimized-css";
+import { setFontDisplay } from "./font-display";
 import { type OptimizeCssOptions, propAwareOptions } from "./options";
 import {
   collectTokenNames,
@@ -22,7 +23,7 @@ import {
 import { collectCarbonTokens, readFiles, scanContent } from "./scan-content";
 
 type OptimizeCarbonCssOptions = PruneOptions &
-  Pick<OptimizeCssOptions, "content" | "propAware"> & {
+  Pick<OptimizeCssOptions, "content" | "propAware" | "fontDisplay"> & {
     /**
      * Carbon components used by the app, as names (`"Button"`) or paths to
      * their `.svelte` source. Classes referenced by these components are kept.
@@ -61,7 +62,12 @@ export async function optimizeCarbonCss(
   const components =
     ids.length > 0 ? await loadComponentIndex(options.cwd) : undefined;
   // Without components, or if the index failed (already warned): unpruned.
-  if (!components) return { css: toCssString(css), removed: 0 };
+  if (!components) {
+    return {
+      css: setFontDisplay(toCssString(css), options.fontDisplay),
+      removed: 0,
+    };
+  }
 
   const scan = scanContent(options.content, options.cwd);
   const contentClasses = new Set(scan.classes);
@@ -88,9 +94,14 @@ export async function optimizeCarbonCss(
     propAware: analyzed?.usage,
     engine: analyzed?.engine,
   });
-  if (!tokenNames) return report;
+  if (!tokenNames) {
+    return { ...report, css: setFontDisplay(report.css, options.fontDisplay) };
+  }
   const tokens = pruneUnusedTokens([report.css], tokenNames);
-  return { css: tokens.css[0], removed: report.removed + tokens.removed[0] };
+  return {
+    css: setFontDisplay(tokens.css[0], options.fontDisplay),
+    removed: report.removed + tokens.removed[0],
+  };
 }
 
 /**

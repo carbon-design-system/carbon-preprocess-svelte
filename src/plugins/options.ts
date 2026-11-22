@@ -1,4 +1,5 @@
 import type { UsageOptions } from "svelte-prune/internal/analysis";
+import type { FontDisplay } from "./font-display";
 import type { SafelistEntry } from "./safelist";
 
 type PropAwareOptions = UsageOptions;
@@ -43,6 +44,15 @@ export type OptimizeCssOptions = {
    * @default false
    */
   preserveAllIBMFonts?: boolean;
+
+  /**
+   * The `font-display` of the IBM Plex `@font-face` rules the CSS keeps.
+   * Carbon's stylesheets ship `auto`, which in most browsers hides text
+   * for up to three seconds while the font loads from IBM's CDN; `swap`
+   * shows it in a fallback font until then.
+   * @default unchanged ("auto")
+   */
+  fontDisplay?: FontDisplay;
 
   /**
    * Class selectors to always keep, regardless of which components are
