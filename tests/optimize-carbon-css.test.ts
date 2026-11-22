@@ -49,6 +49,16 @@ describe("optimizeCarbonCss", () => {
     expect(result.removed).toBeGreaterThan(0);
   });
 
+  test("`fontDisplay` sets IBM Plex's", async () => {
+    const css =
+      "@font-face{font-display:auto;font-family:IBM Plex Mono}.bx--btn{color:red}";
+    const result = await optimizeCarbonCss(css, {
+      components: ["Button"],
+      fontDisplay: "swap",
+    });
+    expect(result.css).toContain("font-display:swap");
+  });
+
   test("returns the input unchanged for an empty component list", async () => {
     const css = ".bx--btn{color:red}";
 

@@ -1,4 +1,8 @@
-export { type CarbonBunPlugin, optimizeCarbonBun } from "./plugins/bun";
+export {
+  type CarbonBunOptions,
+  type CarbonBunPlugin,
+  optimizeCarbonBun,
+} from "./plugins/bun";
 export {
   type CarbonOptimizer,
   type CarbonOptimizerOptions,

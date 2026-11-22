@@ -178,6 +178,25 @@ describe("optimizeCss (Vite plugin)", () => {
     );
   });
 
+  test("`fontDisplay` sets IBM Plex's, and leaves other fonts alone", async () => {
+    const plugin = resolvePlugin(
+      optimizeCss({ silent: true, fontDisplay: "swap" }),
+    );
+    await plugin.buildStart();
+    plugin.transform("", carbonComponent);
+
+    const plex =
+      "@font-face{font-display:auto;font-family:IBM Plex Sans;src:url(a.woff2)}";
+    const other =
+      "@font-face{font-display:auto;font-family:Inter;src:url(b.woff2)}";
+    const bundle = makeCssBundle(`${plex}${other}.bx--btn{color:red}`);
+    await plugin.generateBundle.call({ warn: jest.fn() }, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toBe(
+      `${plex.replace("auto", "swap")}${other}.bx--btn{color:red}`,
+    );
+  });
+
   test("prunes before other plugins read CSS names under Vite", () => {
     const plugin = resolvePlugin(optimizeCss());
     plugin.configResolved({ root: process.cwd(), logger: quietLogger });

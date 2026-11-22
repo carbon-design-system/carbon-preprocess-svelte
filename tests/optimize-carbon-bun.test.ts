@@ -5,13 +5,12 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  type CarbonOptimizerOptions,
+  type CarbonBunOptions,
   createCarbonOptimizer,
   optimizeCarbonBun,
   optimizeComponents,
@@ -28,6 +27,11 @@ const OUTSIDE_CONTENT = /Add those files to `content`/;
 const NEEDS_METAFILE = /metafile: true/;
 const NO_FILE = /virtual:page.*no file on disk/;
 const CSS_LINK = /href="\.\/([\w-]+\.css)"/;
+const SHEET_MARKER = "carbon-preprocess-svelte-sheet";
+const WHITE_CSS = readFileSync(
+  path.join(ROOT, "node_modules/carbon-components-svelte/css/white.css"),
+  "utf8",
+);
 
 const VARIANTS = {
   css: { components: false, propAware: false },
@@ -109,7 +113,7 @@ async function viteCss(app: string, variant: Variant) {
 /** Builds `app` with `Bun.build` and `optimizeCarbonBun`. */
 async function bunBuild(
   app: string,
-  options: CarbonOptimizerOptions,
+  options: CarbonBunOptions,
   outdir: string,
   entry = path.join(ROOT, "golden", app, "src/main.ts"),
 ) {
@@ -198,10 +202,11 @@ describe("optimizeCarbonBun", () => {
     );
   });
 
-  test("prunes the CSS a build wrote and renames it for its content", async () => {
+  /** Builds docs-site's page: the stylesheet it links, and its size. */
+  async function buildPage(options: CarbonBunOptions, name: string) {
     const app = path.join(ROOT, "golden", "docs-site");
-    const outdir = path.join(out, "prune-build");
-    const html = path.join(out, "index.html");
+    const outdir = path.join(out, name);
+    const html = path.join(out, `${name}.html`);
     writeFileSync(
       html,
       readFileSync(path.join(app, "index.html"), "utf8").replace(
@@ -209,27 +214,74 @@ describe("optimizeCarbonBun", () => {
         path.relative(out, path.join(app, "src/main.ts")),
       ),
     );
-    const { carbon, result } = await bunBuild(
+    const built = await bunBuild(
       "docs-site",
-      { optimizeComponents: { silent: true }, optimizeCss: { silent: true } },
+      {
+        optimizeComponents: { silent: true },
+        optimizeCss: { silent: true },
+        ...options,
+      },
       outdir,
       html,
     );
-    const page = path.join(outdir, "index.html");
-    const before = CSS_LINK.exec(readFileSync(page, "utf8"))?.[1];
-    expect(before).toBeDefined();
-    const size = statSync(path.join(outdir, before ?? "")).size;
+    const page = path.join(outdir, `${name}.html`);
+    const linked = () => CSS_LINK.exec(readFileSync(page, "utf8"))?.[1] ?? "";
+    const before = linked();
+    return {
+      ...built,
+      outdir,
+      before,
+      beforeCss: readFileSync(path.join(outdir, before), "utf8"),
+      after: () => {
+        const name = linked();
+        return { name, css: readFileSync(path.join(outdir, name), "utf8") };
+      },
+    };
+  }
 
-    const renamed = await carbon.pruneBuild(result);
+  test("prunes Carbon's stylesheet as Carbon ships it, into the CSS that imported it", async () => {
+    const page = await buildPage({}, "raw");
+    // Bun bundled a marker, not the stylesheet.
+    expect(page.beforeCss.length).toBeLessThan(200);
 
-    const after = CSS_LINK.exec(readFileSync(page, "utf8"))?.[1];
-    expect(after).toBeDefined();
-    expect(after).not.toBe(before);
-    expect(Object.values(renamed)).toEqual([path.join(outdir, after ?? "")]);
-    expect(readdirSync(outdir)).not.toContain(before);
-    expect(statSync(path.join(outdir, after ?? "")).size).toBeLessThan(
-      size / 5,
+    const renamed = await page.carbon.pruneBuild(page.result);
+
+    const after = page.after();
+    expect(after.name).not.toBe(page.before);
+    expect(Object.values(renamed)).toEqual([
+      path.join(page.outdir, after.name),
+    ]);
+    expect(readdirSync(page.outdir)).not.toContain(page.before);
+    expect(after.css).toContain(".bx--btn");
+    expect(after.css).not.toContain(SHEET_MARKER);
+    // Bun lowers `inset-inline` to `:lang()` fallbacks; Carbon's file has none.
+    expect(after.css).not.toContain(":lang(");
+    expect(after.css.length).toBeLessThan(WHITE_CSS.length / 5);
+  }, 60_000);
+
+  test('prunes the CSS Bun bundled with `stylesheet: "bundled"`', async () => {
+    const raw = await buildPage({}, "raw-size");
+    await raw.carbon.pruneBuild(raw.result);
+    const page = await buildPage({ stylesheet: "bundled" }, "bundled");
+    expect(page.beforeCss).toContain(":lang(");
+
+    await page.carbon.pruneBuild(page.result);
+
+    const after = page.after();
+    expect(after.name).not.toBe(page.before);
+    expect(after.css.length).toBeLessThan(page.beforeCss.length / 5);
+    expect(raw.after().css.length).toBeLessThan(after.css.length);
+  }, 60_000);
+
+  test("sets IBM Plex's font-display", async () => {
+    const page = await buildPage(
+      { optimizeCss: { silent: true, fontDisplay: "swap" } },
+      "font-display",
     );
+    await page.carbon.pruneBuild(page.result);
+    const { css } = page.after();
+    expect(css).toContain("font-display:swap");
+    expect(css).not.toContain("font-display:auto");
   }, 60_000);
 });
 
