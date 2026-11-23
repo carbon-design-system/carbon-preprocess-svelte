@@ -21,6 +21,11 @@ const SIZE_LINE_REGEX =
   /carbon-preprocess-svelte: (?:dry run, left as is: )?(\S+\.css) ([\d,.]+) (kB|MB) → ([\d,.]+) (kB|MB) \(-?([\d.]+)%\)/;
 // Preprocessor/index loader prefix, then the plugins' prefix.
 const WARNING_REGEX = /\[carbon-preprocess-svelte\]|carbon-preprocess-svelte:/;
+/** The plugins' result lines share the prefix, but aren't warnings. */
+const REWRITE_LINE_REGEX =
+  /carbon-preprocess-svelte: \d+ Carbon components? rewritten$/;
+const isResultLine = (line: string) =>
+  SIZE_LINE_REGEX.test(line) || REWRITE_LINE_REGEX.test(line);
 
 type OptimizationResult = {
   file: string;
@@ -62,7 +67,7 @@ async function runBuild(dir: string, script: string): Promise<BuildRun> {
 
   const warnings = `${stdout}\n${stderr}`
     .split("\n")
-    .filter((line) => WARNING_REGEX.test(line))
+    .filter((line) => WARNING_REGEX.test(line) && !isResultLine(line))
     .map((line) => line.trim());
 
   return { stdout, warnings };
