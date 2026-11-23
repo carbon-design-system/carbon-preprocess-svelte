@@ -507,13 +507,24 @@ describe("parseFrontmatter", () => {
 });
 
 describe("markdown preprocessor", () => {
-  // The dev-dependency carbon-components-svelte predates Prose.
   test("uses Prose only when the installed Carbon has it", async () => {
-    const auto = await markdown().markup({ content: "Hi", filename: "a.md" });
+    // The dev-dependency carbon-components-svelte has Prose (0.114).
+    const installed = await markdown().markup({
+      content: "Hi",
+      filename: "a.md",
+    });
+    expect(installed?.code).toContain("<Prose {...proseProps}>");
+
+    // A Carbon without it, as before 0.114.
+    const carbonDir = mkdtempSync(path.join(tmpdir(), "cps-no-prose-"));
+    const auto = await markdown({ carbonDir }).markup({
+      content: "Hi",
+      filename: "a.md",
+    });
     expect(auto?.code).not.toContain("Prose");
 
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    const forced = markdown({ prose: true });
+    const forced = markdown({ prose: true, carbonDir });
     await forced.markup({ content: "Hi", filename: "a.md" });
     const second = await forced.markup({ content: "Hi", filename: "b.md" });
     expect(second?.code).toContain("<Prose {...proseProps}>");

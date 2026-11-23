@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { requirePackageDir } from "severan/internal";
+import { requirePackageDir } from "svelte-prune/internal";
 import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { carbonCodeIcon } from "../markdown/code-icons";
 import {
@@ -94,7 +94,6 @@ function detectSvelteMajor(): 3 | 4 | 5 {
   }
 }
 
-/** Whether the installed `carbon-components-svelte` ships `Prose`. */
 /** Whether `carbon-components-svelte` (installed, or at `carbonDir`) ships `Prose`. */
 function hasProse(carbonDir?: string): boolean {
   const dir = carbonDir ?? resolvePackageDir(CarbonSvelte.Components);
