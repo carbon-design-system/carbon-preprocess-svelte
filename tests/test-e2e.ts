@@ -16,10 +16,9 @@ const OBSERVED_PATH = process.env.E2E_OBSERVED;
 /** Comma-separated example names to build (`vite,vite@svelte-5`); all by default. */
 const ONLY_EXAMPLES = process.env.EXAMPLES?.split(",").filter(Boolean);
 
-const OPTIMIZED_REGEX = /Optimized\s+(.+\.css)/;
-const BEFORE_REGEX = /Before:\s*([\d,.]+)\s*(kB|MB)/;
-const AFTER_REGEX = /After:\s*([\d,.]+)\s*(kB|MB)\s*\(-?([\d.]+)%\)/;
-const DOUBLE_NEWLINE_REGEX = /\n\n+/;
+/** `carbon-preprocess-svelte: <file> <before> → <after> (-<percent>%)` */
+const SIZE_LINE_REGEX =
+  /carbon-preprocess-svelte: (?:dry run, left as is: )?(\S+\.css) ([\d,.]+) (kB|MB) → ([\d,.]+) (kB|MB) \(-?([\d.]+)%\)/;
 // Preprocessor/index loader prefix, then the plugins' prefix.
 const WARNING_REGEX = /\[carbon-preprocess-svelte\]|carbon-preprocess-svelte:/;
 
@@ -93,27 +92,18 @@ function isOptimizationResult(
 }
 
 function parseOptimizationOutput(output: string): OptimizationResult | null {
-  const optimizedMatch = output.match(OPTIMIZED_REGEX);
-  const beforeMatch = output.match(BEFORE_REGEX);
-  const afterMatch = output.match(AFTER_REGEX);
+  const match = output.match(SIZE_LINE_REGEX);
+  if (!match) return null;
 
-  if (!optimizedMatch || !beforeMatch || !afterMatch) {
-    return null;
-  }
-
-  const file = optimizedMatch[1];
-  let before_kb = Number.parseFloat(beforeMatch[1].replace(",", ""));
-  let after_kb = Number.parseFloat(afterMatch[1].replace(",", ""));
-  const reduction_percent = Number.parseFloat(afterMatch[3]);
-
-  if (beforeMatch[2] === "MB") {
-    before_kb *= 1000;
-  }
-  if (afterMatch[2] === "MB") {
-    after_kb *= 1000;
-  }
-
-  return { file, before_kb, after_kb, reduction_percent };
+  const [, file, before, beforeUnit, after, afterUnit, percent] = match;
+  const kb = (value: string, unit: string) =>
+    Number.parseFloat(value.replace(",", "")) * (unit === "MB" ? 1000 : 1);
+  return {
+    file,
+    before_kb: kb(before, beforeUnit),
+    after_kb: kb(after, afterUnit),
+    reduction_percent: Number.parseFloat(percent),
+  };
 }
 
 function normalizeFile(file: string): string {
@@ -223,19 +213,10 @@ Run with UPDATE_SNAPSHOTS=true to update.`,
 }
 
 function parseLastOptimizationBlock(output: string): OptimizationResult | null {
-  const optimizationBlocks = output
-    .split(DOUBLE_NEWLINE_REGEX)
-    .filter(
-      (block) => block.includes("Optimized") && block.includes("Before:"),
-    );
-
-  if (optimizationBlocks.length === 0) {
-    return null;
-  }
-
-  return parseOptimizationOutput(
-    optimizationBlocks[optimizationBlocks.length - 1],
-  );
+  const lines = output.split("\n").filter((line) => SIZE_LINE_REGEX.test(line));
+  return lines.length === 0
+    ? null
+    : parseOptimizationOutput(lines[lines.length - 1]);
 }
 
 async function buildSingleEntry(

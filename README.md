@@ -148,12 +148,10 @@ export default {
 
 A build plugin that strips unused Carbon styles. It runs on Vite, Rollup and [Rolldown](https://rolldown.rs), which share a plugin API.
 
-```diff
+```
 $ vite build
-
-Optimized index-CU4gbKFa.css
-- Before: 606.26 kB
-+ After:   53.22 kB (-91.22%)
+…
+carbon-preprocess-svelte: assets/index-CU4gbKFa.css 606.26 kB → 53.22 kB (-91.22%)
 ```
 
 > [!NOTE]
@@ -641,7 +639,13 @@ const result = await Bun.build({
 await carbon.pruneBuild(result);
 ```
 
-It takes `createCarbonOptimizer`'s [options](#createcarbonoptimizer). After the build, it fails if a module renders Carbon components in a way the rewrite didn't read (a file outside `content`, an alias Bun's resolver can't follow), as the Vite plugin does. `hydration: false` warns and does nothing here.
+It takes `createCarbonOptimizer`'s [options](#createcarbonoptimizer), and prints one line per stylesheet it prunes, with how many Carbon components it rewrote:
+
+```
+carbon-preprocess-svelte: assets/index-x3k9.css 849.76 kB → 90.05 kB (-89.4%), 37 Carbon components rewritten
+```
+
+After the build, it fails if a module renders Carbon components in a way the rewrite didn't read (a file outside `content`, an alias Bun's resolver can't follow), as the Vite plugin does. `hydration: false` warns and does nothing here.
 
 Carbon's stylesheets (`carbon-components-svelte/css/*.css`) stay out of Bun's CSS bundler. Bun lowers the CSS it bundles for older browsers, with targets you can't change, which inflates Carbon's: its 847 kB `all.css` grows to 1.07 MB, with about 15,000 `:lang()` selectors, and the pruned sheet would keep that overhead. So the plugin bundles each import of one as a placeholder rule, and `pruneBuild` replaces it with the file as Carbon ships it before pruning. `stylesheet: "bundled"` leaves them to Bun instead.
 
@@ -853,12 +857,9 @@ With Bun, the build step is `bun build src/main.ts --outdir dist`.
 
 #### Sample output
 
-```diff
+```
 $ carbon-preprocess-svelte optimize-css "dist/**/*.css"
-
-Optimized dist/assets/index-CU4gbKFa.css
-- Before: 606.26 kB
-+ After:   53.22 kB (-91.22%)
+carbon-preprocess-svelte: dist/assets/index-CU4gbKFa.css 606.26 kB → 53.22 kB (-91.22%)
 ```
 
 With `--report`:

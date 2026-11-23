@@ -4,14 +4,14 @@ import {
 } from "carbon-preprocess-svelte/plugins/print-diff";
 
 describe("print-diff", () => {
-  test("formats the size block", () => {
+  test("formats one prefixed line", () => {
     expect(
       formatDiff({
         id: "id",
         originalCss: "body { color: red; } .bx--btn {}",
         optimizedCss: "body { color: red; }",
       }),
-    ).toBe("\n\nOptimized id\nBefore: 0.03 kB\nAfter:  0.02 kB (-37.5%)\n");
+    ).toBe("carbon-preprocess-svelte: id 0.03 kB → 0.02 kB (-37.5%)");
   });
 
   test("returns null when nothing changed", () => {
@@ -31,13 +31,13 @@ describe("print-diff", () => {
         originalCss: "x".repeat(2_000_000),
         optimizedCss: "x".repeat(1_500_000),
       }),
-    ).toBe("\n\nOptimized large-file\nBefore:   2 MB\nAfter:  1.5 MB (-25%)\n");
+    ).toBe("carbon-preprocess-svelte: large-file 2 MB → 1.5 MB (-25%)");
   });
 
   test("handles empty output", () => {
     expect(
       formatDiff({ id: "empty", originalCss: "body { }", optimizedCss: "" }),
-    ).toBe("\n\nOptimized empty\nBefore: 0.01 kB\nAfter:     0 kB (-100%)\n");
+    ).toBe("carbon-preprocess-svelte: empty 0.01 kB → 0 kB (-100%)");
   });
 
   test("measures a Uint8Array source as bytes, not as a joined array", () => {
@@ -49,7 +49,7 @@ describe("print-diff", () => {
       optimizedCss,
     });
 
-    expect(asBytes).toContain("Before: 0.03 kB");
+    expect(asBytes).toContain("id 0.03 kB → 0.02 kB");
     expect(asBytes).toEqual(
       formatDiff({ id: "id", originalCss: original, optimizedCss }),
     );
@@ -62,30 +62,43 @@ describe("print-diff", () => {
       optimizedCss: "body { color: red; }",
     };
 
-    test("writes the block to console.log by default", () => {
+    test("writes the line to console.log by default", () => {
       const log = jest.spyOn(console, "log").mockImplementation(() => {});
-      logAssetDiff(props);
+      expect(logAssetDiff(props)).toBe(true);
       expect(log.mock.calls).toEqual([[formatDiff(props)]]);
       log.mockRestore();
     });
 
-    test("writes the dry-run notice first, through `log` when given", () => {
+    test("appends a note", () => {
+      const messages: string[] = [];
+      logAssetDiff({
+        ...props,
+        note: "3 Carbon components rewritten",
+        log: (m) => messages.push(m),
+      });
+      expect(messages).toEqual([
+        "carbon-preprocess-svelte: id 0.03 kB → 0.02 kB (-37.5%), 3 Carbon components rewritten",
+      ]);
+    });
+
+    test("marks a dry run, through `log` when given", () => {
       const messages: string[] = [];
       logAssetDiff({ ...props, dryRun: true, log: (m) => messages.push(m) });
       expect(messages).toEqual([
-        "Dry run: id left unchanged",
-        formatDiff(props),
+        "carbon-preprocess-svelte: dry run, left as is: id 0.03 kB → 0.02 kB (-37.5%)",
       ]);
     });
 
     test("logs nothing when the size is unchanged", () => {
       const messages: string[] = [];
-      logAssetDiff({
-        id: "id",
-        originalCss: "a",
-        optimizedCss: "a",
-        log: (m) => messages.push(m),
-      });
+      expect(
+        logAssetDiff({
+          id: "id",
+          originalCss: "a",
+          optimizedCss: "a",
+          log: (m) => messages.push(m),
+        }),
+      ).toBe(false);
       expect(messages).toEqual([]);
     });
   });

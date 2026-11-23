@@ -602,11 +602,7 @@ describe("OptimizeCssPlugin", () => {
         (line) => line.includes("styles.css") && line.includes("rules removed"),
       ),
     ).toEqual(true);
-    expect(
-      lines.some(
-        (line) => line.includes("Optimized") && line.includes("Before:"),
-      ),
-    ).toEqual(false);
+    expect(lines.some((line) => line.includes(" → "))).toEqual(false);
 
     consoleSpy.mockRestore();
   });

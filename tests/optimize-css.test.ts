@@ -22,7 +22,7 @@ type OutputAsset = Rollup.OutputAsset;
 type OutputBundle = Rollup.OutputBundle;
 
 const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
-const SIZE_BLOCK_HEADER = /^\n\nOptimized styles\.css\nBefore: /;
+const SIZE_LINE = /^carbon-preprocess-svelte: styles\.css [\d.]+ kB → /;
 /** No-op Vite logger for tests that ignore log output. */
 const quietLogger = { info: () => {} };
 
@@ -607,12 +607,11 @@ describe("optimizeCss (Vite plugin)", () => {
     await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect((bundle["styles.css"] as OutputAsset).source).toEqual(cssContent);
-    expect(consoleSpy.mock.calls).toContainEqual([
-      "Dry run: styles.css left unchanged",
-    ]);
     expect(
       consoleSpy.mock.calls.some((call) =>
-        String(call[0]).includes("Optimized styles.css\nBefore: "),
+        String(call[0]).startsWith(
+          "carbon-preprocess-svelte: dry run, left as is: styles.css ",
+        ),
       ),
     ).toEqual(true);
 
@@ -647,11 +646,7 @@ describe("optimizeCss (Vite plugin)", () => {
         (line) => line.includes("styles.css") && line.includes("rules removed"),
       ),
     ).toEqual(true);
-    expect(
-      lines.some(
-        (line) => line.includes("Optimized") && line.includes("Before:"),
-      ),
-    ).toEqual(false);
+    expect(lines.some((line) => line.includes(" → "))).toEqual(false);
 
     consoleSpy.mockRestore();
   });
@@ -704,8 +699,8 @@ describe("optimizeCss (Vite plugin)", () => {
 
     expect(logger.info).toHaveBeenCalledTimes(1);
     const [message] = logger.info.mock.calls[0];
-    expect(message).toMatch(SIZE_BLOCK_HEADER);
-    expect(message).toContain("\nAfter:  ");
+    expect(message).toMatch(SIZE_LINE);
+    expect(message).not.toContain("\n");
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 
@@ -723,7 +718,7 @@ describe("optimizeCss (Vite plugin)", () => {
     await plugin.generateBundle.call(ctx, {}, bundle);
 
     expect(consoleSpy).toHaveBeenCalledTimes(1);
-    expect(consoleSpy.mock.calls[0][0]).toContain("Optimized styles.css\n");
+    expect(consoleSpy.mock.calls[0][0]).toMatch(SIZE_LINE);
   });
 
   test("silent suppresses the logger path too", async () => {

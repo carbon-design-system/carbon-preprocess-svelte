@@ -15,9 +15,9 @@ export type CssAsset = {
 /**
  * Runs `optimizer` over each asset, then (given `tokenNames`) drops the
  * Carbon tokens no asset reads, sets `fontDisplay`, writes the results
- * back (unless `dryRun`),
- * and prints the size log and report the options ask for. Shared by the
- * plugins and the CLI.
+ * back (unless `dryRun`), and prints a line per asset and the report the
+ * options ask for. Shared by the plugins and the CLI. Returns whether it
+ * printed a line.
  */
 export function optimizeAssets({
   assets,
@@ -28,6 +28,7 @@ export function optimizeAssets({
   log,
   reportExtra,
   tokenNames,
+  note,
 }: {
   assets: Iterable<CssAsset>;
   optimizer: CssOptimizer;
@@ -39,16 +40,19 @@ export function optimizeAssets({
   log?: (message: string) => void;
   /** Lines appended to the report, read after every asset has run. */
   reportExtra?: () => string[];
+  /** Appended to the first asset's line, as what else the build did. */
+  note?: string;
   /**
    * `--cds-` names found in the build's scripts and markup. Only a caller
    * that sees everything the build ships can pass them; without them every
    * token stays.
    */
   tokenNames?: Iterable<string>;
-}): void {
+}): boolean {
   const silent = options.silent === true;
   const reports: AssetReport[] = [];
 
+  let logged = false;
   const list = [...assets];
   const results = list.map(({ source }) => optimizer.run(source));
   if (tokenNames && !optimizer.prunesTokens) {
@@ -71,13 +75,15 @@ export function optimizeAssets({
     if (!options.dryRun && (removed > 0 || css !== results[i].css)) write(css);
 
     if (!silent && removed > 0) {
-      logAssetDiff({
-        id,
-        originalCss: source,
-        optimizedCss: css,
-        dryRun: options.dryRun,
-        log,
-      });
+      logged =
+        logAssetDiff({
+          id,
+          originalCss: source,
+          optimizedCss: css,
+          dryRun: options.dryRun,
+          log,
+          note: logged ? undefined : note,
+        }) || logged;
     }
 
     if (options.report) reports.push(toAssetReport(id, source, css, removed));
@@ -95,4 +101,5 @@ export function optimizeAssets({
       extra: reportExtra?.(),
     });
   }
+  return logged;
 }

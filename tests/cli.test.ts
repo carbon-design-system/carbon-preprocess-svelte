@@ -45,7 +45,9 @@ describe("cli optimize-css", () => {
     try {
       const result = runCli(dir, ["dist/app.css"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Optimized dist/app.css");
+      expect(result.stdout).toContain(
+        "carbon-preprocess-svelte: dist/app.css ",
+      );
 
       const css = readFileSync(join(dir, "dist", "app.css"), "utf-8");
       expect(css).toContain(".bx--btn");
@@ -60,7 +62,9 @@ describe("cli optimize-css", () => {
     try {
       const result = runCli(dir, ["dist/app.css", "--dry-run"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Dry run: dist/app.css left unchanged");
+      expect(result.stdout).toContain(
+        "carbon-preprocess-svelte: dry run, left as is: dist/app.css ",
+      );
 
       const css = readFileSync(join(dir, "dist", "app.css"), "utf-8");
       expect(css).toBe(".bx--btn{color:red}\n.bx--accordion{color:blue}\n");

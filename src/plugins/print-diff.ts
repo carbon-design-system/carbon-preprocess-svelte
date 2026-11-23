@@ -1,4 +1,4 @@
-import { BYTES_PER_KB } from "../constants";
+import { BYTES_PER_KB, LOG_PREFIX } from "../constants";
 import { byteLength } from "../utils";
 
 export type AssetDiff = {
@@ -27,34 +27,41 @@ function toHumanReadableSize(bytes: number) {
 }
 
 /**
- * The size block for one asset, or `null` when its size is unchanged (no
- * Carbon CSS, or every component's styles were kept). One string lets a host
- * logger (Vite's `config.logger`) emit it as a single message.
+ * One line for one asset, or `null` when its size is unchanged (no Carbon
+ * CSS, or every component's styles were kept): the prefix, the file, and
+ * its size before and after, then `note` if given.
  */
-export function formatDiff(diff: AssetDiff): string | null {
+export function formatDiff(diff: AssetDiff, note?: string): string | null {
   const originalSize = byteLength(diff.originalCss);
   const optimizedSize = byteLength(diff.optimizedCss);
   if (originalSize === optimizedSize) return null;
 
   const original = toHumanReadableSize(originalSize);
   const optimized = toHumanReadableSize(optimizedSize);
-  const width = Math.max(original.length, optimized.length);
   const percent = format(((originalSize - optimizedSize) / originalSize) * 100);
-
-  return `\n\nOptimized ${diff.id}\nBefore: ${original.padStart(width)}\nAfter:  ${optimized.padStart(width)} (-${percent}%)\n`;
+  const tail = note ? `, ${note}` : "";
+  return `${LOG_PREFIX} ${diff.id} ${original} → ${optimized} (-${percent}%)${tail}`;
 }
 
 /**
- * Logs the dry-run notice and size block for one asset, through `log` (Vite's
- * `config.logger.info`) when set, else `console.log`.
+ * Logs one asset's line through `log` (Vite's `config.logger.info`) when
+ * set, else `console.log`, marked as a dry run on one. Returns whether it
+ * logged anything.
  */
 export function logAssetDiff(
-  props: AssetDiff & { dryRun?: boolean; log?: (message: string) => void },
-): void {
-  const { dryRun, log = console.log, ...diff } = props;
-
-  if (dryRun) log(`Dry run: ${diff.id} left unchanged`);
-
-  const block = formatDiff(diff);
-  if (block !== null) log(block);
+  props: AssetDiff & {
+    dryRun?: boolean;
+    log?: (message: string) => void;
+    note?: string;
+  },
+): boolean {
+  const { dryRun, log = console.log, note, ...diff } = props;
+  const line = formatDiff(diff, note);
+  if (line === null) return false;
+  log(
+    dryRun
+      ? line.replace(`${LOG_PREFIX} `, `${LOG_PREFIX} dry run, left as is: `)
+      : line,
+  );
+  return true;
 }

@@ -230,14 +230,26 @@ export function createCarbonOptimizer(
     return edges;
   }
 
+  /** "37 Carbon components rewritten", unless silent or none were. */
+  function rewriteNote(modules: CarbonBuildModule[]): string | undefined {
+    if (!components || componentOptions?.silent) return undefined;
+    const rewritten = modules.filter(
+      ({ id }) => isCarbonSvelteImport(id) && components.load(id),
+    ).length;
+    if (rewritten === 0) return undefined;
+    return `${rewritten} Carbon component${rewritten === 1 ? "" : "s"} rewritten`;
+  }
+
   async function pruneCss(
     modules: CarbonBuildModule[],
     build: CarbonBuild,
-  ): Promise<Record<string, string>> {
+    note: string | undefined,
+  ): Promise<{ css: Record<string, string>; logged: boolean }> {
     const css = { ...build.css };
-    if (!cssOptions || Object.keys(css).length === 0) return css;
+    const skip = { css, logged: false };
+    if (!cssOptions || Object.keys(css).length === 0) return skip;
     // `loadComponentIndex` already warned.
-    if (!index) return css;
+    if (!index) return skip;
 
     const ids = new Set(
       modules.map(({ id }) => id).filter((id) => isCarbonSvelteImport(id)),
@@ -246,7 +258,7 @@ export function createCarbonOptimizer(
       if (Object.values(css).some((source) => hasOptimizableCss(source))) {
         warn(NO_CARBON_IMPORTS);
       }
-      return css;
+      return skip;
     }
 
     const moduleClasses = new Set<string>();
@@ -339,7 +351,8 @@ export function createCarbonOptimizer(
       warn,
     });
 
-    optimizeAssets({
+    const logged = optimizeAssets({
+      note,
       assets: Object.entries(css).map(([id, source]) => ({
         id,
         source,
@@ -360,7 +373,7 @@ export function createCarbonOptimizer(
       reportExtra: () =>
         usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
     });
-    return css;
+    return { css, logged };
   }
 
   return {
@@ -371,12 +384,9 @@ export function createCarbonOptimizer(
         );
       }
       if (components) {
-        const { warning, info, report } = await components.prepare(
-          root,
-          resolve,
-        );
+        // `info` waits for `finish`: it goes on the CSS line, with the count.
+        const { warning, report } = await components.prepare(root, resolve);
         if (warning) console.warn(warning);
-        if (info) console.log(`${LOG_PREFIX} ${info}`);
         for (const line of report ?? []) console.log(line);
       }
       if (cssOptions) {
@@ -392,7 +402,10 @@ export function createCarbonOptimizer(
     async finish(build) {
       const modules = [...build.modules];
       checkComponents(modules);
-      return pruneCss(modules, build);
+      const note = rewriteNote(modules);
+      const { css, logged } = await pruneCss(modules, build, note);
+      if (note && !logged) console.log(`${LOG_PREFIX} ${note}`);
+      return css;
     },
   };
 }
