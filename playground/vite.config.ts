@@ -807,8 +807,7 @@ type StoredDiagnostic = Omit<Diagnostic, "start" | "end"> & {
   endCharacter: number;
 };
 let diagnosticsCache:
-  | { mtime: number; data: Record<string, StoredDiagnostic[]> }
-  | undefined;
+  { mtime: number; data: Record<string, StoredDiagnostic[]> } | undefined;
 
 /** Register a view for checking, and return its diagnostics from the last check. */
 const origins: Record<string, string> = {};

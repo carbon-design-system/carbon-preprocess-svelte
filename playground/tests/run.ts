@@ -35,7 +35,7 @@ await $`bun scripts/typecheck-examples.ts`.cwd(HERE);
 console.log("Building the playground…");
 await $`bunx vite build --logLevel error`.cwd(HERE).quiet();
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI color codes
+// eslint-disable-next-line no-control-regex -- matching ANSI color codes
 const ANSI_COLOR = /\x1b\[[0-9;]*m/g;
 
 // Serve the build, and read the URL Vite picked.

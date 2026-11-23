@@ -144,7 +144,7 @@ export const GALLERY: GalleryOption[] = [
       {
         label: "custom",
         config:
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: the config as written, shown as code
+          // eslint-disable-next-line no-template-curly-in-string -- the config as written, shown as code
           'markdown({\n  footnoteLabels: { heading: "Notes", backref: (n) => `Back to note ${n}` },\n})',
         options: {
           footnoteLabels: {

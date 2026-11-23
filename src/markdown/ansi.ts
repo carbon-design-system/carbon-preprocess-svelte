@@ -25,16 +25,16 @@ const NAMES = [
 
 // ESC [ params final-byte. With `literals`, also the spellings people type
 // in docs: `\e[`, `\x1b[`, `\u001b[`, `\033[`.
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matching the escape character is the point
+// eslint-disable-next-line no-control-regex -- matching the escape character is the point
 const CSI = /\x1b\[([0-9;:?]*)([@-~])/g;
 const CSI_OR_LITERAL =
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching the escape character is the point
+  // eslint-disable-next-line no-control-regex -- matching the escape character is the point
   /(?:\x1b|\\e|\\x1[bB]|\\u001[bB]|\\033)\[([0-9;:?]*)([@-~])/g;
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matching the escape character is the point
+// eslint-disable-next-line no-control-regex -- matching the escape character is the point
 const HAS_ESCAPE = /\x1b\[/;
 const HAS_LITERAL = /(?:\\e|\\x1[bB]|\\u001[bB]|\\033)\[[0-9;]*m/;
 const SGR_SEPARATOR = /[;:]/;
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matching the escape character is the point
+// eslint-disable-next-line no-control-regex -- matching the escape character is the point
 const OTHER_ESCAPES = /\x1b[@-Z\\-_]|\x1b\][^\x07]*\x07/g;
 
 export interface AnsiStyle {

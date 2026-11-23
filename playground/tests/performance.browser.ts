@@ -35,7 +35,6 @@ describe("performance", () => {
         ).observe({ type: "longtask" });
         for (let y = 0; y < document.documentElement.scrollHeight; y += 600) {
           scrollTo(0, y);
-          // biome-ignore lint/performance/noAwaitInLoops: scrolling step by step, as a reader does
           await new Promise((r) => setTimeout(r, 50));
         }
         await new Promise((r) => setTimeout(r, 300));

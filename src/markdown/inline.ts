@@ -436,7 +436,7 @@ function urlLiterals(
     const start = match.index ?? 0;
     if (start > 0 && !URL_PRECEDER.test(src[start - 1])) continue;
     let url = match[0];
-    for (let previous = ""; previous !== url; ) {
+    for (let previous = ""; previous !== url;) {
       previous = url;
       url = url.replace(URL_TRAILING, "").replace(TRAILING_ENTITY, "");
       if (url.endsWith(")") && url.split("(").length < url.split(")").length) {

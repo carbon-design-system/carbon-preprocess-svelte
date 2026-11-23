@@ -54,6 +54,8 @@ files = [
   "tests/test-e2e.ts",
   "tests/golden-sizes.test.ts",
   "tests/optimize-carbon-bun.test.ts",
+  "playground/scripts/**",
+  "playground/tests/**",
 ]
 rules = { "no-await-in-loop" = "off" }
 
@@ -76,6 +78,9 @@ rules = { "no-restricted-syntax" = [
 # `svelte/compiler`: the compiler's own warnings, such as a scoped selector
 # that matches nothing, which Svelte drops from the CSS without a word.
 rules = { "svelte/require-each-key" = "off", "svelte/compiler" = "error" }
+# The playground's pages and examples, linted only by their own typecheck
+# and browser tests, as they were under Biome.
+ignorePatterns = ["playground/**/*.svelte"]
 
 [fmt]
 # Markdown and YAML stay hand-formatted. Fixtures are inputs the tests

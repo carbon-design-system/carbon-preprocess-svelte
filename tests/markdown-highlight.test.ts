@@ -241,9 +241,8 @@ describe("exampleSource", () => {
     count += step;
   }
 </script>`;
-    expect(
-      exampleSource("<Button on:click={add}>{count}</Button>", spaced),
-    ).toBe(`<script>
+    expect(exampleSource("<Button on:click={add}>{count}</Button>", spaced))
+      .toBe(`<script>
   import { Button } from "carbon-components-svelte";
 
   let count = 0;

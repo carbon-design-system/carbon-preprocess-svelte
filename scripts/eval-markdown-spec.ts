@@ -64,7 +64,6 @@ let passInScope = 0;
 let totalInScope = 0;
 
 for (const example of examples) {
-  // biome-ignore lint/performance/noAwaitInLoops: examples print in order
   const { html } = await renderMarkdown(example.markdown, {
     ids: false,
     expressions: false,

@@ -80,7 +80,6 @@ let totalInScope = 0;
 const examples = readExamples(readFileSync(specPath, "utf8"));
 
 for (const example of examples) {
-  // biome-ignore lint/performance/noAwaitInLoops: examples print in order
   const { html } = await renderMarkdown(example.markdown, {
     ids: false,
     expressions: false,

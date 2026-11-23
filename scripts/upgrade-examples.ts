@@ -8,6 +8,5 @@ for await (const dir of $`find examples -maxdepth 1 -mindepth 1 -type d`.lines()
 dirs.push("playground");
 
 for (const dir of dirs) {
-  // biome-ignore lint/performance/noAwaitInLoops: one install at a time
   await $`cd ${dir} && bun update && bun prune && bun dedupe`;
 }

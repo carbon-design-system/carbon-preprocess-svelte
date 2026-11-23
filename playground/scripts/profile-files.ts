@@ -30,13 +30,13 @@ const fileOf = (id: number | undefined): string => {
   return "(runtime/native)";
 };
 const totals = new Map<string, number>();
-profile.samples?.forEach((id, i) => {
+for (const [i, id] of (profile.samples ?? []).entries()) {
   const n = byId.get(id);
-  if (!n) return;
-  if (["(idle)", "(program)"].includes(n.callFrame.functionName)) return;
+  if (!n) continue;
+  if (["(idle)", "(program)"].includes(n.callFrame.functionName)) continue;
   const f = fileOf(id);
   totals.set(f, (totals.get(f) ?? 0) + (profile.timeDeltas?.[i] ?? 0) / 1000);
-});
+}
 for (const [k, v] of [...totals].sort((a, b) => b[1] - a[1]).slice(0, 12))
   console.log(v.toFixed(1).padStart(7), k);
 await b.close();

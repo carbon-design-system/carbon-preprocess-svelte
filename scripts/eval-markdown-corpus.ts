@@ -109,7 +109,6 @@ let matching = 0;
 let total = 0;
 
 for (const file of FILES) {
-  // biome-ignore lint/performance/noAwaitInLoops: one file at a time, in order
   const text = await source(file);
   if (text === undefined) {
     console.log(`?? ${file}: not found`);

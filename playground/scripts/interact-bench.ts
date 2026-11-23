@@ -31,7 +31,6 @@ async function measure(label: string, action: () => Promise<void>) {
   );
 }
 for (const id of ["combo-virtual", "combo-plain"]) {
-  // biome-ignore lint/performance/noAwaitInLoops: interactions happen one after another
   await measure(`${id}: open`, async () => {
     await p.locator(`#${id} input`).click();
   });

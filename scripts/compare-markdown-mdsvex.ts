@@ -61,7 +61,6 @@ async function child(pipeline: Pipeline, production: boolean) {
   const passes: number[] = [];
   for (let pass = 0; pass < 2; pass++) {
     const passStart = performance.now();
-    // biome-ignore lint/performance/noAwaitInLoops: pages run one at a time, as a build would
     for (const file of pages) await run(file);
     passes.push(performance.now() - passStart);
   }
@@ -148,7 +147,6 @@ async function check() {
   const warnings = new Map<string, number>();
   for (const file of pages) {
     const name = path.basename(file);
-    // biome-ignore lint/performance/noAwaitInLoops: one page at a time keeps output attributable
     const [before, after] = [await mdsvex.run(file), await ours.run(file)];
     try {
       const result = ours.svelte.compile(after, {

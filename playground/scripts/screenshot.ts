@@ -45,7 +45,6 @@ if (mode === "--sections") {
     });
   });
   for (const box of boxes) {
-    // biome-ignore lint/performance/noAwaitInLoops: one screenshot at a time
     await page.screenshot({
       path: path.join(OUT, `${name}-${box.id}.png`),
       fullPage: true,

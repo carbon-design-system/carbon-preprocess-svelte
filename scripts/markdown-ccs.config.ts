@@ -93,7 +93,7 @@ export async function createCcsMarkdown(
           .join("\n\n");
       }
       // An h2 intro that leads into subsections or a table.
-      tree.blocks.forEach((block, index) => {
+      for (const [index, block] of tree.blocks.entries()) {
         const previous = tree.blocks[index - 1];
         const next = tree.blocks[index + 1];
         if (
@@ -107,7 +107,7 @@ export async function createCcsMarkdown(
             class: "bx--type-productive-heading-03 prose-section-intro",
           };
         }
-      });
+      }
     },
     highlight,
     renderers: {

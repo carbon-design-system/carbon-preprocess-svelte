@@ -58,10 +58,8 @@ pre > code:has(> .line) {
   min-height: 1lh;
   vertical-align: top;
   padding-inline: calc(
-      var(--code-pad) +
-      var(--code-numbers, 0px) +
-      var(--code-sign, 0px) +
-      var(--code-indent, 0px)
+      var(--code-pad) + var(--code-numbers, 0px) + var(--code-sign, 0px) +
+        var(--code-indent, 0px)
     )
     var(--code-pad);
 }
@@ -87,14 +85,14 @@ pre[data-line-numbers] .line::before {
 .line[data-ins]::after {
   color: var(--cds-support-02);
   content: "+";
-  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  /* a fallback for browsers without alt text for generated content */
   content: "+" / "added";
 }
 
 .line[data-del]::after {
   color: var(--cds-support-01);
   content: "−";
-  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  /* a fallback for browsers without alt text for generated content */
   content: "−" / "removed";
 }
 
@@ -185,9 +183,7 @@ pre[data-has-focus]:is(:hover, :focus-within) .line {
 .code-fold__summary {
   display: block;
   padding-inline: calc(
-    var(--code-pad) +
-    var(--code-numbers, 0px) +
-    var(--code-sign, 0px)
+    var(--code-pad) + var(--code-numbers, 0px) + var(--code-sign, 0px)
   );
   color: var(--cds-text-02);
   cursor: pointer;
@@ -201,13 +197,13 @@ pre[data-has-focus]:is(:hover, :focus-within) .line {
 /* The visible label; screen readers get the assistive text instead. */
 .code-fold__summary::before {
   content: "▸ Show " attr(data-count);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  /* a fallback for browsers without alt text for generated content */
   content: "▸ Show " attr(data-count) / "";
 }
 
 .code-fold[open] > .code-fold__summary::before {
   content: "▾ Hide " attr(data-count);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: a fallback for browsers without alt text for generated content */
+  /* a fallback for browsers without alt text for generated content */
   content: "▾ Hide " attr(data-count) / "";
 }
 
