@@ -3,7 +3,9 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { optimizerRegistry } from "svelte-prune/internal";
 import webpack from "webpack";
+import { stripVTControlCharacters } from "node:util";
 import { OptimizeComponentsPlugin } from "../src/plugins/OptimizeComponentsPlugin";
+import { OptimizeCssPlugin } from "../src/plugins/OptimizeCssPlugin";
 import { createFakeProject } from "./helpers/fake-project";
 import { resolvePackageRoot } from "./helpers/resolve-package-root";
 
@@ -17,6 +19,8 @@ const CARD_ESCAPED =
   /read the props of src[\\/]Card\.svelte from its call sites in `content`, but lib[\\/]extra\.js also renders it\./;
 const UNREAD_MODAL =
   /can't read how src[\\/]App\.svelte imports `@carbon\/src\/Modal\/Modal\.svelte`/;
+const REWROTE_AND_PRUNED =
+  /^carbon-preprocess-svelte: rewrote [1-9]\d* Carbon components? and pruned their CSS\n/;
 const MISSED_TOOLBAR =
   /OptimizeComponentsPlugin rewrote Carbon components before seeing lib[\\/]toolbar\.js/;
 
@@ -29,6 +33,9 @@ async function build(
   files: Record<string, string>,
   mode: "production" | "development" | undefined = "production",
   resolve: webpack.Configuration["resolve"] = {},
+  plugins: webpack.Configuration["plugins"] = [
+    new OptimizeComponentsPlugin({ silent: true }),
+  ],
 ) {
   const project = createFakeProject();
   project.linkCarbon();
@@ -45,7 +52,7 @@ async function build(
     resolve,
     optimization: { minimize: false },
     devtool: false,
-    plugins: [new OptimizeComponentsPlugin({ silent: true })],
+    plugins,
     infrastructureLogging: { level: "none" },
   });
   const stats = await new Promise<webpack.Stats>((resolve, reject) =>
@@ -74,6 +81,46 @@ describe("OptimizeComponentsPlugin", () => {
       expect(stats.hasErrors()).toBe(false);
       expect(code).toContain(String.raw`\"bx--btn--tertiary\"`);
       expect(code).not.toContain("<ButtonSkeleton");
+    } finally {
+      dispose();
+    }
+  });
+
+  test("hands the count to OptimizeCssPlugin, which prints one header", async () => {
+    // A stylesheet with Carbon rules, as a CSS loader would emit.
+    const emitCss: webpack.WebpackPluginInstance = {
+      apply(compiler) {
+        compiler.hooks.thisCompilation.tap("emit-css", (compilation) => {
+          compilation.hooks.processAssets.tap(
+            {
+              name: "emit-css",
+              stage: webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
+            },
+            () => {
+              compilation.emitAsset(
+                "styles.css",
+                new webpack.sources.RawSource(
+                  ".bx--btn { color: blue }\n.bx--accordion { color: red }",
+                ),
+              );
+            },
+          );
+        });
+      },
+    };
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
+    const { stats, dispose } = await build(APP, "production", {}, [
+      new OptimizeComponentsPlugin(),
+      new OptimizeCssPlugin(),
+      emitCss,
+    ]);
+    const lines = log.mock.calls.map(([line]) =>
+      stripVTControlCharacters(String(line)),
+    );
+    log.mockRestore();
+    try {
+      expect(stats.hasErrors()).toBe(false);
+      expect(lines).toEqual([expect.stringMatching(REWROTE_AND_PRUNED)]);
     } finally {
       dispose();
     }

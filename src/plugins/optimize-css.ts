@@ -25,6 +25,8 @@ import type { CssOptimizer, PropAwareUsage } from "./create-optimized-css";
 import { prepareCssPruning } from "./css-pruning";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
+import { logSummary } from "./print-diff";
+import { rewriteHeader } from "./rewrite-header";
 import {
   type OptimizeCssOptions,
   propAwareOptions,
@@ -318,10 +320,12 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     // Bare unit-test contexts skip `renderStart`.
     prepared ??= prepare.call(this);
     const ready = await prepared;
+    const { rewritten } = header;
     if (!ready) {
       if (components && ids.size === 0 && !silent && hasCarbonCss(bundle)) {
         this.warn(NO_CARBON_IMPORTS);
       }
+      if (!silent) logSummary({ assets: [], rewritten, log: logInfo });
       return;
     }
     const { optimizer, usage, moduleTokens, markupTokens } = ready;
@@ -354,6 +358,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         ...contentTokens,
       ],
       log: logInfo,
+      rewritten,
       reportExtra: () =>
         usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
     });
@@ -446,5 +451,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     },
     generateBundle,
   };
+  // What `optimizeComponents` rewrote, set as it prepares each build.
+  const header = rewriteHeader(plugin, silent);
   return plugin;
 };

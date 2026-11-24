@@ -1,6 +1,8 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { optimizeComponents } from "../src/plugins/optimize-components";
+import { optimizeCss } from "../src/plugins/optimize-css";
 import { createFakeProject } from "./helpers/fake-project";
 
 type Context = {
@@ -13,7 +15,11 @@ type Context = {
 type ResolvedPlugin = {
   apply: string;
   enforce: string;
-  configResolved(config: { root: string }): void;
+  configResolved(config: {
+    root: string;
+    plugins?: readonly object[];
+    logger?: { info(message: string): void };
+  }): void;
   buildStart(this: Context): Promise<void>;
   load(id: string): { code: string; map: { mappings: string } } | undefined;
   transform(code: string, id: string): void;
@@ -44,7 +50,9 @@ function context(aliases: Record<string, string> = {}): Context & GraphContext {
   };
 }
 
-const REWROTE = /^rewrote \d+ Carbon components for this app/;
+const REWROTE = /^carbon-preprocess-svelte: rewrote \d+ Carbon components?$/;
+const REWROTE_AND_PRUNED =
+  /^carbon-preprocess-svelte: rewrote (\d+) Carbon components? and pruned their CSS\n/;
 const MISSED_TOOLBAR =
   /before seeing lib\/Toolbar\.ts, which imports them\. Add those files to `content`/;
 const MISSED_MARKDOWN = /before seeing lib\/Toolbar\.md, which imports them/;
@@ -92,9 +100,16 @@ describe("optimizeComponents", () => {
     );
     try {
       const ctx = context();
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
       await plugin.buildStart.call(ctx);
+      const lines = log.mock.calls.map(([line]) =>
+        stripVTControlCharacters(String(line)),
+      );
+      log.mockRestore();
       expect(ctx.warn).not.toHaveBeenCalled();
-      expect(ctx.info.mock.calls[0][0]).toMatch(REWROTE);
+      // CPS's header, not svelte-prune's sentence: no optimizeCss to hand it to.
+      expect(ctx.info).not.toHaveBeenCalled();
+      expect(lines).toEqual([expect.stringMatching(REWROTE)]);
 
       // Through the symlink, as a bundler might see it, and by real path.
       const button = path.join(carbon, "src/Button/Button.svelte");
@@ -135,6 +150,64 @@ describe("optimizeComponents", () => {
       await plugin.buildStart.call(context());
       const button = plugin.load(path.join(carbon, "src/Button/Button.svelte"));
       expect(button?.code.includes("{#if true}")).toBe(kept);
+    } finally {
+      project.dispose();
+    }
+  });
+
+  test("hands the count to optimizeCss, which prints one header", async () => {
+    const { project, plugin } = setUp(
+      `<script>${IMPORT_BUTTON}</script>\n<Button kind="tertiary">Save</Button>`,
+    );
+    try {
+      const css = optimizeCss() as unknown as {
+        configResolved(config: object): void;
+        buildStart(): Promise<void>;
+        transform(code: string, id: string): void;
+        generateBundle(
+          this: object,
+          output: object,
+          bundle: Record<string, { type: "asset"; source: string }>,
+        ): Promise<void>;
+      };
+      const logger = { info: jest.fn() };
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      plugin.configResolved({
+        root: project.root,
+        plugins: [plugin, css],
+        logger,
+      });
+      css.configResolved({ root: project.root, logger });
+      const ctx = context();
+      await plugin.buildStart.call(ctx);
+      expect(ctx.info).not.toHaveBeenCalled();
+      expect(logger.info).not.toHaveBeenCalled();
+
+      await css.buildStart();
+      css.transform(
+        "",
+        path.join(
+          project.root,
+          "node_modules/carbon-components-svelte/src/Button/Button.svelte",
+        ),
+      );
+      await css.generateBundle.call(
+        { warn: jest.fn() },
+        {},
+        {
+          "styles.css": {
+            type: "asset",
+            source: ".bx--btn { color: blue }\n.bx--accordion { color: red }",
+          },
+        },
+      );
+      const logged = log.mock.calls.length;
+      log.mockRestore();
+
+      expect(logged).toBe(0);
+      expect(logger.info).toHaveBeenCalledTimes(1);
+      const header = stripVTControlCharacters(logger.info.mock.calls[0][0]);
+      expect(Number(REWROTE_AND_PRUNED.exec(header)?.[1])).toBeGreaterThan(0);
     } finally {
       project.dispose();
     }

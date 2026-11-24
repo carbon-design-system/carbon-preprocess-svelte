@@ -168,6 +168,8 @@ export function createCarbonOptimizer(
       { plugin: "optimizeComponents", failure: SPECIALIZE_FAILURE },
     );
   let index: ComponentIndex | undefined;
+  /** Carbon components this build rewrote, for the summary's header; 0 when silent. */
+  let rewritten = 0;
   let analyzer: typeof import("svelte-prune/internal/analysis") | undefined;
 
   function checkComponents(modules: CarbonBuildModule[]): void {
@@ -229,14 +231,6 @@ export function createCarbonOptimizer(
       }
     }
     return edges;
-  }
-
-  /** How many Carbon components the build rewrote; 0 when silent. */
-  function rewrittenCount(modules: CarbonBuildModule[]): number {
-    if (!components || componentOptions?.silent) return 0;
-    return modules.filter(
-      ({ id }) => isCarbonSvelteImport(id) && components.load(id),
-    ).length;
   }
 
   async function pruneCss(
@@ -383,8 +377,11 @@ export function createCarbonOptimizer(
         );
       }
       if (components) {
-        // `info` waits for `finish`: its count goes in the summary's header.
-        const { warning, report } = await components.prepare(root, resolve);
+        const { warning, summary, report } = await components.prepare(
+          root,
+          resolve,
+        );
+        rewritten = componentOptions?.silent ? 0 : (summary?.components ?? 0);
         if (warning) console.warn(warning);
         for (const line of report ?? []) console.log(line);
       }
@@ -401,7 +398,6 @@ export function createCarbonOptimizer(
     async finish(build) {
       const modules = [...build.modules];
       checkComponents(modules);
-      const rewritten = rewrittenCount(modules);
       const { css, logged } = await pruneCss(modules, build, rewritten);
       if (rewritten > 0 && !logged) logSummary({ assets: [], rewritten });
       return css;
