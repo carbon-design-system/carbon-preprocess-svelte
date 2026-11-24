@@ -2,7 +2,7 @@
  * Uses `@typescript/typescript6` because TypeScript 7's `typescript` package
  * no longer ships the classic Compiler API.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
@@ -660,6 +660,14 @@ function resolveDts(
   ];
   for (const c of candidates) {
     if (emitted.has(c)) return c;
+  }
+  // A bundled package's declarations import each other by relative path.
+  if (fromFile.includes("/node_modules/")) {
+    const found = candidates.find((c) => existsSync(c));
+    if (found) {
+      emitted.set(found, readFileSync(found, "utf8"));
+      return found;
+    }
   }
   for (const c of candidates) {
     const idx = c.lastIndexOf("/src/");
