@@ -27,7 +27,6 @@ const OUTSIDE_CONTENT = /Add those files to `content`/;
 const NEEDS_METAFILE = /metafile: true/;
 const NO_FILE = /virtual:page.*no file on disk/;
 const CSS_LINK = /href="\.\/([\w-]+\.css)"/;
-const SHEET_MARKER = "carbon-preprocess-svelte-sheet";
 const WHITE_CSS = readFileSync(
   path.join(ROOT, "node_modules/carbon-components-svelte/css/white.css"),
   "utf8",
@@ -239,10 +238,9 @@ describe("optimizeCarbonBun", () => {
     };
   }
 
-  test("prunes Carbon's stylesheet as Carbon ships it, into the CSS that imported it", async () => {
-    const page = await buildPage({}, "raw");
-    // Bun bundled a marker, not the stylesheet.
-    expect(page.beforeCss.length).toBeLessThan(200);
+  test("prunes the CSS the build wrote, renaming it for its content", async () => {
+    const page = await buildPage({}, "pruned");
+    expect(page.beforeCss).toContain(".bx--btn");
 
     const renamed = await page.carbon.pruneBuild(page.result);
 
@@ -253,24 +251,15 @@ describe("optimizeCarbonBun", () => {
     ]);
     expect(readdirSync(page.outdir)).not.toContain(page.before);
     expect(after.css).toContain(".bx--btn");
-    expect(after.css).not.toContain(SHEET_MARKER);
-    // Bun lowers `inset-inline` to `:lang()` fallbacks; Carbon's file has none.
-    expect(after.css).not.toContain(":lang(");
     expect(after.css.length).toBeLessThan(WHITE_CSS.length / 5);
   }, 60_000);
 
-  test('prunes the CSS Bun bundled with `stylesheet: "bundled"`', async () => {
-    const raw = await buildPage({}, "raw-size");
-    await raw.carbon.pruneBuild(raw.result);
-    const page = await buildPage({ stylesheet: "bundled" }, "bundled");
-    expect(page.beforeCss).toContain(":lang(");
-
-    await page.carbon.pruneBuild(page.result);
-
-    const after = page.after();
-    expect(after.name).not.toBe(page.before);
-    expect(after.css.length).toBeLessThan(page.beforeCss.length / 5);
-    expect(raw.after().css.length).toBeLessThan(after.css.length);
+  // Needs Bun's default CSS targets to support logical properties
+  // (oven-sh/bun#40361): older ones lower `inset-inline` to `:lang()`
+  // fallbacks, which grew Carbon's all.css from 847 kB to 1.07 MB.
+  test("bundles Carbon's stylesheet without lowering it", async () => {
+    const page = await buildPage({}, "unlowered");
+    expect(page.beforeCss.includes(":lang(")).toBe(false);
   }, 60_000);
 
   test("sets IBM Plex's font-display", async () => {
