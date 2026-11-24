@@ -1,8 +1,8 @@
 import { BYTES_PER_KB } from "../constants";
 import { byteLength } from "../utils";
 
-// Made on first use, like `print-diff.ts`'s: an `Intl.NumberFormat` costs
-// milliseconds at import.
+// perf: made on first use, like `print-diff.ts`'s, since an
+// `Intl.NumberFormat` costs milliseconds at import.
 let countFormatter: Intl.NumberFormat | undefined;
 let sizeFormatter: Intl.NumberFormat | undefined;
 

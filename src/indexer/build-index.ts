@@ -45,8 +45,8 @@ export async function buildComponentIndex(options?: {
   const carbonSrc = path.join(carbonRoot, "src");
   const totalStart = performance.now();
 
-  // Export name -> its defining module,
-  // src-relative (`Button/Button.svelte`).
+  // Export name -> its defining module, src-relative
+  // (`Button/Button.svelte`), so it matches `fileEntries`' keys.
   const exportedModules = new Map<string, string>();
   for (const [name, target] of readCarbonExports(carbonRoot)) {
     exportedModules.set(name, target.path.slice(SRC_PREFIX.length));

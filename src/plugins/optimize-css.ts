@@ -173,7 +173,8 @@ function fingerprint(parts: {
 /** Whether a chunk's code can name a CSS file once Vite fills it in. */
 function namesCss(chunk: Rollup.RenderedChunk): boolean {
   if (chunk.dynamicImports.length > 0) return true;
-  // Rollup's `import.meta.ROLLUP_FILE_URL_x`, and Vite's `?url` imports.
+  // Read so Rollup's `import.meta.ROLLUP_FILE_URL_x` and Vite's `?url`
+  // imports count as uses.
   const { referencedFiles, viteMetadata } = chunk as {
     referencedFiles?: readonly string[];
     viteMetadata?: { importedAssets?: Set<string> };
@@ -248,7 +249,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     // `loadComponentIndex` already warned.
     if (!components) return undefined;
 
-    // Absent on the bare contexts unit tests pass, where everything counts.
+    // Only absent on the bare contexts unit tests pass, where
+    // everything counts.
     const graph = this.getModuleIds ? new Set(this.getModuleIds()) : undefined;
     if (graph) {
       for (const id of ids) if (!graph.has(id)) ids.delete(id);
@@ -408,7 +410,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       components = await loadComponentIndex(root);
       if (propAware && sharesAnalysis(propAware)) {
         analyzer ??= await import("svelte-prune/internal/analysis");
-        // Rollup and Rolldown have no config: their plugins, then.
+        // Rollup and Rolldown have no config, so their plugins stand in for it.
         const build = config ?? inputOptions?.plugins;
         shared = build && analyzer.siblingAnalysis(build, CARBON.name);
       }
@@ -464,7 +466,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     },
     generateBundle,
   };
-  // What `optimizeComponents` rewrote, set as it prepares each build.
+  // What `optimizeComponents` rewrote, set as it prepares each build, so the
+  // summary's header can name it.
   const header = rewriteHeader(plugin, silent);
   return plugin;
 };

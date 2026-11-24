@@ -229,8 +229,8 @@ export class OptimizeCssPlugin {
             const analyzer = propAware
               ? await import("svelte-prune/internal/analysis")
               : undefined;
-            // `OptimizeComponentsPlugin`'s analysis, when it's in the build:
-            // the same reading of the call sites it rewrote for.
+            // `OptimizeComponentsPlugin`'s analysis, when it's in the build, so the
+            // CSS keeps exactly what the call sites it rewrote for render.
             const shared =
               analyzer && propAware && sharesAnalysis(propAware)
                 ? analyzer.siblingAnalysis(compiler, CARBON.name)
