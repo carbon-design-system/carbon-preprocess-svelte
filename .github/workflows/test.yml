@@ -1,3 +1,5 @@
+name: Test
+
 on:
   pull_request:
   push:
@@ -6,6 +8,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A full run takes about 3 minutes.
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -31,27 +37,31 @@ jobs:
       - name: Check the test plan can read every test's inputs
         run: bunx --bun bivium check --max-unknown 0
 
-      - name: Format
+      - name: Check formatting
         run: bun fmt --check
 
       - name: Lint
-        run: |
-          bun lint
-          bun run lint:svelte
+        run: bun lint
 
-      - name: Typecheck
-        run: |
-          bun run typecheck
-          bun run typecheck:svelte
+      - name: Lint the Svelte files
+        run: bun run lint:svelte
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Type check the golden apps' components
+        run: bun run typecheck:svelte
 
       - name: Find unused files, exports, and dependencies
         run: bun run knip
 
+      - name: Clear the component index cache
+        if: steps.plan.outputs.unit-tests != 'none'
+        run: rm -rf node_modules/.cache/carbon-preprocess-svelte
+
       - name: Run unit tests
         if: steps.plan.outputs.unit-tests != 'none'
-        run: |
-          rm -rf node_modules/.cache/carbon-preprocess-svelte
-          bun test --parallel ${{ steps.plan.outputs.unit-tests != 'all' && steps.plan.outputs.unit-tests || '' }}
+        run: bun test --parallel ${{ steps.plan.outputs.unit-tests != 'all' && steps.plan.outputs.unit-tests || '' }}
 
       - name: Use the package as a consumer would
         if: steps.plan.outputs.package-tests != 'none'
