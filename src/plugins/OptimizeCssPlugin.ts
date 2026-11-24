@@ -20,6 +20,7 @@ import {
 import { prepareCssPruning } from "./css-pruning";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
+import { type RewriteHeader, rewriteHeader } from "./rewrite-header";
 import {
   type OptimizeCssOptions,
   propAwareOptions,
@@ -123,8 +124,12 @@ type WebpackCompiler = {
 export class OptimizeCssPlugin {
   private options: OptimizeCssOptions;
 
+  /** What `OptimizeComponentsPlugin` rewrote, set as it prepares each build. */
+  private header: RewriteHeader;
+
   public constructor(options?: OptimizeCssOptions) {
     this.options = { ...options };
+    this.header = rewriteHeader(this, options?.silent === true);
   }
 
   public apply(compiler: WebpackCompiler) {
@@ -286,6 +291,7 @@ export class OptimizeCssPlugin {
               })),
               optimizer,
               options,
+              rewritten: this.header.rewritten,
               moduleTokens: moduleClasses.size,
               contentTokens: scan.classes.length,
               tokenNames: [...assetTokenNames(assets), ...scan.tokens],

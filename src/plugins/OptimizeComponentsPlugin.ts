@@ -5,6 +5,7 @@ import type { WebpackCompiler } from "svelte-prune/internal";
 import { SveltePrunePlugin } from "svelte-prune/webpack";
 import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
 import type { OptimizeComponentsOptions } from "./optimize-components";
+import { rewriteReporter } from "./rewrite-header";
 
 /** The loader's built file next to the bundle, or its source in a checkout. */
 const LOADER = (() => {
@@ -27,16 +28,23 @@ const LOADER = (() => {
  */
 export class OptimizeComponentsPlugin {
   private plugin: SveltePrunePlugin;
+  private reporter: ReturnType<typeof rewriteReporter>;
 
   public constructor(options?: OptimizeComponentsOptions) {
+    this.reporter = rewriteReporter(options?.silent === true);
     this.plugin = new SveltePrunePlugin(CARBON, options, {
       plugin: "OptimizeComponentsPlugin",
       failure: SPECIALIZE_FAILURE,
       loader: LOADER,
+      onSummary: this.reporter.onSummary,
     });
   }
 
   public apply(compiler: WebpackCompiler) {
+    // Typed without `plugins`, which webpack and Rspack both set.
+    const { options } = compiler;
+    const plugins: unknown = "plugins" in options ? options.plugins : undefined;
+    this.reporter.start(Array.isArray(plugins) ? plugins : undefined);
     this.plugin.apply(compiler);
   }
 }
