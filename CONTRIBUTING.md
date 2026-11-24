@@ -294,7 +294,7 @@ The following applies only to maintainers.
 
 To cut a release:
 
-1. Bump `version` in [`package.json`](package.json) and update [`CHANGELOG.md`](CHANGELOG.md).
+1. Bump `version` in [`package.json`](package.json).
 2. Commit with the version as the message, tag, and push the tag:
 
 ```sh
@@ -307,5 +307,5 @@ A successful workflow publishes the new version to NPM.
 
 ### Post-release
 
-1. Create a [new release](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/new) on GitHub and publish it as the latest release.
+1. Create a [new release](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/new) on GitHub with the release's notes, and publish it as the latest release. The GitHub release is the only record of a release's changes; releases before 0.13.0 are in [`docs/archive/CHANGELOG.md`](docs/archive/CHANGELOG.md), which isn't updated.
 2. Close out any issues resolved in the release.
