@@ -3,6 +3,7 @@
 // @reads examples/** tests/__snapshots__/e2e.json
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { $ } from "bun";
 import { name } from "../package.json";
 
@@ -16,12 +17,17 @@ const OBSERVED_PATH = process.env.E2E_OBSERVED;
 /** Comma-separated example names to build (`vite,vite@svelte-5`); all by default. */
 const ONLY_EXAMPLES = process.env.EXAMPLES?.split(",").filter(Boolean);
 
-const OPTIMIZED_REGEX = /Optimized\s+(.+\.css)/;
-const BEFORE_REGEX = /Before:\s*([\d,.]+)\s*(kB|MB)/;
-const AFTER_REGEX = /After:\s*([\d,.]+)\s*(kB|MB)\s*\(-?([\d.]+)%\)/;
-const DOUBLE_NEWLINE_REGEX = /\n\n+/;
+/** A stylesheet's row in the pruning summary: `  <file>  <before> kB  →  <after> kB  -<percent>%` */
+const SIZE_ROW_REGEX =
+  /^ {2}(\S+\.css)\s+([\d,]+\.\d) kB {2}→\s+([\d,]+\.\d) kB {2}-(\d+)%$/;
 // Preprocessor/index loader prefix, then the plugins' prefix.
 const WARNING_REGEX = /\[carbon-preprocess-svelte\]|carbon-preprocess-svelte:/;
+/** The summary's header shares the prefix, but isn't a warning. */
+const SUMMARY_HEADER_REGEX =
+  /carbon-preprocess-svelte: (?:rewrote \d+ Carbon components?|pruned Carbon CSS|dry run, files unchanged|nothing to prune)/;
+/** The summary's sizes are rounded to 0.1 kB and whole percentages. */
+const SIZE_TOLERANCE_KB = 0.1;
+const PERCENT_TOLERANCE = 1;
 
 type OptimizationResult = {
   file: string;
@@ -63,7 +69,10 @@ async function runBuild(dir: string, script: string): Promise<BuildRun> {
 
   const warnings = `${stdout}\n${stderr}`
     .split("\n")
-    .filter((line) => WARNING_REGEX.test(line))
+    .map((line) => stripVTControlCharacters(line))
+    .filter(
+      (line) => WARNING_REGEX.test(line) && !SUMMARY_HEADER_REGEX.test(line),
+    )
     .map((line) => line.trim());
 
   return { stdout, warnings };
@@ -92,28 +101,17 @@ function isOptimizationResult(
   return "file" in value;
 }
 
-function parseOptimizationOutput(output: string): OptimizationResult | null {
-  const optimizedMatch = output.match(OPTIMIZED_REGEX);
-  const beforeMatch = output.match(BEFORE_REGEX);
-  const afterMatch = output.match(AFTER_REGEX);
+function parseOptimizationOutput(row: string): OptimizationResult | null {
+  const match = row.match(SIZE_ROW_REGEX);
+  if (!match) return null;
 
-  if (!optimizedMatch || !beforeMatch || !afterMatch) {
-    return null;
-  }
-
-  const file = optimizedMatch[1];
-  let before_kb = Number.parseFloat(beforeMatch[1].replace(",", ""));
-  let after_kb = Number.parseFloat(afterMatch[1].replace(",", ""));
-  const reduction_percent = Number.parseFloat(afterMatch[3]);
-
-  if (beforeMatch[2] === "MB") {
-    before_kb *= 1000;
-  }
-  if (afterMatch[2] === "MB") {
-    after_kb *= 1000;
-  }
-
-  return { file, before_kb, after_kb, reduction_percent };
+  const [, file, before, after, percent] = match;
+  return {
+    file,
+    before_kb: Number.parseFloat(before.replaceAll(",", "")),
+    after_kb: Number.parseFloat(after.replaceAll(",", "")),
+    reduction_percent: Number.parseFloat(percent),
+  };
 }
 
 function normalizeFile(file: string): string {
@@ -196,7 +194,6 @@ function compareResults(
     };
   }
 
-  const tolerance = 0.01;
   const beforeDiff = Math.abs(actual.before_kb - expected.before_kb);
   const afterDiff = Math.abs(actual.after_kb - expected.after_kb);
   const percentDiff = Math.abs(
@@ -204,9 +201,9 @@ function compareResults(
   );
 
   if (
-    beforeDiff > tolerance ||
-    afterDiff > tolerance ||
-    percentDiff > tolerance
+    beforeDiff > SIZE_TOLERANCE_KB ||
+    afterDiff > SIZE_TOLERANCE_KB ||
+    percentDiff > PERCENT_TOLERANCE
   ) {
     return {
       example: label,
@@ -222,19 +219,25 @@ Run with UPDATE_SNAPSHOTS=true to update.`,
   return { example: label, passed: true, message: "OK" };
 }
 
-function parseLastOptimizationBlock(output: string): OptimizationResult | null {
-  const optimizationBlocks = output
-    .split(DOUBLE_NEWLINE_REGEX)
-    .filter(
-      (block) => block.includes("Optimized") && block.includes("Before:"),
-    );
-
-  if (optimizationBlocks.length === 0) {
-    return null;
-  }
-
-  return parseOptimizationOutput(
-    optimizationBlocks[optimizationBlocks.length - 1],
+/**
+ * The summary's row for the snapshot's file, or for the build's largest
+ * stylesheet when there's no snapshot or its file isn't in the summary.
+ */
+function parseLastOptimizationBlock(
+  output: string,
+  expectedFile?: string,
+): OptimizationResult | null {
+  const rows = stripVTControlCharacters(output)
+    .split("\n")
+    .map((line) => parseOptimizationOutput(line))
+    .filter((row): row is OptimizationResult => row !== null);
+  if (rows.length === 0) return null;
+  const expected = rows.find((row) => normalizeFile(row.file) === expectedFile);
+  return (
+    expected ??
+    rows.reduce((largest, row) =>
+      row.before_kb > largest.before_kb ? row : largest,
+    )
   );
 }
 
@@ -249,7 +252,13 @@ async function buildSingleEntry(
   const warned = warningOutcome(exampleName, warnings);
   if (warned) return warned;
 
-  const parsed = parseLastOptimizationBlock(stdout);
+  const expectedFile = snapshots[exampleName];
+  const parsed = parseLastOptimizationBlock(
+    stdout,
+    expectedFile && isOptimizationResult(expectedFile)
+      ? expectedFile.file
+      : undefined,
+  );
   if (!parsed) {
     return {
       example: exampleName,
@@ -304,7 +313,10 @@ async function buildMultiEntry(
       continue;
     }
 
-    const parsed = parseLastOptimizationBlock(stdout);
+    const parsed = parseLastOptimizationBlock(
+      stdout,
+      expectedEntries?.[entry]?.file,
+    );
 
     if (!parsed) {
       outcomes.push({

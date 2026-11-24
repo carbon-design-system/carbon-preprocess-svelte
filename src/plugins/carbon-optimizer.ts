@@ -24,6 +24,7 @@ import {
 import { prepareCssPruning } from "./css-pruning";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
+import { logSummary } from "./print-diff";
 import type { OptimizeComponentsOptions } from "./optimize-components";
 import {
   type OptimizeCssOptions,
@@ -230,14 +231,24 @@ export function createCarbonOptimizer(
     return edges;
   }
 
+  /** How many Carbon components the build rewrote; 0 when silent. */
+  function rewrittenCount(modules: CarbonBuildModule[]): number {
+    if (!components || componentOptions?.silent) return 0;
+    return modules.filter(
+      ({ id }) => isCarbonSvelteImport(id) && components.load(id),
+    ).length;
+  }
+
   async function pruneCss(
     modules: CarbonBuildModule[],
     build: CarbonBuild,
-  ): Promise<Record<string, string>> {
+    rewritten: number,
+  ): Promise<{ css: Record<string, string>; logged: boolean }> {
     const css = { ...build.css };
-    if (!cssOptions || Object.keys(css).length === 0) return css;
+    const skip = { css, logged: false };
+    if (!cssOptions || Object.keys(css).length === 0) return skip;
     // `loadComponentIndex` already warned.
-    if (!index) return css;
+    if (!index) return skip;
 
     const ids = new Set(
       modules.map(({ id }) => id).filter((id) => isCarbonSvelteImport(id)),
@@ -246,7 +257,7 @@ export function createCarbonOptimizer(
       if (Object.values(css).some((source) => hasOptimizableCss(source))) {
         warn(NO_CARBON_IMPORTS);
       }
-      return css;
+      return skip;
     }
 
     const moduleClasses = new Set<string>();
@@ -339,7 +350,8 @@ export function createCarbonOptimizer(
       warn,
     });
 
-    optimizeAssets({
+    const logged = optimizeAssets({
+      rewritten,
       assets: Object.entries(css).map(([id, source]) => ({
         id,
         source,
@@ -360,7 +372,7 @@ export function createCarbonOptimizer(
       reportExtra: () =>
         usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
     });
-    return css;
+    return { css, logged };
   }
 
   return {
@@ -371,12 +383,9 @@ export function createCarbonOptimizer(
         );
       }
       if (components) {
-        const { warning, info, report } = await components.prepare(
-          root,
-          resolve,
-        );
+        // `info` waits for `finish`: its count goes in the summary's header.
+        const { warning, report } = await components.prepare(root, resolve);
         if (warning) console.warn(warning);
-        if (info) console.log(`${LOG_PREFIX} ${info}`);
         for (const line of report ?? []) console.log(line);
       }
       if (cssOptions) {
@@ -392,7 +401,10 @@ export function createCarbonOptimizer(
     async finish(build) {
       const modules = [...build.modules];
       checkComponents(modules);
-      return pruneCss(modules, build);
+      const rewritten = rewrittenCount(modules);
+      const { css, logged } = await pruneCss(modules, build, rewritten);
+      if (rewritten > 0 && !logged) logSummary({ assets: [], rewritten });
+      return css;
     },
   };
 }
