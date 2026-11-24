@@ -170,17 +170,18 @@ function fingerprint(parts: {
   return hash.digest("hex").slice(0, 16);
 }
 
+const isCssName = (name: unknown): boolean =>
+  typeof name === "string" && isCssFile(name);
+
 /** Whether a chunk's code can name a CSS file once Vite fills it in. */
 function namesCss(chunk: Rollup.RenderedChunk): boolean {
   if (chunk.dynamicImports.length > 0) return true;
   // Read so Rollup's `import.meta.ROLLUP_FILE_URL_x` and Vite's `?url`
   // imports count as uses.
-  const { referencedFiles, viteMetadata } = chunk as {
-    referencedFiles?: readonly string[];
-    viteMetadata?: { importedAssets?: Set<string> };
-  };
-  if (referencedFiles?.some(isCssFile)) return true;
-  return [...(viteMetadata?.importedAssets ?? [])].some(isCssFile);
+  // Rollup's chunks have `referencedFiles`; Rolldown's type doesn't.
+  const referenced: unknown = Reflect.get(chunk, "referencedFiles");
+  if (Array.isArray(referenced) && referenced.some(isCssName)) return true;
+  return [...(chunk.viteMetadata?.importedAssets ?? [])].some(isCssFile);
 }
 
 /**

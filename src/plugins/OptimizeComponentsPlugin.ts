@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import type { Summary } from "svelte-prune/internal";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { WebpackCompiler } from "svelte-prune/internal";
@@ -36,7 +37,7 @@ export class OptimizeComponentsPlugin {
       plugin: "OptimizeComponentsPlugin",
       failure: SPECIALIZE_FAILURE,
       loader: LOADER,
-      onSummary: this.reporter.onSummary,
+      onSummary: (summary: Summary) => this.reporter.onSummary(summary),
     });
   }
 

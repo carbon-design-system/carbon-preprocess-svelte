@@ -40,7 +40,7 @@ export function propAwareUsage(
 ): PropAwareUsage {
   return {
     liveComponents: result.liveComponents,
-    isPruned: result.isPruned,
+    isPruned: (cls) => result.isPruned(cls),
     report: (prunedClasses, root) =>
       analyzer.formatPropAwareReport(result, prunedClasses, root),
   };
@@ -56,7 +56,12 @@ export function collectedEngine(
   root: string,
   files: ReadonlyArray<{ code: string }>,
 ): NonNullable<CssOptimizerOptions["engine"]> {
-  return { analyzer, root, loadable: result.analysis.loadable, files };
+  return {
+    analyzer,
+    root,
+    loadable: (key) => result.analysis.loadable(key),
+    files,
+  };
 }
 
 export type CssOptimizerOptions = PruneOptions & {

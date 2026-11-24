@@ -28,7 +28,7 @@ export const optimizeComponents = (
     id: "vite:carbon:optimize-components",
     plugin: "optimizeComponents",
     failure: SPECIALIZE_FAILURE,
-    onSummary: reporter.onSummary,
+    onSummary: (summary) => reporter.onSummary(summary),
   });
   let plugins: readonly unknown[] | undefined;
   let log: ((message: string) => void) | undefined;
@@ -37,22 +37,25 @@ export const optimizeComponents = (
   const { configResolved, buildStart } = plugin;
   plugin.configResolved = function (config) {
     // Partial, since tests pass a bare config.
-    const { logger } = config as Partial<typeof config>;
+    const logger: typeof config.logger | undefined = config.logger;
     plugins = config.plugins;
     log = logger && ((message) => logger.info(message));
     return call(configResolved, this, config);
   };
   // Rollup and Rolldown have no config: their plugins, then.
   plugin.buildStart = function (inputOptions) {
-    reporter.start(
-      plugins ??
-        (inputOptions as Partial<typeof inputOptions> | undefined)?.plugins,
-      log,
-    );
+    reporter.start(plugins ?? optionalPlugins(inputOptions), log);
     return call(buildStart, this, inputOptions);
   };
   return plugin;
 };
+
+// Unit tests call buildStart without options.
+function optionalPlugins<T extends { plugins?: unknown }>(
+  inputOptions: T | undefined,
+): T["plugins"] | undefined {
+  return inputOptions?.plugins;
+}
 
 /** Calls a Vite hook, given as a function or as `{ handler }`. */
 function call<This, Args extends unknown[], Result>(
