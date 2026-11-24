@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.6](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.6) - 2026-11-24
+
+**Features**
+
+- the build's pruning prints as one aligned summary instead of a padded block per stylesheet: a row per stylesheet, largest savings first, folded into `+ N more` past five, and a total when there's more than one. In a terminal it's colored (`NO_COLOR` turns it off, `FORCE_COLOR` on); CI and pipes get plain text. Under `createCarbonOptimizer` and `optimizeCarbonBun`, the header says how many Carbon components were rewritten, in place of svelte-prune's sentence at the start of the build:
+
+  ```
+  carbon-preprocess-svelte: rewrote 37 Carbon components and pruned their CSS
+    assets/index-x3k9Qa.css  849.8 kB  →  90.1 kB  -89%
+  ```
+
+  Tools that parsed the old `Optimized <file>` / `Before:` / `After:` lines need to read the rows instead.
+
 ## [0.12.5](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.5) - 2026-11-22
 
 **Features**
