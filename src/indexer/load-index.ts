@@ -14,6 +14,7 @@ import { CarbonSvelte, LOG_PREFIX } from "../constants";
 import { errorMessage } from "../utils";
 import type { ComponentIndex } from "./build-index";
 import { carbonSignature, resolveCarbonRoot } from "./resolve-carbon-root";
+import { isRecord } from "../utils";
 
 const CACHE_DIRNAME = ".cache/carbon-preprocess-svelte";
 
@@ -32,10 +33,12 @@ const CACHE_ENTRY_REGEX = /^[^_]+_[^_]+\.json(?:\.\d+\.\d+\.tmp)?$/;
 const STALE_MS = 24 * 60 * 60 * 1000;
 
 async function readCarbonVersion(carbonRoot: string): Promise<string> {
-  const pkg = JSON.parse(
+  const pkg: unknown = JSON.parse(
     await readFile(path.join(carbonRoot, "package.json"), "utf8"),
   );
-  return typeof pkg.version === "string" ? pkg.version : "unknown";
+  return isRecord(pkg) && typeof pkg.version === "string"
+    ? pkg.version
+    : "unknown";
 }
 
 /**
@@ -53,13 +56,10 @@ export function isComponentIndex(value: unknown): value is ComponentIndex {
 
   return entries.every(
     (entry) =>
-      typeof entry === "object" &&
-      entry !== null &&
-      typeof (entry as { path?: unknown }).path === "string" &&
-      Array.isArray((entry as { classes?: unknown }).classes) &&
-      (entry as { classes: unknown[] }).classes.every(
-        (cls) => typeof cls === "string",
-      ),
+      isRecord(entry) &&
+      typeof entry.path === "string" &&
+      Array.isArray(entry.classes) &&
+      entry.classes.every((cls: unknown) => typeof cls === "string"),
   );
 }
 
@@ -67,7 +67,7 @@ async function readCache(
   cacheFile: string,
 ): Promise<ComponentIndex | undefined> {
   try {
-    const parsed = JSON.parse(await readFile(cacheFile, "utf8"));
+    const parsed: unknown = JSON.parse(await readFile(cacheFile, "utf8"));
     return isComponentIndex(parsed) ? parsed : undefined;
   } catch {
     return undefined;

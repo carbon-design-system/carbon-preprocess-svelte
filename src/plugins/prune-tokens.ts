@@ -137,8 +137,8 @@ export function pruneUnusedTokens(
     }
   }
   const queue = [...read];
-  while (queue.length > 0) {
-    for (const name of definitions.get(queue.pop() as string) ?? []) {
+  for (let next = queue.pop(); next !== undefined; next = queue.pop()) {
+    for (const name of definitions.get(next) ?? []) {
       if (!read.has(name)) {
         read.add(name);
         queue.push(name);

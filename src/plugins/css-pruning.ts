@@ -70,16 +70,16 @@ export async function prepareCssPruning(input: {
       engine = {
         analyzer,
         root,
-        loadable: analysis.usage.loadable,
+        loadable: (key) => analysis.usage.loadable(key),
         files: [...analysis.files, namedTokens],
       };
     } else input.warn(SHARED_ANALYSIS_FAILED);
   } else if (input.collect && analyzer) {
     const collected = await input.collect();
-    if (collected && "warning" in collected.result) {
-      input.warn(collected.result.warning);
-    } else if (collected) {
-      const { result } = collected as { result: UsageResult };
+    const result = collected?.result;
+    if (result && "warning" in result) {
+      input.warn(result.warning);
+    } else if (collected && result) {
       usage = propAwareUsage(result, analyzer);
       engine = collectedEngine(result, analyzer, root, [
         ...collected.files,

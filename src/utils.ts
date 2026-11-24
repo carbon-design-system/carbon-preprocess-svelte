@@ -8,6 +8,11 @@ import { CarbonSvelte, RE_EXT_CSS, RE_STYLE_QUERY } from "./constants";
 
 export { errorMessage, isSvelteFile, stripQuery };
 
+// For a value read off disk or from another tool, before its fields are.
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function isCssFile(id: string): id is `${string}.css` {
   return RE_EXT_CSS.test(id);
 }

@@ -74,11 +74,14 @@ export function optimizeAssets({
   }
 
   const pruned: AssetDiff[] = [];
-  for (const [i, { id, source, write }] of list.entries()) {
+  for (const [i, asset] of list.entries()) {
+    const { id, source } = asset;
     const { removed } = results[i];
     const css = setFontDisplay(results[i].css, options.fontDisplay);
 
-    if (!options.dryRun && (removed > 0 || css !== results[i].css)) write(css);
+    if (!options.dryRun && (removed > 0 || css !== results[i].css)) {
+      asset.write(css);
+    }
 
     if (removed > 0)
       pruned.push({ id, originalCss: source, optimizedCss: css });

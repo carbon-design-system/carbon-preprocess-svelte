@@ -10,6 +10,7 @@ import {
   createCarbonOptimizer,
   type RewrittenComponent,
 } from "./carbon-optimizer";
+import { isRecord } from "../utils";
 
 /**
  * The parts of `Bun.build`'s result this reads. Declared here, not
@@ -107,15 +108,24 @@ const absolute = (input: string) =>
  * Bun's resolver, for aliased imports (`$lib/Card.svelte`): `import.meta`
  * can't say how the build resolves, and this runs only under Bun.
  */
+type BunResolver = { resolveSync(specifier: string, from: string): string };
+
+// Under Node, there's no Bun to resolve with.
+function bunResolver(value: unknown): BunResolver | undefined {
+  if (!isRecord(value)) return undefined;
+  const { resolveSync } = value;
+  if (typeof resolveSync !== "function") return undefined;
+  return {
+    resolveSync: (specifier, from) =>
+      String(Reflect.apply(resolveSync, value, [specifier, from])),
+  };
+}
+
 function resolveWithBun(
   specifier: string,
   importer: string,
 ): Promise<string | undefined> {
-  const bun = (
-    globalThis as {
-      Bun?: { resolveSync(specifier: string, from: string): string };
-    }
-  ).Bun;
+  const bun = bunResolver(Reflect.get(globalThis, "Bun"));
   try {
     return Promise.resolve(
       bun

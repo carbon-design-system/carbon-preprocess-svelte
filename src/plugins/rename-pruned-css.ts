@@ -5,9 +5,6 @@ import { toCssString } from "../utils";
 
 type Context = Partial<Pick<Rollup.PluginContext, "emitFile">>;
 
-/** Vite's record of the CSS and assets a chunk references. */
-type ViteMetadata = { importedCss: Set<string>; importedAssets: Set<string> };
-
 const PLACEHOLDER = /(\[[a-z]+(?::\d+)?\])/;
 const HASH = /^\[hash(?::(\d+))?\]$/;
 /** Assets that can link a CSS file. */
@@ -102,7 +99,7 @@ function rewriteReferences(
   for (const file of Object.values(bundle)) {
     if (file.type === "chunk") {
       file.code = rewrite(file.code);
-      const meta = (file as { viteMetadata?: ViteMetadata }).viteMetadata;
+      const meta = file.viteMetadata;
       renameIn(meta?.importedCss);
       renameIn(meta?.importedAssets);
     } else if (RE_TEXT_ASSET.test(file.fileName)) {

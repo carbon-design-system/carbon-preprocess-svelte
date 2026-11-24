@@ -34,9 +34,9 @@ export type CarbonStylePrunerInput = {
   analyzer: typeof import("svelte-prune/internal/analysis");
   root: string;
   /** Whether no live component can apply `cls`, as `propAware` decides it. */
-  isPruned(cls: string): boolean;
+  isPruned: (cls: string) => boolean;
   /** Whether a Carbon module (`utils/x.js`) can load. */
-  loadable(key: string): boolean;
+  loadable: (key: string) => boolean;
   /** Names of the Carbon components that can render. */
   liveComponents: ReadonlySet<string>;
   /** The app's files, whose classes, custom properties and keyframes stay. */
