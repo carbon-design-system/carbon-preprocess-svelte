@@ -73,11 +73,11 @@ describe("cli optimize-css", () => {
     }
   });
 
-  test("exits 1 with a stderr message when no CSS file matches", () => {
+  test("exits 2 with a stderr message when no CSS file matches", () => {
     const dir = createTempProject();
     try {
       const result = runCli(dir, ["dist/nope.css"]);
-      expect(result.status).toBe(1);
+      expect(result.status).toBe(2);
       expect(result.stderr).toContain(
         "carbon-preprocess-svelte: no CSS files matched",
       );
@@ -86,7 +86,7 @@ describe("cli optimize-css", () => {
     }
   });
 
-  test("exits 1 when --content finds no imports, succeeds with --components", () => {
+  test("exits 2 when --content finds no imports, succeeds with --components", () => {
     const dir = createTempProject();
     try {
       const noImports = runCli(dir, [
@@ -94,7 +94,7 @@ describe("cli optimize-css", () => {
         "--content",
         "nothing/**",
       ]);
-      expect(noImports.status).toBe(1);
+      expect(noImports.status).toBe(2);
       expect(noImports.stderr).toContain(
         "carbon-preprocess-svelte: no carbon-components-svelte imports found in",
       );
@@ -193,6 +193,97 @@ describe("cli optimize-css", () => {
 
       const css = readFileSync(join(dir, "dist", "app.css"), "utf-8");
       expect(css).toContain(".bx--accordion");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("cli contract", () => {
+  const run = (cwd: string, args: string[]) =>
+    spawnSync(process.execPath, [CLI_PATH, ...args], { cwd, encoding: "utf8" });
+
+  test("an unknown option exits 2 and suggests the closest one", () => {
+    const dir = createTempProject();
+    try {
+      const result = run(dir, ["optimize-css", "dist/app.css", "--dry-rn"]);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain(
+        "unknown option --dry-rn. Did you mean --dry-run?",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("an unknown or missing command exits 2", () => {
+    const dir = createTempProject();
+    try {
+      expect(run(dir, ["optimise-css"]).status).toBe(2);
+      expect(run(dir, []).stderr).toContain("no command given");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("--version prints the package's version", () => {
+    const dir = createTempProject();
+    try {
+      const pkg = JSON.parse(
+        readFileSync(join(import.meta.dirname, "../package.json"), "utf8"),
+      );
+      const result = run(dir, ["--version"]);
+      expect({ status: result.status, out: result.stdout.trim() }).toEqual({
+        status: 0,
+        out: pkg.version,
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("--json prints the result as one object, sizes in bytes", () => {
+    const dir = createTempProject();
+    try {
+      const result = run(dir, ["optimize-css", "dist/app.css", "--json"]);
+      expect(result.status).toBe(0);
+      const out = JSON.parse(result.stdout);
+      expect(out).toMatchObject({
+        schemaVersion: 1,
+        ok: true,
+        dryRun: false,
+        summary: { files: 1, pruned: 1 },
+      });
+      expect(out.files).toEqual([
+        {
+          file: "dist/app.css",
+          before: expect.any(Number),
+          after: expect.any(Number),
+          removed: expect.any(Number),
+        },
+      ]);
+      expect(out.files[0].after).toBeLessThan(out.files[0].before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("--json prints an error as an object on stdout, with its kind", () => {
+    const dir = createTempProject();
+    try {
+      const result = run(dir, ["optimize-css", "dist/nope.css", "--json"]);
+      expect(result.status).toBe(2);
+      expect(JSON.parse(result.stdout)).toEqual({
+        schemaVersion: 1,
+        ok: false,
+        error: {
+          kind: "input",
+          message: expect.stringContaining("no CSS files matched"),
+        },
+      });
+      expect(
+        run(dir, ["optimize-css", "dist/app.css", "--json", "--report"]).status,
+      ).toBe(2);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

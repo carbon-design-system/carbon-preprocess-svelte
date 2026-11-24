@@ -15,6 +15,7 @@ import { optimizeAssets } from "./plugins/optimize-assets";
 import type { SafelistEntry } from "./plugins/safelist";
 import { collectCarbonTokens, readFiles } from "./plugins/scan-content";
 import { collectCarbonImports } from "./plugins/scan-imports";
+import { version } from "../package.json" with { type: "json" };
 import { errorMessage, isCssFile } from "./utils";
 
 const REGEXP_SAFELIST_ENTRY = /^\/(.+)\/([a-z]*)$/;
@@ -41,7 +42,83 @@ Options:
   --dry-run               Print sizes, write nothing.
   --report                Print detected components and allowlist summary.
   --silent                Suppress the per-file size log.
-  -h, --help              Show this help.`;
+  --json                  Print the result as one JSON object on stdout, and
+                          an error as JSON too. Not with --report.
+  -v, --version           Print the version.
+  -h, --help              Show this help.
+
+Exit status: 0 when done; 2 when called wrong, or when there's nothing to
+prune (no CSS file matched, no Carbon import found, no component index).
+
+For agents and scripts: pass --json and read stdout. A run prints
+{ schemaVersion, ok: true, dryRun, summary: { files, pruned, before, after },
+files: [{ file, before, after, removed }] }, sizes in bytes; an exit 2 prints
+{ schemaVersion, ok: false, error: { kind, message } }, where kind is usage,
+input or failure.`;
+
+const SCHEMA_VERSION = 1;
+
+// Why a run exited 2, as --json names it.
+type ErrorKind = "usage" | "input" | "failure";
+
+class CliError extends Error {
+  readonly kind: ErrorKind;
+  constructor(kind: ErrorKind, message: string) {
+    super(message);
+    this.kind = kind;
+  }
+}
+
+const OPTIONS = {
+  content: { type: "string", multiple: true },
+  components: { type: "string" },
+  safelist: { type: "string", multiple: true },
+  "preserve-all-ibm-fonts": { type: "boolean" },
+  "prop-aware": { type: "boolean" },
+  cwd: { type: "string" },
+  "dry-run": { type: "boolean" },
+  report: { type: "boolean" },
+  silent: { type: "boolean" },
+  json: { type: "boolean" },
+  version: { type: "boolean", short: "v" },
+  help: { type: "boolean", short: "h" },
+} as const;
+
+const UNKNOWN_OPTION = /Unknown option '(-{1,2}[^'=]+)/;
+const LEADING_DASHES = /^-+/;
+
+// Edit distance, for suggesting the flag a typo meant.
+function distance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      next[j] = Math.min(
+        (row[j] ?? 0) + 1,
+        (next[j - 1] ?? 0) + 1,
+        (row[j - 1] ?? 0) + cost,
+      );
+    }
+    row = next;
+  }
+  return row[b.length] ?? 0;
+}
+
+function unknownOption(error: unknown): CliError {
+  const flag = UNKNOWN_OPTION.exec(errorMessage(error))?.[1];
+  if (!flag) return new CliError("usage", errorMessage(error));
+  const name = flag.replace(LEADING_DASHES, "");
+  const closest = Object.keys(OPTIONS)
+    .map((option) => ({ option, d: distance(name, option) }))
+    .filter(({ d }) => d <= 2)
+    .sort((x, y) => x.d - y.d)[0];
+  const hint = closest ? ` Did you mean --${closest.option}?` : "";
+  return new CliError(
+    "usage",
+    `unknown option ${flag}.${hint} Run with --help for the options.`,
+  );
+}
 
 function parseSafelist(entries: readonly string[]): SafelistEntry[] {
   return entries.map((entry) => {
@@ -50,35 +127,42 @@ function parseSafelist(entries: readonly string[]): SafelistEntry[] {
   });
 }
 
+function parse(args: string[]) {
+  try {
+    return parseArgs({ args, allowPositionals: true, options: OPTIONS });
+  } catch (error) {
+    throw unknownOption(error);
+  }
+}
+
 async function main() {
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    allowPositionals: true,
-    options: {
-      content: { type: "string", multiple: true },
-      components: { type: "string" },
-      safelist: { type: "string", multiple: true },
-      "preserve-all-ibm-fonts": { type: "boolean" },
-      "prop-aware": { type: "boolean" },
-      cwd: { type: "string" },
-      "dry-run": { type: "boolean" },
-      report: { type: "boolean" },
-      silent: { type: "boolean" },
-      help: { type: "boolean", short: "h" },
-    },
-  });
+  const { values, positionals } = parse(process.argv.slice(2));
 
   if (values.help) {
     console.log(USAGE);
+    return;
+  }
+  if (values.version) {
+    console.log(version);
     return;
   }
 
   const [subcommand, ...cssPatterns] = positionals;
 
   if (subcommand !== "optimize-css") {
-    console.error(USAGE);
-    process.exitCode = 1;
-    return;
+    throw new CliError(
+      "usage",
+      subcommand
+        ? `unknown command ${JSON.stringify(subcommand)}; the one command is optimize-css.`
+        : "no command given; the one command is optimize-css.",
+    );
+  }
+  const json = values.json === true;
+  if (json && values.report) {
+    throw new CliError(
+      "usage",
+      "--report prints text, so it can't go with --json.",
+    );
   }
 
   const cwd = path.resolve(values.cwd ?? process.cwd());
@@ -88,7 +172,10 @@ async function main() {
   ].sort();
 
   if (cssFiles.length === 0) {
-    throw new Error(`no CSS files matched ${JSON.stringify(cssPatterns)}`);
+    throw new CliError(
+      "input",
+      `no CSS files matched ${JSON.stringify(cssPatterns)}`,
+    );
   }
 
   const contentGlobs =
@@ -115,7 +202,8 @@ async function main() {
   }
 
   if (components.size === 0 && !usesAll) {
-    throw new Error(
+    throw new CliError(
+      "input",
       `no carbon-components-svelte imports found in ${JSON.stringify(contentGlobs)}; pass --components or fix --content`,
     );
   }
@@ -123,8 +211,10 @@ async function main() {
   const index = await loadComponentIndex(cwd);
   // `loadComponentIndex` already warned; the files stay unpruned.
   if (!index) {
-    process.exitCode = 1;
-    return;
+    throw new CliError(
+      "input",
+      "no component index for the installed carbon-components-svelte; the files are unchanged",
+    );
   }
   if (usesAll) for (const name of Object.keys(index)) components.add(name);
 
@@ -134,7 +224,7 @@ async function main() {
     preserveAllIBMFonts: values["preserve-all-ibm-fonts"] === true,
     dryRun: values["dry-run"] === true,
     report: values.report === true,
-    silent: values.silent === true,
+    silent: values.silent === true || json,
   };
 
   const analyzer = propAware
@@ -171,6 +261,12 @@ async function main() {
     engine,
   });
 
+  const files: Array<{
+    file: string;
+    before: number;
+    after: number;
+    removed: number;
+  }> = [];
   optimizeAssets({
     assets: cssFiles.map((id) => {
       const file = path.resolve(cwd, id);
@@ -186,6 +282,7 @@ async function main() {
     optimizer,
     options,
     contentTokens: contentClasses.size,
+    onAsset: ({ id, ...sizes }) => files.push({ file: id, ...sizes }),
     reportExtra: () =>
       analyzer && usage
         ? analyzer.formatPropAwareReport(
@@ -195,9 +292,34 @@ async function main() {
           )
         : [],
   });
+
+  if (json) {
+    const result = {
+      schemaVersion: SCHEMA_VERSION,
+      ok: true,
+      dryRun: options.dryRun,
+      summary: {
+        files: files.length,
+        pruned: files.filter(({ removed }) => removed > 0).length,
+        before: files.reduce((sum, { before }) => sum + before, 0),
+        after: files.reduce((sum, { after }) => sum + after, 0),
+      },
+      files,
+    };
+    console.log(JSON.stringify(result, null, 2));
+  }
 }
 
-main().catch((error) => {
-  console.error(`${LOG_PREFIX} ${errorMessage(error)}`);
-  process.exitCode = 1;
+main().catch((error: unknown) => {
+  const kind = error instanceof CliError ? error.kind : "failure";
+  const message = errorMessage(error);
+  if (process.argv.includes("--json")) {
+    const failure = {
+      schemaVersion: SCHEMA_VERSION,
+      ok: false,
+      error: { kind, message },
+    };
+    console.log(JSON.stringify(failure, null, 2));
+  } else console.error(`${LOG_PREFIX} ${message}`);
+  process.exitCode = 2;
 });
