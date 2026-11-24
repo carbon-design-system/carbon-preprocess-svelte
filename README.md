@@ -649,9 +649,7 @@ carbon-preprocess-svelte: rewrote 37 Carbon components and pruned their CSS
 
 After the build, it fails if a module renders Carbon components in a way the rewrite didn't read (a file outside `content`, an alias Bun's resolver can't follow), as the Vite plugin does. `hydration: false` warns and does nothing here.
 
-Carbon's stylesheets (`carbon-components-svelte/css/*.css`) stay out of Bun's CSS bundler. Bun lowers the CSS it bundles for older browsers, with targets you can't change, which inflates Carbon's: its 847 kB `all.css` grows to 1.07 MB, with about 15,000 `:lang()` selectors, and the pruned sheet would keep that overhead. So the plugin bundles each import of one as a placeholder rule, and `pruneBuild` replaces it with the file as Carbon ships it before pruning. `stylesheet: "bundled"` leaves them to Bun instead.
-
-To inline the CSS rather than link it, read the build's CSS files and prune them with `pruneCss`, which replaces the placeholders the same way and leaves the files as they are:
+To inline the CSS rather than link it, read the build's CSS files and prune them with `pruneCss`, which leaves the files as they are:
 
 ```js
 const files = result.outputs.filter((output) => output.path.endsWith(".css"));

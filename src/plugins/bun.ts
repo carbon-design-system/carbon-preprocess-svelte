@@ -34,26 +34,12 @@ type BunBuildResult = {
   };
 };
 
-export type CarbonBunOptions = CarbonOptimizerOptions & {
-  /**
-   * How Carbon's stylesheets (`carbon-components-svelte/css/*.css`) reach
-   * the build. `"raw"` keeps them out of Bun's CSS bundler, which lowers
-   * modern syntax for old browsers (a quarter more CSS for `all.css`), and
-   * prunes the file as Carbon ships it into the CSS that imported it.
-   * `"bundled"` leaves them to Bun.
-   * @default "raw"
-   */
-  stylesheet?: "raw" | "bundled";
-};
+export type CarbonBunOptions = CarbonOptimizerOptions;
 
 export type CarbonBunPlugin = {
   name: string;
   setup(build: {
     onStart(callback: () => void | Promise<void>): unknown;
-    onLoad(
-      options: { filter: RegExp },
-      callback: (args: { path: string }) => { contents: string; loader: "css" },
-    ): unknown;
   }): void;
   /**
    * The rewritten source of `.svelte` file `path`, for your Svelte plugin's
@@ -72,7 +58,7 @@ export type CarbonBunPlugin = {
   /**
    * After `Bun.build` (with `metafile: true`): checks the build, then
    * returns `css` pruned for it, by the same names, leaving its files as
-   * they are. For CSS the build didn't bundle: Carbon's stylesheet, inlined
+   * they are. For CSS you inline rather than link: the build's own, read
    * into the page.
    */
   pruneCss(
@@ -85,14 +71,6 @@ export type CarbonBunPlugin = {
 const RE_NAMESPACED = /^[a-z][\w-]+:/i;
 const RE_TEXT_OUTPUT = /\.(?:css|html?|[cm]?js|svg|json)$/;
 const RE_CSS_OUTPUT = /\.css$/;
-const RE_CARBON_SHEET =
-  /[\\/]carbon-components-svelte[\\/]css[\\/][^\\/]+\.css$/;
-/** What a raw stylesheet bundles as: one rule Bun's minifier keeps, numbered. */
-const SHEET_MARKER = "carbon-preprocess-svelte-sheet";
-const RE_SHEET_MARKER = new RegExp(
-  `\\.${SHEET_MARKER}-(\\d+)\\s*\\{[^}]*\\}`,
-  "g",
-);
 
 const absolute = (input: string) =>
   RE_NAMESPACED.test(input) ? input : path.resolve(input);
@@ -209,8 +187,7 @@ function rehash(file: string, hash: string, css: string): string | undefined {
  * `optimizeComponents` and `optimizeCss` for `Bun.build`, which has no
  * hooks to run them in: Bun runs only the first `onLoad` that matches a
  * file, so your Svelte plugin compiles what `load` returns, and the CSS is
- * pruned once the build is done. Carbon's stylesheets are pruned as Carbon
- * ships them, not as Bun's CSS bundler rewrites them (`stylesheet`).
+ * pruned once the build is done.
  *
  * @example
  * const carbon = optimizeCarbonBun();
@@ -223,16 +200,7 @@ function rehash(file: string, hash: string, css: string): string | undefined {
  * await carbon.pruneBuild(result);
  */
 export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
-  const { stylesheet = "raw", ...optimizerOptions } = options ?? {};
-  const optimizer = createCarbonOptimizer(optimizerOptions);
-  // The raw stylesheets the build imported, by marker number.
-  const sheets: string[] = [];
-
-  /** `css` with each stylesheet marker replaced by the file it stands for. */
-  const withSheets = (css: string) =>
-    css.replace(RE_SHEET_MARKER, (_, i: string) =>
-      readFileSync(sheets[Number(i)], "utf8"),
-    );
+  const optimizer = createCarbonOptimizer(options);
 
   const finish = async (
     result: BunBuildResult,
@@ -241,9 +209,7 @@ export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
   ) =>
     optimizer.finish({
       modules: buildModules(result, optimizer),
-      css: Object.fromEntries(
-        Object.entries(css).map(([id, text]) => [id, withSheets(text)]),
-      ),
+      css,
       output,
     });
 
@@ -251,16 +217,6 @@ export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
     name: "carbon-preprocess-svelte",
     setup(build) {
       build.onStart(() => optimizer.prepare(resolveWithBun));
-      if (stylesheet === "raw") {
-        build.onLoad({ filter: RE_CARBON_SHEET }, ({ path: file }) => {
-          let i = sheets.indexOf(file);
-          if (i === -1) i = sheets.push(file) - 1;
-          return {
-            contents: `.${SHEET_MARKER}-${i}{--${SHEET_MARKER}:${i}}`,
-            loader: "css",
-          };
-        });
-      }
     },
     load: (file) => optimizer.load(file),
     async pruneCss(css, result) {
