@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.8](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.8) - 2026-11-24
+
+**Features**
+
+- under Vite, Rollup, Rolldown, webpack and Rspack, `optimizeComponents` hands its rewrite count to `optimizeCss` in the same build, so the build prints one summary, as `optimizeCarbonBun` does, instead of svelte-prune's `rewrote N Carbon components for this app (M edits)` beside the pruning summary. Without `optimizeCss` (or with a silent one), `optimizeComponents` prints `rewrote N Carbon components` itself ([#332](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/332))
+
+  ```
+  carbon-preprocess-svelte: rewrote 37 Carbon components and pruned their CSS
+    assets/index-x3k9Qa.css  849.8 kB  →  90.1 kB  -89%
+  ```
+
+**Fixes**
+
+- `optimizeComponents` reads a component with Svelte 5.59's `<svelte:options customRenderer="…">` like any other, so Carbon is rewritten for the props it passes; it was skipped without a warning (svelte-prune 0.15.1)
+
 ## [0.12.7](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.7) - 2026-11-24
 
 **Fixes**
