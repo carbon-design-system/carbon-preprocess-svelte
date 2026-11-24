@@ -15,13 +15,22 @@ export type BuildSummary = {
   /** Carbon components `optimizeComponents` rewrote, when it reports here. */
   rewritten?: number;
   dryRun?: boolean;
-  /** ANSI color and weight. @default whether stdout is a terminal, after `NO_COLOR` and `FORCE_COLOR` */
+  /**
+   * ANSI color and weight. @default whether stdout is a terminal, after
+   * `NO_COLOR` and `FORCE_COLOR`
+   */
   color?: boolean;
 };
 
-/** Rows shown before the rest fold into one; a single extra row isn't folded. */
+/**
+ * Rows shown before the rest fold into one; a single extra row
+ * isn't folded.
+ */
 const ROWS = 5;
-/** A content hash in a file name, as bundlers write it: `index-Ab12Cd.css`, `0.Ab12Cd.css`. */
+/**
+ * A content hash in a file name, as bundlers write it:
+ * `index-Ab12Cd.css`, `0.Ab12Cd.css`.
+ */
 const RE_HASH = /([.-][A-Za-z0-9_-]{4,})(?=\.css$)/;
 
 let formatter: Intl.NumberFormat | undefined;
@@ -44,7 +53,10 @@ function percent(before: number, after: number): string {
   return `-${Math.round(((before - after) / before) * 100)}%`;
 }
 
-/** Whether to color output: `NO_COLOR` wins, then `FORCE_COLOR`, then a terminal. */
+/**
+ * Whether to color output: `NO_COLOR` wins, then `FORCE_COLOR`, then
+ * a terminal.
+ */
 export function useColor(
   stream: { isTTY?: boolean } = process.stdout,
 ): boolean {

@@ -7,10 +7,11 @@ const MAX_PASSES = 10;
  * renders it, in place.
  *
  * `componentClasses` maps a component name (exported or internal) to the
- * entry mutated with its merged classes; a parent absent from it is skipped
- * as a merge target but can still be a child's source. Runs to a fixed point
- * (a parent may need a child's classes before the child has absorbed its
- * own), capped to guard against a cyclic `subComponents` graph.
+ * entry mutated with its merged classes; a parent absent from it is
+ * skipped as a merge target but can still be a child's source. Runs to a
+ * fixed point (a parent may need a child's classes before the child has
+ * absorbed its own), capped to guard against a cyclic
+ * `subComponents` graph.
  */
 export function mergeSubComponentClasses(
   subComponents: Map<string, string[]>,

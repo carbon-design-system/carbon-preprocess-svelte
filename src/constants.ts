@@ -6,14 +6,17 @@ export const CarbonSvelte = {
 
 export const PACKAGE_NAME = "carbon-preprocess-svelte";
 
-/** Prefix for every warning and error the package logs, so users can grep for it. */
+/**
+ * Prefix for every warning and error the package logs, so users can grep
+ * for it.
+ */
 export const LOG_PREFIX = `${PACKAGE_NAME}:`;
 
 export const ALWAYS_ON_CLASSES = [".bx--body"];
 
 /**
- * Ancestor classes that may appear in strict selectors without being imported.
- * Subject classes still require a full allowlist match.
+ * Ancestor classes that may appear in strict selectors without being
+ * imported. Subject classes still require a full allowlist match.
  */
 export const CONTEXT_ANCESTORS = [
   ".bx--body--with-modal-open",

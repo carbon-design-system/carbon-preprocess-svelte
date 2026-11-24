@@ -33,8 +33,8 @@ export type CssPruning = {
 
 /**
  * The optimizer a build prunes its CSS with, shared by the plugins and
- * `createCarbonOptimizer`: they differ only in how they collect its inputs.
- * With `propAware`, it prunes from `optimizeComponents`' analysis
+ * `createCarbonOptimizer`: they differ only in how they collect its
+ * inputs. With `propAware`, it prunes from `optimizeComponents`' analysis
  * (`shared`) when that's in the build, else from the call sites `collect`
  * reads, and falls back to the imported components alone with a warning.
  */

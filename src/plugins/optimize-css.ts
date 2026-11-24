@@ -101,7 +101,8 @@ type Prepared = {
 /**
  * `--cds-` names in the module graph: in its code, which the fingerprint
  * reads because chunks are hashed before `generateBundle`, and in the HTML
- * and SVG files it reads, which `generateBundle` can run before Vite emits.
+ * and SVG files it reads, which `generateBundle` can run before
+ * Vite emits.
  */
 function graphTokenNames(
   context: Pick<Rollup.PluginContext, "getModuleIds" | "getModuleInfo">,
@@ -182,34 +183,43 @@ function namesCss(chunk: Rollup.RenderedChunk): boolean {
 }
 
 /**
- * Vite/Rollup plugin that removes unused Carbon CSS from production builds.
+ * Vite/Rollup plugin that removes unused Carbon CSS from
+ * production builds.
  *
  * `transform` records which Carbon components are imported. `renderStart`
- * decides what to keep, and folds a hash of it into the names of the chunks
- * that name CSS. `generateBundle` then splices unused rules out of the CSS
- * assets, renaming each whose name hashes its content.
+ * decides what to keep, and folds a hash of it into the names of the
+ * chunks that name CSS. `generateBundle` then splices unused rules out of
+ * the CSS assets, renaming each whose name hashes its content.
  */
 export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   const silent = options?.silent === true;
   /**
    * Carbon component files seen by `transform`, across `vite build --watch`
    * rebuilds. Rollup serves unchanged modules from cache without calling
-   * `transform`, so `generateBundle` keeps only ids still in the module graph.
+   * `transform`, so `generateBundle` keeps only ids still in the
+   * module graph.
    */
   const ids = new Set<string>();
   let root = process.cwd();
   /**
-   * Set by `configResolved`, which only Vite calls. Plain Rollup and Rolldown
-   * log to the console instead: their CLI writes plugin logs to stderr.
+   * Set by `configResolved`, which only Vite calls. Plain Rollup and
+   * Rolldown log to the console instead: their CLI writes plugin logs
+   * to stderr.
    */
   let logInfo: ((message: string) => void) | undefined;
   /** Classes from `content` globs; cached after the first scan of a build. */
   let contentClasses: string[] | undefined;
   /** `--cds-` names from `content` globs, scanned with `contentClasses`. */
   let contentTokens: string[] = [];
-  /** Literal `bx--` classes in each scanned module, kept per module like `ids`. */
+  /**
+   * Literal `bx--` classes in each scanned module, kept per module
+   * like `ids`.
+   */
   const moduleClasses = new Map<string, Set<string>>();
-  /** Each scanned module's code, for the pruner, when CPS collects its own call sites. */
+  /**
+   * Each scanned module's code, for the pruner, when CPS collects its own
+   * call sites.
+   */
   const moduleSources = new Map<string, string>();
   /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
   let components: ComponentIndex | undefined;
@@ -220,7 +230,10 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   let analyzer: typeof import("svelte-prune/internal/analysis") | undefined;
   /** Vite's resolved config, where `optimizeComponents` shares its analysis. */
   let config: object | undefined;
-  /** `optimizeComponents`' analysis, when it's in the build: no collector then. */
+  /**
+   * `optimizeComponents`' analysis, when it's in the build: no
+   * collector then.
+   */
   let shared: (() => SharedAnalysis | undefined) | undefined;
   /** The module graph's edges into Carbon, read in `buildEnd`. */
   let edges: LibraryImport[] = [];

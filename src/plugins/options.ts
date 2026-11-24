@@ -36,7 +36,8 @@ export type OptimizeCssOptions = {
    * used in Carbon Svelte components.
    *
    * The default behavior is to preserve the following IBM Plex fonts:
-   * - IBM Plex Sans (300/400/600-weight rules; italic only if `<Text italic>` is used)
+   * - IBM Plex Sans (300/400/600-weight rules; italic only if `<Text
+   *   italic>` is used)
    * - IBM Plex Mono (400-weight and normal-font-style rules)
    *
    * Set to `true` to disable this behavior and
@@ -57,7 +58,8 @@ export type OptimizeCssOptions = {
   /**
    * Class selectors to always keep, regardless of which components are
    * imported. For Carbon classes the allowlist misses:
-   * - Hand-written Carbon classes in app markup (e.g. `<div class="bx--grid">`)
+   * - Hand-written Carbon classes in app markup (e.g. `<div
+   *   class="bx--grid">`)
    * - Theme/layout utilities that no component file references
    *
    * Each entry is either:
@@ -92,10 +94,10 @@ export type OptimizeCssOptions = {
   /**
    * Scan the code of every bundled module for literal `bx--` tokens and keep
    * them, so hand-written Carbon classes in your own markup
-   * (`<div class="bx--grid">`) and prefix literals (`` `bx--btn--${kind}` ``)
-   * survive without configuration. Carbon's own sources, CSS modules, and
-   * virtual modules are skipped. Set to `false` to rely only on imported
-   * components, `safelist`, and `content`.
+   * (`<div class="bx--grid">`) and prefix literals
+   * (`` `bx--btn--${kind}` ``) survive without configuration. Carbon's own
+   * sources, CSS modules, and virtual modules are skipped. Set to `false` to
+   * rely only on imported components, `safelist`, and `content`.
    * @default true
    */
   scanModules?: boolean;
@@ -111,8 +113,8 @@ export type OptimizeCssOptions = {
    * the analysis can't read (a reassigned variable, a spread, `bind:`)
    * keeps every value, and a component used as a value, or imported in a
    * way the analysis can't read (a bundler alias), keeps everything.
-   * If the analysis fails, CSS is pruned as without this option, with a
-   * warning.
+   * If the analysis fails, CSS is pruned as without this option, with
+   * a warning.
    *
    * Pass an object to `exclude` components or `assume` values for
    * props set from expressions, or `false` to prune by the imported

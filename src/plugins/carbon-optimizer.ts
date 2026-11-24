@@ -168,7 +168,10 @@ export function createCarbonOptimizer(
       { plugin: "optimizeComponents", failure: SPECIALIZE_FAILURE },
     );
   let index: ComponentIndex | undefined;
-  /** Carbon components this build rewrote, for the summary's header; 0 when silent. */
+  /**
+   * Carbon components this build rewrote, for the summary's header; 0
+   * when silent.
+   */
   let rewritten = 0;
   let analyzer: typeof import("svelte-prune/internal/analysis") | undefined;
 
@@ -255,7 +258,10 @@ export function createCarbonOptimizer(
     }
 
     const moduleClasses = new Set<string>();
-    /** `--cds-` names the modules' code reads, as `optimizeCss` reads Vite's graph. */
+    /**
+     * `--cds-` names the modules' code reads, as `optimizeCss` reads
+     * Vite's graph.
+     */
     const codeTokens = new Set<string>();
     const markupTokens = new Set<string>();
     const sources: Array<{ id: string; code: string }> = [];

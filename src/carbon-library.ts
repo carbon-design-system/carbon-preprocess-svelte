@@ -32,7 +32,10 @@ export const PROP_AWARE_FAILURE = {
   fallback: "Carbon CSS was pruned without it",
 } satisfies Failure;
 
-/** What the usage analysis turns off when it fails, for `optimizeComponents`. */
+/**
+ * What the usage analysis turns off when it fails,
+ * for `optimizeComponents`.
+ */
 export const SPECIALIZE_FAILURE = {
   feature: "optimizeComponents",
   fallback: "Carbon components were bundled unchanged",

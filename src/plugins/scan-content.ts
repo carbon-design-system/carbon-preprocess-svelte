@@ -7,9 +7,9 @@ import { collectTokenNames } from "./prune-tokens";
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;
 
 /**
- * Adds every literal `bx--` token in `source` to `into` as a class selector.
- * The `includes` check is the fast path: most modules contain no Carbon
- * token, and a substring search is far cheaper than the regex.
+ * Adds every literal `bx--` token in `source` to `into` as a class
+ * selector. The `includes` check is the fast path: most modules contain no
+ * Carbon token, and a substring search is far cheaper than the regex.
  */
 export function collectCarbonTokens(source: string, into: Set<string>): void {
   if (!source.includes("bx--")) return;
@@ -47,8 +47,9 @@ export type ContentScan = {
 
 /**
  * Scans files matched by `content` globs (relative to `cwd`) for literal
- * `bx--` tokens and `--cds-` token names. Also reports how many files matched and any glob failure so
- * callers can warn on a misconfigured `content`.
+ * `bx--` tokens and `--cds-` token names. Also reports how many files
+ * matched and any glob failure so callers can warn on a
+ * misconfigured `content`.
  *
  * For ``class={`bx--btn--${kind}`}`` only the prefix `bx--btn--` is found;
  * prefix matching then keeps `.bx--btn--primary` and similar.
