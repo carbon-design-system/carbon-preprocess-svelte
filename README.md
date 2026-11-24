@@ -903,7 +903,19 @@ Options:
   --dry-run               Print sizes, write nothing.
   --report                Print detected components and allowlist summary.
   --silent                Suppress the per-file size log.
+  --json                  Print the result as one JSON object on stdout, and
+                          an error as JSON too. Not with --report.
+  -v, --version           Print the version.
   -h, --help              Show this help.
+
+Exit status: 0 when done; 2 when called wrong, or when there's nothing to
+prune (no CSS file matched, no Carbon import found, no component index).
+
+For agents and scripts: pass --json and read stdout. A run prints
+{ schemaVersion, ok: true, dryRun, summary: { files, pruned, before, after },
+files: [{ file, before, after, removed }] }, sizes in bytes; an exit 2 prints
+{ schemaVersion, ok: false, error: { kind, message } }, where kind is usage,
+input or failure.
 ```
 
 ## Component index

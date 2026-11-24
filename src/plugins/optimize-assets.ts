@@ -1,5 +1,6 @@
 import type { CssOptimizer } from "./create-optimized-css";
 import { setFontDisplay } from "./font-display";
+import { byteLength } from "../utils";
 import type { OptimizeCssOptions } from "./options";
 import { type AssetDiff, logSummary } from "./print-diff";
 import { type AssetReport, printReport, toAssetReport } from "./print-report";
@@ -32,6 +33,7 @@ export function optimizeAssets({
   reportExtra,
   tokenNames,
   rewritten,
+  onAsset,
 }: {
   assets: Iterable<CssAsset>;
   optimizer: CssOptimizer;
@@ -43,6 +45,13 @@ export function optimizeAssets({
   log?: (message: string) => void;
   /** Lines appended to the report, read after every asset has run. */
   reportExtra?: () => string[];
+  /** Hears each asset's sizes in bytes, and the rules removed from it. */
+  onAsset?: (asset: {
+    id: string;
+    before: number;
+    after: number;
+    removed: number;
+  }) => void;
   /**
    * Carbon components `optimizeComponents` rewrote, for the
    * summary's header.
@@ -82,6 +91,13 @@ export function optimizeAssets({
     if (!options.dryRun && (removed > 0 || css !== results[i].css)) {
       asset.write(css);
     }
+
+    onAsset?.({
+      id,
+      before: byteLength(source),
+      after: byteLength(css),
+      removed,
+    });
 
     if (removed > 0)
       pruned.push({ id, originalCss: source, optimizedCss: css });
