@@ -22,7 +22,9 @@ type OutputAsset = Rollup.OutputAsset;
 type OutputBundle = Rollup.OutputBundle;
 
 const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
-const SIZE_LINE = /^carbon-preprocess-svelte: styles\.css [\d.]+ kB → /;
+/** The summary for one pruned stylesheet: a header, then its row. */
+const SIZE_LINE =
+  /^carbon-preprocess-svelte: pruned Carbon CSS\n {2}styles\.css {2}[\d.,]+ kB {2}→ {2}[\d.,]+ kB {2}-\d+%$/;
 /** No-op Vite logger for tests that ignore log output. */
 const quietLogger = { info: () => {} };
 
@@ -610,7 +612,7 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(
       consoleSpy.mock.calls.some((call) =>
         String(call[0]).startsWith(
-          "carbon-preprocess-svelte: dry run, left as is: styles.css ",
+          "carbon-preprocess-svelte: dry run, files unchanged: would prune Carbon CSS\n  styles.css ",
         ),
       ),
     ).toEqual(true);
@@ -700,7 +702,6 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(logger.info).toHaveBeenCalledTimes(1);
     const [message] = logger.info.mock.calls[0];
     expect(message).toMatch(SIZE_LINE);
-    expect(message).not.toContain("\n");
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 

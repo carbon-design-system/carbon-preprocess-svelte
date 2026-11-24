@@ -24,6 +24,7 @@ import {
 import { prepareCssPruning } from "./css-pruning";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
+import { logSummary } from "./print-diff";
 import type { OptimizeComponentsOptions } from "./optimize-components";
 import {
   type OptimizeCssOptions,
@@ -230,20 +231,18 @@ export function createCarbonOptimizer(
     return edges;
   }
 
-  /** "37 Carbon components rewritten", unless silent or none were. */
-  function rewriteNote(modules: CarbonBuildModule[]): string | undefined {
-    if (!components || componentOptions?.silent) return undefined;
-    const rewritten = modules.filter(
+  /** How many Carbon components the build rewrote; 0 when silent. */
+  function rewrittenCount(modules: CarbonBuildModule[]): number {
+    if (!components || componentOptions?.silent) return 0;
+    return modules.filter(
       ({ id }) => isCarbonSvelteImport(id) && components.load(id),
     ).length;
-    if (rewritten === 0) return undefined;
-    return `${rewritten} Carbon component${rewritten === 1 ? "" : "s"} rewritten`;
   }
 
   async function pruneCss(
     modules: CarbonBuildModule[],
     build: CarbonBuild,
-    note: string | undefined,
+    rewritten: number,
   ): Promise<{ css: Record<string, string>; logged: boolean }> {
     const css = { ...build.css };
     const skip = { css, logged: false };
@@ -352,7 +351,7 @@ export function createCarbonOptimizer(
     });
 
     const logged = optimizeAssets({
-      note,
+      rewritten,
       assets: Object.entries(css).map(([id, source]) => ({
         id,
         source,
@@ -384,7 +383,7 @@ export function createCarbonOptimizer(
         );
       }
       if (components) {
-        // `info` waits for `finish`: it goes on the CSS line, with the count.
+        // `info` waits for `finish`: its count goes in the summary's header.
         const { warning, report } = await components.prepare(root, resolve);
         if (warning) console.warn(warning);
         for (const line of report ?? []) console.log(line);
@@ -402,9 +401,9 @@ export function createCarbonOptimizer(
     async finish(build) {
       const modules = [...build.modules];
       checkComponents(modules);
-      const note = rewriteNote(modules);
-      const { css, logged } = await pruneCss(modules, build, note);
-      if (note && !logged) console.log(`${LOG_PREFIX} ${note}`);
+      const rewritten = rewrittenCount(modules);
+      const { css, logged } = await pruneCss(modules, build, rewritten);
+      if (rewritten > 0 && !logged) logSummary({ assets: [], rewritten });
       return css;
     },
   };

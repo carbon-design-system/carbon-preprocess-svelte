@@ -151,7 +151,8 @@ A build plugin that strips unused Carbon styles. It runs on Vite, Rollup and [Ro
 ```
 $ vite build
 …
-carbon-preprocess-svelte: assets/index-CU4gbKFa.css 606.26 kB → 53.22 kB (-91.22%)
+carbon-preprocess-svelte: pruned Carbon CSS
+  assets/index-CU4gbKFa.css  606.3 kB  →  53.2 kB  -91%
 ```
 
 > [!NOTE]
@@ -639,10 +640,11 @@ const result = await Bun.build({
 await carbon.pruneBuild(result);
 ```
 
-It takes `createCarbonOptimizer`'s [options](#createcarbonoptimizer), and prints one line per stylesheet it prunes, with how many Carbon components it rewrote:
+It takes `createCarbonOptimizer`'s [options](#createcarbonoptimizer), and prints how many Carbon components it rewrote with the stylesheets it pruned:
 
 ```
-carbon-preprocess-svelte: assets/index-x3k9.css 849.76 kB → 90.05 kB (-89.4%), 37 Carbon components rewritten
+carbon-preprocess-svelte: rewrote 37 Carbon components and pruned their CSS
+  assets/index-x3k9Qa.css  849.8 kB  →  90.1 kB  -89%
 ```
 
 After the build, it fails if a module renders Carbon components in a way the rewrite didn't read (a file outside `content`, an alias Bun's resolver can't follow), as the Vite plugin does. `hydration: false` warns and does nothing here.
@@ -859,8 +861,14 @@ With Bun, the build step is `bun build src/main.ts --outdir dist`.
 
 ```
 $ carbon-preprocess-svelte optimize-css "dist/**/*.css"
-carbon-preprocess-svelte: dist/assets/index-CU4gbKFa.css 606.26 kB → 53.22 kB (-91.22%)
+carbon-preprocess-svelte: pruned Carbon CSS
+  dist/assets/index-CU4gbKFa.css  606.3 kB  →  53.2 kB  -91%
+  dist/assets/About-Bq9xLm6t.css   38.0 kB  →   3.3 kB  -91%
+                                  ──────────────────────────
+  2 stylesheets                   644.3 kB  →  56.5 kB  -91%
 ```
+
+It prints a row per stylesheet it pruned, the largest savings first, and a total when there's more than one; past five, the rest fold into one row. Color shows in a terminal, and not under `NO_COLOR`, in CI or when piped.
 
 With `--report`:
 

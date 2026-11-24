@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -367,7 +368,7 @@ describe("OptimizeCssPlugin", () => {
     consoleSpy.mockRestore();
   });
 
-  test("skips diff logging when nothing is removed", async () => {
+  test("says there was nothing to prune when nothing is removed", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
     const plugin = allowlistPlugin({ silent: false });
     const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
@@ -387,7 +388,11 @@ describe("OptimizeCssPlugin", () => {
     await mockCompiler.waitForProcessAssets();
     expect(mockCompiler.compilation.warnings).toEqual([]);
 
-    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(
+      consoleSpy.mock.calls.map(([line]) =>
+        stripVTControlCharacters(String(line)),
+      ),
+    ).toEqual(["carbon-preprocess-svelte: nothing to prune in 1 stylesheet"]);
     consoleSpy.mockRestore();
   });
 

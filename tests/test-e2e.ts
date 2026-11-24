@@ -3,6 +3,7 @@
 // @reads examples/** tests/__snapshots__/e2e.json
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { $ } from "bun";
 import { name } from "../package.json";
 
@@ -16,16 +17,17 @@ const OBSERVED_PATH = process.env.E2E_OBSERVED;
 /** Comma-separated example names to build (`vite,vite@svelte-5`); all by default. */
 const ONLY_EXAMPLES = process.env.EXAMPLES?.split(",").filter(Boolean);
 
-/** `carbon-preprocess-svelte: <file> <before> → <after> (-<percent>%)` */
-const SIZE_LINE_REGEX =
-  /carbon-preprocess-svelte: (?:dry run, left as is: )?(\S+\.css) ([\d,.]+) (kB|MB) → ([\d,.]+) (kB|MB) \(-?([\d.]+)%\)/;
+/** A stylesheet's row in the pruning summary: `  <file>  <before> kB  →  <after> kB  -<percent>%` */
+const SIZE_ROW_REGEX =
+  /^ {2}(\S+\.css)\s+([\d,]+\.\d) kB {2}→\s+([\d,]+\.\d) kB {2}-(\d+)%$/;
 // Preprocessor/index loader prefix, then the plugins' prefix.
 const WARNING_REGEX = /\[carbon-preprocess-svelte\]|carbon-preprocess-svelte:/;
-/** The plugins' result lines share the prefix, but aren't warnings. */
-const REWRITE_LINE_REGEX =
-  /carbon-preprocess-svelte: \d+ Carbon components? rewritten$/;
-const isResultLine = (line: string) =>
-  SIZE_LINE_REGEX.test(line) || REWRITE_LINE_REGEX.test(line);
+/** The summary's header shares the prefix, but isn't a warning. */
+const SUMMARY_HEADER_REGEX =
+  /carbon-preprocess-svelte: (?:rewrote \d+ Carbon components?|pruned Carbon CSS|dry run, files unchanged|nothing to prune)/;
+/** The summary's sizes are rounded to 0.1 kB and whole percentages. */
+const SIZE_TOLERANCE_KB = 0.1;
+const PERCENT_TOLERANCE = 1;
 
 type OptimizationResult = {
   file: string;
@@ -67,7 +69,10 @@ async function runBuild(dir: string, script: string): Promise<BuildRun> {
 
   const warnings = `${stdout}\n${stderr}`
     .split("\n")
-    .filter((line) => WARNING_REGEX.test(line) && !isResultLine(line))
+    .map((line) => stripVTControlCharacters(line))
+    .filter(
+      (line) => WARNING_REGEX.test(line) && !SUMMARY_HEADER_REGEX.test(line),
+    )
     .map((line) => line.trim());
 
   return { stdout, warnings };
@@ -96,17 +101,15 @@ function isOptimizationResult(
   return "file" in value;
 }
 
-function parseOptimizationOutput(output: string): OptimizationResult | null {
-  const match = output.match(SIZE_LINE_REGEX);
+function parseOptimizationOutput(row: string): OptimizationResult | null {
+  const match = row.match(SIZE_ROW_REGEX);
   if (!match) return null;
 
-  const [, file, before, beforeUnit, after, afterUnit, percent] = match;
-  const kb = (value: string, unit: string) =>
-    Number.parseFloat(value.replace(",", "")) * (unit === "MB" ? 1000 : 1);
+  const [, file, before, after, percent] = match;
   return {
     file,
-    before_kb: kb(before, beforeUnit),
-    after_kb: kb(after, afterUnit),
+    before_kb: Number.parseFloat(before.replaceAll(",", "")),
+    after_kb: Number.parseFloat(after.replaceAll(",", "")),
     reduction_percent: Number.parseFloat(percent),
   };
 }
@@ -191,7 +194,6 @@ function compareResults(
     };
   }
 
-  const tolerance = 0.01;
   const beforeDiff = Math.abs(actual.before_kb - expected.before_kb);
   const afterDiff = Math.abs(actual.after_kb - expected.after_kb);
   const percentDiff = Math.abs(
@@ -199,9 +201,9 @@ function compareResults(
   );
 
   if (
-    beforeDiff > tolerance ||
-    afterDiff > tolerance ||
-    percentDiff > tolerance
+    beforeDiff > SIZE_TOLERANCE_KB ||
+    afterDiff > SIZE_TOLERANCE_KB ||
+    percentDiff > PERCENT_TOLERANCE
   ) {
     return {
       example: label,
@@ -217,11 +219,16 @@ Run with UPDATE_SNAPSHOTS=true to update.`,
   return { example: label, passed: true, message: "OK" };
 }
 
+/** The summary's row for the build's largest stylesheet, which holds Carbon's. */
 function parseLastOptimizationBlock(output: string): OptimizationResult | null {
-  const lines = output.split("\n").filter((line) => SIZE_LINE_REGEX.test(line));
-  return lines.length === 0
-    ? null
-    : parseOptimizationOutput(lines[lines.length - 1]);
+  const rows = stripVTControlCharacters(output)
+    .split("\n")
+    .map((line) => parseOptimizationOutput(line))
+    .filter((row): row is OptimizationResult => row !== null);
+  if (rows.length === 0) return null;
+  return rows.reduce((largest, row) =>
+    row.before_kb > largest.before_kb ? row : largest,
+  );
 }
 
 async function buildSingleEntry(
