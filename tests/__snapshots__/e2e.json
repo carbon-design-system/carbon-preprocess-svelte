@@ -44,15 +44,15 @@
   "rspack": {
     "default": {
       "file": "build/bundle.*.css",
-      "before_kb": 1910,
-      "after_kb": 58.95,
-      "reduction_percent": 96.92
+      "before_kb": 1912.2,
+      "after_kb": 58.9,
+      "reduction_percent": 97
     },
     "optimized": {
       "file": "build/bundle.*.css",
-      "before_kb": 1910,
-      "after_kb": 38.82,
-      "reduction_percent": 97.97
+      "before_kb": 1912.2,
+      "after_kb": 38.8,
+      "reduction_percent": 98
     }
   },
   "sveltekit": {

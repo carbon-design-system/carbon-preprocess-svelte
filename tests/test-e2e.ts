@@ -219,15 +219,25 @@ Run with UPDATE_SNAPSHOTS=true to update.`,
   return { example: label, passed: true, message: "OK" };
 }
 
-/** The summary's row for the build's largest stylesheet, which holds Carbon's. */
-function parseLastOptimizationBlock(output: string): OptimizationResult | null {
+/**
+ * The summary's row for the snapshot's file, or for the build's largest
+ * stylesheet when there's no snapshot or its file isn't in the summary.
+ */
+function parseLastOptimizationBlock(
+  output: string,
+  expectedFile?: string,
+): OptimizationResult | null {
   const rows = stripVTControlCharacters(output)
     .split("\n")
     .map((line) => parseOptimizationOutput(line))
     .filter((row): row is OptimizationResult => row !== null);
   if (rows.length === 0) return null;
-  return rows.reduce((largest, row) =>
-    row.before_kb > largest.before_kb ? row : largest,
+  const expected = rows.find((row) => normalizeFile(row.file) === expectedFile);
+  return (
+    expected ??
+    rows.reduce((largest, row) =>
+      row.before_kb > largest.before_kb ? row : largest,
+    )
   );
 }
 
@@ -242,7 +252,13 @@ async function buildSingleEntry(
   const warned = warningOutcome(exampleName, warnings);
   if (warned) return warned;
 
-  const parsed = parseLastOptimizationBlock(stdout);
+  const expectedFile = snapshots[exampleName];
+  const parsed = parseLastOptimizationBlock(
+    stdout,
+    expectedFile && isOptimizationResult(expectedFile)
+      ? expectedFile.file
+      : undefined,
+  );
   if (!parsed) {
     return {
       example: exampleName,
@@ -297,7 +313,10 @@ async function buildMultiEntry(
       continue;
     }
 
-    const parsed = parseLastOptimizationBlock(stdout);
+    const parsed = parseLastOptimizationBlock(
+      stdout,
+      expectedEntries?.[entry]?.file,
+    );
 
     if (!parsed) {
       outcomes.push({
