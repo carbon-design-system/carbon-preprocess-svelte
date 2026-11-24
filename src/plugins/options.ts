@@ -36,8 +36,8 @@ export type OptimizeCssOptions = {
    * used in Carbon Svelte components.
    *
    * The default behavior is to preserve the following IBM Plex fonts:
-   * - IBM Plex Sans (300/400/600-weight rules; italic only if `<Text
-   *   italic>` is used)
+   * - IBM Plex Sans (300/400/600-weight rules; italic only if
+   *   `<Text italic>` is used)
    * - IBM Plex Mono (400-weight and normal-font-style rules)
    *
    * Set to `true` to disable this behavior and
@@ -58,8 +58,8 @@ export type OptimizeCssOptions = {
   /**
    * Class selectors to always keep, regardless of which components are
    * imported. For Carbon classes the allowlist misses:
-   * - Hand-written Carbon classes in app markup (e.g. `<div
-   *   class="bx--grid">`)
+   * - Hand-written Carbon classes in app markup (e.g.
+   *   `<div class="bx--grid">`)
    * - Theme/layout utilities that no component file references
    *
    * Each entry is either:
