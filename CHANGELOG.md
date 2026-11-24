@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.7](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.7) - 2026-11-24
+
+**Fixes**
+
+- the component index cache (`node_modules/.cache/carbon-preprocess-svelte/`) no longer keeps one file per version forever: writing an entry removes other versions' entries, and leftover temp files, untouched for a day ([#329](https://github.com/carbon-design-system/carbon-preprocess-svelte/pull/329))
+
 ## [0.12.6](https://github.com/carbon-design-system/carbon-preprocess-svelte/releases/tag/v0.12.6) - 2026-11-24
 
 **Features**
