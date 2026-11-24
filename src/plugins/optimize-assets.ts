@@ -8,7 +8,10 @@ import { pruneUnusedTokens } from "./prune-tokens";
 export type CssAsset = {
   id: string;
   source: Uint8Array | string;
-  /** Replaces the asset's contents; skipped on `dryRun` and when nothing was removed. */
+  /**
+   * Replaces the asset's contents; skipped on `dryRun` and when nothing
+   * was removed.
+   */
   write(css: string): void;
 };
 
@@ -40,7 +43,10 @@ export function optimizeAssets({
   log?: (message: string) => void;
   /** Lines appended to the report, read after every asset has run. */
   reportExtra?: () => string[];
-  /** Carbon components `optimizeComponents` rewrote, for the summary's header. */
+  /**
+   * Carbon components `optimizeComponents` rewrote, for the
+   * summary's header.
+   */
   rewritten?: number;
   /**
    * `--cds-` names found in the build's scripts and markup. Only a caller

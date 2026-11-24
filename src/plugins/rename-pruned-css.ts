@@ -14,7 +14,10 @@ const HASH = /^\[hash(?::(\d+))?\]$/;
 const RE_TEXT_ASSET = /\.(?:html?|css)$/;
 const RE_REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
 
-/** Rollup's and Rolldown's `[hash]` length when the pattern doesn't set one. */
+/**
+ * Rollup's and Rolldown's `[hash]` length when the pattern doesn't
+ * set one.
+ */
 const DEFAULT_HASH_LENGTH = 8;
 
 function placeholderPattern(part: string): string {
@@ -70,7 +73,10 @@ function rehashedName(
   return renamed + asset.fileName.slice(at);
 }
 
-/** Renames `from` to `to` (file names) in chunks, Vite's metadata and HTML and CSS assets. */
+/**
+ * Renames `from` to `to` (file names) in chunks, Vite's metadata and HTML
+ * and CSS assets.
+ */
 function rewriteReferences(
   bundle: Rollup.OutputBundle,
   renames: ReadonlyMap<string, string>,

@@ -22,7 +22,10 @@ export type PruneOptions = Pick<
 
 /** What `propAware` found, as the optimizer consumes it. */
 export type PropAwareUsage = {
-  /** Names of the Carbon components that can render (`Button`, `ButtonSkeleton`). */
+  /**
+   * Names of the Carbon components that can render
+   * (`Button`, `ButtonSkeleton`).
+   */
   liveComponents: ReadonlySet<string>;
   /** Whether no rendered component can apply `cls` under the app's props. */
   isPruned(cls: string): boolean;
@@ -83,8 +86,9 @@ export type OptimizedCssReport = {
 
 /**
  * The class allowlist: `.bx--body` (apps set it on `<body>`, no component
- * references it), the classes of each used component, and `contentClasses`.
- * Also whether flatpickr CSS stays (any DatePicker import).
+ * references it), the classes of each used component, and
+ * `contentClasses`. Also whether flatpickr CSS stays (any
+ * DatePicker import).
  */
 function buildUsage(
   componentIndex: ComponentIndex,
@@ -125,8 +129,8 @@ const NEVER_PRUNED = new Set<string>([
 
 /**
  * `propAware.isPruned`, except for classes the app's own code names
- * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class it
- * prunes in `pruned`.
+ * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class
+ * it prunes in `pruned`.
  */
 function createPrunedCheck(
   propAware: PropAwareUsage,

@@ -13,15 +13,16 @@ const JS_EXT = /\.js$/;
 
 /**
  * A `bx--` class name not preceded by a class-name character, including a
- * trailing-hyphen prefix like the `bx--btn--` in `` `bx--btn--${kind}` ``. A
- * bare `bx--` (as in `/^bx--(overflow-menu|checkbox)/`) is not a class: as a
- * prefix it would keep every Carbon rule.
+ * trailing-hyphen prefix like the `bx--btn--` in `` `bx--btn--${kind}` ``.
+ * A bare `bx--` (as in `/^bx--(overflow-menu|checkbox)/`) is not a class:
+ * as a prefix it would keep every Carbon rule.
  */
 const CARBON_CLASS_TOKEN = /(?<![\w-])bx--[\w-]+/g;
 
 /**
  * Every `bx--` class name in `text`, as `.bx--…` selectors. With
- * `skipLookups`, classes written as selectors (`closest(".bx--modal")`) are
+ * `skipLookups`, classes written as selectors
+ * (`closest(".bx--modal")`) are
  * skipped: they find an element rendered elsewhere instead of applying it.
  */
 export function extractCarbonClassTokens(
@@ -128,8 +129,9 @@ function importCandidates(spec: string): string[] {
  * modules load lazily along import paths.
  *
  * `.js` lookups (`closest(".bx--modal")`) are skipped: a shared utility is
- * imported by many components, and each would keep the looked-up component's
- * rules. Comments are scanned too; a stray class only keeps an extra rule.
+ * imported by many components, and each would keep the looked-up
+ * component's rules. Comments are scanned too; a stray class only keeps an
+ * extra rule.
  */
 export async function buildRuntimeClassMap(
   carbonSrcPath: string,
@@ -140,7 +142,10 @@ export async function buildRuntimeClassMap(
   const reachableRuntime = new Map<string, Set<string>>();
   const loadPromises = new Map<string, Promise<void>>();
 
-  /** The module `moduleKey` names (`.js` or `.svelte` either way), if it exists. */
+  /**
+   * The module `moduleKey` names (`.js` or `.svelte` either way), if
+   * it exists.
+   */
   const resolveModule = (moduleKey: string) =>
     importCandidates(moduleKey).find((candidate) => files.has(candidate));
 

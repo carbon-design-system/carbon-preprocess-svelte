@@ -18,12 +18,16 @@ import { carbonSignature, resolveCarbonRoot } from "./resolve-carbon-root";
 const CACHE_DIRNAME = ".cache/carbon-preprocess-svelte";
 
 const ZIP_ARCHIVE_REGEX = /\.zip[\\/]/;
-/** A cache entry or an interrupted write's temp file: `<carbon>_<own>.json[.<pid>.<time>.tmp]`. */
+/**
+ * A cache entry or an interrupted write's
+ * temp file: `<carbon>_<own>.json[.<pid>.<time>.tmp]`.
+ */
 const CACHE_ENTRY_REGEX = /^[^_]+_[^_]+\.json(?:\.\d+\.\d+\.tmp)?$/;
 /**
  * Entries untouched this long are pruned when a new one is written. Not
  * every other entry: a monorepo can run two versions of this package
- * against one hoisted Carbon, and they'd evict each other's on every build.
+ * against one hoisted Carbon, and they'd evict each other's on
+ * every build.
  */
 const STALE_MS = 24 * 60 * 60 * 1000;
 
@@ -35,8 +39,9 @@ async function readCarbonVersion(carbonRoot: string): Promise<string> {
 }
 
 /**
- * Structural check on whatever came off disk: an empty or differently-shaped
- * index would become an empty allowlist and prune every Carbon rule.
+ * Structural check on whatever came off disk: an empty or
+ * differently-shaped index would become an empty allowlist and prune every
+ * Carbon rule.
  */
 export function isComponentIndex(value: unknown): value is ComponentIndex {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -70,9 +75,9 @@ async function readCache(
 }
 
 /**
- * Best-effort and atomic: a temp file is renamed into place so a concurrent
- * build never reads a half-written one. A failed write means the next build
- * re-indexes.
+ * Best-effort and atomic: a temp file is renamed into place so a
+ * concurrent build never reads a half-written one. A failed write means
+ * the next build re-indexes.
  */
 async function writeCache(
   cacheFile: string,
@@ -175,12 +180,13 @@ const memoized = new Map<string, Promise<ComponentIndex | undefined>>();
  * The component index every CSS entry point prunes against, or `undefined`
  * with a warning when it can't be built (unresolvable Carbon, unexpected
  * `src` layout). Callers then leave CSS unpruned: a bigger stylesheet is
- * safe, while pruning against another Carbon version's index drops rules the
- * installed markup still uses (#213).
+ * safe, while pruning against another Carbon version's index drops rules
+ * the installed markup still uses (#213).
  *
  * Memoized per project root and `carbonSignature`, so a build indexes at
- * most once and a failure warns once, until Carbon changes: a watch session
- * can outlive an install, an upgrade or an edit to a linked checkout.
+ * most once and a failure warns once, until Carbon changes: a watch
+ * session can outlive an install, an upgrade or an edit to a
+ * linked checkout.
  */
 export async function loadComponentIndex(
   projectRoot: string = process.cwd(),

@@ -10,8 +10,8 @@ export type SpliceOptimizerOptions = StrictCssOptimizerOptions & {
   preserveAllIBMFonts: boolean;
 };
 
-// Always validated, so which inputs pass through unchanged doesn't depend on
-// `preserveAllIBMFonts`.
+// Always validated, so which inputs pass through unchanged doesn't depend
+// on `preserveAllIBMFonts`.
 const READ_DECLS = ["font-face"];
 
 /**

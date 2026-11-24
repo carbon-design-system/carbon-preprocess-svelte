@@ -6,8 +6,8 @@ import { resolveCarbonRoot } from "./resolve-carbon-root";
 
 /**
  * Theme stylesheets the index can read, in order of preference: each
- * holds every component's rules. Carbon's 1.0 prereleases ship no
- * `white.css`.
+ * holds every component's rules. Carbon's 1.0 prereleases ship
+ * no `white.css`.
  */
 const INDEXED_THEMES = ["white", "g10", "g90", "g100", "all"];
 
@@ -48,7 +48,10 @@ function buildClassOwners(
   return owners;
 }
 
-/** Calls `onRule` with each rule's parsed selectors; throws on CSS caligula can't model. */
+/**
+ * Calls `onRule` with each rule's parsed selectors; throws on CSS caligula
+ * can't model.
+ */
 function forEachRuleSelector(
   css: string,
   onRule: (selectors: readonly ParsedSelector[]) => void,
@@ -148,7 +151,10 @@ export function extractCssOrphans(
 
 const BEM_SEPARATOR = /__|--/;
 
-/** `.bx--table-toolbar--sm` -> `.bx--table-toolbar`; `.bx--btn__icon` -> `.bx--btn`. */
+/**
+ * `.bx--table-toolbar--sm` -> `.bx--table-toolbar`; `.bx--btn__icon`
+ * -> `.bx--btn`.
+ */
 function blockOf(cls: string): string {
   const name = cls.slice(".bx--".length);
   const end = name.search(BEM_SEPARATOR);

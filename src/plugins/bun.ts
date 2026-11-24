@@ -81,13 +81,19 @@ export type CarbonBunPlugin = {
   ): Promise<Record<string, string>>;
 };
 
-/** A Bun metafile path: relative to the working directory, or `namespace:path`. */
+/**
+ * A Bun metafile path: relative to the working directory,
+ * or `namespace:path`.
+ */
 const RE_NAMESPACED = /^[a-z][\w-]+:/i;
 const RE_TEXT_OUTPUT = /\.(?:css|html?|[cm]?js|svg|json)$/;
 const RE_CSS_OUTPUT = /\.css$/;
 const RE_CARBON_SHEET =
   /[\\/]carbon-components-svelte[\\/]css[\\/][^\\/]+\.css$/;
-/** What a raw stylesheet bundles as: one rule Bun's minifier keeps, numbered. */
+/**
+ * What a raw stylesheet bundles as: one rule Bun's minifier
+ * keeps, numbered.
+ */
 const SHEET_MARKER = "carbon-preprocess-svelte-sheet";
 const RE_SHEET_MARKER = new RegExp(
   `\\.${SHEET_MARKER}-(\\d+)\\s*\\{[^}]*\\}`,

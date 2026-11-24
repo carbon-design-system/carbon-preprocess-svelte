@@ -19,7 +19,10 @@ const BARRELS = new Set<string>([
   CarbonSvelte.Pictograms,
 ]);
 
-/** Carbon's barrel exports, read on first use so icon-only files don't need it installed. */
+/**
+ * Carbon's barrel exports, read on first use so icon-only files don't need
+ * it installed.
+ */
 export type CarbonExportsLoader = () => ReadonlyMap<string, PackageExport>;
 
 /** `import local from "path"` or `import { name as local } from "path"`. */
@@ -29,7 +32,10 @@ function directImport(local: string, path: string, name: string): string {
   return `import { ${binding} } from "${path}";`;
 }
 
-/** The direct-path import for `imported`, or `undefined` to keep it on the barrel. */
+/**
+ * The direct-path import for `imported`, or `undefined` to keep it on
+ * the barrel.
+ */
 function directReplacement(
   source: string,
   imported: string,
@@ -45,9 +51,10 @@ function directReplacement(
 }
 
 /**
- * The direct-path replacement for one barrel import statement, or `null` when
- * nothing changes. Type-only specifiers, default and namespace imports, and
- * names the installed Carbon's barrel doesn't export stay on the barrel.
+ * The direct-path replacement for one barrel import statement, or `null`
+ * when nothing changes. Type-only specifiers, default and namespace
+ * imports, and names the installed Carbon's barrel doesn't export stay on
+ * the barrel.
  */
 function rewriteImport(
   statement: LexedImport,
@@ -144,7 +151,10 @@ export function transformScript(
   };
 }
 
-/** Barrel exports of the Carbon a directory resolves; cached per directory and install, warns once. */
+/**
+ * Barrel exports of the Carbon a directory resolves; cached per directory
+ * and install, warns once.
+ */
 function createCarbonExportsResolver(): (
   dir: string,
 ) => ReadonlyMap<string, PackageExport> {

@@ -102,12 +102,12 @@ function createLiteralCheck(literals: Iterable<string>) {
 
 /**
  * Removes the `--cds-` declarations nothing reads from each stylesheet in
- * `sheets`, which should be every CSS asset of one build: a token one asset
- * defines may be read in another. A token is read if a `var()` outside a
- * token declaration reads it, a read token's value reads it, or `literals`
- * (names found in the build's scripts and markup) name it. Leaves every
- * sheet unchanged if any can't be read. `removed` counts each sheet's
- * removed declarations.
+ * `sheets`, which should be every CSS asset of one build: a token one
+ * asset defines may be read in another. A token is read if a `var()`
+ * outside a token declaration reads it, a read token's value reads it, or
+ * `literals` (names found in the build's scripts and markup) name it.
+ * Leaves every sheet unchanged if any can't be read. `removed` counts each
+ * sheet's removed declarations.
  */
 export function pruneUnusedTokens(
   sheets: readonly string[],

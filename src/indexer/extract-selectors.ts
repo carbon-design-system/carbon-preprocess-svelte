@@ -22,7 +22,10 @@ export type ExtractFromSvelteResult = {
   moduleClasses: string[];
 };
 
-/** Classes a string or template literal node names; `[]` for any other node. */
+/**
+ * Classes a string or template literal node names; `[]` for any
+ * other node.
+ */
 function literalClasses(node: AST.SvelteNode): string[] {
   if (node.type === "Literal" && typeof node.value === "string") {
     return extractCarbonClassTokens(node.value);

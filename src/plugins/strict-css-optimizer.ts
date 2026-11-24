@@ -29,7 +29,10 @@ const FLATPICKR_SELECTOR = new RegExp(
 );
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
 
-/** Whether `selector` names one of flatpickr's classes, which DatePicker's calendar applies. */
+/**
+ * Whether `selector` names one of flatpickr's classes, which DatePicker's
+ * calendar applies.
+ */
 export function isFlatpickrSelector(selector: string): boolean {
   return MAY_HAVE_FLATPICKR.test(selector) && FLATPICKR_SELECTOR.test(selector);
 }
@@ -51,7 +54,10 @@ const OPTIMIZABLE_CSS = new RegExp(
   `bx-|flatpickr|IBM Plex|${[...FLATPICKR_KEYFRAMES, ...FLATPICKR_CLASS_NAMES].join("|")}`,
 );
 const EXACT_ONLY_CLASSES = new Set(ALWAYS_ON_CLASSES);
-/** `CONTEXT_ANCESTORS` without the leading `.`, as parsed selectors name them. */
+/**
+ * `CONTEXT_ANCESTORS` without the leading `.`, as parsed selectors
+ * name them.
+ */
 const CONTEXT_ANCESTOR_NAMES = new Set<string>(
   CONTEXT_ANCESTORS.map((cls) => cls.slice(1)),
 );
@@ -62,7 +68,10 @@ export function hasOptimizableCss(css: string): boolean {
 
 export type StrictCssOptimizerOptions = {
   allowlist: Set<string>;
-  /** Index `allowlist` was built from; supplies the classes shared between components. */
+  /**
+   * Index `allowlist` was built from; supplies the classes shared
+   * between components.
+   */
   components: ComponentIndex;
   preserveFlatpickr: boolean;
   safelist: readonly SafelistEntry[];
@@ -153,8 +162,8 @@ function matchesAllowlist(name: string, index: AllowlistIndex): boolean {
 
   // A BEM child of an allowed class stands in for classes the index
   // doesn't attribute to anyone; one it attributes to some component
-  // stays with that component (`.bx--header__menu` with `HeaderNav`, not
-  // `Header`).
+  // stays with that component (`.bx--header__menu` with `HeaderNav`,
+  // not `Header`).
   if (index.owned.has(name)) return false;
 
   for (let i = 1; i < name.length - 1; i++) {
@@ -202,9 +211,9 @@ function classesMatch(
 
 /**
  * Whether to keep a selector: every subject class must match the allowlist
- * (exactly, as a hyphen prefix, or as a BEM child of an allowed class), and
- * ancestor classes must too, or be one of `CONTEXT_ANCESTORS`. Classes in
- * `:not()` don't count.
+ * (exactly, as a hyphen prefix, or as a BEM child of an allowed class),
+ * and ancestor classes must too, or be one of `CONTEXT_ANCESTORS`. Classes
+ * in `:not()` don't count.
  */
 function shouldKeepSelector(
   selector: ParsedSelector,
@@ -323,9 +332,9 @@ function keepSelectee(
 }
 
 /**
- * Whether `selectee` only matches an element with a `.bx--` class `isPruned`
- * rejects. Classes in `:not()` and `:has()` don't count: those don't
- * require the class.
+ * Whether `selectee` only matches an element with a `.bx--` class
+ * `isPruned` rejects. Classes in `:not()` and `:has()` don't count: those
+ * don't require the class.
  */
 function needsPrunedClass(
   selectee: ParsedSelector,
@@ -356,7 +365,10 @@ const IBM_PLEX_SANS_WEIGHTS = ["300", "400", "600"];
 const QUOTED = /^(["'])(.*)\1$/;
 const SINGLE_WEIGHT = /^\d+$/;
 
-/** Class `<Text italic>` renders: the only Carbon rule that uses italic Plex. */
+/**
+ * Class `<Text italic>` renders: the only Carbon rule that uses
+ * italic Plex.
+ */
 const ITALIC_TYPE_CLASS = ".bx--type-italic";
 
 /**

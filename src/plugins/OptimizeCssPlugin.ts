@@ -35,9 +35,9 @@ import { collectCarbonTokens, scanContent } from "./scan-content";
 import { hasOptimizableCss } from "./strict-css-optimizer";
 
 /**
- * Structural subset of the webpack/Rspack `Compiler` and `Compilation` APIs
- * this plugin uses, so it works with either bundler without depending on
- * either package.
+ * Structural subset of the webpack/Rspack `Compiler` and `Compilation`
+ * APIs this plugin uses, so it works with either bundler without depending
+ * on either package.
  */
 type WebpackAssetSource = {
   source(): string | Buffer;
@@ -115,8 +115,8 @@ type WebpackCompiler = {
 };
 
 /**
- * Webpack/Rspack plugin that removes unused Carbon CSS from production
- * builds.
+ * Webpack/Rspack plugin that removes unused Carbon CSS from
+ * production builds.
  *
  * `finishModules` collects the Carbon components in the module graph;
  * `processAssets` then splices unused rules out of the CSS assets.
