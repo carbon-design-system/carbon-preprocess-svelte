@@ -603,7 +603,7 @@ export default {
 
 ### `optimizeCarbonBun`
 
-`optimizeComponents` and `optimizeCss` for `Bun.build`, with the same output as a Vite build with both plugins. Bun runs only the first `onLoad` that matches a file, so this plugin doesn't load `.svelte` files: your Svelte plugin compiles what `load` returns. Bun has no hook after the bundle is written, so the CSS is pruned once `Bun.build` returns, from its `metafile`. For production builds only: the dev server would serve rewritten components stale.
+`optimizeComponents` and `optimizeCss` for `Bun.build`, with the same output as a Vite build with both plugins. Bun runs only the first `onLoad` that matches a file, so this plugin doesn't load `.svelte` files: your Svelte plugin compiles what `load` returns. The CSS files the build wrote are pruned in its `onEnd`, from its `metafile`, before `Bun.build` returns; `prune: false` leaves them for `pruneBuild`. For production builds only: the dev server would serve rewritten components stale.
 
 ```js
 // build.js
@@ -627,17 +627,15 @@ const svelte = {
   },
 };
 
-const result = await Bun.build({
+// Prunes the CSS files the build wrote when it ends. One whose name holds
+// its hash is renamed for its pruned content, and the HTML, JS and
+// metafile naming it updated, so the plugins after this one see it.
+await Bun.build({
   entrypoints: ["index.html"],
   outdir: "dist",
   conditions: ["svelte"],
-  metafile: true,
   plugins: [carbon, svelte],
 });
-
-// Prunes the CSS files the build wrote. One whose name holds its hash is
-// renamed for its pruned content, and the HTML and JS naming it updated.
-await carbon.pruneBuild(result);
 ```
 
 It takes `createCarbonOptimizer`'s [options](#createcarbonoptimizer), and prints how many Carbon components it rewrote with the stylesheets it pruned:

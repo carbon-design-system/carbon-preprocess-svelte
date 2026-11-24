@@ -19,6 +19,7 @@ import {
 import { build, defaultClientConditions, type Plugin, type Rollup } from "vite";
 import { goldenSvelte } from "../scripts/golden-build";
 import { GOLDEN_SCENARIOS } from "../scripts/golden-steps";
+import type { BunPlugin } from "bun";
 import { bunSvelte } from "./helpers/bun-svelte";
 
 const ROOT = path.join(import.meta.dir, "..");
@@ -110,15 +111,20 @@ async function viteCss(app: string, variant: Variant) {
   return { input, output };
 }
 
-/** Builds `app` with `Bun.build` and `optimizeCarbonBun`. */
+/**
+ * Builds `app` with `Bun.build` and `optimizeCarbonBun`, leaving its CSS
+ * unpruned unless `options` says `prune`.
+ */
 async function bunBuild(
   app: string,
   options: CarbonBunOptions,
   outdir: string,
   entry = path.join(ROOT, "golden", app, "src/main.ts"),
+  plugins: BunPlugin[] = [],
 ) {
   const carbon = optimizeCarbonBun({
     root: path.join(ROOT, "golden", app),
+    prune: false,
     ...options,
   });
   const result = await Bun.build({
@@ -128,7 +134,7 @@ async function bunBuild(
     conditions: ["svelte"],
     metafile: true,
     minify: true,
-    plugins: [carbon, bunSvelte(carbon)],
+    plugins: [carbon, bunSvelte(carbon), ...plugins],
   });
   if (!result.success) throw new AggregateError(result.logs);
   return { carbon, result };
@@ -203,7 +209,11 @@ describe("optimizeCarbonBun", () => {
   });
 
   /** Builds docs-site's page: the stylesheet it links, and its size. */
-  async function buildPage(options: CarbonBunOptions, name: string) {
+  async function buildPage(
+    options: CarbonBunOptions,
+    name: string,
+    plugins: BunPlugin[] = [],
+  ) {
     const app = path.join(ROOT, "golden", "docs-site");
     const outdir = path.join(out, name);
     const html = path.join(out, `${name}.html`);
@@ -223,6 +233,7 @@ describe("optimizeCarbonBun", () => {
       },
       outdir,
       html,
+      plugins,
     );
     const page = path.join(outdir, `${name}.html`);
     const linked = () => CSS_LINK.exec(readFileSync(page, "utf8"))?.[1] ?? "";
@@ -258,6 +269,59 @@ describe("optimizeCarbonBun", () => {
     expect(after.css).not.toContain(":lang(");
     expect(after.css.length).toBeLessThan(WHITE_CSS.length / 5);
   }, 60_000);
+
+  test("prunes the CSS files when the build ends, for the plugins after it", async () => {
+    // What a plugin after this one, such as bun-plugin-page, reads.
+    let seen: { key: string; bundle?: string; css: string } | undefined;
+    const after: BunPlugin = {
+      name: "after",
+      setup(build) {
+        build.onEnd(({ metafile }) => {
+          const outputs = metafile?.outputs ?? {};
+          const key = Object.keys(outputs).find((key) => key.endsWith(".css"));
+          if (!key) return;
+          const bundle = Object.values(outputs).find(
+            (output) => output.cssBundle,
+          )?.cssBundle;
+          const css = readFileSync(path.join(out, "on-end", key), "utf8");
+          seen = { key, bundle, css };
+        });
+      },
+    };
+    const page = await buildPage({ prune: true }, "on-end", [after]);
+
+    const linked = page.before;
+    const css = path.join(page.outdir, linked);
+    expect(page.beforeCss).toContain(".bx--btn");
+    expect(page.beforeCss).not.toContain(SHEET_MARKER);
+    expect(seen).toEqual({
+      key: `./${linked}`,
+      bundle: `./${linked}`,
+      css: page.beforeCss,
+    });
+    expect(page.result.outputs.map((output) => output.path)).toContain(css);
+    expect(Object.keys(page.result.metafile?.outputs ?? {})).toContain(
+      `./${linked}`,
+    );
+    // Already pruned: the same renames, and the file left as it is.
+    const renamed = await page.carbon.pruneBuild(page.result);
+    expect(Object.values(renamed)).toEqual([css]);
+    expect(page.after()).toEqual({ name: linked, css: page.beforeCss });
+  }, 60_000);
+
+  test("fails the build when a module outside `content` renders Carbon", async () => {
+    await expect(
+      bunBuild(
+        "docs-site",
+        {
+          prune: true,
+          optimizeComponents: { silent: true, content: ["src/App.svelte"] },
+          optimizeCss: { silent: true },
+        },
+        path.join(out, "outside-content-on-end"),
+      ),
+    ).rejects.toThrow(OUTSIDE_CONTENT);
+  });
 
   test('prunes the CSS Bun bundled with `stylesheet: "bundled"`', async () => {
     const raw = await buildPage({}, "raw-size");

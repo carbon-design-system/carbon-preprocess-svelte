@@ -30,8 +30,15 @@ type BunBuildResult = {
         }>;
       }
     >;
-    outputs: Record<string, { entryPoint?: string }>;
+    outputs: Record<string, BunMetafileOutput>;
   };
+};
+
+type BunMetafileOutput = {
+  entryPoint?: string;
+  bytes?: number;
+  cssBundle?: string;
+  imports?: Array<{ path: string }>;
 };
 
 export type CarbonBunOptions = CarbonOptimizerOptions & {
@@ -44,12 +51,23 @@ export type CarbonBunOptions = CarbonOptimizerOptions & {
    * @default "raw"
    */
   stylesheet?: "raw" | "bundled";
+  /**
+   * Prune the CSS files the build wrote when it ends, as `pruneBuild`
+   * does, so the plugins after this one and `Bun.build`'s result see the
+   * pruned files. Turns on the build's `metafile`. `false` leaves the
+   * files for you to prune with `pruneBuild` or `pruneCss`.
+   * @default true
+   */
+  prune?: boolean;
 };
 
 export type CarbonBunPlugin = {
   name: string;
   setup(build: {
+    config?: { metafile?: boolean | string };
     onStart(callback: () => void | Promise<void>): unknown;
+    // Absent under `Bun.plugin()`.
+    onEnd?(callback: (result: BunBuildResult) => Promise<void>): unknown;
     onLoad(
       options: { filter: RegExp },
       callback: (args: { path: string }) => { contents: string; loader: "css" },
@@ -65,8 +83,9 @@ export type CarbonBunPlugin = {
    * After `Bun.build` (with `metafile: true`): checks the build, then
    * prunes the CSS files it wrote, in place. One whose name holds its
    * content hash is renamed for the pruned content, and the build's other
-   * files that name it are updated. Returns the renamed files, old path
-   * to new.
+   * files and its result that name it are updated. Returns the renamed
+   * files, old path to new. What `prune` already does when the build
+   * ends: then it returns that.
    */
   pruneBuild(result: BunBuildResult): Promise<Record<string, string>>;
   /**
@@ -206,25 +225,63 @@ function rehash(file: string, hash: string, css: string): string | undefined {
 }
 
 /**
- * `optimizeComponents` and `optimizeCss` for `Bun.build`, which has no
- * hooks to run them in: Bun runs only the first `onLoad` that matches a
- * file, so your Svelte plugin compiles what `load` returns, and the CSS is
- * pruned once the build is done. Carbon's stylesheets are pruned as Carbon
- * ships them, not as Bun's CSS bundler rewrites them (`stylesheet`).
+ * `result`'s metafile and outputs with the file at `from` renamed `to`:
+ * the plugins after this one read them, `bun-plugin-page` among them.
+ */
+function renameOutput(
+  result: BunBuildResult,
+  from: string,
+  to: string,
+  bytes: number,
+) {
+  const { outputs } = result.metafile ?? {};
+  const key = outputs
+    ? Object.keys(outputs).find((key) =>
+        path.resolve(from).endsWith(path.join(path.sep, key)),
+      )
+    : undefined;
+  if (outputs && key) {
+    const next =
+      key.slice(0, key.length - path.basename(from).length) + path.basename(to);
+    const { [key]: output, ...rest } = outputs;
+    for (const other of Object.values(rest)) {
+      if (other.cssBundle === key) other.cssBundle = next;
+      for (const edge of other.imports ?? []) {
+        if (edge.path === key) edge.path = next;
+      }
+    }
+    delete outputs[key];
+    outputs[next] = { ...output, bytes };
+  }
+  // A BuildArtifact's `path` is a getter: an own property shadows it.
+  const artifact = result.outputs.find((output) => output.path === from);
+  if (artifact) Object.defineProperty(artifact, "path", { value: to });
+}
+
+/**
+ * `optimizeComponents` and `optimizeCss` for `Bun.build`: Bun runs only
+ * the first `onLoad` that matches a file, so your Svelte plugin compiles
+ * what `load` returns, and the CSS files are pruned when the build ends.
+ * Carbon's stylesheets are pruned as Carbon ships them, not as Bun's CSS
+ * bundler rewrites them (`stylesheet`).
  *
  * @example
  * const carbon = optimizeCarbonBun();
- * const result = await Bun.build({
+ * await Bun.build({
  *   entrypoints: ["index.html"],
  *   outdir: "dist",
- *   metafile: true,
  *   plugins: [carbon, svelte({ carbon })],
  * });
- * await carbon.pruneBuild(result);
  */
 export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
-  const { stylesheet = "raw", ...optimizerOptions } = options ?? {};
+  const {
+    stylesheet = "raw",
+    prune = true,
+    ...optimizerOptions
+  } = options ?? {};
   const optimizer = createCarbonOptimizer(optimizerOptions);
+  // Each build's renames, once pruned.
+  const pruned = new WeakMap<BunBuildResult, Promise<Record<string, string>>>();
   // The raw stylesheets the build imported, by marker number.
   const sheets: string[] = [];
 
@@ -251,6 +308,13 @@ export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
     name: "carbon-preprocess-svelte",
     setup(build) {
       build.onStart(() => optimizer.prepare(resolveWithBun));
+      if (prune && build.onEnd) {
+        if (build.config) build.config.metafile ||= true;
+        build.onEnd(async (result) => {
+          // Bun's dev server bundles with no metafile; it isn't for it.
+          if (result.metafile) await pruneBuild(result);
+        });
+      }
       if (stylesheet === "raw") {
         build.onLoad({ filter: RE_CARBON_SHEET }, ({ path: file }) => {
           let i = sheets.indexOf(file);
@@ -266,36 +330,48 @@ export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
     async pruneCss(css, result) {
       return finish(result, css, Object.fromEntries(textOutputs(result)));
     },
-    async pruneBuild(result) {
-      const outputs = textOutputs(result);
-      const written: Record<string, string> = {};
-      const others: Record<string, string> = {};
-      for (const [file, text] of outputs) {
-        if (RE_CSS_OUTPUT.test(file)) written[file] = text;
-        else others[file] = text;
-      }
-      const pruned = await finish(result, written, others);
-
-      const renamed: Record<string, string> = {};
-      for (const { path: file, hash } of result.outputs) {
-        const css = pruned[file];
-        if (css === undefined || css === written[file]) continue;
-        const next = rehash(file, hash ?? "", css);
-        writeFileSync(file, css);
-        if (!next) continue;
-        renameSync(file, next);
-        renamed[file] = next;
-      }
-      // The pages and scripts that link a renamed stylesheet, by its name.
-      for (const [file, text] of outputs) {
-        if (RE_CSS_OUTPUT.test(file)) continue;
-        let next = text;
-        for (const [from, to] of Object.entries(renamed)) {
-          next = next.replaceAll(path.basename(from), path.basename(to));
-        }
-        if (next !== text) writeFileSync(file, next);
-      }
-      return renamed;
-    },
+    pruneBuild,
   };
+
+  function pruneBuild(result: BunBuildResult) {
+    let renamed = pruned.get(result);
+    if (!renamed) {
+      renamed = pruneFiles(result);
+      pruned.set(result, renamed);
+    }
+    return renamed;
+  }
+
+  async function pruneFiles(result: BunBuildResult) {
+    const outputs = textOutputs(result);
+    const written: Record<string, string> = {};
+    const others: Record<string, string> = {};
+    for (const [file, text] of outputs) {
+      if (RE_CSS_OUTPUT.test(file)) written[file] = text;
+      else others[file] = text;
+    }
+    const css = await finish(result, written, others);
+
+    const renamed: Record<string, string> = {};
+    for (const { path: file, hash } of result.outputs) {
+      const text = css[file];
+      if (text === undefined || text === written[file]) continue;
+      const next = rehash(file, hash ?? "", text);
+      writeFileSync(file, text);
+      if (!next) continue;
+      renameSync(file, next);
+      renameOutput(result, file, next, Buffer.byteLength(text));
+      renamed[file] = next;
+    }
+    // The pages and scripts that link a renamed stylesheet, by its name.
+    for (const [file, text] of outputs) {
+      if (RE_CSS_OUTPUT.test(file)) continue;
+      let next = text;
+      for (const [from, to] of Object.entries(renamed)) {
+        next = next.replaceAll(path.basename(from), path.basename(to));
+      }
+      if (next !== text) writeFileSync(file, next);
+    }
+    return renamed;
+  }
 }
