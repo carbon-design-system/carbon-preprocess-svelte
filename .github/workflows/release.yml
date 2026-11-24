@@ -28,7 +28,7 @@ jobs:
       - name: Build package
         run: bun run build
 
-      - name: Publish to NPM
+      - name: Publish to npm
         working-directory: dist
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
