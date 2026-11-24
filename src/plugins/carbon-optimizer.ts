@@ -285,8 +285,8 @@ export function createCarbonOptimizer(
       }
     }
 
-    // What the rest of the build ships: the names its JS and HTML hold,
-    // and what its other CSS reads. Not CSS with Carbon's rules, which
+    // Only what the rest of the build ships counts: the names its JS and HTML
+    // hold, and what its other CSS reads. Not CSS with Carbon's rules, which
     // reads every token they do, pruned or not.
     const outputTokens = new Set<string>();
     const outputReads = new Set<string>();

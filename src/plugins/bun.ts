@@ -141,7 +141,8 @@ function buildModules(
       "carbon-preprocess-svelte: optimizeCarbonBun needs the build's metafile: pass `metafile: true` to Bun.build.",
     );
   }
-  // A chunk an `import()` loads has an entry point too, but it's imported.
+  // Tracked apart, since a chunk an `import()` loads has an entry point too,
+  // but it's imported.
   const dynamic = new Set<string>();
   for (const input of Object.values(metafile.inputs)) {
     for (const { kind, entryPoint } of input.imports) {
@@ -163,7 +164,8 @@ function buildModules(
       code,
       entry: entries.has(id),
       imports: imports.flatMap((edge) => {
-        // An `import()` of another output names the input it was built from.
+        // Only an `import()` of another output names the input it was built from,
+        // so that's the edge to follow.
         const target = edge.external ? edge.entryPoint : edge.path;
         if (!target) return [];
         return [
@@ -231,7 +233,8 @@ function rehash(file: string, hash: string, css: string): string | undefined {
 export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
   const { stylesheet = "raw", ...optimizerOptions } = options ?? {};
   const optimizer = createCarbonOptimizer(optimizerOptions);
-  // The raw stylesheets the build imported, by marker number.
+  // The raw stylesheets the build imported, by marker number, so each marker
+  // finds its sheet.
   const sheets: string[] = [];
 
   /** `css` with each stylesheet marker replaced by the file it stands for. */

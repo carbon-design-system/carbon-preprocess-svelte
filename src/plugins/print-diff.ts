@@ -97,7 +97,7 @@ type Row = {
 export function formatSummary(summary: BuildSummary): string | null {
   const { rewritten = 0, unchanged = 0, dryRun = false } = summary;
   const color = summary.color ?? useColor();
-  // Each cell styled on its own: bold and dim end with the same code.
+  // Each cell styled on its own, since bold and dim end with the same code.
   const paint = (text: string, ...styles: Style[]) =>
     color
       ? styles.reduce(
@@ -200,7 +200,8 @@ export function formatSummary(summary: BuildSummary): string | null {
   const header = `${prefix} ${action}`;
   const lines = [header, ...rows.map((row) => line(row, false))];
   if (total) {
-    // before, "  →  ", after, "  ", percent
+    // The widths of before, " → ", after, " " and percent, so the columns
+    // line up.
     const numbers = width.before + 5 + width.after + 2 + width.percent;
     lines.push(
       `  ${" ".repeat(width.label + 2)}${paint("─".repeat(numbers), "dim")}`,

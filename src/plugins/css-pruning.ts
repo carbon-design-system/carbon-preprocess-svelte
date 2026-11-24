@@ -62,7 +62,8 @@ export async function prepareCssPruning(input: {
   let usage: PropAwareUsage | undefined;
   let engine: CssOptimizerOptions["engine"];
   if (input.shared) {
-    // The same reading of the call sites `optimizeComponents` rewrote for.
+    // The same reading of the call sites `optimizeComponents` rewrote for, so
+    // the CSS keeps exactly what the components render.
     const analysis = input.shared();
     if (analysis && !("warning" in analysis) && analyzer) {
       usage = analysis.usage;

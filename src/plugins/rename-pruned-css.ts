@@ -61,7 +61,8 @@ function rehashedName(
   const match = new RegExp(`^${source}$`).exec(asset.fileName);
   if (!match) return undefined;
   const digest = createHash("sha256").update(css).digest("base64url");
-  // Each group is a hash; the text between them is kept as it was.
+  // Only each group, a hash, is replaced; the text between them is kept as
+  // it was.
   let renamed = "";
   let at = 0;
   for (let group = 1; group < match.length; group++) {

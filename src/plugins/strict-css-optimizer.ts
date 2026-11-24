@@ -251,8 +251,8 @@ export function pruneRuleSelector(
     options;
   const index = getAllowlistIndex(allowlist, components);
 
-  // `bx-` covers both the Carbon (`bx--`) and legacy (`bx-`) prefixes. One
-  // flatpickr test on the whole list rules it out for every selectee.
+  // `bx-` covers both the Carbon (`bx--`) and legacy (`bx-`) prefixes, so
+  // one flatpickr test on the whole list rules it out for every selectee.
   const hasCarbon = selector.includes("bx-");
   const hasFlatpickr =
     MAY_HAVE_FLATPICKR.test(selector) && FLATPICKR_SELECTOR.test(selector);

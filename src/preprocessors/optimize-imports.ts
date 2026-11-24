@@ -221,8 +221,8 @@ type ScriptPreprocessor = {
  * ```
  *
  * Component paths come from the `src/index.js` of the
- * `carbon-components-svelte` each file resolves, so they match the installed
- * version. Names that barrel doesn't export stay on the barrel.
+ * `carbon-components-svelte` each file resolves, so they match the
+ * installed version. Names that barrel doesn't export stay on the barrel.
  */
 export const optimizeImports = (): ScriptPreprocessor => {
   const carbonExportsFor = createCarbonExportsResolver();

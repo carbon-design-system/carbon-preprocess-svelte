@@ -32,10 +32,11 @@ export const optimizeComponents = (
   });
   let plugins: readonly unknown[] | undefined;
   let log: ((message: string) => void) | undefined;
-  // In place: svelte-prune finds its analysis by this plugin object.
+  // Changed in place, since svelte-prune finds its analysis by this
+  // plugin object.
   const { configResolved, buildStart } = plugin;
   plugin.configResolved = function (config) {
-    // Tests pass a bare config.
+    // Partial, since tests pass a bare config.
     const { logger } = config as Partial<typeof config>;
     plugins = config.plugins;
     log = logger && ((message) => logger.info(message));
