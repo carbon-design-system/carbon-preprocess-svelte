@@ -3,6 +3,7 @@ import {
   mkdirSync,
   readdirSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -182,6 +183,31 @@ describe("resolveComponentIndex", () => {
     });
 
     expect(index).toEqual(components);
+  });
+
+  test("writing an entry prunes other versions' entries untouched for a day", async () => {
+    const dir = path.dirname(cacheFile);
+    mkdirSync(dir, { recursive: true });
+    const old = [
+      `${CARBON_VERSION}_0.0.1.json`,
+      `0.1.0_${OWN_VERSION}.json`,
+      `0.1.0_0.0.1.json.123.456.tmp`,
+    ];
+    const fresh = `${CARBON_VERSION}_0.0.2.json`;
+    const unrelated = "notes.txt";
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    for (const name of [...old, fresh, unrelated]) {
+      writeFileSync(path.join(dir, name), "{}");
+    }
+    for (const name of [...old, unrelated]) {
+      utimesSync(path.join(dir, name), twoDaysAgo, twoDaysAgo);
+    }
+
+    await resolveComponentIndex({ projectRoot: project.root });
+
+    expect(readdirSync(dir).sort()).toEqual(
+      [path.basename(cacheFile), fresh, unrelated].sort(),
+    );
   });
 });
 

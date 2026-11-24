@@ -1,4 +1,12 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { isLinkedCheckout } from "svelte-prune/internal";
 import { version as OWN_VERSION } from "../../package.json";
@@ -10,6 +18,14 @@ import { carbonSignature, resolveCarbonRoot } from "./resolve-carbon-root";
 const CACHE_DIRNAME = ".cache/carbon-preprocess-svelte";
 
 const ZIP_ARCHIVE_REGEX = /\.zip[\\/]/;
+/** A cache entry or an interrupted write's temp file: `<carbon>_<own>.json[.<pid>.<time>.tmp]`. */
+const CACHE_ENTRY_REGEX = /^[^_]+_[^_]+\.json(?:\.\d+\.\d+\.tmp)?$/;
+/**
+ * Entries untouched this long are pruned when a new one is written. Not
+ * every other entry: a monorepo can run two versions of this package
+ * against one hoisted Carbon, and they'd evict each other's on every build.
+ */
+const STALE_MS = 24 * 60 * 60 * 1000;
 
 async function readCarbonVersion(carbonRoot: string): Promise<string> {
   const pkg = JSON.parse(
@@ -69,6 +85,33 @@ async function writeCache(
     await rename(tmpFile, cacheFile);
   } catch {
     await rm(tmpFile, { force: true }).catch(() => {});
+    return;
+  }
+  await pruneCache(cacheFile);
+}
+
+/**
+ * Removes the cache entries other versions wrote more than `STALE_MS` ago,
+ * so upgrades don't pile them up. Best-effort, like the write.
+ */
+async function pruneCache(cacheFile: string): Promise<void> {
+  const dir = path.dirname(cacheFile);
+  const now = Date.now();
+  try {
+    await Promise.all(
+      (await readdir(dir))
+        .filter(
+          (name) =>
+            name !== path.basename(cacheFile) && CACHE_ENTRY_REGEX.test(name),
+        )
+        .map(async (name) => {
+          const file = path.join(dir, name);
+          if (now - (await stat(file)).mtimeMs > STALE_MS)
+            await rm(file, { force: true });
+        }),
+    );
+  } catch {
+    // Another build may be pruning too: whatever's left goes next time.
   }
 }
 
