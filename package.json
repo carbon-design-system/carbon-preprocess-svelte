@@ -1,18 +1,43 @@
 {
   "name": "carbon-preprocess-svelte",
   "version": "0.12.8",
-  "license": "Apache-2.0",
   "description": "Zero-dependency Svelte preprocessors and build plugins for the Carbon Design System",
+  "license": "Apache-2.0",
   "author": "Eric Liu (https://github.com/metonym)",
+  "repository": "github:carbon-design-system/carbon-preprocess-svelte",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "carbon-preprocess-svelte": "./dist/cli.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=22"
   },
+  "keywords": [
+    "carbon",
+    "carbon design system",
+    "svelte",
+    "preprocessor",
+    "plugin",
+    "zero-dependency",
+    "optimize imports",
+    "optimize CSS",
+    "vite",
+    "astro",
+    "rollup",
+    "rolldown",
+    "webpack",
+    "rspack"
+  ],
   "scripts": {
     "build": "bun scripts/build.ts",
     "test": "rm -rf node_modules/.cache/carbon-preprocess-svelte && bun test --parallel",
@@ -52,33 +77,5 @@
     "svelte-typecheck": "^0.1.21",
     "vite": "^8.3.5",
     "webpack": "^5.112.2"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/carbon-design-system/carbon-preprocess-svelte.git"
-  },
-  "homepage": "https://github.com/carbon-design-system/carbon-preprocess-svelte",
-  "bugs": "https://github.com/carbon-design-system/carbon-preprocess-svelte/issues",
-  "keywords": [
-    "carbon",
-    "carbon design system",
-    "svelte",
-    "preprocessor",
-    "plugin",
-    "zero-dependency",
-    "optimize imports",
-    "optimize CSS",
-    "vite",
-    "astro",
-    "rollup",
-    "rolldown",
-    "webpack",
-    "rspack"
-  ],
-  "files": [
-    "dist"
-  ],
-  "maintainers": [
-    "Eric Liu (https://github.com/metonym)"
-  ]
+  }
 }

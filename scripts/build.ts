@@ -54,27 +54,18 @@ async function slimPackageManifest() {
     delete pkg[key];
   }
 
-  pkg.main = pkg.main.replace(DIST_PREFIX, "./");
-  pkg.types = pkg.types.replace(DIST_PREFIX, "./");
+  // Paths point into dist/ from the repository, and at the package root
+  // once published from it.
+  const exported: unknown = JSON.parse(
+    JSON.stringify(pkg.exports).replaceAll('"./dist/', '"./'),
+  );
+  pkg.exports = exported;
   for (const [name, path] of Object.entries(
     pkg.bin as Record<string, string>,
   )) {
     pkg.bin[name] = path.replace(DIST_PREFIX, "");
   }
-  // Constructed directly from the slimmed main/types above rather than
-  // rewritten from a root `exports` field, so root package.json doesn't
-  // need to carry a duplicate (and easily-drifting) copy of this map.
-  const exports = {
-    ".": { types: pkg.types, import: pkg.main, default: pkg.main },
-  };
-
-  // A new key always appends at the end of JS object order, so rebuild the
-  // manifest to place `exports` right after `types` instead of last.
-  const ordered: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(pkg)) {
-    ordered[key] = value;
-    if (key === "types") ordered.exports = exports;
-  }
+  const ordered: Record<string, unknown> = pkg;
 
   await writeFile(manifestPath, `${JSON.stringify(ordered, null, 2)}\n`);
 }
