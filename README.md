@@ -9,8 +9,8 @@ One app, built five ways ([examples/vite-matrix@svelte-5](https://github.com/car
 | Variant | CSS gzip | JS gzip |
 | --- | --- | --- |
 | `optimizeImports` only | 93.96 kB | 152.73 kB |
-| `optimizeCss()` | 44.01 kB (-53.2%) | 152.73 kB |
-| `optimizeCss({ propAware: true })` | 22.14 kB (-76.4%) | 152.73 kB |
+| `optimizeCss({ propAware: false })` | 44.01 kB (-53.2%) | 152.73 kB |
+| `optimizeCss()` | 22.14 kB (-76.4%) | 152.73 kB |
 | plus `optimizeComponents()` | 22.14 kB (-76.4%) | 101.27 kB (-33.7%) |
 | plus `hydration: false` | 22.14 kB (-76.4%) | 99.51 kB (-34.8%) |
 
@@ -49,7 +49,7 @@ export default {
       preprocess: [vitePreprocess(), optimizeImports()],
       adapter: adapter(),
     }),
-    optimizeCss({ propAware: true }),
+    optimizeCss(),
   ],
 };
 ```

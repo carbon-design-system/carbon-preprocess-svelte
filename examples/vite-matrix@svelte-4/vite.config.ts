@@ -8,7 +8,8 @@ import {
 /**
  * One build per optimization level, compared by `bun run build`:
  * - `baseline`: no CSS or component optimization
- * - `css`: `optimizeCss()`, pruning styles of components the app imports
+ * - `css`: `optimizeCss({ propAware: false })`, pruning styles of
+ *   components the app imports
  * - `prop-aware`: also prunes styles for props the app never passes
  * - `full`: also rewrites Carbon components for the props the app passes
  */
