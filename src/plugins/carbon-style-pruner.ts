@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { filterCss } from "caligula";
 import { CARBON } from "../carbon-library";
@@ -46,6 +46,105 @@ export function collectCarbonStylesheets(
   for (const [, name] of code.matchAll(STYLESHEET_PATH)) {
     into.add(`carbon-components-svelte/css/${name}`);
   }
+}
+
+type StylePruner = NonNullable<
+  ReturnType<CarbonStylePrunerInput["analyzer"]["libraryStylePruner"]>
+>;
+
+function stylePruner(
+  input: CarbonStylePrunerInput,
+  stylesheets: readonly string[],
+): StylePruner | undefined {
+  return input.analyzer.libraryStylePruner({
+    spec:
+      stylesheets.length > 0
+        ? {
+            ...CARBON_STYLES,
+            styles: { ...CARBON_STYLES.styles, stylesheets },
+          }
+        : CARBON_STYLES,
+    projectRoot: input.root,
+    isPruned: input.isPruned,
+    loadable: input.loadable,
+    files: input.files,
+    safelist: input.safelist,
+  });
+}
+
+// What can tell Carbon's rules from an app's: its `bx--` classes, escapes
+// kept (`.bx--lg\:col-span-4`), and its `--cds-` and `--ccs-` properties
+// as declared. Its `@keyframes` names have no prefix, but only arrive
+// with rules that have these.
+const CARBON_CLASS = /\.(bx--(?:[\w-]|\\.)+)/g;
+const CARBON_PROPERTY = /(--c[cd]s-[\w-]+)\s*:/g;
+
+type DefinedNames = { classes: Set<string>; properties: Set<string> };
+
+// Keyed by file and modified time, since a build reads the same
+// stylesheet for every CSS file, and a watch build for every rebuild.
+const definedCache = new Map<
+  string,
+  { mtimeMs: number; names: DefinedNames }
+>();
+
+function addNames(css: string, into: DefinedNames): void {
+  for (const [, cls] of css.matchAll(CARBON_CLASS)) into.classes.add(cls);
+  for (const [, prop] of css.matchAll(CARBON_PROPERTY))
+    into.properties.add(prop);
+}
+
+// The Carbon classes and properties `stylesheets` define, read from the
+// Carbon installed at `root`; `undefined` if one can't be read, so the
+// caller can't trust a narrow pruner.
+function definedNames(
+  stylesheets: readonly string[],
+  root: string,
+): DefinedNames | undefined {
+  let carbonRoot: string;
+  try {
+    carbonRoot = resolveCarbonRoot(root);
+  } catch {
+    return undefined;
+  }
+  const names: DefinedNames = { classes: new Set(), properties: new Set() };
+  for (const stylesheet of stylesheets) {
+    const file = path.join(
+      carbonRoot,
+      stylesheet.slice("carbon-components-svelte/".length),
+    );
+    let cached = definedCache.get(file);
+    try {
+      const { mtimeMs } = statSync(file);
+      if (cached?.mtimeMs !== mtimeMs) {
+        const own: DefinedNames = { classes: new Set(), properties: new Set() };
+        addNames(readFileSync(file, "utf8"), own);
+        cached = { mtimeMs, names: own };
+        definedCache.set(file, cached);
+      }
+    } catch {
+      return undefined;
+    }
+    for (const cls of cached.names.classes) names.classes.add(cls);
+    for (const prop of cached.names.properties) names.properties.add(prop);
+  }
+  return names;
+}
+
+// Whether every Carbon class and property `css` has is one `names`
+// holds; the `includes` checks skip the scan for CSS with no Carbon in it.
+function covers(names: DefinedNames, css: string): boolean {
+  if (css.includes("bx--")) {
+    for (const [, cls] of css.matchAll(CARBON_CLASS)) {
+      if (!names.classes.has(cls)) return false;
+    }
+  }
+  if (css.includes("--c")) {
+    for (const [, prop] of css.matchAll(CARBON_PROPERTY)) {
+      if (!names.properties.has(prop)) return false;
+    }
+  }
+  return true;
 }
 
 // The `stylesheets` the Carbon installed at `root` ships, since the
@@ -127,26 +226,28 @@ export function createCarbonStylePruner(
   input: CarbonStylePrunerInput,
 ): ((css: string) => { css: string; removed: number }) | undefined {
   const stylesheets = installedStylesheets(input.stylesheets, input.root);
-  const prune = input.analyzer.libraryStylePruner({
-    spec:
-      stylesheets.length > 0
-        ? {
-            ...CARBON_STYLES,
-            styles: { ...CARBON_STYLES.styles, stylesheets },
-          }
-        : CARBON_STYLES,
-    projectRoot: input.root,
-    isPruned: input.isPruned,
-    loadable: input.loadable,
-    files: input.files,
-    safelist: input.safelist,
-  });
-  if (!prune) return undefined;
+  const narrow =
+    stylesheets.length > 0 ? stylePruner(input, stylesheets) : undefined;
+  let all: StylePruner | undefined | null = null;
+  const pruneAll = () => {
+    all ??= stylePruner(input, []) ?? undefined;
+    return all;
+  };
+  const first = narrow ?? pruneAll();
+  if (!first) return undefined;
+  const coverage = narrow && definedNames(stylesheets, input.root);
+  // The narrow pruner only knows what the stylesheets it read define, so
+  // CSS with a Carbon class or property they don't (one a CSS `@import`
+  // or a Sass build brought in) gets every stylesheet's, as without them.
+  const pruneFor = (css: string): StylePruner =>
+    !narrow || (coverage && covers(coverage, css))
+      ? first
+      : (pruneAll() ?? first);
   const preserveFlatpickr = input.liveComponents.has("DatePicker");
   const italic = () => !input.isPruned(ITALIC_TYPE_CLASS);
 
   return (source) => {
-    const pruned = prune(source);
+    const pruned = pruneFor(source)(source);
     let removed = pruned.rules + pruned.declarations;
     const result = filterCss(pruned.css, {
       readDecls: READ_DECLS,
