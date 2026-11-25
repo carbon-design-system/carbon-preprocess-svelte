@@ -1,7 +1,7 @@
 /**
- * What only Carbon needs pruned on top of svelte-prune's stylesheet pruner:
- * flatpickr's rules (DatePicker's calendar), and the IBM Plex faces no
- * component uses.
+ * What only Carbon needs pruned on top of svelte-prune's
+ * stylesheet pruner: flatpickr's rules (DatePicker's calendar), and the
+ * IBM Plex faces no component uses.
  */
 
 const FLATPICKR_CLASS_NAMES = [
@@ -30,7 +30,10 @@ const FLATPICKR_SELECTOR = new RegExp(
 );
 const FLATPICKR_KEYFRAMES = new Set(["fpFadeInDown"]);
 
-/** Whether `selector` names one of flatpickr's classes, which DatePicker's calendar applies. */
+/**
+ * Whether `selector` names one of flatpickr's classes, which DatePicker's
+ * calendar applies.
+ */
 export function isFlatpickrSelector(selector: string): boolean {
   return MAY_HAVE_FLATPICKR.test(selector) && FLATPICKR_SELECTOR.test(selector);
 }

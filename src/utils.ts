@@ -34,7 +34,8 @@ export function isCarbonSvelteImport(id: string) {
  * Whether a bundled module's code should be scanned for literal `bx--`
  * tokens. Skips virtual modules (`\0` prefix), stylesheets (see
  * `RE_EXT_STYLESHEET`), Svelte `<style>` sub-modules, and files inside
- * `carbon-components-svelte`, which the usage analysis reads more precisely.
+ * `carbon-components-svelte`, which the usage analysis reads
+ * more precisely.
  */
 export function isScannableModule(id: string): boolean {
   if (id.startsWith("\0")) return false;

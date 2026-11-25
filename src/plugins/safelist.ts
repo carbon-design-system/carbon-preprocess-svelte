@@ -34,8 +34,9 @@ function matches(selector: string, entry: SafelistEntry): boolean {
 }
 
 /**
- * Whether a selector must be kept regardless of what renders. Strings match
- * a class token literally; RegExps are tested against the whole selector.
+ * Whether a selector must be kept regardless of what renders. Strings
+ * match a class token literally; RegExps are tested against the
+ * whole selector.
  */
 export function isSafelisted(
   selector: string,

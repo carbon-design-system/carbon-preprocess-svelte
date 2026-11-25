@@ -93,10 +93,10 @@ export type OptimizeCssOptions = {
   /**
    * Scan the code of every bundled module for literal `bx--` tokens and keep
    * them, so hand-written Carbon classes in your own markup
-   * (`<div class="bx--grid">`) and prefix literals (`` `bx--btn--${kind}` ``)
-   * survive without configuration. Carbon's own sources, CSS modules, and
-   * virtual modules are skipped. Set to `false` to rely only on what the
-   * components render, `safelist`, and `content`.
+   * (`<div class="bx--grid">`) and prefix literals
+   * (`` `bx--btn--${kind}` ``) survive without configuration. Carbon's own
+   * sources, CSS modules, and virtual modules are skipped. Set to `false` to
+   * rely only on what the components render, `safelist`, and `content`.
    * @default true
    */
   scanModules?: boolean;
@@ -104,8 +104,8 @@ export type OptimizeCssOptions = {
   /**
    * Components that keep every variant's styles, as if rendered with any
    * props: for one whose props come from data the analysis can't read and
-   * `assume` can't list, or to rule the analysis out when a style goes
-   * missing.
+   * `assume` can't list, or to rule the analysis out when a style
+   * goes missing.
    *
    * Carbon rules for prop values, slots and child components the app never
    * uses are pruned: with only `<Button kind="tertiary">`, the tertiary

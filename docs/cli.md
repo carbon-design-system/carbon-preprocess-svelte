@@ -75,8 +75,9 @@ Options:
   -v, --version           Print the version.
   -h, --help              Show this help.
 
-Exit status: 0 when done; 2 when called wrong, or when there's nothing to
-prune (no CSS file matched, no Carbon import found, no component index).
+Exit status: 0 when done; 2 when called wrong, when there's nothing to
+prune (no CSS file matched, no Carbon import found), or when the analysis
+of the --content files fails, which leaves every file unchanged.
 
 For agents and scripts: pass --json and read stdout. A run prints
 { schemaVersion, ok: true, dryRun, summary: { files, pruned, before, after },

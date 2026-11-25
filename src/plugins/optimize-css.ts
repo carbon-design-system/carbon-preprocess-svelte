@@ -219,7 +219,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   async function prepare(
     this: Rollup.PluginContext,
   ): Promise<Prepared | undefined> {
-    // Absent on the bare contexts unit tests pass, where everything counts.
+    // Unit tests pass bare contexts without `getModuleIds`, so there
+    // every module counts.
     const graph = this.getModuleIds ? new Set(this.getModuleIds()) : undefined;
     if (graph) {
       for (const id of ids) if (!graph.has(id)) ids.delete(id);

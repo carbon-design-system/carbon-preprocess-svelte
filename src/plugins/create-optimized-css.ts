@@ -16,7 +16,10 @@ export type PruneOptions = Pick<
 
 /** What the usage analysis found, as the optimizer consumes it. */
 export type CssUsage = {
-  /** Names of the Carbon components that can render (`Button`, `ButtonSkeleton`). */
+  /**
+   * Names of the Carbon components that can render
+   * (`Button`, `ButtonSkeleton`).
+   */
   liveComponents: ReadonlySet<string>;
   /** Whether no rendered component can apply `cls` under the app's props. */
   isPruned(cls: string): boolean;
@@ -83,8 +86,8 @@ const NEVER_PRUNED = new Set<string>([
 
 /**
  * `analysis.isPruned`, except for classes the app's own code names
- * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class it
- * prunes in `pruned`.
+ * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class
+ * it prunes in `pruned`.
  */
 function createPrunedCheck(
   analysis: CssUsage,

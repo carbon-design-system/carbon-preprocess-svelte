@@ -16,8 +16,8 @@ export const ALWAYS_ON_CLASSES = [".bx--body"];
 
 /**
  * Ancestor classes the pruner keeps without a component rendering them:
- * the app or a third party sets them on an ancestor at runtime. A selector's
- * subject must still be something that renders.
+ * the app or a third party sets them on an ancestor at runtime. A
+ * selector's subject must still be something that renders.
  */
 export const CONTEXT_ANCESTORS = [
   ".bx--body--with-modal-open",

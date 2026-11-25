@@ -10,8 +10,8 @@ const STYLESHEETS = ["css/all.css", "css/white.css"];
 const cache = new Map<string, { mtimeMs: number; classes: string[] }>();
 
 /**
- * The `bx--` classes the installed Carbon's stylesheet defines (`.bx--btn`),
- * for what the pruning depends on; `[]` if it can't be read.
+ * The `bx--` classes the installed Carbon's stylesheet defines
+ * (`.bx--btn`), for what the pruning depends on; `[]` if it can't be read.
  */
 export function carbonStylesheetClasses(root: string): readonly string[] {
   let carbonRoot: string;
