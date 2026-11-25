@@ -73,6 +73,15 @@ test("pruning only the bundled stylesheet gives the same CSS as reading all of t
   const all = prune();
   expect(all.removed).toBeGreaterThan(0);
   expect(prune(["carbon-components-svelte/css/white.css"])).toEqual(all);
+  // A name the installed Carbon doesn't ship, as a comment or another
+  // install can give, is left out rather than failing the build.
+  expect(prune(["carbon-components-svelte/css/missing.css"])).toEqual(all);
+  expect(
+    prune([
+      "carbon-components-svelte/css/missing.css",
+      "carbon-components-svelte/css/white.css",
+    ]),
+  ).toEqual(all);
 });
 
 describe("collectCarbonStylesheets", () => {

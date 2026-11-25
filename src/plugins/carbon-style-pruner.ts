@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { filterCss } from "caligula";
 import { CARBON } from "../carbon-library";
+import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
 import { isSafelisted, type SafelistEntry } from "./safelist";
 import {
@@ -43,6 +46,29 @@ export function collectCarbonStylesheets(
   for (const [, name] of code.matchAll(STYLESHEET_PATH)) {
     into.add(`carbon-components-svelte/css/${name}`);
   }
+}
+
+// The `stylesheets` the Carbon installed at `root` ships, since the
+// pruner throws for one that matches no file: a name from another Carbon
+// install, or one a comment mentions, would fail the build. With none
+// left, the pruner reads every one, as without them.
+function installedStylesheets(
+  stylesheets: readonly string[] | undefined,
+  root: string,
+): readonly string[] {
+  if (!stylesheets || stylesheets.length === 0) return [];
+  let carbonRoot: string;
+  try {
+    carbonRoot = resolveCarbonRoot(root);
+  } catch {
+    return [];
+  }
+  const prefix = "carbon-components-svelte/";
+  return stylesheets.filter(
+    (stylesheet) =>
+      stylesheet.startsWith(prefix) &&
+      existsSync(path.join(carbonRoot, stylesheet.slice(prefix.length))),
+  );
 }
 
 /**
@@ -100,12 +126,13 @@ export type CarbonStylePrunerInput = {
 export function createCarbonStylePruner(
   input: CarbonStylePrunerInput,
 ): ((css: string) => { css: string; removed: number }) | undefined {
+  const stylesheets = installedStylesheets(input.stylesheets, input.root);
   const prune = input.analyzer.libraryStylePruner({
     spec:
-      input.stylesheets && input.stylesheets.length > 0
+      stylesheets.length > 0
         ? {
             ...CARBON_STYLES,
-            styles: { ...CARBON_STYLES.styles, stylesheets: input.stylesheets },
+            styles: { ...CARBON_STYLES.styles, stylesheets },
           }
         : CARBON_STYLES,
     projectRoot: input.root,
