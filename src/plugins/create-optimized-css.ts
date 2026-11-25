@@ -69,7 +69,7 @@ export type CssOptimizerOptions = PruneOptions & {
    */
   engine?: Pick<
     CarbonStylePrunerInput,
-    "analyzer" | "root" | "loadable" | "files"
+    "analyzer" | "root" | "loadable" | "files" | "stylesheets"
   >;
 };
 

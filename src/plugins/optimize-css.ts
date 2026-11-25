@@ -31,6 +31,7 @@ import {
   sharesAnalysis,
   usageOptions,
 } from "./options";
+import { bundledStylesheets } from "./carbon-style-pruner";
 import { carbonStylesheetClasses } from "./stylesheet-classes";
 import { collectTokenNames, collectTokenReads } from "./token-names";
 import { writePrunedCss } from "./rename-pruned-css";
@@ -112,6 +113,8 @@ function fingerprint(parts: {
   ids: Iterable<string>;
   classes: Iterable<string>;
   tokens: Iterable<string>;
+  /** The Carbon stylesheets the pruner reads; see `bundledStylesheets`. */
+  stylesheets: readonly string[];
   /** Every class the stylesheet defines, to hash which ones are pruned. */
   stylesheetClasses: readonly string[];
   usage: CssUsage | undefined;
@@ -131,6 +134,7 @@ function fingerprint(parts: {
   );
   add("classes", parts.classes);
   add("tokens", parts.tokens);
+  add("stylesheets", parts.stylesheets);
   const { usage } = parts;
   if (usage) {
     add("live", usage.liveComponents);
@@ -256,6 +260,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         ? graphTokenNames(this)
         : { code: [], markup: [], written: [] };
     const classes = [...contentClasses, ...moduleTokens];
+    const stylesheets = graph ? bundledStylesheets(graph) : [];
     const usageCollector = collector;
     const { optimizer, usage, files } = await prepareCssPruning({
       options,
@@ -267,6 +272,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         ...graphTokens.markup,
       ],
       analyzer,
+      stylesheets,
       shared,
       collect: usageCollector
         ? async () => ({
@@ -304,6 +310,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         ids,
         classes,
         tokens: namedTokens,
+        stylesheets,
         stylesheetClasses: carbonStylesheetClasses(root),
         usage,
         files,
