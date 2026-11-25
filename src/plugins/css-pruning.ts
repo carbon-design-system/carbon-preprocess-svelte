@@ -49,6 +49,8 @@ export async function prepareCssPruning(input: {
    */
   namedTokens: Iterable<string>;
   analyzer: Analyzer | undefined;
+  /** The Carbon stylesheets the build bundles; see `bundledStylesheets`. */
+  stylesheets?: readonly string[];
   shared: (() => SharedAnalysis | undefined) | undefined;
   collect: (() => Promise<Collected | undefined>) | undefined;
   /** Already silenced by `silent`. */
@@ -69,6 +71,7 @@ export async function prepareCssPruning(input: {
         root,
         loadable: (key) => analysis.usage.loadable(key),
         files: [...analysis.files, namedTokens],
+        stylesheets: input.stylesheets,
       };
     } else input.warn(SHARED_ANALYSIS_FAILED);
   } else if (input.collect && analyzer) {
@@ -78,10 +81,13 @@ export async function prepareCssPruning(input: {
       input.warn(result.warning);
     } else if (collected && result) {
       usage = cssUsage(result, analyzer);
-      engine = collectedEngine(result, analyzer, root, [
-        ...collected.files,
-        namedTokens,
-      ]);
+      engine = {
+        ...collectedEngine(result, analyzer, root, [
+          ...collected.files,
+          namedTokens,
+        ]),
+        stylesheets: input.stylesheets,
+      };
     }
   }
   const classes = [...input.classes];

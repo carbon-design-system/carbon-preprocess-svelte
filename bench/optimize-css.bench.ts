@@ -98,6 +98,22 @@ for (const scenario of SCENARIOS) {
   });
 }
 
+// What a build that bundles `white.css` as a module of its own reads: the
+// pruner skips Carbon's other 18 stylesheets.
+const WHITE = ["carbon-components-svelte/css/white.css"];
+for (const scenario of SCENARIOS) {
+  group(`${scenario.name}, white.css bundled`, () => {
+    task("optimizeCssWithReport", () => {
+      const options = forIds(scenario.ids);
+      optimizeCssWithReport({
+        source,
+        analysis: options.analysis,
+        engine: options.engine && { ...options.engine, stylesheets: WHITE },
+      });
+    });
+  });
+}
+
 const BUNDLE_IDS = ["DataTable", "Toolbar", "ToolbarSearch", "OverflowMenu"];
 const DATE_PICKER_IDS = [...BUNDLE_IDS, "DatePicker", "DatePickerInput"];
 await Promise.all(

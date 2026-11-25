@@ -15,6 +15,7 @@ import {
   isScannableModule,
   stripQuery,
 } from "../utils";
+import { bundledStylesheets } from "./carbon-style-pruner";
 import { prepareCssPruning } from "./css-pruning";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
@@ -314,6 +315,7 @@ export function createCarbonOptimizer(
         ...outputReads,
       ],
       analyzer: loaded,
+      stylesheets: bundledStylesheets(modules.map(({ id }) => id)),
       shared,
       collect:
         loaded && !shared

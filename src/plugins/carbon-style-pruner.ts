@@ -8,6 +8,25 @@ import {
   isUnusedPlexFace,
 } from "./carbon-rules";
 
+const ALL_STYLESHEETS = ["carbon-components-svelte/css/*.css"];
+// A stylesheet Carbon ships, as a module id: its file name is the part a
+// package path needs.
+const CARBON_STYLESHEET =
+  /[\\/]carbon-components-svelte[\\/]css[\\/]([^\\/?]+\.css)(?:\?|$)/;
+
+// The package paths (`carbon-components-svelte/css/white.css`) of the
+// Carbon stylesheets among a build's module `ids`, since the pruner only
+// needs to read those. Empty when the build bundles none as a module of
+// its own (a CSS `@import`, a `<link>`), so it reads them all.
+export function bundledStylesheets(ids: Iterable<string>): string[] {
+  const paths = new Set<string>();
+  for (const id of ids) {
+    const name = CARBON_STYLESHEET.exec(id)?.[1];
+    if (name) paths.add(`carbon-components-svelte/css/${name}`);
+  }
+  return [...paths].sort();
+}
+
 /**
  * Carbon's stylesheets, for svelte-prune's pruner: which classes
  * they define.
@@ -15,7 +34,7 @@ import {
 const CARBON_STYLES = {
   ...CARBON,
   styles: {
-    stylesheets: ["carbon-components-svelte/css/*.css"],
+    stylesheets: ALL_STYLESHEETS,
     // Apps set these on elements no component renders.
     keep: [...ALWAYS_ON_CLASSES, ...CONTEXT_ANCESTORS].map((cls) =>
       cls.slice(1),
@@ -43,6 +62,14 @@ export type CarbonStylePrunerInput = {
   files: ReadonlyArray<{ code: string }>;
   safelist: readonly SafelistEntry[];
   preserveAllIBMFonts: boolean;
+  /**
+   * The Carbon stylesheets the build bundles, from `bundledStylesheets`:
+   * the pruner reads only these, where all 19 of Carbon 0.114's take most
+   * of its setup. Without them, it reads every one. A stylesheet left out
+   * is never wrong, only less pruned: a class goes only if a stylesheet
+   * it reads defines it.
+   */
+  stylesheets?: readonly string[] | undefined;
 };
 
 /**
@@ -56,7 +83,13 @@ export function createCarbonStylePruner(
   input: CarbonStylePrunerInput,
 ): ((css: string) => { css: string; removed: number }) | undefined {
   const prune = input.analyzer.libraryStylePruner({
-    spec: CARBON_STYLES,
+    spec:
+      input.stylesheets && input.stylesheets.length > 0
+        ? {
+            ...CARBON_STYLES,
+            styles: { ...CARBON_STYLES.styles, stylesheets: input.stylesheets },
+          }
+        : CARBON_STYLES,
     projectRoot: input.root,
     isPruned: input.isPruned,
     loadable: input.loadable,

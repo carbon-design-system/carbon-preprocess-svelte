@@ -17,6 +17,7 @@ import {
   isScannableModule,
 } from "../utils";
 import { prepareCssPruning } from "./css-pruning";
+import { bundledStylesheets } from "./carbon-style-pruner";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
 import { type RewriteHeader, rewriteHeader } from "./rewrite-header";
@@ -161,6 +162,9 @@ export class OptimizeCssPlugin {
         const analyzedModules: Array<[string, string]> = [];
         /** The module graph's edges into Carbon, for the analysis. */
         const carbonImports: LibraryImport[] = [];
+        // Every module's resource, since the Carbon stylesheets among them
+        // are all the pruner needs to read.
+        const resources = new Set<string>();
         const warn = (message: string) => {
           if (!silent) compilation.warnings.push(new WebpackError(message));
         };
@@ -171,6 +175,7 @@ export class OptimizeCssPlugin {
             for (const module of modules) {
               const resource = module.resource;
               if (typeof resource !== "string") continue;
+              resources.add(resource);
 
               if (carbon.importKey(resource)) {
                 carbonImports.push(
@@ -246,6 +251,7 @@ export class OptimizeCssPlugin {
                 ...scan.tokens,
               ],
               analyzer,
+              stylesheets: bundledStylesheets(resources),
               shared,
               collect: shared
                 ? undefined
