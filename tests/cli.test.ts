@@ -247,6 +247,15 @@ describe("cli contract", () => {
     }
   });
 
+  test("--help exits 0 and fits in 80 columns", () => {
+    const result = run(process.cwd(), ["--help"]);
+    expect(result.status).toBe(0);
+    const widest = Math.max(
+      ...result.stdout.split("\n").map((line) => line.length),
+    );
+    expect(widest).toBeLessThanOrEqual(80);
+  });
+
   test("--version prints the package's version", () => {
     const dir = createTempProject();
     try {

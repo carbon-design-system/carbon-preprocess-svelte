@@ -57,7 +57,8 @@ every file that renders Carbon components.
 
 Options:
   --content <glob>        Source files to scan for Carbon imports and literal
-                          bx-- classes. Repeatable. Default: src/**/*.{svelte,js,ts,mjs}
+                          bx-- classes. Repeatable.
+                          Default: src/**/*.{svelte,js,ts,mjs}
   --components <a,b,c>    Component names to keep in addition to detected ones.
   --safelist <selector>   Class selector to always keep. Repeatable. Wrap in
                           slashes for a RegExp: --safelist "/^\.bx--btn--/"
@@ -68,7 +69,8 @@ Options:
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
   --dry-run               Print sizes, write nothing.
-  --report                Print the components that can render, and what was kept.
+  --report                Print the components that can render, and what was
+                          kept.
   --silent                Suppress the per-file size log.
   --json                  Print the result as one JSON object on stdout, and
                           an error as JSON too. Not with --report.
