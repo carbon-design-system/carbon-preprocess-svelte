@@ -163,6 +163,28 @@ describe("OptimizeCssPlugin", () => {
     }
   });
 
+  test("warns about tokens the CSS reads but no stylesheet declares", async () => {
+    const plugin = new OptimizeCssPlugin();
+    const mockCompiler = createMockCompiler({
+      assets: {
+        "styles.css": {
+          source: () =>
+            ":root{--cds-a:1}.bx--btn{color:var(--cds-a)}.app{color:var(--cds-text-01)}",
+        },
+      },
+      moduleResources: [carbonButton],
+    });
+
+    plugin.apply(asCompiler(mockCompiler));
+    await mockCompiler.waitForProcessAssets();
+
+    const messages = mockCompiler.compilation.warnings.map((w) => w.message);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain(
+      "  --cds-text-01: a v10 name, now --cds-text-primary",
+    );
+  });
+
   test("skips processing in development mode", () => {
     const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({

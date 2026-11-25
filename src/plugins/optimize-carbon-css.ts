@@ -12,6 +12,7 @@ import {
   type PruneOptions,
 } from "./create-optimized-css";
 import { setFontDisplay } from "./font-display";
+import { undeclaredTokens } from "./messages";
 import {
   checkRemovedOptions,
   type OptimizeCssOptions,
@@ -19,6 +20,7 @@ import {
 } from "./options";
 import { collectTokenNames, tokenNamesFile } from "./token-names";
 import { collectCarbonTokens, readFiles, scanContent } from "./scan-content";
+import { findUndeclaredTokens } from "./undeclared-tokens";
 
 type OptimizeCarbonCssOptions = PruneOptions &
   Pick<OptimizeCssOptions, "content" | "exclude" | "assume" | "fontDisplay"> & {
@@ -93,6 +95,12 @@ export async function optimizeCarbonCss(
     analysis: analyzed?.usage,
     engine: analyzed?.engine,
   });
+  // Only `sources` says what else the build ships, so only with it can a
+  // read be known to resolve to nothing.
+  if (tokenNames) {
+    const undeclared = findUndeclaredTokens([report.css], tokenNames);
+    if (undeclared.length > 0) console.warn(undeclaredTokens(undeclared));
+  }
   return { ...report, css: setFontDisplay(report.css, options.fontDisplay) };
 }
 
