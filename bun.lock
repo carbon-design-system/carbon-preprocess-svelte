@@ -18,7 +18,7 @@
         "svelte": "^5.57.2",
         "svelte-ast": "^0.12.0",
         "svelte-lint": "^0.1.1",
-        "svelte-prune": "^0.15.1",
+        "svelte-prune": "^0.15.2",
         "svelte-typecheck": "^0.1.21",
         "vite": "^8.3.5",
         "webpack": "^5.112.2",
@@ -452,7 +452,7 @@
 
     "svelte-lint": ["svelte-lint@0.1.1", "", { "peerDependencies": { "svelte": ">=3" }, "optionalPeers": ["svelte"], "bin": { "svelte-lint": "cli.js" } }, "sha512-S4ey4UYioGK3U22x9vltEj7w7OB92FYSrs3JD0fWNc9dt+fzhabRY6X5dNiKV8Q5VFaMgZvnjEdHpe0D49fgfw=="],
 
-    "svelte-prune": ["svelte-prune@0.15.1", "", {}, "sha512-H+lbxxRYpXidtPucv9EgoGcw2VKacpTIG/ZiqDirA18UcmxEJ8HA4hPxBkSIUiWjzPWT953YalEEmIcLD6WZRA=="],
+    "svelte-prune": ["svelte-prune@0.15.2", "", {}, "sha512-XHfnCmNLIEX4/DqeFRa4vjPIMds92h5EQJrNekW1ahf+qLS77KayVQ0Ud3hh5yI4F57QZcMmsh9MbpFKvhjKxQ=="],
 
     "svelte-typecheck": ["svelte-typecheck@0.1.21", "", { "bin": { "svelte-typecheck": "cli.js" } }, "sha512-Bgi0YHX2n/GPFu4J56kgIVNkXSv8bQYQNbG6ThkCyxMxXxUuQwZ4YyG7jEKWsJNIL/mhd56V78/mUmWPBXbQUQ=="],
 
