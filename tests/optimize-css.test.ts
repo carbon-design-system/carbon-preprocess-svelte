@@ -238,6 +238,54 @@ describe("optimizeCss (Vite plugin)", () => {
     expect(ctx.warn).not.toHaveBeenCalled();
   });
 
+  test("keeps no token for a script that only sets them, as Carbon's Theme does", async () => {
+    const plugin = resolvePlugin(optimizeCss({ silent: true }));
+    await plugin.buildStart();
+    importButton(plugin);
+    const script = "/app/src/theme.ts";
+    const modules: Record<string, string> = {
+      [buttonApp]: BUTTON_APP,
+      [carbonComponent]: "",
+      [script]:
+        "for (const [token, value] of entries) root.style.setProperty(`--cds-${token}`, value);",
+    };
+    const ctx = {
+      warn: jest.fn(),
+      getModuleIds: () => Object.keys(modules)[Symbol.iterator](),
+      getModuleInfo: (id: string) => ({ code: modules[id] }),
+    };
+    const bundle = makeCssBundle(
+      ":root{--cds-ai-aura-start:1;--cds-ai-aura-end:2}.bx--btn{color:var(--cds-ai-aura-start)}",
+    );
+    await plugin.generateBundle.call(ctx, {}, bundle);
+
+    expect((bundle["styles.css"] as OutputAsset).source).toBe(
+      ":root{--cds-ai-aura-start:1}.bx--btn{color:var(--cds-ai-aura-start)}",
+    );
+  });
+
+  test("counts a token a script sets as declared, for the warning", async () => {
+    const plugin = resolvePlugin(optimizeCss());
+    plugin.configResolved({ root: process.cwd(), logger: quietLogger });
+    await plugin.buildStart();
+    importButton(plugin);
+    const script = "/app/src/brand.ts";
+    const modules: Record<string, string> = {
+      [buttonApp]: BUTTON_APP,
+      [carbonComponent]: "",
+      [script]: 'root.style.setProperty("--cds-brand-x", "#f00");',
+    };
+    const ctx = {
+      warn: jest.fn(),
+      getModuleIds: () => Object.keys(modules)[Symbol.iterator](),
+      getModuleInfo: (id: string) => ({ code: modules[id] }),
+    };
+    const css =
+      ":root{--cds-layer-01:#fff}.bx--btn{background:var(--cds-layer-01);color:var(--cds-brand-x)}";
+    await plugin.generateBundle.call(ctx, {}, makeCssBundle(css));
+    expect(ctx.warn).not.toHaveBeenCalled();
+  });
+
   test("`fontDisplay` sets IBM Plex's, and leaves other fonts alone", async () => {
     const plugin = resolvePlugin(
       optimizeCss({ silent: true, fontDisplay: "swap" }),

@@ -8,11 +8,41 @@ import {
 describe("collectTokenNames", () => {
   test("collects literal names, including a bare prefix", () => {
     const names = new Set<string>();
-    collectTokenNames(
-      'el.style.setProperty("--cds-layer", v); `--cds-${t}`; --ccs-x',
-      names,
-    );
+    collectTokenNames('get("--cds-layer"); `--cds-${t}`; --ccs-x', names);
     expect([...names]).toEqual(["--cds-layer", "--cds-"]);
+  });
+
+  test("sets aside names a script only sets or removes", () => {
+    const collect = (source: string) => {
+      const names = new Set<string>();
+      const written = new Set<string>();
+      collectTokenNames(source, names, written);
+      return { names: [...names], written: [...written] };
+    };
+    // Carbon's `Theme`, as written and as a minifier leaves it.
+    expect(
+      collect(
+        "s.setProperty(`--cds-${token}`, value); s.removeProperty(`--cds-${token}`)",
+      ),
+    ).toEqual({ names: [], written: ["--cds-"] });
+    expect(collect('e.style.setProperty("--cds-"+t,n)')).toEqual({
+      names: [],
+      written: ["--cds-"],
+    });
+    expect(collect("el.style.setProperty('--cds-layer', v)")).toEqual({
+      names: [],
+      written: ["--cds-layer"],
+    });
+    // A value that reads a token still names it.
+    expect(
+      collect('el.style.setProperty("color", "var(--cds-text-primary)")'),
+    ).toEqual({ names: ["--cds-text-primary"], written: [] });
+    // So does a read of the same name elsewhere.
+    expect(
+      collect(
+        'el.style.setProperty("--cds-layer", v); getPropertyValue("--cds-layer")',
+      ),
+    ).toEqual({ names: ["--cds-layer"], written: ["--cds-layer"] });
   });
 });
 

@@ -254,6 +254,9 @@ export function createCarbonOptimizer(
      */
     const codeTokens = new Set<string>();
     const markupTokens = new Set<string>();
+    // What scripts and markup only set or remove: declared at run time, so
+    // the warning counts them, but pruning doesn't need them.
+    const writtenTokens = new Set<string>();
     const sources: Array<{ id: string; code: string }> = [];
     for (const { id, code } of modules) {
       if (code !== undefined) {
@@ -262,7 +265,7 @@ export function createCarbonOptimizer(
         if (isCssFile(stripQuery(id))) {
           if (!RE_CARBON_STYLESHEET.test(id))
             collectTokenReads(code, codeTokens);
-        } else collectTokenNames(code, codeTokens);
+        } else collectTokenNames(code, codeTokens, writtenTokens);
         if (isScannableModule(id) && !isCarbonSvelteImport(id)) {
           sources.push({ id, code });
           if (cssOptions.scanModules !== false) {
@@ -271,7 +274,11 @@ export function createCarbonOptimizer(
         }
       }
       if (RE_MARKUP_FILE.test(id) && existsSync(id)) {
-        collectTokenNames(readFileSync(id, "utf8"), markupTokens);
+        collectTokenNames(
+          readFileSync(id, "utf8"),
+          markupTokens,
+          writtenTokens,
+        );
       }
     }
 
@@ -281,7 +288,8 @@ export function createCarbonOptimizer(
     const outputTokens = new Set<string>();
     const outputReads = new Set<string>();
     for (const [name, code] of Object.entries(build.output ?? {})) {
-      if (!isCssFile(name)) collectTokenNames(code, outputTokens);
+      if (!isCssFile(name))
+        collectTokenNames(code, outputTokens, writtenTokens);
       else if (!hasOptimizableCss(code)) collectTokenReads(code, outputReads);
     }
 
@@ -358,6 +366,7 @@ export function createCarbonOptimizer(
         ...codeTokens,
         ...markupTokens,
         ...outputTokens,
+        ...writtenTokens,
       ],
       warn,
       reportExtra: () =>
