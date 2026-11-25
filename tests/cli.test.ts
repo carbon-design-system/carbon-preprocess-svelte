@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createFakeProject } from "./helpers/fake-project";
 
 const KIND_TERTIARY = /kind\s+"tertiary"/;
 
@@ -113,31 +114,37 @@ describe("cli optimize-css", () => {
   });
 
   test("keeps the styles of components a file re-exports or imports as a namespace", () => {
-    const dir = createTempProject();
+    // A tiny Carbon, since a namespace import has the CLI analyze every
+    // component, and the real one has about 170.
+    const project = createFakeProject();
+    project.installTinyCarbon();
+    const { root } = project;
     try {
+      mkdirSync(join(root, "src"));
+      mkdirSync(join(root, "dist"));
       writeFileSync(
-        join(dir, "src", "carbon.ts"),
+        join(root, "src", "App.svelte"),
+        '<script>\n  import { Button } from "carbon-components-svelte";\n</script>\n<Button />\n',
+      );
+      const css =
+        ".bx--btn{color:red}\n.bx--accordion{color:red}\n.bx--tag{color:red}\n";
+      const run = (module: string) => {
+        writeFileSync(join(root, "src", "carbon.ts"), module);
+        writeFileSync(join(root, "dist", "app.css"), css);
+        expect(runCli(root, ["dist/app.css", "--silent"]).status).toBe(0);
+        return readFileSync(join(root, "dist", "app.css"), "utf-8");
+      };
+
+      const reexported = run(
         'export { Accordion } from "carbon-components-svelte";',
       );
-      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
-      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
-        ".bx--accordion",
-      );
-
-      writeFileSync(
-        join(dir, "dist", "app.css"),
-        ".bx--btn{color:red}\n.bx--tag{color:blue}\n",
-      );
-      writeFileSync(
-        join(dir, "src", "carbon.ts"),
-        'import * as Carbon from "carbon-components-svelte";',
-      );
-      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
-      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
-        ".bx--tag",
-      );
+      expect(reexported).toContain(".bx--accordion");
+      expect(reexported).not.toContain(".bx--tag");
+      expect(
+        run('import * as Carbon from "carbon-components-svelte";'),
+      ).toContain(".bx--tag");
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      project.dispose();
     }
   });
 
