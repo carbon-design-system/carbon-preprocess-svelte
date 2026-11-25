@@ -1,6 +1,6 @@
 {
   "name": "carbon-preprocess-svelte",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Zero-dependency Svelte preprocessors and build plugins for the Carbon Design System",
   "license": "Apache-2.0",
   "author": "Eric Liu (https://github.com/metonym)",
