@@ -43,17 +43,22 @@ type WebpackAssetSource = {
   source(): string | Buffer;
 };
 
-/** `--cds-` names in the compilation's scripts and markup. */
-function assetTokenNames(
-  assets: Record<string, WebpackAssetSource>,
-): Set<string> {
+/**
+ * `--cds-` names in the compilation's scripts and markup; `written` holds
+ * the ones they only set or remove.
+ */
+function assetTokenNames(assets: Record<string, WebpackAssetSource>): {
+  names: Set<string>;
+  written: Set<string>;
+} {
   const names = new Set<string>();
+  const written = new Set<string>();
   for (const [id, asset] of Object.entries(assets)) {
     if (canNameTokens(id)) {
-      collectTokenNames(asset.source().toString(), names);
+      collectTokenNames(asset.source().toString(), names, written);
     }
   }
-  return names;
+  return { names, written };
 }
 
 /**
@@ -222,6 +227,7 @@ export class OptimizeCssPlugin {
             if (warning) warn(warning);
 
             const analyzer = await import("svelte-prune/internal/analysis");
+            const assetTokens = assetTokenNames(assets);
             // `OptimizeComponentsPlugin`'s analysis, when it's in the build, so the
             // CSS keeps exactly what the call sites it rewrote for render.
             const shared = sharesAnalysis(options)
@@ -235,7 +241,7 @@ export class OptimizeCssPlugin {
               // the token names the scripts, markup and `content` name, and
               // the other CSS assets read.
               namedTokens: [
-                ...assetTokenNames(assets),
+                ...assetTokens.names,
                 ...assetTokenReads(assets),
                 ...scan.tokens,
               ],
@@ -288,7 +294,11 @@ export class OptimizeCssPlugin {
               rewritten: this.header.rewritten,
               moduleTokens: moduleClasses.size,
               contentTokens: scan.classes.length,
-              tokenNames: [...assetTokenNames(assets), ...scan.tokens],
+              tokenNames: [
+                ...assetTokens.names,
+                ...assetTokens.written,
+                ...scan.tokens,
+              ],
               warn,
               reportExtra: () =>
                 usage?.report?.(

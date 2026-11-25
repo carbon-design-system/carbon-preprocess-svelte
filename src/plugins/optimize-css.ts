@@ -80,25 +80,26 @@ type Prepared = {
  * `--cds-` names in the module graph: in its code, which the fingerprint
  * reads because chunks are hashed before `generateBundle`, and in the HTML
  * and SVG files it reads, which `generateBundle` can run before
- * Vite emits.
+ * Vite emits. `written` holds the ones code only sets or removes.
  */
 function graphTokenNames(
   context: Pick<Rollup.PluginContext, "getModuleIds" | "getModuleInfo">,
-): { code: string[]; markup: string[] } {
+): { code: string[]; markup: string[]; written: string[] } {
   const code = new Set<string>();
   const markup = new Set<string>();
+  const written = new Set<string>();
   for (const id of context.getModuleIds()) {
     const source = context.getModuleInfo(id)?.code;
     // A stylesheet names the tokens it defines too: only its reads count,
     // and not Carbon's own, whose pruned rules' reads don't.
     if (source && isCssFile(stripQuery(id))) {
       if (!isCarbonStylesheet(id)) collectTokenReads(source, code);
-    } else if (source) collectTokenNames(source, code);
+    } else if (source) collectTokenNames(source, code, written);
     if (RE_MARKUP_FILE.test(id) && existsSync(id)) {
-      collectTokenNames(readFileSync(id, "utf8"), markup);
+      collectTokenNames(readFileSync(id, "utf8"), markup, written);
     }
   }
-  return { code: [...code], markup: [...markup] };
+  return { code: [...code], markup: [...markup], written: [...written] };
 }
 
 function serializeOption(_: string, value: unknown): unknown {
@@ -253,7 +254,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     const graphTokens =
       typeof this.getModuleInfo === "function"
         ? graphTokenNames(this)
-        : { code: [], markup: [] };
+        : { code: [], markup: [], written: [] };
     const classes = [...contentClasses, ...moduleTokens];
     const usageCollector = collector;
     const { optimizer, usage, files } = await prepareCssPruning({
@@ -286,7 +287,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       },
     });
 
-    const tokenNames = [
+    const namedTokens = [
       ...contentTokens,
       ...graphTokens.code,
       ...graphTokens.markup,
@@ -295,13 +296,14 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       optimizer,
       usage,
       moduleTokens,
-      tokenNames,
+      // What a script sets is declared at run time, for the warning.
+      tokenNames: [...namedTokens, ...graphTokens.written],
       fingerprint: fingerprint({
         options,
         root,
         ids,
         classes,
-        tokens: tokenNames,
+        tokens: namedTokens,
         stylesheetClasses: carbonStylesheetClasses(root),
         usage,
         files,

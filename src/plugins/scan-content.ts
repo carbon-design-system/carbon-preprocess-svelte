@@ -79,7 +79,8 @@ export function scanContent(
 
   for (const { code } of readFiles(files, cwd)) {
     collectCarbonTokens(code, classes);
-    collectTokenNames(code, tokens);
+    // The app's own files: what they set counts too, to stay safe.
+    collectTokenNames(code, tokens, tokens);
   }
 
   return {

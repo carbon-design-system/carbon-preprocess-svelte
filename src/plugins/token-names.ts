@@ -41,11 +41,27 @@ export function tokenNamesFile(names: Iterable<string>): { code: string } {
   return { code: lines.join("\n") };
 }
 
+// A token a script only sets or removes inline
+// (`style.setProperty(`--cds-${name}`, value)`, as Carbon's `Theme` does)
+// needs no declaration: the inline value stands on its own, and a read
+// anywhere keeps the declaration anyway. Matches minified code too.
+const TOKEN_WRITE = /\.(?:set|remove)Property\(\s*[`'"](--cds-[A-Za-z0-9_-]*)/g;
+
 /**
- * Adds every literal `--cds-` name in `source` to `into`. The `includes`
- * check is the fast path: most code names no token.
+ * Adds every literal `--cds-` name in `source` to `into`, except those it
+ * only sets or removes with `setProperty` or `removeProperty`, which go
+ * to `written`. The `includes` check is the fast path: most code names
+ * no token.
  */
-export function collectTokenNames(source: string, into: Set<string>): void {
+export function collectTokenNames(
+  source: string,
+  into: Set<string>,
+  written?: Set<string>,
+): void {
   if (!source.includes(TOKEN_PREFIX)) return;
-  for (const name of source.match(TOKEN_LITERAL) ?? []) into.add(name);
+  const reads = source.replace(TOKEN_WRITE, (write: string, name: string) => {
+    written?.add(name);
+    return write.slice(0, -name.length);
+  });
+  for (const name of reads.match(TOKEN_LITERAL) ?? []) into.add(name);
 }

@@ -74,9 +74,12 @@ export async function optimizeCarbonCss(
   const scan = scanContent(options.content, cwd);
   const contentClasses = new Set(scan.classes);
   const tokenNames = options.sources ? new Set(scan.tokens) : undefined;
+  // What `sources` only set or remove: declared at run time, so the
+  // warning counts them, but pruning doesn't need them.
+  const written = new Set<string>();
   for (const source of options.sources ?? []) {
     collectCarbonTokens(source, contentClasses);
-    if (tokenNames) collectTokenNames(source, tokenNames);
+    if (tokenNames) collectTokenNames(source, tokenNames, written);
   }
 
   // Without `sources`, nothing says which tokens the build reads: every one
@@ -98,7 +101,10 @@ export async function optimizeCarbonCss(
   // Only `sources` says what else the build ships, so only with it can a
   // read be known to resolve to nothing.
   if (tokenNames) {
-    const undeclared = findUndeclaredTokens([report.css], tokenNames);
+    const undeclared = findUndeclaredTokens(
+      [report.css],
+      [...tokenNames, ...written],
+    );
     if (undeclared.length > 0) console.warn(undeclaredTokens(undeclared));
   }
   return { ...report, css: setFontDisplay(report.css, options.fontDisplay) };
