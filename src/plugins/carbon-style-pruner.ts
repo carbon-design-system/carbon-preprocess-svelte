@@ -27,6 +27,24 @@ export function bundledStylesheets(ids: Iterable<string>): string[] {
   return [...paths].sort();
 }
 
+// A Carbon stylesheet as an app's code names it: a JS or Svelte
+// `import`, a CSS `@import` or a `<link>`, so a caller without a module
+// graph can still read only the ones it uses.
+const STYLESHEET_PATH = /carbon-components-svelte\/css\/([\w.-]+\.css)\b/g;
+
+// Adds the package paths of the Carbon stylesheets `code` names
+// (`carbon-components-svelte/css/white.css`) to `into`, since a caller
+// without a module graph learns from them which ones the pruner reads.
+export function collectCarbonStylesheets(
+  code: string,
+  into: Set<string>,
+): void {
+  if (!code.includes("carbon-components-svelte/css/")) return;
+  for (const [, name] of code.matchAll(STYLESHEET_PATH)) {
+    into.add(`carbon-components-svelte/css/${name}`);
+  }
+}
+
 /**
  * Carbon's stylesheets, for svelte-prune's pruner: which classes
  * they define.

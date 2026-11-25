@@ -1,6 +1,6 @@
 # CLI
 
-Prunes built CSS files in place, for pipelines with no plugin hook. File names don't change, so a name hashed from the CSS before pruning can stay the same across builds that prune differently: don't cache them as immutable. It finds the components to keep by scanning `--content` files for Carbon imports (barrel or direct paths) and literal `bx--` tokens, and prunes [by the props](optimize-css.md#pruning-by-props) those files pass, so `--content` must cover every file that renders Carbon components. It shares the plugins' [blind spot](optimize-css.md#optimizecss-api).
+Prunes built CSS files in place, for pipelines with no plugin hook. File names don't change, so a name hashed from the CSS before pruning can stay the same across builds that prune differently: don't cache them as immutable. It finds the components to keep by scanning `--content` files for Carbon imports (barrel or direct paths) and literal `bx--` tokens, and prunes [by the props](optimize-css.md#pruning-by-props) those files pass, so `--content` must cover every file that renders Carbon components. It shares the plugins' [blind spot](optimize-css.md#optimizecss-api). To learn what Carbon defines, it reads the Carbon stylesheets those files import (`import "carbon-components-svelte/css/white.css"`), or all of them when they import none, which takes longer.
 
 **Jump to:** [Command](#command) · [Sample output](#sample-output) · [Options](#options)
 

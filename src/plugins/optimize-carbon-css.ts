@@ -11,6 +11,7 @@ import {
   type CssUsage,
   type PruneOptions,
 } from "./create-optimized-css";
+import { collectCarbonStylesheets } from "./carbon-style-pruner";
 import { setFontDisplay } from "./font-display";
 import { undeclaredTokens } from "./messages";
 import {
@@ -139,8 +140,18 @@ async function analyze(
     console.warn(result.warning);
     return undefined;
   }
+  // The Carbon stylesheets the app's files and `sources` name are all
+  // the pruner needs to read; with none named, it reads every one.
+  const stylesheets = new Set<string>();
+  for (const { code } of files) collectCarbonStylesheets(code, stylesheets);
+  for (const code of options.sources ?? []) {
+    collectCarbonStylesheets(code, stylesheets);
+  }
   return {
     usage: cssUsage(result, analyzer),
-    engine: collectedEngine(result, analyzer, cwd, [...files, namedTokens]),
+    engine: {
+      ...collectedEngine(result, analyzer, cwd, [...files, namedTokens]),
+      stylesheets: [...stylesheets].sort(),
+    },
   };
 }
