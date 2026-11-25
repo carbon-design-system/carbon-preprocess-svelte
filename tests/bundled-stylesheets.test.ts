@@ -39,6 +39,41 @@ describe("bundledStylesheets", () => {
   });
 });
 
+test("CSS with Carbon rules the bundled stylesheets don't define is pruned as with all of them", async () => {
+  const analyzer = await import("svelte-prune/internal/analysis");
+  const root = process.cwd();
+  const result = await analyzeFiles({
+    library: CARBON,
+    failure: CSS_FAILURE,
+    projectRoot: root,
+    files: [
+      {
+        file: join(root, "App.svelte"),
+        code: '<script>\n  import { Button } from "carbon-components-svelte";\n</script>\n<Button kind="tertiary">Save</Button>\n',
+      },
+    ],
+    components: ["Button"],
+    options: {},
+  });
+  if ("warning" in result) throw new Error(result.warning);
+  const css = (name: string) =>
+    readFileSync(join(resolveCarbonRoot(), "css", name), "utf8");
+  // `white.css` as a module, and `prose.css` as a CSS `@import` inlines it.
+  const source = `${css("white.css")}\n${css("prose.css")}`;
+  const prune = (stylesheets?: string[]) =>
+    optimizeCssWithReport({
+      source,
+      analysis: cssUsage(result, analyzer),
+      engine: {
+        ...collectedEngine(result, analyzer, root, []),
+        stylesheets,
+      },
+    });
+
+  const all = prune();
+  expect(prune(["carbon-components-svelte/css/white.css"])).toEqual(all);
+});
+
 test("pruning only the bundled stylesheet gives the same CSS as reading all of them", async () => {
   const analyzer = await import("svelte-prune/internal/analysis");
   const root = process.cwd();
