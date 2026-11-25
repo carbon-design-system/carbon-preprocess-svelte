@@ -102,6 +102,23 @@ describe("optimizeCarbonCss", () => {
     );
   });
 
+  test("`sources` lets it warn about tokens nothing declares", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const css =
+        ":root{--cds-layer-01:#fff}.bx--btn{background:var(--cds-layer-01);color:var(--cds-text-01)}";
+      await optimizeCarbonCss(css, { components: ["Button"] });
+      expect(warn).not.toHaveBeenCalled();
+
+      await optimizeCarbonCss(css, { components: ["Button"], sources: [""] });
+      expect(warn.mock.calls[0]?.[0]).toContain(
+        "  --cds-text-01: a v10 name, now --cds-text-primary",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   test("`content` resolves from `cwd`", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-carbon-css-"));
     try {

@@ -67,6 +67,8 @@ type Prepared = {
   optimizer: CssOptimizer;
   usage: CssUsage | undefined;
   moduleTokens: Set<string>;
+  /** `--cds-` names the module graph's code and markup and `content` hold. */
+  tokenNames: string[];
   /**
    * A hash of everything the pruning depends on besides the CSS, for the
    * names of the chunks whose code names CSS files.
@@ -284,16 +286,22 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       },
     });
 
+    const tokenNames = [
+      ...contentTokens,
+      ...graphTokens.code,
+      ...graphTokens.markup,
+    ];
     return {
       optimizer,
       usage,
       moduleTokens,
+      tokenNames,
       fingerprint: fingerprint({
         options,
         root,
         ids,
         classes,
-        tokens: [...contentTokens, ...graphTokens.code, ...graphTokens.markup],
+        tokens: tokenNames,
         stylesheetClasses: carbonStylesheetClasses(root),
         usage,
         files,
@@ -317,7 +325,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       if (!silent) logSummary({ assets: [], rewritten, log: logInfo });
       return;
     }
-    const { optimizer, usage, moduleTokens } = ready;
+    const { optimizer, usage, moduleTokens, tokenNames } = ready;
 
     const pruned = new Map<string, string>();
     optimizeAssets({
@@ -343,6 +351,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       contentTokens: contentClasses?.length ?? 0,
       log: logInfo,
       rewritten,
+      tokenNames,
+      warn: (message) => this.warn(message),
       reportExtra: () =>
         usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
     });

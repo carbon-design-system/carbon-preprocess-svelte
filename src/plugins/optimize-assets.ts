@@ -3,7 +3,9 @@ import { setFontDisplay } from "./font-display";
 import { byteLength } from "../utils";
 import type { OptimizeCssOptions } from "./options";
 import { type AssetDiff, logSummary } from "./print-diff";
+import { undeclaredTokens } from "./messages";
 import { type AssetReport, printReport, toAssetReport } from "./print-report";
+import { findUndeclaredTokens } from "./undeclared-tokens";
 
 export type CssAsset = {
   id: string;
@@ -16,8 +18,9 @@ export type CssAsset = {
 };
 
 /**
- * Runs `optimizer` over each asset, sets `fontDisplay`, writes the
- * results back (unless `dryRun`), and prints one summary of them and the
+ * Runs `optimizer` over each asset, sets `fontDisplay`, writes the results
+ * back (unless `dryRun`), warns about tokens the results read that nothing
+ * declares (given `tokenNames`), and prints one summary of them and the
  * report the options ask for. Shared by the plugins and the CLI. Returns
  * whether it printed a summary.
  */
@@ -31,6 +34,8 @@ export function optimizeAssets({
   reportExtra,
   rewritten,
   onAsset,
+  tokenNames,
+  warn,
 }: {
   assets: Iterable<CssAsset>;
   optimizer: CssOptimizer;
@@ -54,6 +59,14 @@ export function optimizeAssets({
    * summary's header.
    */
   rewritten?: number;
+  /**
+   * `--cds-` names the build's scripts, markup and `content` hold. Only a
+   * caller that sees all of them can pass it, since a token one of them
+   * sets at run time is declared; without it, no token warning.
+   */
+  tokenNames?: Iterable<string>;
+  /** Where warnings go; `console.warn` when unset. */
+  warn?: (message: string) => void;
 }): boolean {
   const silent = options.silent === true;
   const reports: AssetReport[] = [];
@@ -82,6 +95,16 @@ export function optimizeAssets({
       pruned.push({ id, originalCss: source, optimizedCss: css });
 
     if (options.report) reports.push(toAssetReport(id, source, css, removed));
+  }
+
+  if (!silent && tokenNames) {
+    const undeclared = findUndeclaredTokens(
+      results.map(({ css }) => css),
+      tokenNames,
+    );
+    if (undeclared.length > 0) {
+      (warn ?? console.warn)(undeclaredTokens(undeclared));
+    }
   }
 
   const logged =

@@ -353,6 +353,13 @@ export function createCarbonOptimizer(
       options: cssOptions,
       moduleTokens: moduleClasses.size,
       contentTokens: scan.classes.length,
+      tokenNames: [
+        ...scan.tokens,
+        ...codeTokens,
+        ...markupTokens,
+        ...outputTokens,
+      ],
+      warn,
       reportExtra: () =>
         usage?.report?.(optimizer.usage.prunedByProps, root) ?? [],
     });

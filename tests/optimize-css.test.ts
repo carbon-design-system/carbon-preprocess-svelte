@@ -202,6 +202,42 @@ describe("optimizeCss (Vite plugin)", () => {
     );
   });
 
+  test("warns about tokens the CSS reads but no stylesheet declares", async () => {
+    const css =
+      ":root{--cds-layer-01:#fff}.bx--btn{background:var(--cds-layer-01)}.app{background:var(--cds-ui-01);color:var(--cds-brand-x)}";
+    const run = async (options: Parameters<typeof optimizeCss>[0]) => {
+      const plugin = resolvePlugin(optimizeCss(options));
+      plugin.configResolved({ root: process.cwd(), logger: quietLogger });
+      await plugin.buildStart();
+      importButton(plugin);
+      const ctx = graphContext(carbonComponent);
+      await plugin.generateBundle.call(ctx, {}, makeCssBundle(css));
+      return ctx.warn.mock.calls.map(([message]) => message);
+    };
+
+    expect(await run({})).toEqual([
+      [
+        "carbon-preprocess-svelte: CSS reads Carbon tokens that no stylesheet declares, so they resolve to nothing:",
+        "  --cds-brand-x",
+        "  --cds-ui-01: a v10 name, now --cds-layer-01",
+        "v10 names were renamed in carbon-components-svelte 0.114: https://github.com/carbon-design-system/carbon-components-svelte/blob/master/docs/migrations/v0.114.x.md#1-color-tokens",
+      ].join("\n"),
+    ]);
+    expect(await run({ silent: true })).toEqual([]);
+  });
+
+  test("doesn't warn about an undeclared token read with a fallback", async () => {
+    const plugin = resolvePlugin(optimizeCss());
+    plugin.configResolved({ root: process.cwd(), logger: quietLogger });
+    await plugin.buildStart();
+    importButton(plugin);
+    const ctx = graphContext(carbonComponent);
+    const css =
+      ":root{--cds-layer-01:#fff}.bx--btn{background:var(--cds-layer-01)}.app{gap:var(--cds-grid-gutter, 2rem)}";
+    await plugin.generateBundle.call(ctx, {}, makeCssBundle(css));
+    expect(ctx.warn).not.toHaveBeenCalled();
+  });
+
   test("`fontDisplay` sets IBM Plex's, and leaves other fonts alone", async () => {
     const plugin = resolvePlugin(
       optimizeCss({ silent: true, fontDisplay: "swap" }),
