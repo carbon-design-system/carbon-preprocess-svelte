@@ -8,6 +8,7 @@ import {
   collectedEngine,
   createCssOptimizer,
 } from "./plugins/create-optimized-css";
+import { collectCarbonStylesheets } from "./plugins/carbon-style-pruner";
 import { tokenNamesFile } from "./plugins/token-names";
 import { optimizeAssets } from "./plugins/optimize-assets";
 import { usageOptions } from "./plugins/options";
@@ -204,12 +205,16 @@ async function main() {
   const components = new Set<string>();
   const contentClasses = new Set<string>();
   const sources: Array<{ file: string; code: string }> = [];
+  // The Carbon stylesheets the files import, since those are all the
+  // pruner needs to read.
+  const stylesheets = new Set<string>();
   /** Some file may use components it doesn't name (`import * as C`). */
   let usesAll = false;
 
   for (const source of readFiles(globSync(contentGlobs, { cwd }), cwd)) {
     usesAll = collectCarbonImports(source.code, components) || usesAll;
     collectCarbonTokens(source.code, contentClasses);
+    collectCarbonStylesheets(source.code, stylesheets);
     sources.push(source);
   }
 
@@ -249,10 +254,13 @@ async function main() {
   // the files stay as they are.
   if ("warning" in usage) throw new CliError("failure", usage.warning);
   // The CLI sees no build output, so every token stays.
-  const engine = collectedEngine(usage, analyzer, cwd, [
-    ...sources,
-    tokenNamesFile(["--cds-"]),
-  ]);
+  const engine = {
+    ...collectedEngine(usage, analyzer, cwd, [
+      ...sources,
+      tokenNamesFile(["--cds-"]),
+    ]),
+    stylesheets: [...stylesheets].sort(),
+  };
 
   const optimizer = createCssOptimizer({
     ...options,
