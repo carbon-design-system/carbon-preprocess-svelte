@@ -9,8 +9,8 @@ Each build sets `VARIANT` ([vite.config.ts](vite.config.ts)):
 | Variant | Plugins |
 | --- | --- |
 | `baseline` | `optimizeImports` only |
-| `css` | `optimizeCss()`: drops styles of components the app doesn't import |
-| `prop-aware` | `optimizeCss({ propAware: true })`: also drops styles for props the app never passes |
+| `css` | `optimizeCss({ propAware: false })`: drops styles of components the app doesn't import |
+| `prop-aware` | `optimizeCss()`: also drops styles for props the app never passes |
 | `full` | prop-aware CSS, plus `optimizeComponents()` (which unwraps live branches on Svelte 5): rewrites Carbon components for the props the app passes |
 | `client-only` | `full` with `optimizeComponents({ hydration: false })`: the app only mounts ([index.html](index.html)), so Svelte's hydration code goes too |
 
