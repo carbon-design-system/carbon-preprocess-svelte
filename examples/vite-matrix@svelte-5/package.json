@@ -6,12 +6,10 @@
     "build": "bun scripts/compare.ts",
     "build:baseline": "VARIANT=baseline vite build",
     "build:css": "VARIANT=css vite build",
-    "build:prop-aware": "VARIANT=prop-aware vite build",
     "build:full": "VARIANT=full vite build",
     "build:client-only": "VARIANT=client-only vite build",
     "preview:baseline": "VARIANT=baseline vite preview",
     "preview:css": "VARIANT=css vite preview",
-    "preview:prop-aware": "VARIANT=prop-aware vite preview",
     "preview:full": "VARIANT=full vite preview",
     "preview:client-only": "VARIANT=client-only vite preview"
   },

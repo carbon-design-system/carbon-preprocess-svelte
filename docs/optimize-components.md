@@ -1,6 +1,6 @@
 # `optimizeComponents`
 
-Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). Your own wrapper components are rewritten the same way when every place that renders them is in `content`. It's the JavaScript counterpart of prop-aware pruning, using the same analysis ([svelte-prune](https://github.com/metonym/svelte-prune)).
+Rewrites each Carbon component your app renders for the props it passes: values that never change become literals, and branches that can't run go, along with the child components only they render (a skeleton, a tooltip portal). Your own wrapper components are rewritten the same way when every place that renders them is in `content`. It's the JavaScript counterpart of [pruning by props](optimize-css.md#pruning-by-props), using the same analysis ([svelte-prune](https://github.com/metonym/svelte-prune)).
 
 ```js
 // vite.config.js

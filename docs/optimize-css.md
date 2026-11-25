@@ -17,16 +17,16 @@ carbon-preprocess-svelte: pruned Carbon CSS
 
 It runs on production builds, after other plugins (`apply: "build"`, `enforce: "post"`).
 
-1. **`transform`:** collects the Carbon components the app imports, and (unless `scanModules: false`) every literal `bx--` token in other modules.
-2. **`renderStart`:** before chunks are hashed, reads the call sites (`propAware`) and folds a hash of everything the pruning depends on into the names of the chunks whose code names CSS files (the preload lists of dynamic imports), so they change when the pruning does.
-3. **`generateBundle`:** for each CSS file, builds an allowlist of the `bx--` classes those components use, plus globals like `.bx--body`. The class index comes from your installed Carbon (see [Component index](component-index.md#component-index)).
-4. **Prune** Carbon selectors outside the allowlist:
-   - from a selector list, only the branches that don't match;
-   - a compound selector only survives if every Carbon class in it does, so NumberInput doesn't pull in `.bx--modal .bx--number`;
-   - flatpickr and legacy `bx-` rules go unless a flatpickr-based component (DatePicker) is bundled;
+1. **`transform`:** collects the Carbon modules the build bundles, the app's `.svelte` modules (their call sites are read from source), and (unless `scanModules: false`) every literal `bx--` token in other modules.
+2. **`renderStart`:** before chunks are hashed, analyzes the call sites and folds a hash of everything the pruning depends on into the names of the chunks whose code names CSS files (the preload lists of dynamic imports), so they change when the pruning does.
+3. **`generateBundle`:** prunes each CSS file with [svelte-prune](https://github.com/metonym/svelte-prune)'s stylesheet pruner. A rule goes when it needs a `bx--` class Carbon's stylesheet defines and nothing can render it: no Carbon component that can render under the app's props (under any props, for one in `exclude`), no Carbon script module in the bundle, no `bx--` token in the app's modules or `content`, nothing in `safelist`, and not a global like `.bx--body`.
+4. **Prune** selector by selector:
+   - from a selector list, only the branches that can't match;
+   - a selector goes if any Carbon class in it can't render, so NumberInput doesn't keep `.bx--modal .bx--number`;
+   - flatpickr and legacy `bx-` rules go unless a flatpickr-based component (DatePicker) is bundled, and so do the IBM Plex `@font-face` rules Carbon never uses;
    - `:is(…)` and `:not(…)` groups are parsed, not split on commas.
-5. Empty rules are dropped.
-6. **Carbon tokens** (`--cds-*` custom properties) that nothing reads are removed. A token stays if a `var()` in the kept CSS reads it, a kept token's value reads it, or the bundle's scripts or markup (or `content` files) name it. Carbon 0.114 defines about 400 of them, and an app typically reads a few dozen.
+5. Empty rules and `@keyframes` nothing names are dropped.
+6. **Custom properties** Carbon's stylesheet defines that nothing reads are removed: the `--cds-*` tokens and its own `--ccs-*` properties. One stays if the kept CSS reads it, a kept property's value reads it, or the bundle's modules or markup (or `content` files) name it. Carbon 0.114 defines about 400 tokens, and an app typically reads a few dozen.
 7. **Renames** each pruned file whose name hashes its content (`assets/index-[hash].css`) to a hash of the pruned CSS, and updates the HTML, chunks and Vite manifest that name it. Two builds that prune differently never share a file name, so long-lived caching (`Cache-Control: immutable`) is safe. Under Vite this runs before other plugins' `generateBundle`, so Vite's HTML and Astro's pages see the new names.
 
 Validated against most Carbon components and common multi-component bundles with no unexplained survivors. Its one blind spot is in the warning under the [API](#optimizecss-api): class names that never appear as a literal `bx--` token.
@@ -34,12 +34,12 @@ Validated against most Carbon components and common multi-component bundles with
 ```mermaid
 flowchart TB
   subgraph scan["Module scan"]
-    T[transform hook] --> S["Collect imported Carbon<br/>component paths"]
+    T[transform hook] --> S["Collect Carbon modules<br/>and app call sites"]
   end
   subgraph emit["Bundle phase"]
     S --> G[generateBundle]
-    G --> A["Allowlist bx-- selectors<br/>(index + .bx--body)"]
-    A --> P[Prune unused Carbon styles]
+    G --> A["Analyze call sites<br/>(what can render)"]
+    A --> P[Prune Carbon styles nothing renders]
     P --> R[Optimize CSS assets]
   end
 
@@ -158,9 +158,10 @@ optimizeCss({
   dryRun: true,
 
   /**
-   * Print a per-build summary of what the plugin detected: imported Carbon
-   * components, allowlist size and its sources (module scan, `content`,
-   * `safelist`), and per-asset results. Independent of `silent`.
+   * Print a per-build summary of what the plugin detected: the Carbon
+   * components that can render, what it keeps (module scan, `content`,
+   * `safelist`), each component's prop values, and per-asset results.
+   * Independent of `silent`.
    * @default false
    */
   report: true,
@@ -190,10 +191,10 @@ optimizeCss({
   fontDisplay: "swap",
 
   /**
-   * Class selectors to always keep, regardless of which components are
-   * imported. Use for Carbon classes the allowlist misses: hand-written
-   * classes in app markup (e.g. `<div class="bx--grid">`) and theme/layout
-   * utilities that no component file references.
+   * Class selectors to always keep, regardless of what renders. Use for
+   * Carbon classes the analysis can't see: hand-written classes in app
+   * markup (e.g. `<div class="bx--grid">`) and theme/layout utilities that
+   * no component file references.
    *
    * Each entry is either:
    * - a `string`, matched literally as a complete class token. `.bx--grid`
@@ -223,19 +224,25 @@ optimizeCss({
    * them, so hand-written Carbon classes in your own markup
    * (`<div class="bx--grid">`) and prefix literals (`` `bx--btn--${kind}` ``)
    * survive without configuration. Carbon's own sources, CSS modules, and
-   * virtual modules are skipped. Set to `false` to rely only on imported
-   * components, `safelist`, and `content`.
+   * virtual modules are skipped. Set to `false` to rely only on what the
+   * components render, `safelist`, and `content`.
    * @default true
    */
   scanModules: false,
 
   /**
-   * Also prune styles for the prop values the app never passes.
-   * See "Prop-aware pruning" below. Set to `false` to prune by the
-   * imported components alone.
-   * @default true
+   * Components that keep every variant's styles, as if rendered with any
+   * props. See "Pruning by props" below.
+   * @default []
    */
-  propAware: false,
+  exclude: ["DataTable"],
+
+  /**
+   * Values for props set from expressions the analysis can't read; a value
+   * not listed loses its styles. See "Pruning by props" below.
+   * @default {}
+   */
+  assume: { Button: { kind: ["primary", "danger"] } },
 });
 ```
 
@@ -259,13 +266,9 @@ optimizeCss({
 >
 > Carbon tokens work the same way: one read only outside the bundle (a stylesheet in `public/`, a CMS template) is removed unless `content` covers that file. A name built at runtime keeps every token whose name starts with the literal part (`` `--cds-${name}` `` keeps them all).
 
-## Prop-aware pruning
+## Pruning by props
 
-By default, `optimizeCss` also reads the props your app passes, and prunes the variants it never uses. It reads which components render, too, so barrel imports (`import { Button } from "carbon-components-svelte"`) prune as well as `optimizeImports` paths do. To prune by the imported components alone:
-
-```js
-optimizeCss({ propAware: false });
-```
+`optimizeCss` reads the props your app passes, and prunes the variants it never uses. It reads which components render, too, so barrel imports (`import { Button } from "carbon-components-svelte"`) prune as well as `optimizeImports` paths do.
 
 ```svelte
 <Button kind="tertiary">Save</Button>
@@ -295,18 +298,18 @@ What keeps every variant (it errs toward keeping styles):
 | Markup it can't see | imported but never rendered as a tag (another preprocessor's output) |
 | A wrapper rendered from outside the analyzed files | a route or entry the framework mounts, `import.meta.glob` |
 
-Imports through an alias (`#lib/Card.svelte` in SvelteKit 3, `$lib/Card.svelte` before it) are resolved with the bundler's own resolver. Without a bundler (`optimizeCarbonCss`, the CLI), a component imported through an alias renders with any props. If the analysis fails, the build warns and prunes without it. To tune it:
+Imports through an alias (`#lib/Card.svelte` in SvelteKit 3, `$lib/Card.svelte` before it) are resolved with the bundler's own resolver. Without a bundler (`optimizeCarbonCss`, the CLI), a component imported through an alias renders with any props. If the analysis fails, the build warns and leaves Carbon CSS unpruned. To tune it:
 
 ```js
 optimizeCss({
-  propAware: {
-    // Keep every variant's styles for these components.
-    exclude: ["DataTable"],
-    // Values for props set from expressions; a value not listed loses its styles.
-    assume: { Button: { kind: ["primary", "danger"] } },
-  },
+  // Keep every variant's styles for these components.
+  exclude: ["DataTable"],
+  // Values for props set from expressions; a value not listed loses its styles.
+  assume: { Button: { kind: ["primary", "danger"] } },
 });
 ```
+
+If a style goes missing, `exclude` the component it belongs to, and [open an issue](https://github.com/carbon-design-system/carbon-preprocess-svelte/issues) with the call site.
 
 `report: true` prints each component's prop values, and for each value it can't read, where and why it was lost:
 
@@ -317,9 +320,9 @@ DataTable (1 call site)
   page             dynamic: App.svelte:231 `page` is bound with `bind:` at line 253
 ```
 
-The same options work on `OptimizeCssPlugin`, `createCarbonOptimizer`'s `optimizeCss`, and `optimizeCarbonCss` (which needs `content`). The CLI's `--prop-aware` turns it on without `exclude` or `assume`.
+The same options work on `OptimizeCssPlugin`, `createCarbonOptimizer`'s `optimizeCss`, and `optimizeCarbonCss` (which reads the `content` files), and the CLI takes `--exclude`.
 
-Across 2,416 apps covering every Carbon component and prop value, it left 46% less CSS than default pruning, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](optimize-components.md#optimizecomponents).
+Across 3,528 apps covering every Carbon component and prop value, it left 36% less CSS than excluding every component, and no class those apps render lost its rules. To also remove the code for the pruned branches, add [`optimizeComponents`](optimize-components.md#optimizecomponents).
 
 ## `OptimizeCssPlugin`
 

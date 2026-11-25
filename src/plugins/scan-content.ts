@@ -1,7 +1,7 @@
 import { globSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { errorMessage } from "../utils";
-import { collectTokenNames } from "./prune-tokens";
+import { collectTokenNames } from "./token-names";
 
 /** Literal `bx--`-prefixed tokens as they appear in source markup. */
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;

@@ -6,7 +6,7 @@ import {
   isFlatpickrKeyframes,
   isFlatpickrSelector,
   isUnusedPlexFace,
-} from "./strict-css-optimizer";
+} from "./carbon-rules";
 
 /**
  * Carbon's stylesheets, for svelte-prune's pruner: which classes
@@ -33,7 +33,7 @@ const READ_DECLS = ["font-face"];
 export type CarbonStylePrunerInput = {
   analyzer: typeof import("svelte-prune/internal/analysis");
   root: string;
-  /** Whether no live component can apply `cls`, as `propAware` decides it. */
+  /** Whether no live component can apply `cls`, under the app's props. */
   isPruned: (cls: string) => boolean;
   /** Whether a Carbon module (`utils/x.js`) can load. */
   loadable: (key: string) => boolean;

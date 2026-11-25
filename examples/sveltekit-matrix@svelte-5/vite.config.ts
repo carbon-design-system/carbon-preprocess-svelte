@@ -10,9 +10,8 @@ import { defineConfig } from "vite";
 /**
  * One build per optimization level, compared by `bun run build`:
  * - `baseline`: no CSS or component optimization
- * - `css`: `optimizeCss({ propAware: false })`, pruning styles of
- *   components the app imports
- * - `prop-aware`: also prunes styles for props the app never passes
+ * - `css`: `optimizeCss()`, pruning styles of components the app doesn't
+ *   render, and of props it never passes
  * - `full`: also rewrites Carbon components for the props the app passes
  *
  * SvelteKit prerenders the page with the server build and hydrates it with
@@ -31,10 +30,7 @@ export default defineConfig({
         assets: `build/${variant}`,
       }),
     }),
-    variant !== "baseline" &&
-      optimizeCss({
-        propAware: variant !== "css",
-      }),
+    variant !== "baseline" && optimizeCss(),
   ],
   optimizeDeps: {
     exclude: [

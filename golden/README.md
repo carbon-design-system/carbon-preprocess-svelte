@@ -15,7 +15,7 @@ own wrappers), written the way apps are, not to exercise one feature.
 # Rewrite each app and compare its SSR HTML with the original
 bun scripts/eval-specialize.ts --golden
 
-# Build each app with Vite (unoptimized, `optimizeCss`, prop-aware, and
+# Build each app with Vite (unoptimized, `optimizeCss`, and
 # with `optimizeComponents`) and click through it in Chromium: every step
 # must give the same DOM and pixels as the unoptimized build
 bun scripts/eval-interactions.ts --examples golden/admin-dashboard

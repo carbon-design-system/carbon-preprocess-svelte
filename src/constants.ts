@@ -15,8 +15,9 @@ export const LOG_PREFIX = `${PACKAGE_NAME}:`;
 export const ALWAYS_ON_CLASSES = [".bx--body"];
 
 /**
- * Ancestor classes that may appear in strict selectors without being
- * imported. Subject classes still require a full allowlist match.
+ * Ancestor classes the pruner keeps without a component rendering them:
+ * the app or a third party sets them on an ancestor at runtime. A
+ * selector's subject must still be something that renders.
  */
 export const CONTEXT_ANCESTORS = [
   ".bx--body--with-modal-open",

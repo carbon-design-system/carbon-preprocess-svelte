@@ -26,10 +26,10 @@ export const CARBON: LibrarySpec = {
   },
 };
 
-/** What the usage analysis turns off when it fails, for `propAware`. */
-export const PROP_AWARE_FAILURE = {
-  feature: "propAware",
-  fallback: "Carbon CSS was pruned without it",
+/** What the usage analysis turns off when it fails, for `optimizeCss`. */
+export const CSS_FAILURE = {
+  feature: "optimizeCss",
+  fallback: "Carbon CSS is left unpruned",
 } satisfies Failure;
 
 /**

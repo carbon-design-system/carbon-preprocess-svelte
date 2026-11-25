@@ -99,7 +99,7 @@ async function buildProject() {
     return;
   }
 
-  // The component index parses Carbon with the bundled `svelte-ast`, so nothing
+  // The analysis parses Svelte with the bundled `svelte-ast`, so nothing
   // in dist/ may import svelte: it would load the consumer's compiler, or
   // fail where none resolves. Scan every emitted file because code splitting
   // can put the import in a shared chunk.

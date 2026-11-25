@@ -55,10 +55,6 @@ jobs:
       - name: Find unused files, exports, and dependencies
         run: bun run knip
 
-      - name: Clear the component index cache
-        if: steps.plan.outputs.unit-tests != 'none'
-        run: rm -rf node_modules/.cache/carbon-preprocess-svelte
-
       - name: Run unit tests
         if: steps.plan.outputs.unit-tests != 'none'
         run: bun test --parallel ${{ steps.plan.outputs.unit-tests != 'all' && steps.plan.outputs.unit-tests || '' }}

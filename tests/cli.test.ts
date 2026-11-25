@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createFakeProject } from "./helpers/fake-project";
 
 const KIND_TERTIARY = /kind\s+"tertiary"/;
 
@@ -113,31 +114,37 @@ describe("cli optimize-css", () => {
   });
 
   test("keeps the styles of components a file re-exports or imports as a namespace", () => {
-    const dir = createTempProject();
+    // A tiny Carbon, since a namespace import has the CLI analyze every
+    // component, and the real one has about 170.
+    const project = createFakeProject();
+    project.installTinyCarbon();
+    const { root } = project;
     try {
+      mkdirSync(join(root, "src"));
+      mkdirSync(join(root, "dist"));
       writeFileSync(
-        join(dir, "src", "carbon.ts"),
+        join(root, "src", "App.svelte"),
+        '<script>\n  import { Button } from "carbon-components-svelte";\n</script>\n<Button />\n',
+      );
+      const css =
+        ".bx--btn{color:red}\n.bx--accordion{color:red}\n.bx--tag{color:red}\n";
+      const run = (module: string) => {
+        writeFileSync(join(root, "src", "carbon.ts"), module);
+        writeFileSync(join(root, "dist", "app.css"), css);
+        expect(runCli(root, ["dist/app.css", "--silent"]).status).toBe(0);
+        return readFileSync(join(root, "dist", "app.css"), "utf-8");
+      };
+
+      const reexported = run(
         'export { Accordion } from "carbon-components-svelte";',
       );
-      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
-      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
-        ".bx--accordion",
-      );
-
-      writeFileSync(
-        join(dir, "dist", "app.css"),
-        ".bx--btn{color:red}\n.bx--tag{color:blue}\n",
-      );
-      writeFileSync(
-        join(dir, "src", "carbon.ts"),
-        'import * as Carbon from "carbon-components-svelte";',
-      );
-      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
-      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
-        ".bx--tag",
-      );
+      expect(reexported).toContain(".bx--accordion");
+      expect(reexported).not.toContain(".bx--tag");
+      expect(
+        run('import * as Carbon from "carbon-components-svelte";'),
+      ).toContain(".bx--tag");
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      project.dispose();
     }
   });
 
@@ -146,13 +153,15 @@ describe("cli optimize-css", () => {
     try {
       const result = runCli(dir, ["dist/app.css", "--report"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Detected components (1): Button");
+      expect(result.stdout).toContain(
+        "Components that can render (2): Button, Loading",
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  test("--prop-aware prunes variants the content never uses", () => {
+  test("prunes variants the content never uses, except for --exclude", () => {
     const dir = createTempProject();
     try {
       writeFileSync(
@@ -163,19 +172,31 @@ describe("cli optimize-css", () => {
         ".bx--btn{a:1}\n.bx--btn--tertiary{a:2}\n.bx--btn--danger{a:3}\n";
       writeFileSync(join(dir, "dist", "app.css"), css);
 
-      expect(runCli(dir, ["dist/app.css"]).status).toBe(0);
-      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
-        ".bx--btn--danger",
-      );
-
-      writeFileSync(join(dir, "dist", "app.css"), css);
-      const result = runCli(dir, ["dist/app.css", "--prop-aware", "--report"]);
+      const result = runCli(dir, ["dist/app.css", "--report"]);
       expect(result.status).toBe(0);
       const pruned = readFileSync(join(dir, "dist", "app.css"), "utf-8");
       expect(pruned).toContain(".bx--btn--tertiary");
       expect(pruned).not.toContain(".bx--btn--danger");
-      expect(result.stdout).toContain("Prop-aware:");
       expect(result.stdout).toMatch(KIND_TERTIARY);
+
+      writeFileSync(join(dir, "dist", "app.css"), css);
+      expect(runCli(dir, ["dist/app.css", "--exclude", "Button"]).status).toBe(
+        0,
+      );
+      expect(readFileSync(join(dir, "dist", "app.css"), "utf-8")).toContain(
+        ".bx--btn--danger",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("--prop-aware, removed in 0.14.0, fails with what to do", () => {
+    const dir = createTempProject();
+    try {
+      const result = runCli(dir, ["dist/app.css", "--prop-aware"]);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("--prop-aware was removed in 0.14.0");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -224,6 +245,15 @@ describe("cli contract", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("--help exits 0 and fits in 80 columns", () => {
+    const result = run(process.cwd(), ["--help"]);
+    expect(result.status).toBe(0);
+    const widest = Math.max(
+      ...result.stdout.split("\n").map((line) => line.length),
+    );
+    expect(widest).toBeLessThanOrEqual(80);
   });
 
   test("--version prints the package's version", () => {

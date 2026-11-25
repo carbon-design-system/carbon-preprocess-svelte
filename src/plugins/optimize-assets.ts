@@ -4,7 +4,6 @@ import { byteLength } from "../utils";
 import type { OptimizeCssOptions } from "./options";
 import { type AssetDiff, logSummary } from "./print-diff";
 import { type AssetReport, printReport, toAssetReport } from "./print-report";
-import { pruneUnusedTokens } from "./prune-tokens";
 
 export type CssAsset = {
   id: string;
@@ -17,11 +16,10 @@ export type CssAsset = {
 };
 
 /**
- * Runs `optimizer` over each asset, then (given `tokenNames`) drops the
- * Carbon tokens no asset reads, sets `fontDisplay`, writes the results
- * back (unless `dryRun`), and prints one summary of them and the report
- * the options ask for. Shared by the plugins and the CLI. Returns whether
- * it printed a summary.
+ * Runs `optimizer` over each asset, sets `fontDisplay`, writes the
+ * results back (unless `dryRun`), and prints one summary of them and the
+ * report the options ask for. Shared by the plugins and the CLI. Returns
+ * whether it printed a summary.
  */
 export function optimizeAssets({
   assets,
@@ -31,7 +29,6 @@ export function optimizeAssets({
   contentTokens,
   log,
   reportExtra,
-  tokenNames,
   rewritten,
   onAsset,
 }: {
@@ -57,30 +54,12 @@ export function optimizeAssets({
    * summary's header.
    */
   rewritten?: number;
-  /**
-   * `--cds-` names found in the build's scripts and markup. Only a caller
-   * that sees everything the build ships can pass them; without them every
-   * token stays.
-   */
-  tokenNames?: Iterable<string>;
 }): boolean {
   const silent = options.silent === true;
   const reports: AssetReport[] = [];
 
   const list = [...assets];
   const results = list.map(({ source }) => optimizer.run(source));
-  if (tokenNames && !optimizer.prunesTokens) {
-    const tokens = pruneUnusedTokens(
-      results.map((result) => result.css),
-      tokenNames,
-    );
-    for (const [i, result] of results.entries()) {
-      results[i] = {
-        css: tokens.css[i],
-        removed: result.removed + tokens.removed[i],
-      };
-    }
-  }
 
   const pruned: AssetDiff[] = [];
   for (const [i, asset] of list.entries()) {
@@ -118,7 +97,6 @@ export function optimizeAssets({
   if (options.report) {
     printReport({
       components: optimizer.usage.components,
-      allowlistSize: optimizer.usage.allowlistSize,
       moduleTokens,
       contentTokens,
       safelistEntries: options.safelist?.length ?? 0,

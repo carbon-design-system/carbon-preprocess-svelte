@@ -1,17 +1,16 @@
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import type { UsageResult } from "svelte-prune/internal/analysis";
-import { CARBON, PROP_AWARE_FAILURE } from "./carbon-library";
+import { CARBON, CSS_FAILURE } from "./carbon-library";
 import { LOG_PREFIX } from "./constants";
-import { loadComponentIndex } from "./indexer/load-index";
+import { resolveCarbonRoot } from "./indexer/resolve-carbon-root";
 import {
-  type CssOptimizerOptions,
   collectedEngine,
   createCssOptimizer,
 } from "./plugins/create-optimized-css";
-import { tokenNamesFile } from "./plugins/prune-tokens";
+import { tokenNamesFile } from "./plugins/token-names";
 import { optimizeAssets } from "./plugins/optimize-assets";
+import { usageOptions } from "./plugins/options";
 import type { SafelistEntry } from "./plugins/safelist";
 import { collectCarbonTokens, readFiles } from "./plugins/scan-content";
 import { collectCarbonImports } from "./plugins/scan-imports";
@@ -25,30 +24,35 @@ const DEFAULT_CONTENT_GLOBS = ["src/**/*.{svelte,js,ts,mjs}"];
 const USAGE = `Usage: carbon-preprocess-svelte optimize-css [options] <css-file-or-glob>...
 
 Removes unused Carbon styles from built CSS files, in place.
-Carbon components are detected from imports in the files matched by --content.
+Carbon components are detected from imports in the files matched by --content,
+and their styles pruned by the props those files pass: --content must cover
+every file that renders Carbon components.
 
 Options:
   --content <glob>        Source files to scan for Carbon imports and literal
-                          bx-- classes. Repeatable. Default: src/**/*.{svelte,js,ts,mjs}
+                          bx-- classes. Repeatable.
+                          Default: src/**/*.{svelte,js,ts,mjs}
   --components <a,b,c>    Component names to keep in addition to detected ones.
   --safelist <selector>   Class selector to always keep. Repeatable. Wrap in
                           slashes for a RegExp: --safelist "/^\\.bx--btn--/"
   --preserve-all-ibm-fonts
                           Keep every IBM Plex @font-face rule.
-  --prop-aware            Also prune styles for prop values, slots, and child
-                          components the --content files never use.
+  --exclude <a,b,c>       Components that keep every variant's styles, as if
+                          rendered with any props.
   --cwd <dir>             Project directory; globs and carbon-components-svelte
                           resolve from it. Default: process.cwd()
   --dry-run               Print sizes, write nothing.
-  --report                Print detected components and allowlist summary.
+  --report                Print the components that can render, and what was
+                          kept.
   --silent                Suppress the per-file size log.
   --json                  Print the result as one JSON object on stdout, and
                           an error as JSON too. Not with --report.
   -v, --version           Print the version.
   -h, --help              Show this help.
 
-Exit status: 0 when done; 2 when called wrong, or when there's nothing to
-prune (no CSS file matched, no Carbon import found, no component index).
+Exit status: 0 when done; 2 when called wrong, when there's nothing to
+prune (no CSS file matched, no Carbon import found), or when the analysis
+of the --content files fails, which leaves every file unchanged.
 
 For agents and scripts: pass --json and read stdout. A run prints
 { schemaVersion, ok: true, dryRun, summary: { files, pruned, before, after },
@@ -74,7 +78,7 @@ const OPTIONS = {
   components: { type: "string" },
   safelist: { type: "string", multiple: true },
   "preserve-all-ibm-fonts": { type: "boolean" },
-  "prop-aware": { type: "boolean" },
+  exclude: { type: "string" },
   cwd: { type: "string" },
   "dry-run": { type: "boolean" },
   report: { type: "boolean" },
@@ -120,6 +124,14 @@ function unknownOption(error: unknown): CliError {
   );
 }
 
+/** `a, b,c` as `["a", "b", "c"]`. */
+function parseList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
 function parseSafelist(entries: readonly string[]): SafelistEntry[] {
   return entries.map((entry) => {
     const match = entry.match(REGEXP_SAFELIST_ENTRY);
@@ -128,6 +140,12 @@ function parseSafelist(entries: readonly string[]): SafelistEntry[] {
 }
 
 function parse(args: string[]) {
+  if (args.includes("--prop-aware")) {
+    throw new CliError(
+      "usage",
+      "--prop-aware was removed in 0.14.0: CSS is always pruned by the props the --content files pass. Drop it, and pass --exclude DataTable for a component that should keep every variant.",
+    );
+  }
   try {
     return parseArgs({ args, allowPositionals: true, options: OPTIONS });
   } catch (error) {
@@ -185,7 +203,6 @@ async function main() {
 
   const components = new Set<string>();
   const contentClasses = new Set<string>();
-  const propAware = values["prop-aware"] === true;
   const sources: Array<{ file: string; code: string }> = [];
   /** Some file may use components it doesn't name (`import * as C`). */
   let usesAll = false;
@@ -193,13 +210,10 @@ async function main() {
   for (const source of readFiles(globSync(contentGlobs, { cwd }), cwd)) {
     usesAll = collectCarbonImports(source.code, components) || usesAll;
     collectCarbonTokens(source.code, contentClasses);
-    if (propAware) sources.push(source);
+    sources.push(source);
   }
 
-  for (const name of (values.components ?? "").split(",")) {
-    const trimmed = name.trim();
-    if (trimmed) components.add(trimmed);
-  }
+  for (const name of parseList(values.components)) components.add(name);
 
   if (components.size === 0 && !usesAll) {
     throw new CliError(
@@ -208,15 +222,11 @@ async function main() {
     );
   }
 
-  const index = await loadComponentIndex(cwd);
-  // `loadComponentIndex` already warned; the files stay unpruned.
-  if (!index) {
-    throw new CliError(
-      "input",
-      "no component index for the installed carbon-components-svelte; the files are unchanged",
-    );
+  const analyzer = await import("svelte-prune/internal/analysis");
+  if (usesAll) {
+    const carbon = analyzer.libraryAt(CARBON, resolveCarbonRoot(cwd));
+    for (const name of carbon.components.keys()) components.add(name);
   }
-  if (usesAll) for (const name of Object.keys(index)) components.add(name);
 
   const safelist = parseSafelist(values.safelist ?? []);
   const options = {
@@ -227,37 +237,27 @@ async function main() {
     silent: values.silent === true || json,
   };
 
-  const analyzer = propAware
-    ? await import("svelte-prune/internal/analysis")
-    : undefined;
-  let usage: UsageResult | undefined;
-  let engine: CssOptimizerOptions["engine"];
-  if (analyzer) {
-    const result = await analyzer.analyzeFiles({
-      library: CARBON,
-      failure: PROP_AWARE_FAILURE,
-      projectRoot: cwd,
-      files: sources,
-      components,
-      options: {},
-    });
-    if ("warning" in result) console.warn(result.warning);
-    else {
-      usage = result;
-      // The CLI sees no build output, so every token stays, as before.
-      engine = collectedEngine(result, analyzer, cwd, [
-        ...sources,
-        tokenNamesFile(["--cds-"]),
-      ]);
-    }
-  }
+  const usage = await analyzer.analyzeFiles({
+    library: CARBON,
+    failure: CSS_FAILURE,
+    projectRoot: cwd,
+    files: sources,
+    components,
+    options: usageOptions({ exclude: parseList(values.exclude) }),
+  });
+  // Without the analysis, nothing says which styles the app renders, so
+  // the files stay as they are.
+  if ("warning" in usage) throw new CliError("failure", usage.warning);
+  // The CLI sees no build output, so every token stays.
+  const engine = collectedEngine(usage, analyzer, cwd, [
+    ...sources,
+    tokenNamesFile(["--cds-"]),
+  ]);
 
   const optimizer = createCssOptimizer({
     ...options,
-    components: index,
-    ids: components,
     contentClasses,
-    propAware: usage,
+    analysis: usage,
     engine,
   });
 
@@ -284,13 +284,7 @@ async function main() {
     contentTokens: contentClasses.size,
     onAsset: ({ id, ...sizes }) => files.push({ file: id, ...sizes }),
     reportExtra: () =>
-      analyzer && usage
-        ? analyzer.formatPropAwareReport(
-            usage,
-            optimizer.usage.prunedByProps,
-            cwd,
-          )
-        : [],
+      analyzer.formatPropAwareReport(usage, optimizer.usage.prunedByProps, cwd),
   });
 
   if (json) {

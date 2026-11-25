@@ -8,10 +8,8 @@ import type {
 } from "svelte-prune/internal/analysis";
 import type { Plugin, Rollup } from "vite";
 import { version as OWN_VERSION } from "../../package.json";
-import { CARBON, PROP_AWARE_FAILURE } from "../carbon-library";
+import { CARBON, CSS_FAILURE } from "../carbon-library";
 import { LOG_PREFIX } from "../constants";
-import type { ComponentIndex } from "../indexer/build-index";
-import { loadComponentIndex } from "../indexer/load-index";
 import {
   errorMessage,
   isCarbonSvelteImport,
@@ -21,7 +19,7 @@ import {
   toCssString,
 } from "../utils";
 import type { BundlerPlugin } from "./bundler-plugin";
-import type { CssOptimizer, PropAwareUsage } from "./create-optimized-css";
+import type { CssOptimizer, CssUsage } from "./create-optimized-css";
 import { prepareCssPruning } from "./css-pruning";
 import { contentScanWarning, NO_CARBON_IMPORTS } from "./messages";
 import { optimizeAssets } from "./optimize-assets";
@@ -29,32 +27,15 @@ import { logSummary } from "./print-diff";
 import { rewriteHeader } from "./rewrite-header";
 import {
   type OptimizeCssOptions,
-  propAwareOptions,
+  checkRemovedOptions,
   sharesAnalysis,
+  usageOptions,
 } from "./options";
-import {
-  canNameTokens,
-  collectTokenNames,
-  collectTokenReads,
-} from "./prune-tokens";
+import { carbonStylesheetClasses } from "./stylesheet-classes";
+import { collectTokenNames, collectTokenReads } from "./token-names";
 import { writePrunedCss } from "./rename-pruned-css";
 import { collectCarbonTokens, scanContent } from "./scan-content";
-import { hasOptimizableCss } from "./strict-css-optimizer";
-
-/**
- * `--cds-` names in everything the bundle ships besides CSS: chunks, and
- * text assets like `index.html`.
- */
-function bundleTokenNames(bundle: Rollup.OutputBundle): Set<string> {
-  const names = new Set<string>();
-  for (const [id, file] of Object.entries(bundle)) {
-    if (file.type === "chunk") collectTokenNames(file.code, names);
-    else if (canNameTokens(id)) {
-      collectTokenNames(toCssString(file.source), names);
-    }
-  }
-  return names;
-}
+import { hasOptimizableCss } from "./carbon-rules";
 
 /** True if any emitted CSS asset has Carbon rules the optimizer can prune. */
 function hasCarbonCss(bundle: Rollup.OutputBundle): boolean {
@@ -84,13 +65,8 @@ function isCarbonStylesheet(id: string): boolean {
 /** What `generateBundle` prunes with, decided before chunks are hashed. */
 type Prepared = {
   optimizer: CssOptimizer;
-  usage: PropAwareUsage | undefined;
+  usage: CssUsage | undefined;
   moduleTokens: Set<string>;
-  /**
-   * `--cds-` names in the HTML and SVG files the module graph reads:
-   * `generateBundle` can run before Vite emits `index.html`.
-   */
-  markupTokens: string[];
   /**
    * A hash of everything the pruning depends on besides the CSS, for the
    * names of the chunks whose code names CSS files.
@@ -133,8 +109,9 @@ function fingerprint(parts: {
   ids: Iterable<string>;
   classes: Iterable<string>;
   tokens: Iterable<string>;
-  components: ComponentIndex;
-  usage: PropAwareUsage | undefined;
+  /** Every class the stylesheet defines, to hash which ones are pruned. */
+  stylesheetClasses: readonly string[];
+  usage: CssUsage | undefined;
   files: ReadonlyArray<{ code: string }> | undefined;
 }): string {
   const hash = createHash("sha256");
@@ -154,12 +131,9 @@ function fingerprint(parts: {
   const { usage } = parts;
   if (usage) {
     add("live", usage.liveComponents);
-    const classes = Object.values(parts.components).flatMap(
-      (entry) => entry.classes,
-    );
     add(
       "pruned",
-      classes.filter((cls) => usage.isPruned(cls)),
+      parts.stylesheetClasses.filter((cls) => usage.isPruned(cls)),
     );
   }
   if (parts.files)
@@ -194,6 +168,7 @@ function namesCss(chunk: Rollup.RenderedChunk): boolean {
  * the CSS assets, renaming each whose name hashes its content.
  */
 export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
+  checkRemovedOptions(options);
   const silent = options?.silent === true;
   /**
    * Carbon component files seen by `transform`, across `vite build --watch`
@@ -223,10 +198,7 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
    * call sites.
    */
   const moduleSources = new Map<string, string>();
-  /** The installed Carbon's index; `undefined` leaves CSS unpruned. */
-  let components: ComponentIndex | undefined;
-  const propAware = propAwareOptions(options);
-  /** Call sites per module for `propAware`. */
+  /** Call sites per module, when CPS collects its own. */
   let collector: UsageCollector | undefined;
   /** Loaded in `buildStart`, so `transform` stays synchronous. */
   let analyzer: typeof import("svelte-prune/internal/analysis") | undefined;
@@ -247,11 +219,8 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
   async function prepare(
     this: Rollup.PluginContext,
   ): Promise<Prepared | undefined> {
-    // `loadComponentIndex` already warned.
-    if (!components) return undefined;
-
-    // Only absent on the bare contexts unit tests pass, where
-    // everything counts.
+    // Unit tests pass bare contexts without `getModuleIds`, so there
+    // every module counts.
     const graph = this.getModuleIds ? new Set(this.getModuleIds()) : undefined;
     if (graph) {
       for (const id of ids) if (!graph.has(id)) ids.delete(id);
@@ -288,8 +257,6 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     const { optimizer, usage, files } = await prepareCssPruning({
       options,
       root,
-      components,
-      ids,
       classes,
       namedTokens: [
         ...contentTokens,
@@ -297,14 +264,21 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
         ...graphTokens.markup,
       ],
       analyzer,
-      shared: propAware ? shared : undefined,
-      collect:
-        usageCollector && propAware
-          ? async () => ({
-              result: await usageCollector.analyze(ids, propAware, edges),
-              files: [...moduleSources.values()].map((code) => ({ code })),
-            })
-          : undefined,
+      shared,
+      collect: usageCollector
+        ? async () => ({
+            result: await usageCollector.analyze(
+              ids,
+              usageOptions(options),
+              edges,
+            ),
+            // What the app's modules name stays, unless `scanModules` is off.
+            files:
+              options?.scanModules === false
+                ? []
+                : [...moduleSources.values()].map((code) => ({ code })),
+          })
+        : undefined,
       warn: (message) => {
         if (!silent) this.warn(message);
       },
@@ -314,14 +288,13 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       optimizer,
       usage,
       moduleTokens,
-      markupTokens: graphTokens.markup,
       fingerprint: fingerprint({
         options,
         root,
         ids,
         classes,
         tokens: [...contentTokens, ...graphTokens.code, ...graphTokens.markup],
-        components,
+        stylesheetClasses: carbonStylesheetClasses(root),
         usage,
         files,
       }),
@@ -338,13 +311,13 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     const ready = await prepared;
     const { rewritten } = header;
     if (!ready) {
-      if (components && ids.size === 0 && !silent && hasCarbonCss(bundle)) {
+      if (ids.size === 0 && !silent && hasCarbonCss(bundle)) {
         this.warn(NO_CARBON_IMPORTS);
       }
       if (!silent) logSummary({ assets: [], rewritten, log: logInfo });
       return;
     }
-    const { optimizer, usage, moduleTokens, markupTokens } = ready;
+    const { optimizer, usage, moduleTokens } = ready;
 
     const pruned = new Map<string, string>();
     optimizeAssets({
@@ -368,11 +341,6 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
       options: options ?? {},
       moduleTokens: moduleTokens.size,
       contentTokens: contentClasses?.length ?? 0,
-      tokenNames: [
-        ...bundleTokenNames(bundle),
-        ...markupTokens,
-        ...contentTokens,
-      ],
       log: logInfo,
       rewritten,
       reportExtra: () =>
@@ -401,32 +369,27 @@ export const optimizeCss = (options?: OptimizeCssOptions): BundlerPlugin => {
     },
     /**
      * Re-reads `content` on `--watch` rebuilds (the plugin instance is
-     * reused) and loads the component index while modules transform.
+     * reused) and loads the analyzer while modules transform.
      */
     // Tests call it bare; bundlers always pass their options.
     async buildStart(inputOptions?: { plugins?: readonly object[] }) {
       contentClasses = undefined;
       prepared = undefined;
       current = undefined;
-      components = await loadComponentIndex(root);
-      if (propAware && sharesAnalysis(propAware)) {
+      if (sharesAnalysis(options)) {
         analyzer ??= await import("svelte-prune/internal/analysis");
         // Rollup and Rolldown have no config, so their plugins stand in for it.
         const build = config ?? inputOptions?.plugins;
         shared = build && analyzer.siblingAnalysis(build, CARBON.name);
       }
-      if (propAware && !shared && !collector) {
+      if (!shared && !collector) {
         analyzer ??= await import("svelte-prune/internal/analysis");
         try {
-          collector = analyzer.createUsageCollector(
-            CARBON,
-            root,
-            PROP_AWARE_FAILURE,
-          );
+          collector = analyzer.createUsageCollector(CARBON, root, CSS_FAILURE);
         } catch (error) {
           if (!silent) {
             this.warn(
-              `${LOG_PREFIX} propAware is off for this build (${errorMessage(error)}).`,
+              `${LOG_PREFIX} Carbon CSS is left unpruned in this build (${errorMessage(error)}).`,
             );
           }
         }

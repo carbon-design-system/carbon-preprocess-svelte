@@ -4,20 +4,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Compiler } from "webpack";
 import { CarbonSvelte } from "../src/constants";
+import { resolveCarbonRoot } from "../src/indexer/resolve-carbon-root";
 import {
   contentMatchedNothing,
   NO_CARBON_IMPORTS,
 } from "../src/plugins/messages";
 import { OptimizeCssPlugin } from "../src/plugins/OptimizeCssPlugin";
-import type { OptimizeCssOptions } from "../src/plugins/options";
-
-/**
- * These tests cover pruning by the imported components, so `propAware` is
- * off unless a test turns it on; `prop-aware.test.ts` covers it.
- */
-const allowlistPlugin = (options: OptimizeCssOptions = {}) =>
-  new OptimizeCssPlugin({ propAware: false, ...options });
 import { createFakeProject } from "./helpers/fake-project";
+
+/** Carbon's Button, and an app module that renders it. */
+const carbonButton = join(resolveCarbonRoot(), "src/Button/Button.svelte");
+const appDir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
+const buttonApp = join(appDir, "ButtonApp.svelte");
+const BUTTON_APP = `<script>
+  import { Button } from "carbon-components-svelte";
+</script>
+<Button>Save</Button>`;
+writeFileSync(buttonApp, BUTTON_APP);
+afterAll(() => rmSync(appDir, { recursive: true, force: true }));
 
 const KIND_TERTIARY = /kind\s+"tertiary"/;
 
@@ -35,10 +39,18 @@ const createMockCompiler = (
 ) => {
   const {
     assets = {},
-    moduleResources = [],
+    moduleResources: resources = [],
     mode = "production",
     context = process.cwd(),
   } = options;
+
+  // With Button in the graph, the app module that renders it is too.
+  const moduleResources = resources.some(
+    (entry) =>
+      (typeof entry === "string" ? entry : entry.resource) === carbonButton,
+  )
+    ? [...resources, { resource: buttonApp, source: BUTTON_APP }]
+    : resources;
 
   let processAssetsPromise: Promise<void> | null = null;
 
@@ -122,22 +134,19 @@ describe("OptimizeCssPlugin", () => {
     });
   });
 
-  test("leaves CSS unpruned when the component index can't be built", async () => {
+  test("leaves CSS unpruned when Carbon can't be read", async () => {
     const project = createFakeProject();
     project.installBrokenCarbon();
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
 
     try {
-      const plugin = allowlistPlugin();
+      const plugin = new OptimizeCssPlugin();
       const mockCompiler = createMockCompiler({
         assets: {
           "styles.css": {
             source: () => ".bx--btn{color:red}.bx--accordion{color:blue}",
           },
         },
-        moduleResources: [
-          `node_modules/${CarbonSvelte.Components}/Button.svelte`,
-        ],
+        moduleResources: [carbonButton],
         context: project.root,
       });
 
@@ -145,15 +154,17 @@ describe("OptimizeCssPlugin", () => {
       await mockCompiler.waitForProcessAssets();
 
       expect(mockCompiler.compilation.updateAsset).not.toHaveBeenCalled();
-      expect(warn.mock.calls[0][0]).toContain("leaving Carbon CSS unpruned");
+      expect(mockCompiler.compilation.warnings).toHaveLength(1);
+      expect(mockCompiler.compilation.warnings[0].message).toContain(
+        "Carbon CSS is left unpruned",
+      );
     } finally {
-      warn.mockRestore();
       project.dispose();
     }
   });
 
   test("skips processing in development mode", () => {
-    const plugin = allowlistPlugin();
+    const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => ".bx--btn { color: blue; }" } },
       moduleResources: ["node_modules/carbon-components-svelte/Button.svelte"],
@@ -165,7 +176,7 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("skips processing if no Carbon Svelte imports are found", () => {
-    const plugin = allowlistPlugin();
+    const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => "body { color: red; }" } },
       moduleResources: ["regular-component.svelte"],
@@ -176,7 +187,7 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("warns when no Carbon component was imported", async () => {
-    const plugin = allowlistPlugin();
+    const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => ".bx--btn { color: red; }" } },
       moduleResources: [],
@@ -193,7 +204,7 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("silent suppresses the no-imports warning", async () => {
-    const plugin = allowlistPlugin({ silent: true });
+    const plugin = new OptimizeCssPlugin({ silent: true });
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => ".bx--btn { color: red; }" } },
       moduleResources: [],
@@ -208,7 +219,7 @@ describe("OptimizeCssPlugin", () => {
   test("does not warn when no asset contains Carbon CSS", async () => {
     // A second compiler in a multi-config setup that never imports Carbon
     // should not warn.
-    const plugin = allowlistPlugin();
+    const plugin = new OptimizeCssPlugin();
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => "body { color: red; }" } },
       moduleResources: [],
@@ -222,8 +233,8 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("processes CSS files when Carbon Svelte imports are found", async () => {
-    const plugin = allowlistPlugin();
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin();
+    const carbonComponent = carbonButton;
     const cssContent =
       ".bx--btn { color: blue; } .bx--accordion { color: red; }";
 
@@ -247,19 +258,17 @@ describe("OptimizeCssPlugin", () => {
     );
   });
 
-  test("removes Carbon tokens no asset or script reads", async () => {
-    const plugin = allowlistPlugin({ silent: true });
+  test("removes Carbon tokens nothing in the build reads", async () => {
+    const plugin = new OptimizeCssPlugin({ silent: true });
     const mockCompiler = createMockCompiler({
       assets: {
         "styles.css": {
           source: () =>
-            ":root{--cds-a:1;--cds-b:2;--cds-c:3}.bx--btn{color:var(--cds-a)}",
+            ":root{--cds-ai-aura-start:1;--cds-ai-aura-end:2;--cds-ai-aura-hover-start:3}.bx--btn{color:var(--cds-ai-aura-start)}",
         },
-        "main.js": { source: () => 'const token = "--cds-b";' },
+        "main.js": { source: () => 'const token = "--cds-ai-aura-end";' },
       },
-      moduleResources: [
-        `node_modules/${CarbonSvelte.Components}/Button.svelte`,
-      ],
+      moduleResources: [carbonButton],
     });
 
     plugin.apply(asCompiler(mockCompiler));
@@ -268,11 +277,11 @@ describe("OptimizeCssPlugin", () => {
     const [[id, written]] = mockCompiler.compilation.updateAsset.mock.calls;
     expect(id).toBe("styles.css");
     expect(written.source()).toBe(
-      ":root{--cds-a:1;--cds-b:2}.bx--btn{color:var(--cds-a)}",
+      ":root{--cds-ai-aura-start:1;--cds-ai-aura-end:2}.bx--btn{color:var(--cds-ai-aura-start)}",
     );
   });
 
-  test("propAware reads call sites from each .svelte module's source", async () => {
+  test("reads call sites from each .svelte module's source", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
     const dir = mkdtempSync(join(tmpdir(), "cps-webpack-prop-aware-"));
     try {
@@ -281,10 +290,9 @@ describe("OptimizeCssPlugin", () => {
         app,
         '<script>\n  import { Button } from "carbon-components-svelte";\n</script>\n<Button kind="tertiary">Save</Button>\n',
       );
-      const plugin = allowlistPlugin({
+      const plugin = new OptimizeCssPlugin({
         silent: true,
         report: true,
-        propAware: true,
       });
       const mockCompiler = createMockCompiler({
         assets: {
@@ -321,8 +329,8 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("handles Buffer input correctly", async () => {
-    const plugin = allowlistPlugin();
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin();
+    const carbonComponent = carbonButton;
     const cssContent = Buffer.from(
       ".bx--btn { color: blue; } .bx--accordion { color: red; }",
     );
@@ -346,8 +354,8 @@ describe("OptimizeCssPlugin", () => {
 
   test("respects silent option for printing diff", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
-    const plugin = allowlistPlugin({ silent: false });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ silent: false });
+    const carbonComponent = carbonButton;
     // CSS must shrink after optimization or printDiff skips logging (same kB)
     const cssWithUnusedCarbon = `* { box-sizing: border-box }
 .bx--btn { color: blue }
@@ -370,8 +378,8 @@ describe("OptimizeCssPlugin", () => {
 
   test("says there was nothing to prune when nothing is removed", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation();
-    const plugin = allowlistPlugin({ silent: false });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ silent: false });
+    const carbonComponent = carbonButton;
     // Button is imported and .bx--btn is the only Carbon class, so nothing is
     // pruned even though Carbon imports exist (e.g. a secondary stylesheet).
     const cssWithOnlyUsedCarbon = `* { box-sizing: border-box }
@@ -397,8 +405,8 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("prunes legacy single-hyphen Carbon selectors by default", async () => {
-    const plugin = allowlistPlugin({ silent: true });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const carbonComponent = carbonButton;
     const cssContent = `.bx--btn { color: blue }
 .bx-slider-text-input { appearance: textfield }`;
 
@@ -418,11 +426,11 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("keeps literal bx-- classes found in app modules", async () => {
-    const plugin = allowlistPlugin({ silent: true });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const carbonComponent = carbonButton;
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
 
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => cssContent } },
@@ -455,14 +463,14 @@ describe("OptimizeCssPlugin", () => {
         '<div class="bx--accordion"></div>',
       );
 
-      const plugin = allowlistPlugin({
+      const plugin = new OptimizeCssPlugin({
         silent: true,
         content: ["src/**/*.svelte"],
       });
-      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const carbonComponent = carbonButton;
       const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
 
       const mockCompiler = createMockCompiler({
         assets: { "styles.css": { source: () => cssContent } },
@@ -485,8 +493,8 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("scanModules: false ignores app modules", async () => {
-    const plugin = allowlistPlugin({ silent: true, scanModules: false });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ silent: true, scanModules: false });
+    const carbonComponent = carbonButton;
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
 
@@ -510,8 +518,8 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("does not scan CSS modules, virtual modules, or Carbon's own sources", async () => {
-    const plugin = allowlistPlugin({ silent: true });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const carbonComponent = carbonButton;
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
 
@@ -537,8 +545,8 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("ignores a module whose originalSource() throws", async () => {
-    const plugin = allowlistPlugin({ silent: true });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ silent: true });
+    const carbonComponent = carbonButton;
     const cssContent =
       ".bx--btn { color: blue }\n.bx--accordion { color: red }";
 
@@ -558,8 +566,8 @@ describe("OptimizeCssPlugin", () => {
   });
 
   test("dryRun does not call updateAsset", async () => {
-    const plugin = allowlistPlugin({ dryRun: true, silent: true });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ dryRun: true, silent: true });
+    const carbonComponent = carbonButton;
     const cssContent =
       ".bx--btn { color: blue }\n.bx--accordion { background: yellow }";
 
@@ -577,11 +585,11 @@ describe("OptimizeCssPlugin", () => {
 
   test("report prints detected components and assets", async () => {
     const consoleSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    const plugin = allowlistPlugin({ report: true, silent: true });
-    const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+    const plugin = new OptimizeCssPlugin({ report: true, silent: true });
+    const carbonComponent = carbonButton;
     const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }
-.bx--modal { background: red }`;
+.bx--data-table { background: red }`;
 
     const mockCompiler = createMockCompiler({
       assets: { "styles.css": { source: () => cssContent } },
@@ -597,7 +605,11 @@ describe("OptimizeCssPlugin", () => {
     const lines = consoleSpy.mock.calls.map((call) => call.join(" "));
 
     expect(
-      lines.some((line) => line.includes("Detected components (1): Button")),
+      lines.some(
+        (line) =>
+          line.includes("Components that can render") &&
+          line.includes("Button"),
+      ),
     ).toEqual(true);
     expect(lines.some((line) => line.includes("module scan 1 tokens"))).toEqual(
       true,
@@ -615,8 +627,8 @@ describe("OptimizeCssPlugin", () => {
   test("warns when content globs match nothing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
     try {
-      const plugin = allowlistPlugin({ content: ["nope/**/*.svelte"] });
-      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const plugin = new OptimizeCssPlugin({ content: ["nope/**/*.svelte"] });
+      const carbonComponent = carbonButton;
       const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
 
@@ -646,11 +658,11 @@ describe("OptimizeCssPlugin", () => {
   test("silent suppresses the content-globs-matched-nothing warning", async () => {
     const dir = mkdtempSync(join(tmpdir(), "optimize-css-plugin-"));
     try {
-      const plugin = allowlistPlugin({
+      const plugin = new OptimizeCssPlugin({
         silent: true,
         content: ["nope/**/*.svelte"],
       });
-      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const carbonComponent = carbonButton;
       const cssContent = ".bx--btn { color: blue }";
 
       const mockCompiler = createMockCompiler({
@@ -677,8 +689,8 @@ describe("OptimizeCssPlugin", () => {
         '<div class="bx--accordion"></div>',
       );
 
-      const plugin = allowlistPlugin({ content: ["src/**/*.svelte"] });
-      const carbonComponent = `node_modules/${CarbonSvelte.Components}/Button.svelte`;
+      const plugin = new OptimizeCssPlugin({ content: ["src/**/*.svelte"] });
+      const carbonComponent = carbonButton;
       const cssContent = `.bx--btn { color: blue }
 .bx--accordion { background: yellow }`;
 

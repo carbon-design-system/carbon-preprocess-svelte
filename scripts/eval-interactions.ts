@@ -7,7 +7,7 @@
  * hover, modals).
  *
  * - `vite-matrix@svelte-4`, `vite-matrix@svelte-5`: Vite, `baseline` vs
- *   `css`, `prop-aware` and `full`, and on Svelte 5 `client-only`
+ *   `css` and `full`, and on Svelte 5 `client-only`
  *   (`optimizeComponents({ hydration: false })`).
  * - `sveltekit-matrix@svelte-5`: the same app prerendered by SvelteKit and
  *   hydrated. Also requires the same prerendered HTML, the same console
@@ -18,7 +18,7 @@
  * - `astro`: the same, prerendered by Astro and hydrated (`client:load`),
  *   with the SvelteKit example's SSR checks.
  * - `golden/<app>`: the golden apps, built here with Vite (see
- *   `golden-build.ts`), `baseline` vs `css`, `prop-aware` and `full`, through
+ *   `golden-build.ts`), `baseline` vs `css` and `full`, through
  *   the scripts in `golden-steps.ts`.
  *
  *   bun scripts/eval-interactions.ts [--examples rollup,rspack] [--no-build]
@@ -44,7 +44,7 @@ const { values: args } = parseArgs({
 
 const ROOT = path.resolve(import.meta.dir, "..");
 const OUT = path.join(ROOT, ".context/eval-interactions");
-const MATRIX_VARIANTS = ["baseline", "css", "prop-aware", "full"];
+const MATRIX_VARIANTS = ["baseline", "css", "full"];
 
 type Step = { name: string; run: (page: Page) => Promise<unknown> };
 

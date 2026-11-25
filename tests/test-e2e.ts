@@ -357,9 +357,6 @@ async function buildExample(
   console.log("=".repeat(60));
 
   await $`cd ${dir} && bun link ${name} && bun install`;
-  // The index cache is keyed by package versions, which don't change
-  // between local edits to the indexer, so a stale one would mask them.
-  await $`rm -rf ${join(dir, "node_modules/.cache/carbon-preprocess-svelte")}`;
 
   const entries = loadEntryManifest(dir);
   if (entries) {

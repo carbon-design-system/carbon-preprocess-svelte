@@ -9,17 +9,15 @@ Each build sets `VARIANT` ([vite.config.ts](vite.config.ts)):
 | Variant | Plugins |
 | --- | --- |
 | `baseline` | `optimizeImports` only |
-| `css` | `optimizeCss({ propAware: false })`: drops styles of components the app doesn't import |
-| `prop-aware` | `optimizeCss()`: also drops styles for props the app never passes |
-| `full` | prop-aware CSS, plus `optimizeComponents()`: rewrites Carbon components for the props the app passes |
+| `css` | `optimizeCss()`: drops styles of components the app doesn't render, and of props it never passes |
+| `full` | `css`, plus `optimizeComponents()`: rewrites Carbon components for the props the app passes |
 
 With carbon-components-svelte 0.114.2, `bun run build` printed:
 
 | Variant | CSS | CSS gzip | JS | JS gzip |
 | --- | --- | --- | --- | --- |
 | baseline | 774.92 kB | 94.14 kB | 873.92 kB | 246.97 kB |
-| css | 386.37 kB (-50.1%) | 46.44 kB (-50.7%) | 873.92 kB | 246.97 kB |
-| prop-aware | 217.89 kB (-71.9%) | 28.69 kB (-69.5%) | 873.92 kB | 246.97 kB |
+| css | 217.89 kB (-71.9%) | 28.69 kB (-69.5%) | 873.92 kB | 246.97 kB |
 | full | 217.89 kB (-71.9%) | 28.69 kB (-69.5%) | 494.89 kB (-43.4%) | 151.05 kB (-38.8%) |
 
 ## Usage

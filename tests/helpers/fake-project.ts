@@ -46,6 +46,44 @@ export function createFakeProject() {
         JSON.stringify({ name: "carbon-components-svelte", version: "9.9.9" }),
       );
     },
+    /**
+     * A `carbon-components-svelte` of `Button`, `Accordion` and `Tag`,
+     * each rendering its one class, with a stylesheet defining them: an
+     * analysis of every component costs a fraction of the real one's.
+     */
+    installTinyCarbon(): void {
+      const carbon = path.join(
+        root,
+        "node_modules",
+        "carbon-components-svelte",
+      );
+      const components = { Button: "btn", Accordion: "accordion", Tag: "tag" };
+      mkdirSync(path.join(carbon, "css"), { recursive: true });
+      writeFileSync(
+        path.join(carbon, "package.json"),
+        JSON.stringify({
+          name: "carbon-components-svelte",
+          version: "0.0.0",
+          type: "module",
+          svelte: "./src/index.js",
+        }),
+      );
+      const exports: string[] = [];
+      const rules: string[] = [];
+      for (const [name, cls] of Object.entries(components)) {
+        mkdirSync(path.join(carbon, "src", name), { recursive: true });
+        writeFileSync(
+          path.join(carbon, "src", name, `${name}.svelte`),
+          `<div class="bx--${cls}"><slot /></div>\n`,
+        );
+        exports.push(
+          `export { default as ${name} } from "./${name}/${name}.svelte";`,
+        );
+        rules.push(`.bx--${cls}{color:red}`);
+      }
+      writeFileSync(path.join(carbon, "src", "index.js"), exports.join("\n"));
+      writeFileSync(path.join(carbon, "css", "white.css"), rules.join("\n"));
+    },
     dispose() {
       rmSync(root, { recursive: true, force: true });
     },

@@ -8,9 +8,8 @@ import {
 /**
  * One build per optimization level, compared by `bun run build`:
  * - `baseline`: no CSS or component optimization
- * - `css`: `optimizeCss({ propAware: false })`, pruning styles of
- *   components the app imports
- * - `prop-aware`: also prunes styles for props the app never passes
+ * - `css`: `optimizeCss()`, pruning styles of components the app doesn't
+ *   render, and of props it never passes
  * - `full`: also rewrites Carbon components for the props the app passes
  * - `client-only`: `full` without Svelte's hydration code
  *   (`hydration: false`), since this app only mounts
@@ -27,10 +26,7 @@ export default {
     variant === "full" && optimizeComponents(),
     variant === "client-only" && optimizeComponents({ hydration: false }),
     svelte({ preprocess: [optimizeImports()] }),
-    variant !== "baseline" &&
-      optimizeCss({
-        propAware: variant !== "css",
-      }),
+    variant !== "baseline" && optimizeCss(),
   ],
   resolve: {
     conditions: ["browser"],

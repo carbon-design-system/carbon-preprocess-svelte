@@ -14,7 +14,6 @@ describe("print-report", () => {
 
     printReport({
       components: ["Button", "DataTable", "Modal"],
-      allowlistSize: 431,
       moduleTokens: 21,
       contentTokens: 0,
       safelistEntries: 2,
@@ -37,9 +36,9 @@ describe("print-report", () => {
     expect(log.mock.calls).toEqual([
       [""],
       ["carbon-preprocess-svelte report"],
-      ["  Detected components (3): Button, DataTable, Modal"],
+      ["  Components that can render (3): Button, DataTable, Modal"],
       [
-        "  Allowlist: 431 classes (module scan 21 tokens, content 0 tokens, safelist 2 entries)",
+        "  Kept whatever renders: module scan 21 tokens, content 0 tokens, safelist 2 entries",
       ],
       ["  Assets:"],
       [
@@ -49,12 +48,11 @@ describe("print-report", () => {
     ]);
   });
 
-  test("no detected components", () => {
+  test("no components that can render", () => {
     const log = jest.spyOn(console, "log").mockImplementation(() => {});
 
     printReport({
       components: [],
-      allowlistSize: 0,
       moduleTokens: 0,
       contentTokens: 0,
       safelistEntries: 0,
@@ -64,9 +62,9 @@ describe("print-report", () => {
     expect(log.mock.calls).toEqual([
       [""],
       ["carbon-preprocess-svelte report"],
-      ["  Detected components (0): none"],
+      ["  Components that can render (0): none"],
       [
-        "  Allowlist: 0 classes (module scan 0 tokens, content 0 tokens, safelist 0 entries)",
+        "  Kept whatever renders: module scan 0 tokens, content 0 tokens, safelist 0 entries",
       ],
       ["  Assets:"],
     ]);
@@ -77,7 +75,6 @@ describe("print-report", () => {
 
     printReport({
       components: ["Button"],
-      allowlistSize: 10,
       moduleTokens: 0,
       contentTokens: 0,
       safelistEntries: 0,

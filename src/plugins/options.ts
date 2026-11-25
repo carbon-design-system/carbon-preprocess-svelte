@@ -1,8 +1,7 @@
 import type { UsageOptions } from "svelte-prune/internal/analysis";
+import { LOG_PREFIX } from "../constants";
 import type { FontDisplay } from "./font-display";
 import type { SafelistEntry } from "./safelist";
-
-type PropAwareOptions = UsageOptions;
 
 export type OptimizeCssOptions = {
   /**
@@ -23,9 +22,10 @@ export type OptimizeCssOptions = {
   dryRun?: boolean;
 
   /**
-   * Print a per-build summary of what the plugin detected: imported Carbon
-   * components, allowlist size and its sources (module scan, `content`,
-   * `safelist`), and per-asset results. Independent of `silent`.
+   * Print a per-build summary of what the plugin detected: the Carbon
+   * components that can render, what it keeps (module scan, `content`,
+   * `safelist`), each component's prop values, and per-asset results.
+   * Independent of `silent`.
    * @default false
    */
   report?: boolean;
@@ -56,10 +56,9 @@ export type OptimizeCssOptions = {
   fontDisplay?: FontDisplay;
 
   /**
-   * Class selectors to always keep, regardless of which components are
-   * imported. For Carbon classes the allowlist misses:
-   * - Hand-written Carbon classes in app markup (e.g.
-   *   `<div class="bx--grid">`)
+   * Class selectors to always keep, regardless of what renders. For
+   * Carbon classes the analysis can't see:
+   * - Hand-written Carbon classes in app markup (e.g. `<div class="bx--grid">`)
    * - Theme/layout utilities that no component file references
    *
    * Each entry is either:
@@ -97,49 +96,71 @@ export type OptimizeCssOptions = {
    * (`<div class="bx--grid">`) and prefix literals
    * (`` `bx--btn--${kind}` ``) survive without configuration. Carbon's own
    * sources, CSS modules, and virtual modules are skipped. Set to `false` to
-   * rely only on imported components, `safelist`, and `content`.
+   * rely only on what the components render, `safelist`, and `content`.
    * @default true
    */
   scanModules?: boolean;
 
   /**
-   * Also prune Carbon rules for prop values, slots, and child components
-   * the app never uses. With only `<Button kind="tertiary">`, the
-   * tertiary styles stay and the other kinds, sizes, the skeleton and the
-   * icon-only tooltip go.
+   * Components that keep every variant's styles, as if rendered with any
+   * props: for one whose props come from data the analysis can't read and
+   * `assume` can't list, or to rule the analysis out when a style
+   * goes missing.
    *
-   * Each `.svelte` file that imports Carbon is analyzed from its source,
-   * along with the app's constants and its own wrapper components. A prop
-   * the analysis can't read (a reassigned variable, a spread, `bind:`)
-   * keeps every value, and a component used as a value, or imported in a
-   * way the analysis can't read (a bundler alias), keeps everything.
-   * If the analysis fails, CSS is pruned as without this option, with
-   * a warning.
+   * Carbon rules for prop values, slots and child components the app never
+   * uses are pruned: with only `<Button kind="tertiary">`, the tertiary
+   * styles stay and the other kinds, sizes, the skeleton and the icon-only
+   * tooltip go. A prop the analysis can't read (a reassigned variable, a
+   * spread, `bind:`) keeps every value, and a component used as a value,
+   * or imported in a way the analysis can't read (a bundler alias), keeps
+   * everything. If the analysis fails, CSS is left unpruned, with a warning.
    *
-   * Pass an object to `exclude` components or `assume` values for
-   * props set from expressions, or `false` to prune by the imported
-   * components alone.
-   * @default true
+   * @example
+   * exclude: ["DataTable"]
    */
-  propAware?: boolean | PropAwareOptions;
+  exclude?: readonly string[];
+
+  /**
+   * Values for props set from expressions the analysis can't read, by
+   * component then prop. A value not listed loses its styles. Spreads
+   * still keep everything.
+   *
+   * @example
+   * assume: { Button: { kind: ["primary", "danger"] } }
+   */
+  assume?: Record<
+    string,
+    Record<string, Array<string | number | boolean | null>>
+  >;
 };
 
 /**
- * Whether `propAware` can prune from `optimizeComponents`' analysis: only
+ * Whether CSS can be pruned from `optimizeComponents`' analysis: only
  * without `exclude` or `assume`, which the rewrite doesn't read.
  */
-export function sharesAnalysis(propAware: PropAwareOptions): boolean {
+export function sharesAnalysis(options?: OptimizeCssOptions): boolean {
   return (
-    (propAware.exclude ?? []).length === 0 &&
-    Object.keys(propAware.assume ?? {}).length === 0
+    (options?.exclude ?? []).length === 0 &&
+    Object.keys(options?.assume ?? {}).length === 0
   );
 }
 
-/** `propAware`'s options, or `undefined` when it's off. */
-export function propAwareOptions(
-  options?: OptimizeCssOptions,
-): PropAwareOptions | undefined {
-  const propAware = options?.propAware ?? true;
-  if (!propAware) return undefined;
-  return propAware === true ? {} : propAware;
+/** What the usage analysis reads the app with. */
+export function usageOptions(options?: OptimizeCssOptions): UsageOptions {
+  return {
+    exclude: options?.exclude && [...options.exclude],
+    assume: options?.assume,
+  };
+}
+
+/**
+ * Throws for `propAware`, removed in 0.14.0: a JavaScript config would
+ * otherwise drop it silently.
+ */
+export function checkRemovedOptions(options?: object): void {
+  if (options && "propAware" in options) {
+    throw new Error(
+      `${LOG_PREFIX} \`propAware\` was removed in 0.14.0: CSS is always pruned by the props the app passes. Remove it, and use \`exclude: ["DataTable"]\` for a component that should keep every variant.`,
+    );
+  }
 }

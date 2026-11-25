@@ -1,18 +1,12 @@
 import type { UsageResult } from "svelte-prune/internal/analysis";
-import path from "node:path";
 import { ALWAYS_ON_CLASSES, CONTEXT_ANCESTORS } from "../constants";
-import type { ComponentIndex } from "../indexer/build-index";
 import { toCssString } from "../utils";
-import {
-  type SpliceOptimizerOptions,
-  spliceOptimizeCss,
-} from "./css-splice-optimizer";
 import {
   type CarbonStylePrunerInput,
   createCarbonStylePruner,
 } from "./carbon-style-pruner";
+import { hasOptimizableCss } from "./carbon-rules";
 import type { OptimizeCssOptions } from "./options";
-import { hasOptimizableCss } from "./strict-css-optimizer";
 
 /** The options that shape what the optimizer prunes. */
 export type PruneOptions = Pick<
@@ -20,8 +14,8 @@ export type PruneOptions = Pick<
   "safelist" | "preserveAllIBMFonts"
 >;
 
-/** What `propAware` found, as the optimizer consumes it. */
-export type PropAwareUsage = {
+/** What the usage analysis found, as the optimizer consumes it. */
+export type CssUsage = {
   /**
    * Names of the Carbon components that can render
    * (`Button`, `ButtonSkeleton`).
@@ -29,15 +23,15 @@ export type PropAwareUsage = {
   liveComponents: ReadonlySet<string>;
   /** Whether no rendered component can apply `cls` under the app's props. */
   isPruned(cls: string): boolean;
-  /** The report's prop-aware lines, given the classes it pruned. */
+  /** The report's per-component prop lines, given the classes it pruned. */
   report?(prunedClasses: ReadonlySet<string>, root: string): string[];
 };
 
-/** A `UsageResult`, as `PropAwareUsage`. */
-export function propAwareUsage(
+/** A `UsageResult`, as `CssUsage`. */
+export function cssUsage(
   result: UsageResult,
   analyzer: typeof import("svelte-prune/internal/analysis"),
-): PropAwareUsage {
+): CssUsage {
   return {
     liveComponents: result.liveComponents,
     isPruned: (cls) => result.isPruned(cls),
@@ -65,17 +59,13 @@ export function collectedEngine(
 }
 
 export type CssOptimizerOptions = PruneOptions & {
-  /** Index of the installed Carbon; see `loadComponentIndex`. */
-  components: ComponentIndex;
-  /** Paths (or bare names) of the Carbon components the app uses. */
-  ids: Iterable<string>;
   /** Class selectors (`.bx--*`) to keep; pre-scanned so no I/O happens here. */
   contentClasses?: Iterable<string>;
-  propAware?: PropAwareUsage;
+  /** The usage analysis. Without it and `engine`, CSS is left unpruned. */
+  analysis?: CssUsage;
   /**
-   * With `propAware`: prune with svelte-prune's `libraryStylePruner` instead
-   * of the allowlist, from the analysis `optimizeComponents` shares or one
-   * CPS collected itself.
+   * svelte-prune's `libraryStylePruner`, from the analysis
+   * `optimizeComponents` shares or one CPS collected itself.
    */
   engine?: Pick<
     CarbonStylePrunerInput,
@@ -89,56 +79,18 @@ export type OptimizedCssReport = {
   removed: number;
 };
 
-/**
- * The class allowlist: `.bx--body` (apps set it on `<body>`, no component
- * references it), the classes of each used component, and
- * `contentClasses`. Also whether flatpickr CSS stays (any
- * DatePicker import).
- */
-function buildUsage(
-  componentIndex: ComponentIndex,
-  ids: Iterable<string>,
-  contentClasses: Iterable<string> = [],
-  liveComponents?: ReadonlySet<string>,
-) {
-  const allowlist = new Set(ALWAYS_ON_CLASSES);
-  const usedComponents = new Set<string>();
-  let preserveFlatpickr = false;
-
-  for (const id of ids) {
-    const { name } = path.parse(id);
-    // Bundled, but only rendered from branches the app's props rule out.
-    if (liveComponents && !liveComponents.has(name)) continue;
-
-    if (name === "DatePicker") preserveFlatpickr = true;
-
-    if (Object.hasOwn(componentIndex, name)) {
-      usedComponents.add(name);
-      for (const cls of componentIndex[name].classes) allowlist.add(cls);
-    }
-  }
-
-  for (const cls of contentClasses) allowlist.add(cls);
-
-  return {
-    allowlist,
-    preserveFlatpickr,
-    components: [...usedComponents].sort(),
-  };
-}
-
 const NEVER_PRUNED = new Set<string>([
   ...ALWAYS_ON_CLASSES,
   ...CONTEXT_ANCESTORS,
 ]);
 
 /**
- * `propAware.isPruned`, except for classes the app's own code names
+ * `analysis.isPruned`, except for classes the app's own code names
  * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class
  * it prunes in `pruned`.
  */
 function createPrunedCheck(
-  propAware: PropAwareUsage,
+  analysis: CssUsage,
   contentClasses: Iterable<string> | undefined,
   pruned: Set<string>,
 ): (cls: string) => boolean {
@@ -153,7 +105,7 @@ function createPrunedCheck(
       NEVER_PRUNED.has(cls) ||
       exact.has(cls) ||
       prefixes.some((prefix) => cls.startsWith(prefix)) ||
-      !propAware.isPruned(cls)
+      !analysis.isPruned(cls)
     ) {
       return false;
     }
@@ -164,60 +116,44 @@ function createPrunedCheck(
 
 export type CssOptimizer = ReturnType<typeof createCssOptimizer>;
 
+/**
+ * Prunes Carbon CSS with svelte-prune's pruner and Carbon's own rules on
+ * top (see `createCarbonStylePruner`). Without an analysis, or when
+ * svelte-prune can't read Carbon's stylesheets, CSS passes through.
+ */
 export function createCssOptimizer(options: CssOptimizerOptions) {
-  const { allowlist, preserveFlatpickr, components } = buildUsage(
-    options.components,
-    options.ids,
-    options.contentClasses,
-    options.propAware?.liveComponents,
-  );
   const prunedByProps = new Set<string>();
-  const { engine, propAware } = options;
+  const { engine, analysis } = options;
   const carbonPruner =
-    engine && propAware
+    engine && analysis
       ? createCarbonStylePruner({
           ...engine,
           isPruned: createPrunedCheck(
-            propAware,
+            analysis,
             options.contentClasses,
             prunedByProps,
           ),
-          liveComponents: propAware.liveComponents,
+          liveComponents: analysis.liveComponents,
           safelist: options.safelist ?? [],
           preserveAllIBMFonts: options.preserveAllIBMFonts === true,
         })
       : undefined;
-  const optimizerOptions: SpliceOptimizerOptions = {
-    allowlist,
-    components: options.components,
-    preserveAllIBMFonts: options.preserveAllIBMFonts === true,
-    preserveFlatpickr,
-    safelist: options.safelist ?? [],
-    isPruned:
-      options.propAware &&
-      createPrunedCheck(
-        options.propAware,
-        options.contentClasses,
-        prunedByProps,
-      ),
-  };
 
   return {
-    usage: { components, allowlistSize: allowlist.size, prunedByProps },
-    /**
-     * svelte-prune's pruner already removes the tokens nothing reads; only
-     * the allowlist engine needs `pruneUnusedTokens` after it.
-     */
-    prunesTokens: carbonPruner !== undefined,
+    usage: {
+      components: [...(analysis?.liveComponents ?? [])].sort(),
+      prunedByProps,
+    },
+    /** Whether it prunes at all. */
+    prunes: carbonPruner !== undefined,
     run(source: Uint8Array | string): OptimizedCssReport {
       // Bundlers hand over every CSS asset, including chunks with no Carbon
       // styles; skip the parse unless something removable could be present.
       const input = toCssString(source);
-      if (!hasOptimizableCss(input)) return { css: input, removed: 0 };
-
-      return carbonPruner
-        ? carbonPruner(input)
-        : spliceOptimizeCss(input, optimizerOptions);
+      if (!carbonPruner || !hasOptimizableCss(input)) {
+        return { css: input, removed: 0 };
+      }
+      return carbonPruner(input);
     },
   };
 }

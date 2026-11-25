@@ -2,7 +2,7 @@ name: Evaluate
 
 # Accuracy checks for CSS pruning (default and prop-aware) and component
 # specialization. Slow (minutes per job), so they run only when the code
-# they exercise (the analyzer, the component index, the plugins and
+# they exercise (the analyzer, the plugins and
 # `optimizeImports`), the examples and golden apps they build, the
 # evaluation scripts, or the dependencies change: once per pull request,
 # and again on main after merge. A dependency bump counts because
@@ -14,6 +14,7 @@ on:
     paths:
       - "src/analyzer/**"
       - "src/indexer/**"
+      - "src/carbon-library.ts"
       - "src/plugins/**"
       - "src/preprocessors/**"
       - "src/optimize-components-loader.ts"
@@ -40,6 +41,7 @@ on:
     paths:
       - "src/analyzer/**"
       - "src/indexer/**"
+      - "src/carbon-library.ts"
       - "src/plugins/**"
       - "src/preprocessors/**"
       - "src/optimize-components-loader.ts"

@@ -2,14 +2,18 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { group, task } from "ostia";
+import { analyzeFiles } from "svelte-prune/internal/analysis";
+import { CARBON, CSS_FAILURE } from "../src/carbon-library";
 import {
+  type CssOptimizerOptions,
+  collectedEngine,
   createCssOptimizer,
   optimizeCssWithReport,
+  cssUsage,
 } from "../src/plugins/create-optimized-css";
 import { collectCarbonTokens, scanContent } from "../src/plugins/scan-content";
 import { collectCarbonImports } from "../src/plugins/scan-imports";
 import { resolveCarbonCss } from "../tests/helpers/carbon-css";
-import { components } from "../tests/helpers/component-index";
 
 // Real Carbon theme CSS (~700kb minified), same source the plugin optimizes
 // at build time. Any theme works for selector coverage.
@@ -42,6 +46,33 @@ const CARBON_PLUS_APP = `${source}\n${APP_CHUNK}`;
 const CARBON_PLUS_LAYER = `${source}\n@layer base{${APP_CHUNK}}`;
 const SOURCE_BYTES = new TextEncoder().encode(source);
 
+/** The analysis for `ids` rendered with any props, made before the timed tasks. */
+const analyzer = await import("svelte-prune/internal/analysis");
+const optionsFor = new Map<
+  string,
+  Pick<CssOptimizerOptions, "analysis" | "engine">
+>();
+async function analyze(ids: string[]): Promise<void> {
+  const result = await analyzeFiles({
+    library: CARBON,
+    failure: CSS_FAILURE,
+    projectRoot: process.cwd(),
+    files: [],
+    components: ids,
+    options: {},
+  });
+  if ("warning" in result) throw new Error(result.warning);
+  optionsFor.set(ids.join(), {
+    analysis: cssUsage(result, analyzer),
+    engine: collectedEngine(result, analyzer, process.cwd(), []),
+  });
+}
+const forIds = (ids: string[]) => {
+  const options = optionsFor.get(ids.join());
+  if (!options) throw new Error(`no analysis for ${ids.join()}`);
+  return options;
+};
+
 type Scenario = { name: string; ids: string[] };
 
 const SCENARIOS: Scenario[] = [
@@ -60,36 +91,42 @@ for (const scenario of SCENARIOS) {
   group(scenario.name, () => {
     task("optimizeCssWithReport", () => {
       optimizeCssWithReport({
-        components,
         source,
-        ids: scenario.ids,
+        ...forIds(scenario.ids),
       });
     });
   });
 }
 
 const BUNDLE_IDS = ["DataTable", "Toolbar", "ToolbarSearch", "OverflowMenu"];
+const DATE_PICKER_IDS = [...BUNDLE_IDS, "DatePicker", "DatePickerInput"];
+await Promise.all(
+  [
+    ...SCENARIOS.map((scenario) => scenario.ids),
+    BUNDLE_IDS,
+    DATE_PICKER_IDS,
+  ].map(analyze),
+);
 const SAFELIST_REGEXPS = [/^\.bx--btn--/, /bx--tag/];
 
 // Every CSS asset in a build goes through `run`.
-// These cover each branch of that call: the no-Carbon skip, the splice path
-// on a mixed asset, the splice path on an asset with `@layer`, and the
+// These cover each branch of that call: the no-Carbon skip, a mixed asset,
+// an asset with `@layer`, and the
 // Uint8Array source like Vite emits for CSS assets.
 group("per-asset paths (small bundle)", () => {
   const optimizer = createCssOptimizer({
-    components,
-    ids: BUNDLE_IDS,
+    ...forIds(BUNDLE_IDS),
   });
 
   task("non-Carbon chunk (skip, ~25kb)", () => {
     optimizer.run(APP_CHUNK);
   });
 
-  task("Carbon + app CSS (splice)", () => {
+  task("Carbon + app CSS (prune)", () => {
     optimizer.run(CARBON_PLUS_APP);
   });
 
-  task("Carbon + @layer (splice)", () => {
+  task("Carbon + @layer (prune)", () => {
     optimizer.run(CARBON_PLUS_LAYER);
   });
 
@@ -98,48 +135,43 @@ group("per-asset paths (small bundle)", () => {
   });
 });
 
-// Options that widen the allowlist or add per-selector work.
+// Options that keep more or add per-selector work.
 group("options (small bundle)", () => {
   task("safelist: strings", () => {
     optimizeCssWithReport({
-      components,
       source,
-      ids: BUNDLE_IDS,
+      ...forIds(BUNDLE_IDS),
       safelist: [".bx--grid", ".bx--row", ".bx--col", ".bx--aspect-ratio"],
     });
   });
 
   task("safelist: RegExp", () => {
     optimizeCssWithReport({
-      components,
       source,
-      ids: BUNDLE_IDS,
+      ...forIds(BUNDLE_IDS),
       safelist: SAFELIST_REGEXPS,
     });
   });
 
   task("contentClasses: 300 tokens", () => {
     optimizeCssWithReport({
-      components,
       source,
-      ids: BUNDLE_IDS,
+      ...forIds(BUNDLE_IDS),
       contentClasses: CONTENT_CLASSES,
     });
   });
 
   task("DatePicker (flatpickr kept)", () => {
     optimizeCssWithReport({
-      components,
       source,
-      ids: [...BUNDLE_IDS, "DatePicker", "DatePickerInput"],
+      ...forIds(DATE_PICKER_IDS),
     });
   });
 
   task("preserveAllIBMFonts", () => {
     optimizeCssWithReport({
-      components,
       source,
-      ids: BUNDLE_IDS,
+      ...forIds(BUNDLE_IDS),
       preserveAllIBMFonts: true,
     });
   });
@@ -156,8 +188,7 @@ group("full build (small bundle, 4 assets)", () => {
 
   task("createCssOptimizer + run each asset", () => {
     const optimizer = createCssOptimizer({
-      components,
-      ids: BUNDLE_IDS,
+      ...forIds(BUNDLE_IDS),
     });
     for (const [_id, css] of assets) {
       optimizer.run(css);
