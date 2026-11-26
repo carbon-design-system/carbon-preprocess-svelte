@@ -48,7 +48,7 @@
     "snapshots:from-ci": "bun scripts/snapshots-from-ci.ts",
     "bench": "bun bench/run.ts",
     "typecheck": "bun check",
-    "typecheck:svelte": "svelte-typecheck --workspace golden --no-tsconfig --checker bun --fail-on-warnings",
+    "typecheck:svelte": "svelte-typecheck --workspace golden --no-tsconfig --checker bun --diagnostic-sources js --fail-on-warnings",
     "lint:all": "bun fmt && bun lint --fix && svelte-lint --fix",
     "lint:changed": "bun fmt --staged && bun lint --staged --fix && svelte-lint --staged --fix",
     "lint:svelte": "svelte-lint",
