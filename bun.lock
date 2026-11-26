@@ -17,7 +17,7 @@
         "playwright": "1.64.1",
         "svelte": "^5.57.2",
         "svelte-ast": "^0.12.0",
-        "svelte-lint": "^0.3.0",
+        "svelte-lint": "^0.4.0",
         "svelte-prune": "^0.15.3",
         "svelte-typecheck": "^0.4.0",
         "vite": "^8.3.5",
@@ -450,7 +450,7 @@
 
     "svelte-ast": ["svelte-ast@0.12.0", "", {}, "sha512-wtRCJQrZQB4q6liWv2VIS6e/u+gcJyofMOx5BGOJkicp13V0fAQ6/jkZ3RC40iuJOjwBKF5ioEmpvcCEd7y1RQ=="],
 
-    "svelte-lint": ["svelte-lint@0.3.0", "", { "bin": { "svelte-lint": "cli.js" } }, "sha512-XkG2idJkMi/K3GuiZVJTSOfkzYwd1NOShMhtwp0STC/kao1KEHNvCo2phaExHKBOuuWhmvmDdCTfyfUaf/Lk9w=="],
+    "svelte-lint": ["svelte-lint@0.4.0", "", { "bin": { "svelte-lint": "cli.js" } }, "sha512-ce1vTtJ4i4m6XGT8oGvDdNX0ywMIo2x3TRNqeVDm/MTnUwB7tW5Lnxeq5UG14chv06pJ3BC1d3rrwFiPEqXe/w=="],
 
     "svelte-prune": ["svelte-prune@0.15.3", "", {}, "sha512-dho1jhUvOdKLLqZiZXrndcUfwm2RtyI9V/J9HSUiIoXPbbGEyfwnZJXqsyK0kgLXSHceEVDAAjWqjHG4HsAA4w=="],
 
