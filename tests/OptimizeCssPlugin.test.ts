@@ -341,7 +341,7 @@ describe("OptimizeCssPlugin", () => {
       const [, updated] = mockCompiler.compilation.updateAsset.mock.calls[0];
       expect(updated.source()).toBe(".bx--btn{a:1}.bx--btn--tertiary{a:2}");
       const printed = consoleSpy.mock.calls.flat().join("\n");
-      expect(printed).toContain("Prop-aware:");
+      expect(printed).toContain("Props the app passes:");
       expect(printed).toMatch(KIND_TERTIARY);
       expect(printed).toContain("Classes pruned by props: 1");
     } finally {
