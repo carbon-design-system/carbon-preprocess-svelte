@@ -124,10 +124,12 @@ export type CarbonOptimizer = {
   finish(build: CarbonBuild): Promise<Record<string, string>>;
 };
 
-/** Files the module graph reads that can name tokens, but whose code is JS. */
+// HTML and SVG can name tokens, but the module graph holds their code as
+// JS, so they're read from disk.
 const RE_MARKUP_FILE = /\.(?:html?|svg)$/;
 const RE_CARBON_STYLESHEET = /[\\/]carbon-components-svelte[\\/]/;
-/** Specifiers that can't be an alias of Carbon, as svelte-prune reads them. */
+// Relative, absolute, virtual and `svelte` specifiers can't be an alias of
+// Carbon, as svelte-prune reads them, so their edges carry no specifier.
 const NOT_AN_ALIAS = /^(?:\.|\/|\0|svelte(?:\/|$))/;
 
 /**
@@ -161,16 +163,14 @@ export function createCarbonOptimizer(
       { ...componentOptions, hydration: undefined },
       { plugin: "optimizeComponents", failure: SPECIALIZE_FAILURE },
     );
-  /**
-   * Carbon components this build rewrote, for the summary's header; 0
-   * when silent.
-   */
+  // For the summary's header; 0 when `optimizeComponents` is silent, so
+  // the header doesn't count its rewrites.
   let rewritten = 0;
   let analyzer: typeof import("svelte-prune/internal/analysis") | undefined;
 
   function checkComponents(modules: CarbonBuildModule[]): void {
     if (!components) return;
-    /** Each module's importers; `undefined` for the bundler, for an entry. */
+    // An entry's importer is `undefined`, since the bundler imports it.
     const graph = new Map<
       string,
       { importers: Array<string | undefined>; dynamic: string[] }
@@ -205,10 +205,9 @@ export function createCarbonOptimizer(
     if (error) throw new Error(error);
   }
 
-  /**
-   * The edges into Carbon from outside it, with the specifier of one that
-   * may be an alias, as svelte-prune's `libraryImports` reads a Vite graph.
-   */
+  // Read as svelte-prune's `libraryImports` reads a Vite graph, so both
+  // builds check the same edges; only one that may be an alias keeps
+  // its specifier.
   function libraryEdges(modules: CarbonBuildModule[]): LibraryImport[] {
     const edges: LibraryImport[] = [];
     for (const module of modules) {
@@ -249,10 +248,8 @@ export function createCarbonOptimizer(
     }
 
     const moduleClasses = new Set<string>();
-    /**
-     * `--cds-` names the modules' code reads, as `optimizeCss` reads
-     * Vite's graph.
-     */
+    // Collected as `optimizeCss` reads Vite's graph, so both builds keep
+    // the same tokens.
     const codeTokens = new Set<string>();
     const markupTokens = new Set<string>();
     // What scripts and markup only set or remove: declared at run time, so

@@ -22,25 +22,19 @@ export type BuildSummary = {
   color?: boolean;
 };
 
-/**
- * Rows shown before the rest fold into one; a single extra row
- * isn't folded.
- */
+// Rows shown before the rest fold into one; a single extra row isn't
+// folded, since its fold row would take as much room.
 const ROWS = 5;
-/**
- * A content hash in a file name, as bundlers write it:
- * `index-Ab12Cd.css`, `0.Ab12Cd.css`.
- */
+// A content hash as bundlers write it (`index-Ab12Cd.css`,
+// `0.Ab12Cd.css`), so the summary can dim it.
 const RE_HASH = /([.-][A-Za-z0-9_-]{4,})(?=\.css$)/;
 
 let formatter: Intl.NumberFormat | undefined;
 
-/**
- * `bytes` in kB with one decimal and thousands separators, so a column of
- * sizes lines up on its decimal point. The formatter is made on first use:
- * an `Intl.NumberFormat` costs milliseconds, and every tool that loads
- * `svelte.config.js` imports this module.
- */
+// One decimal and thousands separators, so a column of sizes lines up on
+// its decimal point. The formatter is made on first use, since an
+// `Intl.NumberFormat` costs milliseconds, and every tool that loads
+// `svelte.config.js` imports this module.
 function kb(bytes: number): string {
   formatter ??= new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 1,
@@ -53,10 +47,8 @@ function percent(before: number, after: number): string {
   return `-${Math.round(((before - after) / before) * 100)}%`;
 }
 
-/**
- * Whether to color output: `NO_COLOR` wins, then `FORCE_COLOR`, then
- * a terminal.
- */
+// `NO_COLOR` wins, then `FORCE_COLOR`, so a user's setting overrides
+// whether the stream is a terminal.
 export function useColor(
   stream: { isTTY?: boolean } = process.stdout,
 ): boolean {
@@ -82,18 +74,15 @@ type Row = {
   after: number;
 };
 
-/**
- * The build's pruning, as a header and a table: a row per stylesheet, the
- * largest savings first and the rest folded into one row past five, then
- * a total under a rule when there's more than one. Sizes, arrows and
- * percentages line up in columns. `null` when there's nothing to say.
- *
- *   carbon-preprocess-svelte: rewrote 37 Carbon components and pruned their CSS
- *     assets/index-Ab12Cd.css    772.5 kB  →  32.8 kB  -96%
- *     assets/About-Xy34Zw.css     38.0 kB  →   3.3 kB  -91%
- *                               ──────────────────────────
- *     2 stylesheets              810.5 kB  →  36.1 kB  -96%
- */
+// The largest savings first, and the rest folded into one row past five,
+// so the table stays short; a total under a rule only when there's more
+// than one stylesheet. `null` when there's nothing to say.
+//
+//   carbon-preprocess-svelte: rewrote 37 Carbon components and pruned their CSS
+//     assets/index-Ab12Cd.css    772.5 kB  →  32.8 kB  -96%
+//     assets/About-Xy34Zw.css     38.0 kB  →   3.3 kB  -91%
+//                               ──────────────────────────
+//     2 stylesheets              810.5 kB  →  36.1 kB  -96%
 export function formatSummary(summary: BuildSummary): string | null {
   const { rewritten = 0, unchanged = 0, dryRun = false } = summary;
   const color = summary.color ?? useColor();
@@ -211,10 +200,9 @@ export function formatSummary(summary: BuildSummary): string | null {
   return lines.join("\n");
 }
 
-/**
- * Logs the build's summary through `log` (Vite's `config.logger.info`)
- * when set, else `console.log`. Returns whether it logged anything.
- */
+// Through `log` (Vite's `config.logger.info`) when set, so the summary
+// lands in Vite's output, else `console.log`. Returns whether it
+// logged anything.
 export function logSummary(
   summary: BuildSummary & { log?: (message: string) => void },
 ): boolean {

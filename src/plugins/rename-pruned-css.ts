@@ -7,14 +7,13 @@ type Context = Partial<Pick<Rollup.PluginContext, "emitFile">>;
 
 const PLACEHOLDER = /(\[[a-z]+(?::\d+)?\])/;
 const HASH = /^\[hash(?::(\d+))?\]$/;
-/** Assets that can link a CSS file. */
+// Only HTML and CSS assets can link a CSS file, so only
+// they're rewritten.
 const RE_TEXT_ASSET = /\.(?:html?|css)$/;
 const RE_REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
 
-/**
- * Rollup's and Rolldown's `[hash]` length when the pattern doesn't
- * set one.
- */
+// What Rollup and Rolldown use when the pattern doesn't set a `[hash]`
+// length, so a name matches as they wrote it.
 const DEFAULT_HASH_LENGTH = 8;
 
 function placeholderPattern(part: string): string {
@@ -26,13 +25,10 @@ function placeholderPattern(part: string): string {
   return ".*";
 }
 
-/**
- * `asset`'s name with each content hash in it replaced by a hash of `css`,
- * or `undefined` if `assetFileNames` didn't name it with a hash: an asset
- * a plugin emitted with a fixed `fileName` keeps that name. Only the hash
- * changes, since an asset several sources were merged into can have
- * several `names`.
- */
+// `undefined` if `assetFileNames` didn't name it with a hash, since an
+// asset a plugin emitted with a fixed `fileName` keeps that name. Only the
+// hash changes, since an asset several sources were merged into can have
+// several `names`.
 function rehashedName(
   asset: Rollup.OutputAsset,
   assetFileNames: Rollup.NormalizedOutputOptions["assetFileNames"],
@@ -71,10 +67,8 @@ function rehashedName(
   return renamed + asset.fileName.slice(at);
 }
 
-/**
- * Renames `from` to `to` (file names) in chunks, Vite's metadata and HTML
- * and CSS assets.
- */
+// In chunks, Vite's metadata, and HTML and CSS assets, since each can
+// name a CSS file.
 function rewriteReferences(
   bundle: Rollup.OutputBundle,
   renames: ReadonlyMap<string, string>,
@@ -110,12 +104,9 @@ function rewriteReferences(
   }
 }
 
-/**
- * Writes the pruned CSS in `pruned` (file name to CSS) to `bundle`. An
- * asset whose name holds a hash of its content gets a new name hashed from
- * the pruned CSS, and every chunk and HTML or CSS asset naming it is
- * updated, so a cached file is never reused for different CSS.
- */
+// An asset whose name holds a hash of its content gets a new name hashed
+// from the pruned CSS, and every chunk and HTML or CSS asset naming it is
+// updated, so a cached file is never reused for different CSS.
 export function writePrunedCss(
   context: Context,
   bundle: Rollup.OutputBundle,

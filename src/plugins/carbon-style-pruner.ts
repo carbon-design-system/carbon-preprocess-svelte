@@ -170,10 +170,6 @@ function installedStylesheets(
   );
 }
 
-/**
- * Carbon's stylesheets, for svelte-prune's pruner: which classes
- * they define.
- */
 const CARBON_STYLES = {
   ...CARBON,
   styles: {
@@ -186,7 +182,6 @@ const CARBON_STYLES = {
 };
 
 const ITALIC_TYPE_CLASS = ".bx--type-italic";
-/** A legacy `bx-x` class (not `bx--x`) in a selector. */
 const LEGACY_CLASS = /(?:^|[^-\w])\.bx-(?!-)/;
 // Always validated, so which inputs pass through unchanged doesn't depend
 // on `preserveAllIBMFonts`.
@@ -215,13 +210,11 @@ export type CarbonStylePrunerInput = {
   stylesheets?: readonly string[] | undefined;
 };
 
-/**
- * Prunes Carbon CSS with svelte-prune's `libraryStylePruner`, then what
- * only Carbon needs: IBM Plex faces no component uses, flatpickr's rules
- * without a DatePicker, and legacy `bx-` selectors whose `bx--` class
- * can't render. `undefined` when svelte-prune can't read
- * Carbon's stylesheets.
- */
+// svelte-prune's `libraryStylePruner` first, then what only Carbon needs:
+// IBM Plex faces no component uses, flatpickr's rules without a
+// DatePicker, and legacy `bx-` selectors whose `bx--` class can't render.
+// `undefined` when svelte-prune can't read Carbon's stylesheets, so the
+// CSS passes through.
 export function createCarbonStylePruner(
   input: CarbonStylePrunerInput,
 ): ((css: string) => { css: string; removed: number }) | undefined {

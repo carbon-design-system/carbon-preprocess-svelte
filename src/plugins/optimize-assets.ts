@@ -17,13 +17,10 @@ export type CssAsset = {
   write(css: string): void;
 };
 
-/**
- * Runs `optimizer` over each asset, sets `fontDisplay`, writes the results
- * back (unless `dryRun`), warns about tokens the results read that nothing
- * declares (given `tokenNames`), and prints one summary of them and the
- * report the options ask for. Shared by the plugins and the CLI. Returns
- * whether it printed a summary.
- */
+// Shared by the plugins and the CLI, so they prune, warn and print one
+// summary the same way. Writes nothing on `dryRun`, and warns about
+// undeclared tokens only given `tokenNames`. Returns whether it printed
+// a summary.
 export function optimizeAssets({
   assets,
   optimizer,

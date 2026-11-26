@@ -56,7 +56,6 @@ function optionalPlugins<T extends { plugins?: unknown }>(
   return inputOptions?.plugins;
 }
 
-/** Calls a Vite hook, given as a function or as `{ handler }`. */
 function call<This, Args extends unknown[], Result>(
   hook:
     | ((this: This, ...args: Args) => Result)

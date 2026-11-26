@@ -25,17 +25,12 @@ const BARRELS = new Set<string>([
  */
 export type CarbonExportsLoader = () => ReadonlyMap<string, PackageExport>;
 
-/** `import local from "path"` or `import { name as local } from "path"`. */
 function directImport(local: string, path: string, name: string): string {
   if (name === "default") return `import ${local} from "${path}";`;
   const binding = name === local ? name : `${name} as ${local}`;
   return `import { ${binding} } from "${path}";`;
 }
 
-/**
- * The direct-path import for `imported`, or `undefined` to keep it on
- * the barrel.
- */
 function directReplacement(
   source: string,
   imported: string,
@@ -50,12 +45,9 @@ function directReplacement(
   return target && directImport(local, target.path, target.name);
 }
 
-/**
- * The direct-path replacement for one barrel import statement, or `null`
- * when nothing changes. Type-only specifiers, default and namespace
- * imports, and names the installed Carbon's barrel doesn't export stay on
- * the barrel.
- */
+// Type-only specifiers, default and namespace imports, and names the
+// installed Carbon's barrel doesn't export stay on the barrel; `null`
+// when nothing changes, so the statement is left as written.
 function rewriteImport(
   statement: LexedImport,
   loadExports: CarbonExportsLoader,
@@ -151,10 +143,7 @@ export function transformScript(
   };
 }
 
-/**
- * Barrel exports of the Carbon a directory resolves; cached per directory
- * and install, warns once.
- */
+// Cached per directory and install, so it warns once.
 function createCarbonExportsResolver(): (
   dir: string,
 ) => ReadonlyMap<string, PackageExport> {

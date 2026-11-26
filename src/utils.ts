@@ -17,11 +17,9 @@ export function isCssFile(id: string): id is `${string}.css` {
   return RE_EXT_CSS.test(id);
 }
 
-/**
- * `carbon-components-svelte` as a whole path segment, so a consumer's own
- * path (a fork, a folder named after the package) doesn't match. Accepts
- * `\`: webpack reports Windows module paths with it.
- */
+// A whole path segment, so a consumer's own path (a fork, a folder named
+// after the package) doesn't match. Accepts `\`, since webpack reports
+// Windows module paths with it.
 const RE_CARBON_COMPONENTS_SEGMENT = new RegExp(
   `(^|[\\\\/])${CarbonSvelte.Components}([\\\\/]|$)`,
 );
@@ -30,13 +28,10 @@ export function isCarbonSvelteImport(id: string) {
   return isSvelteFile(id) && RE_CARBON_COMPONENTS_SEGMENT.test(id);
 }
 
-/**
- * Whether a bundled module's code should be scanned for literal `bx--`
- * tokens. Skips virtual modules (`\0` prefix), stylesheets (see
- * `RE_EXT_STYLESHEET`), Svelte `<style>` sub-modules, and files inside
- * `carbon-components-svelte`, which the usage analysis reads
- * more precisely.
- */
+// Only app code is scanned for literal `bx--` tokens: not virtual modules
+// (`\0` prefix), stylesheets (see `RE_EXT_STYLESHEET`), Svelte `<style>`
+// sub-modules, or files inside `carbon-components-svelte`, which the
+// usage analysis reads more precisely.
 export function isScannableModule(id: string): boolean {
   if (id.startsWith("\0")) return false;
   if (RE_EXT_STYLESHEET.test(stripQuery(id)) || RE_STYLE_QUERY.test(id)) {
@@ -45,7 +40,8 @@ export function isScannableModule(id: string): boolean {
   return !RE_CARBON_COMPONENTS_SEGMENT.test(id);
 }
 
-/** Decodes a CSS asset source without copying the bytes. */
+// A view over the same memory, so the bytes aren't copied
+// before decoding.
 export function toCssString(source: Uint8Array | string): string {
   if (typeof source === "string") return source;
   return Buffer.from(

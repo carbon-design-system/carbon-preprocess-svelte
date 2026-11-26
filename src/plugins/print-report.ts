@@ -50,7 +50,6 @@ function toKB(bytes: number): string {
   return `${sizeFormatter.format(bytes / BYTES_PER_KB)} kB`;
 }
 
-/** Right-pads every value to the width of the longest one in the column. */
 function padColumn(values: string[]): string[] {
   const width = Math.max(0, ...values.map((value) => value.length));
   return values.map((value) => value.padEnd(width));

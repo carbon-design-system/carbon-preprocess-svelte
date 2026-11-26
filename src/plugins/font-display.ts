@@ -4,11 +4,9 @@ const RE_FONT_FACE = /@font-face\s*\{[^}]*\}/g;
 const RE_FONT_DISPLAY = /font-display\s*:\s*[a-z]+/;
 const RE_IBM_PLEX = /IBM Plex/;
 
-/**
- * `css` with each IBM Plex `@font-face` rule's `font-display` set to
- * `value`. Carbon's stylesheets ship `auto`, which hides text until the
- * font loads from IBM's CDN. Other `@font-face` rules stay as they are.
- */
+// Only IBM Plex `@font-face` rules get `value`, since Carbon's stylesheets
+// ship them with `auto`, which hides text until the font loads from IBM's
+// CDN. Other `@font-face` rules stay as they are.
 export function setFontDisplay(css: string, value: FontDisplay | undefined) {
   if (!value) return css;
   return css.replace(RE_FONT_FACE, (rule) =>
