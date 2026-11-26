@@ -27,7 +27,6 @@ export type CssUsage = {
   report?(prunedClasses: ReadonlySet<string>, root: string): string[];
 };
 
-/** A `UsageResult`, as `CssUsage`. */
 export function cssUsage(
   result: UsageResult,
   analyzer: typeof import("svelte-prune/internal/analysis"),
@@ -40,10 +39,8 @@ export function cssUsage(
   };
 }
 
-/**
- * The `engine` for a usage analysis CPS ran itself, from `files`: the app
- * sources it read, whose classes, custom properties and keyframes stay.
- */
+// Only for an analysis CPS ran itself, since `files` must be the app
+// sources it read: their classes, custom properties and keyframes stay.
 export function collectedEngine(
   result: UsageResult,
   analyzer: typeof import("svelte-prune/internal/analysis"),
@@ -84,11 +81,9 @@ const NEVER_PRUNED = new Set<string>([
   ...CONTEXT_ANCESTORS,
 ]);
 
-/**
- * `analysis.isPruned`, except for classes the app's own code names
- * (`contentClasses`, exact or as a `bx--x-` prefix). Records every class
- * it prunes in `pruned`.
- */
+// A class the app's own code names (in `contentClasses`, exact or as a
+// `bx--x-` prefix) stays even if `analysis.isPruned` says it goes, since
+// that code may apply it. Records every class it prunes in `pruned`.
 function createPrunedCheck(
   analysis: CssUsage,
   contentClasses: Iterable<string> | undefined,
@@ -116,11 +111,8 @@ function createPrunedCheck(
 
 export type CssOptimizer = ReturnType<typeof createCssOptimizer>;
 
-/**
- * Prunes Carbon CSS with svelte-prune's pruner and Carbon's own rules on
- * top (see `createCarbonStylePruner`). Without an analysis, or when
- * svelte-prune can't read Carbon's stylesheets, CSS passes through.
- */
+// Prunes only with an analysis and Carbon's stylesheets read; without
+// either, CSS passes through.
 export function createCssOptimizer(options: CssOptimizerOptions) {
   const prunedByProps = new Set<string>();
   const { engine, analysis } = options;

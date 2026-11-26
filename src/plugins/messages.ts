@@ -14,7 +14,6 @@ export function contentMatchedNothing(
   return `${LOG_PREFIX} \`content\` globs ${JSON.stringify(content)} matched no files (resolved from ${root}). No classes from \`content\` were kept.`;
 }
 
-/** A warning for a failed or empty `content` scan, else `undefined`. */
 export function contentScanWarning(
   content: readonly string[] | undefined,
   root: string,
@@ -28,7 +27,6 @@ export function contentScanWarning(
   return undefined;
 }
 
-/** `optimizeComponents` is in the build, but its analysis failed. */
 export const SHARED_ANALYSIS_FAILED = `${LOG_PREFIX} optimizeComponents could not analyze this build, so Carbon CSS is left unpruned.`;
 
 const TOKEN_MIGRATION =

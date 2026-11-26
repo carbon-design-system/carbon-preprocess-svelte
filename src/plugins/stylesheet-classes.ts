@@ -2,17 +2,16 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { resolveCarbonRoot } from "../indexer/resolve-carbon-root";
 
-/** A class in a stylesheet, `\:` escapes included (`.bx--lg\:col-span-4`). */
+// `\:` escapes included, so breakpoint classes
+// (`.bx--lg\:col-span-4`) count.
 const CLASS = /\.(bx--(?:[\w-]|\\:)+)/g;
-/** Every theme defines the same classes: one stylesheet lists them. */
+// Every theme defines the same classes, so one stylesheet lists them.
 const STYLESHEETS = ["css/all.css", "css/white.css"];
 
 const cache = new Map<string, { mtimeMs: number; classes: string[] }>();
 
-/**
- * The `bx--` classes the installed Carbon's stylesheet defines
- * (`.bx--btn`), for what the pruning depends on; `[]` if it can't be read.
- */
+// For the fingerprint of what the pruning depends on, so another Carbon
+// install changes the chunk hashes; `[]` if the stylesheet can't be read.
 export function carbonStylesheetClasses(root: string): readonly string[] {
   let carbonRoot: string;
   try {

@@ -134,10 +134,8 @@ export type OptimizeCssOptions = {
   >;
 };
 
-/**
- * Whether CSS can be pruned from `optimizeComponents`' analysis: only
- * without `exclude` or `assume`, which the rewrite doesn't read.
- */
+// CSS can be pruned from `optimizeComponents`' analysis only without
+// `exclude` or `assume`, since the rewrite doesn't read them.
 export function sharesAnalysis(options?: OptimizeCssOptions): boolean {
   return (
     (options?.exclude ?? []).length === 0 &&
@@ -145,7 +143,6 @@ export function sharesAnalysis(options?: OptimizeCssOptions): boolean {
   );
 }
 
-/** What the usage analysis reads the app with. */
 export function usageOptions(options?: OptimizeCssOptions): UsageOptions {
   return {
     exclude: options?.exclude && [...options.exclude],
@@ -153,10 +150,8 @@ export function usageOptions(options?: OptimizeCssOptions): UsageOptions {
   };
 }
 
-/**
- * Throws for `propAware`, removed in 0.14.0: a JavaScript config would
- * otherwise drop it silently.
- */
+// `propAware` was removed in 0.14.0; a JavaScript config would otherwise
+// drop it silently, so it throws.
 export function checkRemovedOptions(options?: object): void {
   if (options && "propAware" in options) {
     throw new Error(

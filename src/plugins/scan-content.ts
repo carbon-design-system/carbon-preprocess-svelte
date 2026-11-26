@@ -3,14 +3,10 @@ import path from "node:path";
 import { errorMessage } from "../utils";
 import { collectTokenNames } from "./token-names";
 
-/** Literal `bx--`-prefixed tokens as they appear in source markup. */
 const CARBON_TOKEN = /bx--[A-Za-z0-9_-]+/g;
 
-/**
- * Adds every literal `bx--` token in `source` to `into` as a class
- * selector. The `includes` check is the fast path: most modules contain no
- * Carbon token, and a substring search is far cheaper than the regex.
- */
+// The `includes` check is the fast path, since most modules contain no
+// Carbon token, and a substring search is far cheaper than the regex.
 export function collectCarbonTokens(source: string, into: Set<string>): void {
   if (!source.includes("bx--")) return;
 
@@ -19,7 +15,6 @@ export function collectCarbonTokens(source: string, into: Set<string>): void {
   }
 }
 
-/** Each readable file in `files` (relative to `cwd`), by absolute path. */
 export function* readFiles(
   files: readonly string[],
   cwd: string,
@@ -45,15 +40,11 @@ export type ContentScan = {
   error?: string;
 };
 
-/**
- * Scans files matched by `content` globs (relative to `cwd`) for literal
- * `bx--` tokens and `--cds-` token names. Also reports how many files
- * matched and any glob failure so callers can warn on a
- * misconfigured `content`.
- *
- * For ``class={`bx--btn--${kind}`}`` only the prefix `bx--btn--` is found;
- * prefix matching then keeps `.bx--btn--primary` and similar.
- */
+// Also reports how many files matched and any glob failure, so callers
+// can warn on a misconfigured `content`.
+//
+// For ``class={`bx--btn--${kind}`}`` only the prefix `bx--btn--` is found;
+// prefix matching then keeps `.bx--btn--primary` and similar.
 export function scanContent(
   content?: readonly string[],
   cwd: string = process.cwd(),

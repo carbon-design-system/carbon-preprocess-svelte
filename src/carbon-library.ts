@@ -2,14 +2,11 @@ import type { Failure, LibrarySpec } from "svelte-prune";
 import { CarbonSvelte, PACKAGE_NAME } from "./constants";
 import { collectCarbonTokens } from "./plugins/scan-content";
 
-/**
- * A Carbon class, with the breakpoint ones CSS Grid columns build
- * (`bx--lg:col-span-4`). `bx--lg:` alone is a prefix: svelte-prune keeps
- * every class starting with it.
- */
+// The `:` part is for the breakpoint classes CSS Grid columns build
+// (`bx--lg:col-span-4`). `bx--lg:` alone matches too, as a prefix, since
+// svelte-prune keeps every class starting with it.
 const CLASS_TOKEN = /(?<![\w-])bx--[\w-]+(?::[\w-]*)?/g;
 
-/** Carbon, as svelte-prune reads and rewrites it. */
 export const CARBON: LibrarySpec = {
   name: CarbonSvelte.Components,
   srcDir: "src",
@@ -26,16 +23,11 @@ export const CARBON: LibrarySpec = {
   },
 };
 
-/** What the usage analysis turns off when it fails, for `optimizeCss`. */
 export const CSS_FAILURE = {
   feature: "optimizeCss",
   fallback: "Carbon CSS is left unpruned",
 } satisfies Failure;
 
-/**
- * What the usage analysis turns off when it fails,
- * for `optimizeComponents`.
- */
 export const SPECIALIZE_FAILURE = {
   feature: "optimizeComponents",
   fallback: "Carbon components were bundled unchanged",

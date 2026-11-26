@@ -7,25 +7,22 @@ import { logSummary } from "./print-diff";
  */
 export type RewriteHeader = { readonly silent: boolean; rewritten: number };
 
-/** Each `optimizeCss` and `OptimizeCssPlugin`, by its plugin object. */
+// Keyed by plugin object, so `rewriteReporter` can find each `optimizeCss`
+// and `OptimizeCssPlugin` among a build's plugins.
 const headers = new WeakMap<object, RewriteHeader>();
 
-/**
- * Registers `plugin`, an `optimizeCss`, to report the rewrites of
- * its builds.
- */
+// `plugin` is an `optimizeCss`, so its summary's header reports the
+// rewrites of its builds.
 export function rewriteHeader(plugin: object, silent: boolean): RewriteHeader {
   const header = { silent, rewritten: 0 };
   headers.set(plugin, header);
   return header;
 }
 
-/**
- * For `optimizeComponents`: hands each build's rewrite count to the
- * `optimizeCss` among the build's plugins, which prints it in its
- * summary's header, or prints it itself when there's none (or it's
- * silent), in place of svelte-prune's sentence.
- */
+// For `optimizeComponents`: each build's rewrite count goes to the
+// `optimizeCss` among the build's plugins, which prints it in its
+// summary's header, or is printed here when there's none (or it's
+// silent), instead of svelte-prune's sentence.
 export function rewriteReporter(silent: boolean) {
   let header: RewriteHeader | undefined;
   let log: ((message: string) => void) | undefined;

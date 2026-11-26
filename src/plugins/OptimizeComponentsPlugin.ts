@@ -8,7 +8,8 @@ import { CARBON, SPECIALIZE_FAILURE } from "../carbon-library";
 import type { OptimizeComponentsOptions } from "./optimize-components";
 import { rewriteReporter } from "./rewrite-header";
 
-/** The loader's built file next to the bundle, or its source in a checkout. */
+// The built loader sits next to the bundle; a checkout has only its
+// source, so that's the fallback.
 const LOADER = (() => {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [

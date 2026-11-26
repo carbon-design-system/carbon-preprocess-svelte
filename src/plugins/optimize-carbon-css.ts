@@ -111,11 +111,9 @@ export async function optimizeCarbonCss(
   return { ...report, css: setFontDisplay(report.css, options.fontDisplay) };
 }
 
-/**
- * The usage analysis, from the `content` files. Without them, each of
- * `components` renders with any props: every variant stays, and only what
- * they never render goes. `undefined` (CSS unpruned, warned) if it fails.
- */
+// Without `content` files, each of `components` renders with any props,
+// so every variant stays and only what they never render goes.
+// `undefined` (CSS unpruned, warned) if it fails.
 async function analyze(
   options: OptimizeCarbonCssOptions,
   ids: string[],

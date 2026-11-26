@@ -125,7 +125,6 @@ function unknownOption(error: unknown): CliError {
   );
 }
 
-/** `a, b,c` as `["a", "b", "c"]`. */
 function parseList(value: string | undefined): string[] {
   return (value ?? "")
     .split(",")
@@ -208,7 +207,8 @@ async function main() {
   // The Carbon stylesheets the files import, since those are all the
   // pruner needs to read.
   const stylesheets = new Set<string>();
-  /** Some file may use components it doesn't name (`import * as C`). */
+  // Set when a file may use components it doesn't name (`import * as C`),
+  // so every component counts as used.
   let usesAll = false;
 
   for (const source of readFiles(globSync(contentGlobs, { cwd }), cwd)) {

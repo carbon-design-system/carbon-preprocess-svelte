@@ -82,19 +82,15 @@ export type CarbonBunPlugin = {
   ): Promise<Record<string, string>>;
 };
 
-/**
- * A Bun metafile path: relative to the working directory,
- * or `namespace:path`.
- */
+// A Bun metafile path is relative to the working directory or
+// `namespace:path`, and only the first kind resolves to a file.
 const RE_NAMESPACED = /^[a-z][\w-]+:/i;
 const RE_TEXT_OUTPUT = /\.(?:css|html?|[cm]?js|svg|json)$/;
 const RE_CSS_OUTPUT = /\.css$/;
 const RE_CARBON_SHEET =
   /[\\/]carbon-components-svelte[\\/]css[\\/][^\\/]+\.css$/;
-/**
- * What a raw stylesheet bundles as: one rule Bun's minifier
- * keeps, numbered.
- */
+// A raw stylesheet bundles as one numbered rule, which Bun's minifier
+// keeps, so the sheet can take its place once the build is done.
 const SHEET_MARKER = "carbon-preprocess-svelte-sheet";
 const RE_SHEET_MARKER = new RegExp(
   `\\.${SHEET_MARKER}-(\\d+)\\s*\\{[^}]*\\}`,
@@ -137,10 +133,8 @@ function resolveWithBun(
   }
 }
 
-/**
- * The modules a Bun build bundled, from its metafile, with their sources:
- * a component `optimizer` rewrote as it served it.
- */
+// A component's source is the one `optimizer` served, since that's what
+// Bun bundled, not the file on disk.
 function buildModules(
   result: BunBuildResult,
   optimizer: CarbonOptimizer,
@@ -199,7 +193,6 @@ function readText(id: string): string | undefined {
   }
 }
 
-/** The text files a Bun build wrote, by path. */
 function textOutputs(result: BunBuildResult): Map<string, string> {
   const outputs = new Map<string, string>();
   for (const { path: file } of result.outputs) {
@@ -210,7 +203,7 @@ function textOutputs(result: BunBuildResult): Map<string, string> {
   return outputs;
 }
 
-/** `hash` in `file`'s name replaced by one of `css`, of the same length. */
+// The new hash is as long as the old one, so the name keeps its shape.
 function rehash(file: string, hash: string, css: string): string | undefined {
   const name = path.basename(file);
   if (!hash || !name.includes(hash)) return undefined;
@@ -247,7 +240,6 @@ export function optimizeCarbonBun(options?: CarbonBunOptions): CarbonBunPlugin {
   // finds its sheet.
   const sheets: string[] = [];
 
-  /** `css` with each stylesheet marker replaced by the file it stands for. */
   const withSheets = (css: string) =>
     css.replace(RE_SHEET_MARKER, (_, i: string) =>
       readFileSync(sheets[Number(i)], "utf8"),

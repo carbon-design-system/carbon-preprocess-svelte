@@ -44,10 +44,8 @@ type WebpackAssetSource = {
   source(): string | Buffer;
 };
 
-/**
- * `--cds-` names in the compilation's scripts and markup; `written` holds
- * the ones they only set or remove.
- */
+// `written` holds the names scripts and markup only set or remove, since
+// those are declared at run time.
 function assetTokenNames(assets: Record<string, WebpackAssetSource>): {
   names: Set<string>;
   written: Set<string>;
@@ -62,11 +60,9 @@ function assetTokenNames(assets: Record<string, WebpackAssetSource>): {
   return { names, written };
 }
 
-/**
- * The tokens the app's own CSS assets read: svelte-prune's pruner sees one
- * asset at a time. Not Carbon's, which it prunes: what those read counts
- * only once their pruned rules are gone, which it checks itself.
- */
+// The app's own CSS assets, since svelte-prune's pruner sees one asset at
+// a time. Not Carbon's, which it prunes: what those read counts only once
+// their pruned rules are gone, which it checks itself.
 function assetTokenReads(
   assets: Record<string, WebpackAssetSource>,
 ): Set<string> {
@@ -158,9 +154,7 @@ export class OptimizeCssPlugin {
       (compilation) => {
         const ids = new Set<string>();
         const moduleClasses = new Set<string>();
-        /** `[resource, code]` of every scannable module, for the analysis. */
         const analyzedModules: Array<[string, string]> = [];
-        /** The module graph's edges into Carbon, for the analysis. */
         const carbonImports: LibraryImport[] = [];
         // Every module's resource, since the Carbon stylesheets among them
         // are all the pruner needs to read.

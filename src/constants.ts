@@ -6,19 +6,14 @@ export const CarbonSvelte = {
 
 export const PACKAGE_NAME = "carbon-preprocess-svelte";
 
-/**
- * Prefix for every warning and error the package logs, so users can grep
- * for it.
- */
+// On every warning and error the package logs, so users can grep for it.
 export const LOG_PREFIX = `${PACKAGE_NAME}:`;
 
 export const ALWAYS_ON_CLASSES = [".bx--body"];
 
-/**
- * Ancestor classes the pruner keeps without a component rendering them:
- * the app or a third party sets them on an ancestor at runtime. A
- * selector's subject must still be something that renders.
- */
+// Kept without a component rendering them, since the app or a third party
+// sets them on an ancestor at runtime. A selector's subject must still be
+// something that renders.
 export const CONTEXT_ANCESTORS = [
   ".bx--body--with-modal-open",
   ".bx--header__global",
@@ -28,8 +23,7 @@ export const CONTEXT_ANCESTORS = [
 
 export const RE_EXT_CSS = /\.css$/;
 
-/** Matches a Vite Svelte style sub-module query (`?svelte&type=style&...`). */
 export const RE_STYLE_QUERY = /[?&]type=style(&|$)/;
 
-/** Vite reports file sizes in decimal units. */
+// Not 1,024, since Vite reports file sizes in decimal units.
 export const BYTES_PER_KB = 1_000;
